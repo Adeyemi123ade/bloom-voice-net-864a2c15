@@ -61,52 +61,53 @@ const CSS = `
 @keyframes chichat-draw { to { stroke-dashoffset: 0; } }
 .chichat-splash .brand {
   position: absolute; z-index: 3;
-  left: 0; right: 0; top: 50%;
-  transform: translateY(-8%);
-  display: flex; flex-direction: column; align-items: center;
-  padding: 0 40px;
+  left: 40px; right: 40px; top: 50%;
+  transform: translate(0, -55%);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 0 24px;
 }
 .chichat-splash .logo-icon {
-  margin-bottom: 12px;
+  margin-bottom: 10px;
   animation: chichat-rise 0.8s cubic-bezier(0.22,1,0.36,1) 1.2s both;
 }
 .chichat-splash .logo-icon svg {
-  width: 66px; height: 66px;
-  filter: drop-shadow(0 4px 20px rgba(34,197,94,0.65));
+  width: 54px; height: 54px;
+  filter: drop-shadow(0 4px 18px rgba(34,197,94,0.65));
 }
 .chichat-splash .wordmark {
   font-family: 'DM Sans', sans-serif;
-  font-size: 48px; font-weight: 500;
-  color: #fff; letter-spacing: 3px; line-height: 1.15;
-  margin-bottom: 10px;
+  font-size: 38px; font-weight: 500;
+  color: #fff; letter-spacing: 2px; line-height: 1.15;
+  margin-bottom: 8px;
   animation: chichat-rise 0.8s cubic-bezier(0.22,1,0.36,1) 1.35s both;
 }
 .chichat-splash .wordmark em { color: #22C55E; font-style: normal; }
 .chichat-splash .tagline {
   font-family: 'DM Sans', sans-serif;
-  font-size: 13px; font-weight: 700;
+  font-size: 11px; font-weight: 700;
   color: rgba(255,255,255,0.60);
   letter-spacing: 0.10em;
   text-align: center;
   text-decoration: underline;
   text-underline-offset: 4px;
   text-decoration-color: rgba(255,255,255,0.22);
+  white-space: nowrap;
   animation: chichat-rise 0.8s cubic-bezier(0.22,1,0.36,1) 1.50s both;
 }
 .chichat-splash .cta-wrap {
   position: absolute; z-index: 4;
-  bottom: 28px; left: 7.2%; right: 7.2%;
+  bottom: 56px; left: 40px; right: 40px;
   display: flex; justify-content: center;
   animation: chichat-rise 0.8s cubic-bezier(0.22,1,0.36,1) 1.70s both;
 }
 .chichat-splash .cta {
-  width: 220px; height: 50px; border-radius: 25px; border: none;
+  width: 110px; height: 36px; border-radius: 18px; border: none;
   background: linear-gradient(120deg, #22C55E 0%, #16A34A 100%);
   color: #fff;
   font-family: 'Syne', sans-serif;
-  font-size: 15px; font-weight: 700; letter-spacing: 0.05em;
+  font-size: 12px; font-weight: 700; letter-spacing: 0.05em;
   cursor: pointer;
-  box-shadow: 0 8px 28px rgba(34,197,94,0.38), inset 0 1px 0 rgba(255,255,255,0.18);
+  box-shadow: 0 6px 20px rgba(34,197,94,0.38), inset 0 1px 0 rgba(255,255,255,0.18);
   position: relative; overflow: hidden;
   transition: transform 0.13s;
 }
