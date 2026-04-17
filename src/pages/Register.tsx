@@ -82,28 +82,28 @@ export default function Register() {
 
   return (
     <MobileFrame>
-      <div className="h-full w-full flex flex-col px-6 pt-12 pb-8">
+      <div className="h-full w-full flex flex-col px-4 pt-5 pb-4 overflow-y-auto">
         <button
           onClick={() => navigate("/")}
           aria-label="Back"
-          className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-secondary transition-colors -ml-2"
+          className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary transition-colors -ml-1"
         >
-          <ArrowLeft className="w-5 h-5 text-foreground" />
+          <ArrowLeft className="w-4 h-4 text-foreground" />
         </button>
 
-        <div className="mt-6">
-          <h1 className="text-[22px] font-bold text-foreground leading-tight">
+        <div className="mt-2">
+          <h1 className="text-[18px] font-bold text-foreground leading-tight">
             Create your account
           </h1>
-          <p className="text-sm text-muted-foreground mt-2">
+          <p className="text-[11px] text-muted-foreground mt-1">
             Join Chichat and experience the possibilities.
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-8 flex-1 flex flex-col">
-          <div className="space-y-5">
+        <form onSubmit={handleSubmit} className="mt-3 flex-1 flex flex-col">
+          <div className="space-y-2.5">
             <div>
-              <Label htmlFor="name" className="text-xs text-muted-foreground">
+              <Label htmlFor="name" className="text-[10px] text-muted-foreground">
                 Full name
               </Label>
               <Input
@@ -114,16 +114,16 @@ export default function Register() {
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Jane Doe"
                 maxLength={60}
-                className="mt-2 h-12 bg-input border-border text-foreground placeholder:text-muted-foreground"
+                className="mt-1 h-9 text-xs bg-input border-border text-foreground placeholder:text-muted-foreground"
                 aria-invalid={!!errors.name}
               />
               {errors.name && (
-                <p className="text-xs text-destructive mt-1.5">{errors.name}</p>
+                <p className="text-[10px] text-destructive mt-1">{errors.name}</p>
               )}
             </div>
 
             <div>
-              <Label htmlFor="email" className="text-xs text-muted-foreground">
+              <Label htmlFor="email" className="text-[10px] text-muted-foreground">
                 Email address
               </Label>
               <Input
@@ -134,19 +134,19 @@ export default function Register() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
                 maxLength={255}
-                className="mt-2 h-12 bg-input border-border text-foreground placeholder:text-muted-foreground"
+                className="mt-1 h-9 text-xs bg-input border-border text-foreground placeholder:text-muted-foreground"
                 aria-invalid={!!errors.email}
               />
               {errors.email && (
-                <p className="text-xs text-destructive mt-1.5">{errors.email}</p>
+                <p className="text-[10px] text-destructive mt-1">{errors.email}</p>
               )}
             </div>
 
             <div>
-              <Label htmlFor="password" className="text-xs text-muted-foreground">
+              <Label htmlFor="password" className="text-[10px] text-muted-foreground">
                 Password
               </Label>
-              <div className="relative mt-2">
+              <div className="relative mt-1">
                 <Input
                   id="password"
                   type={showPwd ? "text" : "password"}
@@ -155,37 +155,53 @@ export default function Register() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="At least 8 characters"
                   maxLength={72}
-                  className="h-12 bg-input border-border text-foreground placeholder:text-muted-foreground pr-12"
+                  className="h-9 text-xs bg-input border-border text-foreground placeholder:text-muted-foreground pr-10"
                   aria-invalid={!!errors.password}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPwd((s) => !s)}
                   aria-label={showPwd ? "Hide password" : "Show password"}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
-                  {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPwd ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                 </button>
               </div>
-              {errors.password ? (
-                <p className="text-xs text-destructive mt-1.5">{errors.password}</p>
-              ) : (
-                <p className="text-xs text-muted-foreground mt-1.5">
-                  8+ characters, with an uppercase letter and a number.
-                </p>
+              {errors.password && (
+                <p className="text-[10px] text-destructive mt-1">{errors.password}</p>
+              )}
+            </div>
+
+            <div>
+              <Label htmlFor="confirmPassword" className="text-[10px] text-muted-foreground">
+                Confirm password
+              </Label>
+              <Input
+                id="confirmPassword"
+                type={showPwd ? "text" : "password"}
+                autoComplete="new-password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Re-enter password"
+                maxLength={72}
+                className="mt-1 h-9 text-xs bg-input border-border text-foreground placeholder:text-muted-foreground"
+                aria-invalid={!!errors.confirmPassword}
+              />
+              {errors.confirmPassword && (
+                <p className="text-[10px] text-destructive mt-1">{errors.confirmPassword}</p>
               )}
             </div>
           </div>
 
-          <div className="mt-auto pt-8">
+          <div className="mt-auto pt-3">
             <Button
               type="submit"
               disabled={submitting}
-              className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg"
+              className="w-full h-8 text-xs bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg"
             >
               {submitting ? "Sending code…" : "Continue"}
             </Button>
-            <p className="text-[11px] text-muted-foreground text-center mt-4">
+            <p className="text-[9px] text-muted-foreground text-center mt-2">
               By continuing, you agree to our Terms & Privacy Policy.
             </p>
           </div>
