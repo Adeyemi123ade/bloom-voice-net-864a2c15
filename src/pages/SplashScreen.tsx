@@ -67,24 +67,24 @@ const CSS = `
   padding: 0 24px;
 }
 .chichat-splash .logo-icon {
-  margin-bottom: 10px;
+  margin-bottom: 14px;
   animation: chichat-rise 0.8s cubic-bezier(0.22,1,0.36,1) 1.2s both;
 }
 .chichat-splash .logo-icon svg {
-  width: 54px; height: 54px;
+  width: 64px; height: 64px;
   filter: drop-shadow(0 4px 18px rgba(34,197,94,0.65));
 }
 .chichat-splash .wordmark {
   font-family: 'DM Sans', sans-serif;
-  font-size: 38px; font-weight: 500;
-  color: #fff; letter-spacing: 2px; line-height: 1.15;
-  margin-bottom: 8px;
+  font-size: 44px; font-weight: 500;
+  color: #fff; letter-spacing: 2.5px; line-height: 1.15;
+  margin-bottom: 10px;
   animation: chichat-rise 0.8s cubic-bezier(0.22,1,0.36,1) 1.35s both;
 }
 .chichat-splash .wordmark em { color: #22C55E; font-style: normal; }
 .chichat-splash .tagline {
   font-family: 'DM Sans', sans-serif;
-  font-size: 11px; font-weight: 700;
+  font-size: 12px; font-weight: 700;
   color: rgba(255,255,255,0.60);
   letter-spacing: 0.10em;
   text-align: center;
@@ -96,7 +96,7 @@ const CSS = `
 }
 .chichat-splash .cta-wrap {
   position: absolute; z-index: 4;
-  bottom: 56px; left: 40px; right: 40px;
+  bottom: 50px; left: 0; right: 0;
   display: flex; justify-content: center;
   animation: chichat-rise 0.8s cubic-bezier(0.22,1,0.36,1) 1.70s both;
 }
@@ -105,7 +105,7 @@ const CSS = `
   background: linear-gradient(120deg, #22C55E 0%, #16A34A 100%);
   color: #fff;
   font-family: 'Syne', sans-serif;
-  font-size: 12px; font-weight: 700; letter-spacing: 0.05em;
+  font-size: 18px; font-weight: 700; letter-spacing: 0.05em;
   cursor: pointer;
   box-shadow: 0 6px 20px rgba(34,197,94,0.38), inset 0 1px 0 rgba(255,255,255,0.18);
   position: relative; overflow: hidden;
