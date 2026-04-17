@@ -14,8 +14,8 @@ export default function MobileFrame({ children }: Props) {
       <div
         className="relative bg-card overflow-hidden shadow-2xl"
         style={{
-          width: "min(390px, 100vw)",
-          height: "min(591px, 100vh)",
+          width: "min(312px, 80vw)",
+          height: "min(473px, 100vh)",
           borderRadius: "44px",
           border: "1px solid hsl(var(--border))",
           boxShadow:
