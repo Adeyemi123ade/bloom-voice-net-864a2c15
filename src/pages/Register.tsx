@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const registerSchema = z.object({
   name: z
@@ -52,9 +53,23 @@ export default function Register() {
     }
     setErrors({});
     setSubmitting(true);
-    // TODO: replace with supabase.auth.signUp once Cloud is enabled
-    await new Promise((r) => setTimeout(r, 600));
+    const { error } = await supabase.auth.signUp({
+      email: result.data.email,
+      password: result.data.password,
+      options: {
+        data: { full_name: result.data.name },
+        emailRedirectTo: `${window.location.origin}/welcome`,
+      },
+    });
     setSubmitting(false);
+    if (error) {
+      toast({
+        title: "Sign up failed",
+        description: error.message,
+        variant: "destructive",
+      });
+      return;
+    }
     toast({ title: "Code sent", description: `We sent a 6-digit code to ${result.data.email}.` });
     navigate("/verify", { state: { email: result.data.email, name: result.data.name } });
   };

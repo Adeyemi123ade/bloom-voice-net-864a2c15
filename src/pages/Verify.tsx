@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const OTP_LEN = 6;
 const RESEND_SECONDS = 30;
@@ -71,15 +72,30 @@ export default function Verify() {
   const handleVerify = async () => {
     if (!isComplete) return;
     setVerifying(true);
-    // TODO: replace with supabase.auth.verifyOtp once Cloud is enabled.
-    // Mock: any 6-digit code is accepted.
-    await new Promise((r) => setTimeout(r, 600));
+    const { error } = await supabase.auth.verifyOtp({
+      email,
+      token: code,
+      type: "signup",
+    });
     setVerifying(false);
+    if (error) {
+      toast({
+        title: "Verification failed",
+        description: error.message,
+        variant: "destructive",
+      });
+      return;
+    }
     navigate("/welcome", { state: { name, email } });
   };
 
-  const handleResend = () => {
+  const handleResend = async () => {
     if (countdown > 0) return;
+    const { error } = await supabase.auth.resend({ type: "signup", email });
+    if (error) {
+      toast({ title: "Couldn't resend", description: error.message, variant: "destructive" });
+      return;
+    }
     setCountdown(RESEND_SECONDS);
     toast({ title: "Code resent", description: `New code sent to ${email}.` });
   };
