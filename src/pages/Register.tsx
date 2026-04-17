@@ -43,22 +43,27 @@ export default function Register() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const result = registerSchema.safeParse({ name, email, password });
+    const fieldErrors: FormErrors & { confirmPassword?: string } = {};
     if (!result.success) {
-      const fieldErrors: FormErrors = {};
       result.error.issues.forEach((issue) => {
         const key = issue.path[0] as keyof FormErrors;
         if (!fieldErrors[key]) fieldErrors[key] = issue.message;
       });
+    }
+    if (password !== confirmPassword) {
+      fieldErrors.confirmPassword = "Passwords don't match";
+    }
+    if (Object.keys(fieldErrors).length > 0) {
       setErrors(fieldErrors);
       return;
     }
     setErrors({});
     setSubmitting(true);
     const { error } = await supabase.auth.signUp({
-      email: result.data.email,
-      password: result.data.password,
+      email: result.data!.email,
+      password: result.data!.password,
       options: {
-        data: { full_name: result.data.name },
+        data: { full_name: result.data!.name },
         emailRedirectTo: `${window.location.origin}/welcome`,
       },
     });
@@ -72,7 +77,7 @@ export default function Register() {
       return;
     }
     toast({ title: "Code sent", description: `We sent a 6-digit code to ${result.data.email}.` });
-    navigate("/verify", { state: { email: result.data.email, name: result.data.name } });
+    navigate("/verify", { state: { email: result.data!.email, name: result.data!.name } });
   };
 
   return (
