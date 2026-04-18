@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Send, Check, CheckCheck } from "lucide-react";
+import { ArrowLeft, Send, Check, CheckCheck, Phone, Video } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -228,6 +228,20 @@ export default function ChatRoom() {
                     : ""}
             </p>
           </div>
+          <button
+            aria-label="Voice call"
+            onClick={() => navigate(`/call/${conversationId}?type=voice`)}
+            className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
+          >
+            <Phone className="w-4 h-4 text-foreground" />
+          </button>
+          <button
+            aria-label="Video call"
+            onClick={() => navigate(`/call/${conversationId}?type=video`)}
+            className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
+          >
+            <Video className="w-4 h-4 text-foreground" />
+          </button>
         </div>
 
         {/* Messages */}
