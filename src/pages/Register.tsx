@@ -76,8 +76,8 @@ export default function Register() {
       });
       return;
     }
-    toast({ title: "Check your email", description: `We sent a 6-digit code to ${result.data!.email}.` });
-    navigate("/verify", { state: { email: result.data!.email, name: result.data!.name } });
+    toast({ title: "Account created", description: "Welcome to Chichat!" });
+    navigate("/welcome", { state: { name: result.data!.name, email: result.data!.email } });
   };
 
   return (
