@@ -459,10 +459,10 @@ export default function ChatRoom() {
     clearSelection();
   };
   const replyMsg = (m: Message) => {
-    const preview = m.content.length > 60 ? m.content.slice(0, 60) + "…" : m.content;
-    setText(`> ${preview}\n`);
+    setReplyTo(m);
     clearSelection();
   };
+  const cancelReply = () => setReplyTo(null);
 
   // Voice notes
   const startRecording = async () => {
