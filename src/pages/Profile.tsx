@@ -1,14 +1,26 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Camera, Loader2 } from "lucide-react";
+import { ArrowLeft, Camera, Loader2, LogOut, Trash2 } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 function initials(name?: string | null) {
   if (!name) return "?";
@@ -19,9 +31,12 @@ export default function Profile() {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
   const [displayName, setDisplayName] = useState("");
+  const [about, setAbout] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmStage, setConfirmStage] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -44,6 +59,8 @@ export default function Profile() {
         setDisplayName(data.display_name ?? "");
         setAvatarUrl(data.avatar_url);
       }
+      // About is stored in user metadata for now (no schema change)
+      setAbout((user.user_metadata as any)?.about ?? "");
     })();
   }, [user]);
 
@@ -90,19 +107,40 @@ export default function Profile() {
         { id: user.id, display_name: displayName.trim() || null },
         { onConflict: "id" }
       );
+    await supabase.auth.updateUser({ data: { about: about.trim() } });
     setSaving(false);
     if (error) {
       toast({ title: "Save failed", description: error.message, variant: "destructive" });
     } else {
       toast({ title: "Profile saved" });
-      navigate("/home");
     }
+  };
+
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    navigate("/login");
+  };
+
+  const deleteAccount = async () => {
+    if (!user) return;
+    setDeleting(true);
+    // Soft-delete: clear profile data, sign out. (Hard delete needs admin function.)
+    await supabase
+      .from("profiles")
+      .upsert(
+        { id: user.id, display_name: "Deleted user", avatar_url: null, is_online: false },
+        { onConflict: "id" }
+      );
+    await supabase.auth.signOut();
+    setDeleting(false);
+    toast({ title: "Account removed", description: "You have been signed out." });
+    navigate("/register");
   };
 
   return (
     <MobileFrame>
-      <div className="h-full w-full flex flex-col bg-background">
-        <div className="px-3 pt-4 pb-3 flex items-center gap-2 border-b border-border">
+      <div className="h-full w-full flex flex-col bg-background overflow-y-auto">
+        <div className="px-3 pt-4 pb-3 flex items-center gap-2 border-b border-border sticky top-0 bg-background z-10">
           <button
             aria-label="Back"
             onClick={() => navigate("/home")}
@@ -110,14 +148,17 @@ export default function Profile() {
           >
             <ArrowLeft className="w-4 h-4 text-foreground" />
           </button>
-          <h1 className="text-sm font-semibold text-foreground">Edit profile</h1>
+          <h1 className="text-sm font-semibold text-foreground">Profile</h1>
         </div>
 
-        <div className="flex-1 px-6 py-6 flex flex-col items-center">
+        <div className="flex-1 px-6 py-5 flex flex-col items-center">
+          <p className="text-xs text-muted-foreground mb-3">
+            Hello {displayName || user?.email?.split("@")[0] || "friend"} 👋
+          </p>
           <div className="relative">
-            <Avatar className="w-24 h-24">
+            <Avatar className="w-20 h-20">
               <AvatarImage src={avatarUrl ?? undefined} />
-              <AvatarFallback className="bg-primary/20 text-foreground text-xl font-semibold">
+              <AvatarFallback className="bg-primary/20 text-foreground text-lg font-semibold">
                 {initials(displayName || user?.email)}
               </AvatarFallback>
             </Avatar>
@@ -125,12 +166,12 @@ export default function Profile() {
               onClick={onPick}
               disabled={uploading}
               aria-label="Change photo"
-              className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-primary hover:bg-primary/90 flex items-center justify-center border-2 border-background"
+              className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-primary hover:bg-primary/90 flex items-center justify-center border-2 border-background"
             >
               {uploading ? (
-                <Loader2 className="w-4 h-4 text-primary-foreground animate-spin" />
+                <Loader2 className="w-3.5 h-3.5 text-primary-foreground animate-spin" />
               ) : (
-                <Camera className="w-4 h-4 text-primary-foreground" />
+                <Camera className="w-3.5 h-3.5 text-primary-foreground" />
               )}
             </button>
             <input
@@ -142,29 +183,93 @@ export default function Profile() {
             />
           </div>
 
-          <div className="w-full mt-8 space-y-2">
-            <Label htmlFor="name" className="text-xs text-muted-foreground">Display name</Label>
+          <div className="w-full mt-5 space-y-1.5">
+            <Label htmlFor="name" className="text-[11px] text-muted-foreground">Display name</Label>
             <Input
               id="name"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               placeholder="Your name"
-              className="h-10 text-sm bg-input border-border"
+              className="h-9 text-xs bg-input border-border"
             />
           </div>
 
-          <div className="w-full mt-3 space-y-2">
-            <Label className="text-xs text-muted-foreground">Email</Label>
-            <Input value={user?.email ?? ""} disabled className="h-10 text-sm bg-input border-border" />
+          <div className="w-full mt-3 space-y-1.5">
+            <Label htmlFor="about" className="text-[11px] text-muted-foreground">About</Label>
+            <Textarea
+              id="about"
+              value={about}
+              onChange={(e) => setAbout(e.target.value)}
+              placeholder="Hey there! I'm using Chichat."
+              className="min-h-[56px] text-xs bg-input border-border resize-none"
+            />
+          </div>
+
+          <div className="w-full mt-3 space-y-1.5">
+            <Label className="text-[11px] text-muted-foreground">Email</Label>
+            <Input value={user?.email ?? ""} disabled className="h-9 text-xs bg-input border-border" />
           </div>
 
           <Button
             onClick={save}
             disabled={saving}
-            className="w-full mt-8 h-11 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg"
+            className="w-full mt-5 h-10 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-xs"
           >
             {saving ? "Saving…" : "Save changes"}
           </Button>
+
+          <div className="w-full mt-4 pt-4 border-t border-border space-y-2">
+            <button
+              onClick={signOut}
+              className="w-full h-10 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground text-xs flex items-center justify-center gap-2"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              Sign out
+            </button>
+
+            <AlertDialog onOpenChange={(o) => !o && setConfirmStage(false)}>
+              <AlertDialogTrigger asChild>
+                <button className="w-full h-10 rounded-lg bg-destructive/10 hover:bg-destructive/20 text-destructive text-xs flex items-center justify-center gap-2">
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Delete account
+                </button>
+              </AlertDialogTrigger>
+              <AlertDialogContent className="max-w-[280px]">
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="text-sm">
+                    {confirmStage ? "Are you absolutely sure?" : "Delete your account?"}
+                  </AlertDialogTitle>
+                  <AlertDialogDescription className="text-xs">
+                    {confirmStage
+                      ? "This permanently removes your profile and signs you out. This cannot be undone."
+                      : "Your profile and presence will be removed. You'll need to register again to come back."}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel className="text-xs h-9">Cancel</AlertDialogCancel>
+                  {confirmStage ? (
+                    <AlertDialogAction
+                      onClick={deleteAccount}
+                      disabled={deleting}
+                      className="bg-destructive hover:bg-destructive/90 text-destructive-foreground text-xs h-9"
+                    >
+                      {deleting ? "Deleting…" : "Yes, delete"}
+                    </AlertDialogAction>
+                  ) : (
+                    <AlertDialogAction
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setConfirmStage(true);
+                      }}
+                      className="bg-destructive hover:bg-destructive/90 text-destructive-foreground text-xs h-9"
+                    >
+                      Continue
+                    </AlertDialogAction>
+                  )}
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
         </div>
       </div>
     </MobileFrame>
