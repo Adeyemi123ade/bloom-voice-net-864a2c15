@@ -86,6 +86,7 @@ export default function Verify() {
       });
       return;
     }
+    toast({ title: "Verified", description: "Your email is confirmed." });
     navigate("/welcome", { state: { name, email } });
   };
 
