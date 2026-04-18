@@ -71,8 +71,7 @@ export default function Profile() {
     const url = `${pub.publicUrl}?v=${Date.now()}`;
     const { error: updErr } = await supabase
       .from("profiles")
-      .update({ avatar_url: url })
-      .eq("id", user.id);
+      .upsert({ id: user.id, avatar_url: url }, { onConflict: "id" });
     if (updErr) {
       toast({ title: "Save failed", description: updErr.message, variant: "destructive" });
     } else {
@@ -87,8 +86,10 @@ export default function Profile() {
     setSaving(true);
     const { error } = await supabase
       .from("profiles")
-      .update({ display_name: displayName.trim() || null })
-      .eq("id", user.id);
+      .upsert(
+        { id: user.id, display_name: displayName.trim() || null },
+        { onConflict: "id" }
+      );
     setSaving(false);
     if (error) {
       toast({ title: "Save failed", description: error.message, variant: "destructive" });
