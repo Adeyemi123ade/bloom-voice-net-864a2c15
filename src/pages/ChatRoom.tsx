@@ -766,11 +766,23 @@ export default function ChatRoom() {
               );
             }
 
+            // Parse quoted reply prefix: lines starting with "> " followed by message
+            let quoted: string | null = null;
+            let body = m.content;
+            if (!isVoice && !isDeleted && body.startsWith("> ")) {
+              const nl = body.indexOf("\n");
+              if (nl > -1) {
+                quoted = body.slice(2, nl);
+                body = body.slice(nl + 1);
+              }
+            }
+
             return (
-              <div
+              <SwipeRow
                 key={m.id}
-                className={`flex ${mine ? "justify-end" : "justify-start"}`}
-                onClick={(e) => {
+                mine={mine}
+                onReply={() => replyMsg(m)}
+                onTap={(e) => {
                   e.stopPropagation();
                   setSelectedId(isSelected ? null : m.id);
                 }}
@@ -784,12 +796,23 @@ export default function ChatRoom() {
                     isSelected ? "ring-2 ring-accent" : ""
                   }`}
                 >
+                  {quoted && (
+                    <div
+                      className={`mb-1 px-2 py-1 rounded-md border-l-2 text-[11px] truncate ${
+                        mine
+                          ? "bg-primary-foreground/10 border-primary-foreground/60 text-primary-foreground/85"
+                          : "bg-foreground/5 border-primary text-muted-foreground"
+                      }`}
+                    >
+                      {quoted}
+                    </div>
+                  )}
                   {isDeleted ? (
                     <p className="text-[12px]">🚫 This message was deleted</p>
                   ) : isVoice ? (
                     <VoiceBubble id={m.id} url={voiceUrl} mine={mine} />
                   ) : (
-                    <p className="text-[13px] whitespace-pre-wrap break-words">{m.content}</p>
+                    <p className="text-[13px] whitespace-pre-wrap break-words">{body}</p>
                   )}
                   <div className={`flex items-center gap-1 mt-0.5 ${mine ? "justify-end" : "justify-start"}`}>
                     {m.edited_at && !isDeleted && (
@@ -809,7 +832,7 @@ export default function ChatRoom() {
                     )}
                   </div>
                 </div>
-              </div>
+              </SwipeRow>
             );
           })}
           {otherTyping && (
