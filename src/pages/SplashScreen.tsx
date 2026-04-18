@@ -101,11 +101,11 @@ const CSS = `
   animation: chichat-rise 0.8s cubic-bezier(0.22,1,0.36,1) 1.70s both;
 }
 .chichat-splash .cta {
-  width: 55px; height: 28px; border-radius: 14px; border: none;
+  width: 83px; height: 42px; border-radius: 21px; border: none;
   background: linear-gradient(120deg, #22C55E 0%, #16A34A 100%);
   color: #fff;
   font-family: 'Syne', sans-serif;
-  font-size: 9px; font-weight: 700; letter-spacing: 0.05em;
+  font-size: 13px; font-weight: 700; letter-spacing: 0.05em;
   cursor: pointer;
   box-shadow: 0 6px 20px rgba(34,197,94,0.38), inset 0 1px 0 rgba(255,255,255,0.18);
   position: relative; overflow: hidden;

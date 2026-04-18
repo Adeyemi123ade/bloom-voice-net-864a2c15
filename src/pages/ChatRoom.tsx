@@ -220,6 +220,7 @@ export default function ChatRoom() {
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<Message | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [recording, setRecording] = useState(false);
   const [recSec, setRecSec] = useState(0);
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -370,10 +371,19 @@ export default function ChatRoom() {
       return;
     }
 
+    let finalContent = content;
+    if (replyTo) {
+      const preview = replyTo.content.startsWith(VOICE_PREFIX)
+        ? "🎤 Voice note"
+        : replyTo.content.length > 80 ? replyTo.content.slice(0, 80) + "…" : replyTo.content;
+      finalContent = `> ${preview}\n${content}`;
+      setReplyTo(null);
+    }
+
     const { error } = await supabase.from("messages").insert({
       conversation_id: conversationId,
       sender_id: user.id,
-      content,
+      content: finalContent,
     });
     if (error) {
       toast({ title: "Failed to send", description: error.message, variant: "destructive" });
