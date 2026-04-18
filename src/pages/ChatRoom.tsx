@@ -563,7 +563,7 @@ export default function ChatRoom() {
             >
               <X className="w-4 h-4 text-foreground" />
             </button>
-            <span className="text-xs text-muted-foreground flex-1 px-1">1 selected</span>
+            <div className="flex-1" />
             {!isSelectionDeleted && !isSelectionCall && (
               <button
                 aria-label="Copy"
@@ -575,16 +575,7 @@ export default function ChatRoom() {
             )}
             {!isSelectionDeleted && !isSelectionCall && (
               <button
-                aria-label="Reply"
-                onClick={() => selected && replyMsg(selected)}
-                className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
-              >
-                <Reply className="w-4 h-4 text-foreground" />
-              </button>
-            )}
-            {!isSelectionDeleted && !isSelectionCall && (
-              <button
-                aria-label="Share / Forward"
+                aria-label="Forward"
                 onClick={() => selected && shareMsg(selected)}
                 className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
               >
@@ -600,20 +591,21 @@ export default function ChatRoom() {
                 <Pencil className="w-4 h-4 text-foreground" />
               </button>
             )}
-            <button
-              aria-label="Delete for me"
-              onClick={() => selected && deleteForMe(selected)}
-              className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
-            >
-              <Trash2 className="w-4 h-4 text-foreground" />
-            </button>
-            {isSelectionMine && !isSelectionDeleted && (
+            {isSelectionMine && !isSelectionDeleted ? (
               <button
                 aria-label="Delete for everyone"
                 onClick={() => selected && deleteForEveryone(selected)}
                 className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
               >
                 <Trash2 className="w-4 h-4 text-destructive" />
+              </button>
+            ) : (
+              <button
+                aria-label="Delete for me"
+                onClick={() => selected && deleteForMe(selected)}
+                className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
+              >
+                <Trash2 className="w-4 h-4 text-foreground" />
               </button>
             )}
           </div>
