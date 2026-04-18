@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, MessageSquarePlus, LogOut, UserCircle2 } from "lucide-react";
+import { Search, MessageSquarePlus, LogOut, UserCircle2, Phone } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -288,6 +288,13 @@ export default function Home() {
                 </div>
               </DialogContent>
             </Dialog>
+            <button
+              aria-label="Calls"
+              onClick={() => navigate("/calls")}
+              className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
+            >
+              <Phone className="w-4 h-4 text-foreground" />
+            </button>
             <button
               aria-label="Profile"
               onClick={() => navigate("/profile")}
