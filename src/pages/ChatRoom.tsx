@@ -220,6 +220,7 @@ export default function ChatRoom() {
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<Message | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [recording, setRecording] = useState(false);
   const [recSec, setRecSec] = useState(0);
   const recorderRef = useRef<MediaRecorder | null>(null);
