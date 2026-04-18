@@ -10,6 +10,12 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import {
+  AttachmentBubble,
+  FILE_PREFIX,
+  encodeFileMessage,
+  parseFileMessage,
+} from "@/components/chat/AttachmentBubble";
 
 type Message = {
   id: string;
@@ -305,6 +311,11 @@ export default function ChatRoom() {
   const fileRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const typingTimeout = useRef<number | null>(null);
+  const [pendingFile, setPendingFile] = useState<{
+    file: File;
+    previewUrl: string;
+  } | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) navigate("/login");
@@ -595,25 +606,60 @@ export default function ChatRoom() {
     if (error) toast({ title: "Send failed", description: error.message, variant: "destructive" });
   };
 
-  // Attachment upload (image/file -> sent as voice-style url, but we just send link for now)
-  const onPickFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Attachment upload — stage the file and show caption preview, send on confirm.
+  const onPickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     e.target.value = "";
-    if (!f || !user || !conversationId) return;
-    const path = `${user.id}/${conversationId}/${Date.now()}-${f.name}`;
-    const { error: upErr } = await supabase.storage
-      .from("chat-media")
-      .upload(path, f, { contentType: f.type });
-    if (upErr) {
-      toast({ title: "Upload failed", description: upErr.message, variant: "destructive" });
+    if (!f) return;
+    const MAX = 25 * 1024 * 1024; // 25MB
+    if (f.size > MAX) {
+      toast({ title: "File too large", description: "Max 25MB", variant: "destructive" });
       return;
     }
-    const { data: pub } = supabase.storage.from("chat-media").getPublicUrl(path);
-    await supabase.from("messages").insert({
-      conversation_id: conversationId,
-      sender_id: user.id,
-      content: pub.publicUrl,
-    });
+    setPendingFile({ file: f, previewUrl: URL.createObjectURL(f) });
+  };
+
+  const cancelPending = () => {
+    if (pendingFile) URL.revokeObjectURL(pendingFile.previewUrl);
+    setPendingFile(null);
+    setText("");
+  };
+
+  const sendPending = async () => {
+    if (!pendingFile || !user || !conversationId) return;
+    const f = pendingFile.file;
+    const caption = text.trim();
+    setUploading(true);
+    try {
+      const safeName = f.name.replace(/[^\w.\-]+/g, "_");
+      const path = `${user.id}/${conversationId}/${Date.now()}-${safeName}`;
+      const { error: upErr } = await supabase.storage
+        .from("chat-media")
+        .upload(path, f, { contentType: f.type || "application/octet-stream" });
+      if (upErr) throw upErr;
+      const { data: pub } = supabase.storage.from("chat-media").getPublicUrl(path);
+      const content = encodeFileMessage({
+        url: pub.publicUrl,
+        mime: f.type || "application/octet-stream",
+        name: f.name,
+        size: f.size,
+        caption,
+      });
+      const { error } = await supabase.from("messages").insert({
+        conversation_id: conversationId,
+        sender_id: user.id,
+        content,
+      });
+      if (error) throw error;
+      URL.revokeObjectURL(pendingFile.previewUrl);
+      setPendingFile(null);
+      setText("");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Upload failed";
+      toast({ title: "Upload failed", description: msg, variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
   };
 
   const visible = useMemo(() => messages.filter((m) => !hidden.has(m.id)), [messages, hidden]);
