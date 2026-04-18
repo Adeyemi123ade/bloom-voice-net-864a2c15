@@ -791,7 +791,9 @@ export default function ChatRoom() {
             const mine = m.sender_id === user?.id;
             const isVoice = m.content.startsWith(VOICE_PREFIX);
             const isCall = m.content.startsWith(CALL_PREFIX);
+            const isFile = m.content.startsWith(FILE_PREFIX);
             const voiceUrl = isVoice ? m.content.slice(VOICE_PREFIX.length) : "";
+            const fileMeta = isFile ? parseFileMessage(m.content) : null;
             const isDeleted = m.deleted_for_everyone;
             const isSelected = selectedId === m.id;
 
@@ -815,7 +817,7 @@ export default function ChatRoom() {
             // Parse quoted reply prefix: lines starting with "> " followed by message
             let quoted: string | null = null;
             let body = m.content;
-            if (!isVoice && !isDeleted && body.startsWith("> ")) {
+            if (!isVoice && !isFile && !isDeleted && body.startsWith("> ")) {
               const nl = body.indexOf("\n");
               if (nl > -1) {
                 quoted = body.slice(2, nl);
@@ -857,6 +859,8 @@ export default function ChatRoom() {
                     <p className="text-[12px]">🚫 This message was deleted</p>
                   ) : isVoice ? (
                     <VoiceBubble id={m.id} url={voiceUrl} mine={mine} />
+                  ) : isFile && fileMeta ? (
+                    <AttachmentBubble meta={fileMeta} mine={mine} />
                   ) : (
                     <p className="text-[13px] whitespace-pre-wrap break-words">{body}</p>
                   )}
