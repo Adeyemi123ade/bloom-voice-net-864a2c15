@@ -250,6 +250,27 @@ export default function ChatRoom() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, otherTyping]);
 
+  const startCall = async (type: "voice" | "video") => {
+    if (!user || !conversationId || !other) return;
+    const roomName = `chichat-${conversationId}-${Date.now()}`;
+    const { data, error } = await supabase
+      .from("calls")
+      .insert({
+        conversation_id: conversationId,
+        caller_id: user.id,
+        callee_id: other.id,
+        room_name: roomName,
+        call_type: type,
+      })
+      .select("id")
+      .single();
+    if (error) {
+      toast({ title: "Could not start call", description: error.message, variant: "destructive" });
+      return;
+    }
+    navigate(`/call/${conversationId}?type=${type}&callId=${data.id}&room=${encodeURIComponent(roomName)}&role=caller`);
+  };
+
   const send = async () => {
     if (!user || !conversationId) return;
     const content = text.trim();
