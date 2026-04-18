@@ -16,6 +16,7 @@ import Profile from "./pages/Profile.tsx";
 import ForgotPassword from "./pages/ForgotPassword.tsx";
 import ResetPassword from "./pages/ResetPassword.tsx";
 import MessageNotifier from "./components/MessageNotifier.tsx";
+import IncomingCallListener from "./components/IncomingCallListener.tsx";
 
 const queryClient = new QueryClient();
 
@@ -27,6 +28,7 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <MessageNotifier />
+          <IncomingCallListener />
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/register" element={<Register />} />
