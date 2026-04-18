@@ -188,46 +188,16 @@ export default function Home() {
 
   const startChat = async (otherId: string) => {
     if (!user) return;
-    // Find existing 1:1
-    const { data: mine } = await supabase
-      .from("conversation_participants")
-      .select("conversation_id")
-      .eq("user_id", user.id);
-    const myConvs = (mine ?? []).map((m) => m.conversation_id);
-    let conversationId: string | null = null;
-    if (myConvs.length) {
-      const { data: shared } = await supabase
-        .from("conversation_participants")
-        .select("conversation_id")
-        .eq("user_id", otherId)
-        .in("conversation_id", myConvs);
-      if (shared && shared.length) conversationId = shared[0].conversation_id;
-    }
-    if (!conversationId) {
-      const { data: conv, error } = await supabase
-        .from("conversations")
-        .insert({})
-        .select("id")
-        .single();
-      if (error || !conv) {
-        toast({ title: "Could not start chat", description: error?.message, variant: "destructive" });
-        return;
-      }
-      conversationId = conv.id;
-      const { error: pErr } = await supabase
-        .from("conversation_participants")
-        .insert([
-          { conversation_id: conversationId, user_id: user.id },
-          { conversation_id: conversationId, user_id: otherId },
-        ]);
-      if (pErr) {
-        toast({ title: "Could not add participants", description: pErr.message, variant: "destructive" });
-        return;
-      }
+    const { data, error } = await supabase.rpc("start_direct_conversation", {
+      _other_user: otherId,
+    });
+    if (error || !data) {
+      toast({ title: "Could not start chat", description: error?.message, variant: "destructive" });
+      return;
     }
     setOpenNew(false);
     await loadChats();
-    if (conversationId) navigate(`/chat/${conversationId}`);
+    navigate(`/chat/${data}`);
   };
 
   const [peopleQuery, setPeopleQuery] = useState("");
