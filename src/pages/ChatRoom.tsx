@@ -209,6 +209,82 @@ function CallSystemBubble({ m, mine }: { m: Message; mine: boolean }) {
   );
 }
 
+// Swipe-to-reply wrapper (WhatsApp-style)
+function SwipeRow({
+  mine,
+  onReply,
+  onTap,
+  children,
+}: {
+  mine: boolean;
+  onReply: () => void;
+  onTap: (e: React.MouseEvent) => void;
+  children: React.ReactNode;
+}) {
+  const [dx, setDx] = useState(0);
+  const startX = useRef<number | null>(null);
+  const startY = useRef<number | null>(null);
+  const triggered = useRef(false);
+  const THRESHOLD = 60;
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    startX.current = e.touches[0].clientX;
+    startY.current = e.touches[0].clientY;
+    triggered.current = false;
+  };
+  const onTouchMove = (e: React.TouchEvent) => {
+    if (startX.current == null || startY.current == null) return;
+    const dxRaw = e.touches[0].clientX - startX.current;
+    const dyRaw = e.touches[0].clientY - startY.current;
+    if (Math.abs(dyRaw) > Math.abs(dxRaw)) return; // vertical scroll
+    // Only allow rightward swipe
+    if (dxRaw <= 0) {
+      setDx(0);
+      return;
+    }
+    const clamped = Math.min(dxRaw, 90);
+    setDx(clamped);
+    if (clamped >= THRESHOLD && !triggered.current) {
+      triggered.current = true;
+      try {
+        (navigator as any).vibrate?.(15);
+      } catch {}
+    }
+  };
+  const onTouchEnd = () => {
+    if (triggered.current) onReply();
+    setDx(0);
+    startX.current = null;
+    startY.current = null;
+  };
+
+  const progress = Math.min(dx / THRESHOLD, 1);
+
+  return (
+    <div className={`relative flex ${mine ? "justify-end" : "justify-start"}`} onClick={onTap}>
+      {/* Reply icon revealed under the bubble on swipe */}
+      <div
+        className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center pointer-events-none"
+        style={{ opacity: progress, transform: `translateY(-50%) scale(${0.6 + progress * 0.4})` }}
+      >
+        <Reply className="w-4 h-4 text-primary" />
+      </div>
+      <div
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        style={{
+          transform: `translateX(${dx}px)`,
+          transition: dx === 0 ? "transform 180ms ease-out" : "none",
+        }}
+        className={`flex ${mine ? "justify-end" : "justify-start"} w-full`}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export default function ChatRoom() {
   const { id: conversationId } = useParams();
   const navigate = useNavigate();
