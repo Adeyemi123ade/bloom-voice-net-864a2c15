@@ -864,6 +864,27 @@ export default function ChatRoom() {
           </div>
         )}
 
+        {/* Reply preview banner (WhatsApp-style) */}
+        {replyTo && !editing && (
+          <div
+            className="px-3 py-2 bg-secondary border-t border-border flex items-center gap-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-1 self-stretch rounded bg-primary" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-semibold text-primary">
+                Replying to {replyTo.sender_id === user?.id ? "yourself" : other?.display_name ?? "them"}
+              </p>
+              <p className="text-[11px] text-muted-foreground truncate">
+                {replyTo.content.startsWith(VOICE_PREFIX) ? "🎤 Voice note" : replyTo.content}
+              </p>
+            </div>
+            <button onClick={cancelReply} aria-label="Cancel reply" className="text-muted-foreground hover:text-foreground">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         {/* Composer — lifted above bottom edge */}
         <div
           className="px-3 pt-2 pb-4 border-t border-border flex items-center gap-2 bg-background"
