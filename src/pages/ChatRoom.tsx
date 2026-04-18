@@ -209,6 +209,82 @@ function CallSystemBubble({ m, mine }: { m: Message; mine: boolean }) {
   );
 }
 
+// Swipe-to-reply wrapper (WhatsApp-style)
+function SwipeRow({
+  mine,
+  onReply,
+  onTap,
+  children,
+}: {
+  mine: boolean;
+  onReply: () => void;
+  onTap: (e: React.MouseEvent) => void;
+  children: React.ReactNode;
+}) {
+  const [dx, setDx] = useState(0);
+  const startX = useRef<number | null>(null);
+  const startY = useRef<number | null>(null);
+  const triggered = useRef(false);
+  const THRESHOLD = 60;
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    startX.current = e.touches[0].clientX;
+    startY.current = e.touches[0].clientY;
+    triggered.current = false;
+  };
+  const onTouchMove = (e: React.TouchEvent) => {
+    if (startX.current == null || startY.current == null) return;
+    const dxRaw = e.touches[0].clientX - startX.current;
+    const dyRaw = e.touches[0].clientY - startY.current;
+    if (Math.abs(dyRaw) > Math.abs(dxRaw)) return; // vertical scroll
+    // Only allow rightward swipe
+    if (dxRaw <= 0) {
+      setDx(0);
+      return;
+    }
+    const clamped = Math.min(dxRaw, 90);
+    setDx(clamped);
+    if (clamped >= THRESHOLD && !triggered.current) {
+      triggered.current = true;
+      try {
+        (navigator as any).vibrate?.(15);
+      } catch {}
+    }
+  };
+  const onTouchEnd = () => {
+    if (triggered.current) onReply();
+    setDx(0);
+    startX.current = null;
+    startY.current = null;
+  };
+
+  const progress = Math.min(dx / THRESHOLD, 1);
+
+  return (
+    <div className={`relative flex ${mine ? "justify-end" : "justify-start"}`} onClick={onTap}>
+      {/* Reply icon revealed under the bubble on swipe */}
+      <div
+        className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center pointer-events-none"
+        style={{ opacity: progress, transform: `translateY(-50%) scale(${0.6 + progress * 0.4})` }}
+      >
+        <Reply className="w-4 h-4 text-primary" />
+      </div>
+      <div
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        style={{
+          transform: `translateX(${dx}px)`,
+          transition: dx === 0 ? "transform 180ms ease-out" : "none",
+        }}
+        className={`flex ${mine ? "justify-end" : "justify-start"} w-full`}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export default function ChatRoom() {
   const { id: conversationId } = useParams();
   const navigate = useNavigate();
@@ -459,10 +535,10 @@ export default function ChatRoom() {
     clearSelection();
   };
   const replyMsg = (m: Message) => {
-    const preview = m.content.length > 60 ? m.content.slice(0, 60) + "…" : m.content;
-    setText(`> ${preview}\n`);
+    setReplyTo(m);
     clearSelection();
   };
+  const cancelReply = () => setReplyTo(null);
 
   // Voice notes
   const startRecording = async () => {
@@ -563,7 +639,7 @@ export default function ChatRoom() {
             >
               <X className="w-4 h-4 text-foreground" />
             </button>
-            <span className="text-xs text-muted-foreground flex-1 px-1">1 selected</span>
+            <div className="flex-1" />
             {!isSelectionDeleted && !isSelectionCall && (
               <button
                 aria-label="Copy"
@@ -575,16 +651,7 @@ export default function ChatRoom() {
             )}
             {!isSelectionDeleted && !isSelectionCall && (
               <button
-                aria-label="Reply"
-                onClick={() => selected && replyMsg(selected)}
-                className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
-              >
-                <Reply className="w-4 h-4 text-foreground" />
-              </button>
-            )}
-            {!isSelectionDeleted && !isSelectionCall && (
-              <button
-                aria-label="Share / Forward"
+                aria-label="Forward"
                 onClick={() => selected && shareMsg(selected)}
                 className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
               >
@@ -600,20 +667,21 @@ export default function ChatRoom() {
                 <Pencil className="w-4 h-4 text-foreground" />
               </button>
             )}
-            <button
-              aria-label="Delete for me"
-              onClick={() => selected && deleteForMe(selected)}
-              className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
-            >
-              <Trash2 className="w-4 h-4 text-foreground" />
-            </button>
-            {isSelectionMine && !isSelectionDeleted && (
+            {isSelectionMine && !isSelectionDeleted ? (
               <button
                 aria-label="Delete for everyone"
                 onClick={() => selected && deleteForEveryone(selected)}
                 className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
               >
                 <Trash2 className="w-4 h-4 text-destructive" />
+              </button>
+            ) : (
+              <button
+                aria-label="Delete for me"
+                onClick={() => selected && deleteForMe(selected)}
+                className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
+              >
+                <Trash2 className="w-4 h-4 text-foreground" />
               </button>
             )}
           </div>
@@ -698,11 +766,23 @@ export default function ChatRoom() {
               );
             }
 
+            // Parse quoted reply prefix: lines starting with "> " followed by message
+            let quoted: string | null = null;
+            let body = m.content;
+            if (!isVoice && !isDeleted && body.startsWith("> ")) {
+              const nl = body.indexOf("\n");
+              if (nl > -1) {
+                quoted = body.slice(2, nl);
+                body = body.slice(nl + 1);
+              }
+            }
+
             return (
-              <div
+              <SwipeRow
                 key={m.id}
-                className={`flex ${mine ? "justify-end" : "justify-start"}`}
-                onClick={(e) => {
+                mine={mine}
+                onReply={() => replyMsg(m)}
+                onTap={(e) => {
                   e.stopPropagation();
                   setSelectedId(isSelected ? null : m.id);
                 }}
@@ -716,12 +796,23 @@ export default function ChatRoom() {
                     isSelected ? "ring-2 ring-accent" : ""
                   }`}
                 >
+                  {quoted && (
+                    <div
+                      className={`mb-1 px-2 py-1 rounded-md border-l-2 text-[11px] truncate ${
+                        mine
+                          ? "bg-primary-foreground/10 border-primary-foreground/60 text-primary-foreground/85"
+                          : "bg-foreground/5 border-primary text-muted-foreground"
+                      }`}
+                    >
+                      {quoted}
+                    </div>
+                  )}
                   {isDeleted ? (
                     <p className="text-[12px]">🚫 This message was deleted</p>
                   ) : isVoice ? (
                     <VoiceBubble id={m.id} url={voiceUrl} mine={mine} />
                   ) : (
-                    <p className="text-[13px] whitespace-pre-wrap break-words">{m.content}</p>
+                    <p className="text-[13px] whitespace-pre-wrap break-words">{body}</p>
                   )}
                   <div className={`flex items-center gap-1 mt-0.5 ${mine ? "justify-end" : "justify-start"}`}>
                     {m.edited_at && !isDeleted && (
@@ -741,7 +832,7 @@ export default function ChatRoom() {
                     )}
                   </div>
                 </div>
-              </div>
+              </SwipeRow>
             );
           })}
           {otherTyping && (
@@ -769,6 +860,27 @@ export default function ChatRoom() {
             </span>
             <button onClick={cancelEdit} className="text-muted-foreground hover:text-foreground">
               <X className="w-3 h-3" />
+            </button>
+          </div>
+        )}
+
+        {/* Reply preview banner (WhatsApp-style) */}
+        {replyTo && !editing && (
+          <div
+            className="px-3 py-2 bg-secondary border-t border-border flex items-center gap-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-1 self-stretch rounded bg-primary" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-semibold text-primary">
+                Replying to {replyTo.sender_id === user?.id ? "yourself" : other?.display_name ?? "them"}
+              </p>
+              <p className="text-[11px] text-muted-foreground truncate">
+                {replyTo.content.startsWith(VOICE_PREFIX) ? "🎤 Voice note" : replyTo.content}
+              </p>
+            </div>
+            <button onClick={cancelReply} aria-label="Cancel reply" className="text-muted-foreground hover:text-foreground">
+              <X className="w-4 h-4" />
             </button>
           </div>
         )}
