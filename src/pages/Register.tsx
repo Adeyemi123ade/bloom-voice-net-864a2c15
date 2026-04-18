@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { ArrowLeft, Eye, EyeOff } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
@@ -201,7 +201,13 @@ export default function Register() {
             >
               {submitting ? "Sending code…" : "Continue"}
             </Button>
-            <p className="text-[9px] text-muted-foreground text-center mt-2">
+            <p className="text-[10px] text-muted-foreground text-center mt-2">
+              Already have an account?{" "}
+              <Link to="/login" className="text-accent font-semibold hover:underline">
+                Sign in
+              </Link>
+            </p>
+            <p className="text-[9px] text-muted-foreground text-center mt-1.5">
               By continuing, you agree to our Terms & Privacy Policy.
             </p>
           </div>
