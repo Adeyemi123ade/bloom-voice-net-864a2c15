@@ -1,9 +1,5 @@
-// Mints a Twilio Video Access Token for the authenticated user.
-// Uses TWILIO_ACCOUNT_SID + TWILIO_AUTH_TOKEN to provision a temporary API Key
-// (valid for the call duration), then signs a Video grant JWT with it.
-//
-// Body: { roomName: string }
-// Returns: { token: string, identity: string }
+// Mints a Twilio Video Access Token using a permanent API Key (SK.../secret).
+// Body: { roomName: string }  → { token: string, identity: string }
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { create, getNumericDate } from "https://deno.land/x/djwt@v3.0.2/mod.ts";
@@ -19,12 +15,12 @@ Deno.serve(async (req) => {
 
   try {
     const ACCOUNT_SID = Deno.env.get("TWILIO_ACCOUNT_SID");
-    const AUTH_TOKEN = Deno.env.get("TWILIO_AUTH_TOKEN");
-    if (!ACCOUNT_SID || !AUTH_TOKEN) {
+    const API_KEY_SID = Deno.env.get("TWILIO_API_KEY_SID");
+    const API_KEY_SECRET = Deno.env.get("TWILIO_API_KEY_SECRET");
+    if (!ACCOUNT_SID || !API_KEY_SID || !API_KEY_SECRET) {
       throw new Error("Twilio credentials not configured");
     }
 
-    // Auth check
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -57,45 +53,22 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 1) Provision a short-lived API Key via REST using Auth Token (Basic Auth)
-    const basic = btoa(`${ACCOUNT_SID}:${AUTH_TOKEN}`);
-    const keyRes = await fetch(
-      `https://api.twilio.com/2010-04-01/Accounts/${ACCOUNT_SID}/Keys.json`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Basic ${basic}`,
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: new URLSearchParams({ FriendlyName: `chichat-${roomName}-${Date.now()}` }),
-      },
-    );
-    const keyJson = await keyRes.json();
-    if (!keyRes.ok) {
-      console.error("Twilio Keys API failed", keyRes.status, keyJson);
-      throw new Error(`Twilio key provisioning failed: ${keyJson?.message ?? keyRes.status}`);
-    }
-    const apiKeySid: string = keyJson.sid;
-    const apiKeySecret: string = keyJson.secret;
-
-    // 2) Sign a Video Access Token (JWT) with the API Key
     const now = Math.floor(Date.now() / 1000);
     const payload = {
-      jti: `${apiKeySid}-${now}`,
-      iss: apiKeySid,
+      jti: `${API_KEY_SID}-${now}`,
+      iss: API_KEY_SID,
       sub: ACCOUNT_SID,
       iat: now,
-      exp: getNumericDate(60 * 60), // 1h
+      exp: getNumericDate(60 * 60),
       grants: {
         identity: userId,
         video: { room: roomName },
       },
     };
 
-    const encoder = new TextEncoder();
     const key = await crypto.subtle.importKey(
       "raw",
-      encoder.encode(apiKeySecret),
+      new TextEncoder().encode(API_KEY_SECRET),
       { name: "HMAC", hash: "SHA-256" },
       false,
       ["sign", "verify"],
@@ -105,10 +78,6 @@ Deno.serve(async (req) => {
       payload,
       key,
     );
-
-    // Note: We intentionally do NOT delete the API Key here — Twilio caches keys
-    // and deleting immediately can invalidate the just-issued JWT. They auto-expire
-    // along with the JWT (1h). For production, create one permanent API Key.
 
     return new Response(JSON.stringify({ token, identity: userId }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
