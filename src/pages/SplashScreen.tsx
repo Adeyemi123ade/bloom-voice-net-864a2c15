@@ -96,16 +96,16 @@ const CSS = `
 }
 .chichat-splash .cta-wrap {
   position: absolute; z-index: 4;
-  bottom: 50px; left: 0; right: 0;
+  bottom: calc(50px + 5%); left: 0; right: 0;
   display: flex; justify-content: center;
   animation: chichat-rise 0.8s cubic-bezier(0.22,1,0.36,1) 1.70s both;
 }
 .chichat-splash .cta {
-  width: 110px; height: 36px; border-radius: 18px; border: none;
+  width: 55px; height: 28px; border-radius: 14px; border: none;
   background: linear-gradient(120deg, #22C55E 0%, #16A34A 100%);
   color: #fff;
   font-family: 'Syne', sans-serif;
-  font-size: 18px; font-weight: 700; letter-spacing: 0.05em;
+  font-size: 9px; font-weight: 700; letter-spacing: 0.05em;
   cursor: pointer;
   box-shadow: 0 6px 20px rgba(34,197,94,0.38), inset 0 1px 0 rgba(255,255,255,0.18);
   position: relative; overflow: hidden;
