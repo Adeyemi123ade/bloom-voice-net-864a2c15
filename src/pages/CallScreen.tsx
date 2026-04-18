@@ -11,10 +11,11 @@ import {
   type RemoteTrack,
   type RemoteTrackPublication,
 } from "twilio-video";
+import { Volume2 } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
 import CallHeader from "@/components/call/CallHeader";
 import CallControls from "@/components/call/CallControls";
-import RemoteVideo from "@/components/call/RemoteVideo";
+import RemoteMedia from "@/components/call/RemoteMedia";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -38,13 +39,14 @@ export default function CallScreen() {
   const [muted, setMuted] = useState(false);
   const [videoEnabled, setVideoEnabled] = useState(isVideo);
   const [seconds, setSeconds] = useState(0);
+  const [needsTapForSound, setNeedsTapForSound] = useState(false);
 
   const roomRef = useRef<Room | null>(null);
   const localAudioRef = useRef<LocalAudioTrack | null>(null);
   const localVideoRef = useRef<LocalVideoTrack | null>(null);
   const localVideoEl = useRef<HTMLDivElement>(null);
   const remoteVideoEl = useRef<HTMLDivElement>(null);
-  const remoteAudioEl = useRef<HTMLDivElement>(null);
+  const remoteAudioEl = useRef<HTMLAudioElement>(null);
   const tickTimer = useRef<number | null>(null);
   const endedRef = useRef(false);
 
@@ -83,7 +85,7 @@ export default function CallScreen() {
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "calls", filter: `id=eq.${callId}` },
         (payload) => {
-          const row: any = payload.new;
+          const row = payload.new as { status: string };
           if (row.status === "accepted" && status === "ringing") {
             joinRoom();
           } else if (row.status === "declined") {
@@ -127,7 +129,9 @@ export default function CallScreen() {
       localAudioRef.current?.stop();
       localVideoRef.current?.stop();
       roomRef.current?.disconnect();
-    } catch {}
+    } catch {
+      /* ignore */
+    }
     setTimeout(() => navigate(`/chat/${conversationId}`), 500);
   };
 
@@ -139,7 +143,9 @@ export default function CallScreen() {
         sender_id: user.id,
         content: `[call]${isVideo ? "video" : "voice"}|${kind}|${duration}`,
       });
-    } catch {}
+    } catch {
+      /* ignore */
+    }
   };
 
   const endCall = async () => {
@@ -155,32 +161,48 @@ export default function CallScreen() {
     cleanupAndExit();
   };
 
-  const attachTrack = (track: RemoteTrack, container: HTMLDivElement | null) => {
-    if (!container) return;
-    if (track.kind === "video" || track.kind === "audio") {
-      const el = (track as any).attach();
-      el.style.width = "100%";
-      el.style.height = "100%";
-      el.style.objectFit = "cover";
-      container.appendChild(el);
+  // Try to play the remote <audio> element. If browser blocks autoplay,
+  // surface a tap-to-enable button.
+  const tryPlayRemoteAudio = async () => {
+    const el = remoteAudioEl.current;
+    if (!el) return;
+    try {
+      el.muted = false;
+      el.volume = 1;
+      await el.play();
+      setNeedsTapForSound(false);
+    } catch {
+      setNeedsTapForSound(true);
+    }
+  };
+
+  const attachRemoteTrack = (track: RemoteTrack) => {
+    if (track.kind === "audio") {
+      const el = remoteAudioEl.current;
+      if (!el) return;
+      // Attach into our existing <audio> element so it actually plays.
+      (track as unknown as { attach: (el: HTMLMediaElement) => HTMLMediaElement }).attach(el);
+      void tryPlayRemoteAudio();
+    } else if (track.kind === "video") {
+      const container = remoteVideoEl.current;
+      if (!container) return;
+      const videoEl = (
+        track as unknown as { attach: () => HTMLVideoElement }
+      ).attach();
+      videoEl.style.width = "100%";
+      videoEl.style.height = "100%";
+      videoEl.style.objectFit = "cover";
+      videoEl.setAttribute("playsinline", "true");
+      videoEl.muted = true; // video element shouldn't double-play audio
+      container.appendChild(videoEl);
     }
   };
 
   const handleParticipant = (participant: RemoteParticipant) => {
     participant.tracks.forEach((pub: RemoteTrackPublication) => {
-      if (pub.track) {
-        attachTrack(
-          pub.track,
-          pub.track.kind === "video" ? remoteVideoEl.current : remoteAudioEl.current,
-        );
-      }
+      if (pub.track) attachRemoteTrack(pub.track);
     });
-    participant.on("trackSubscribed", (track: RemoteTrack) => {
-      attachTrack(
-        track,
-        track.kind === "video" ? remoteVideoEl.current : remoteAudioEl.current,
-      );
-    });
+    participant.on("trackSubscribed", (track: RemoteTrack) => attachRemoteTrack(track));
   };
 
   const joinRoom = async () => {
@@ -206,6 +228,8 @@ export default function CallScreen() {
           el.style.width = "100%";
           el.style.height = "100%";
           el.style.objectFit = "cover";
+          el.setAttribute("playsinline", "true");
+          (el as HTMLVideoElement).muted = true;
           localVideoEl.current.appendChild(el);
         }
       }
@@ -225,6 +249,9 @@ export default function CallScreen() {
         endCall();
       });
       room.on("disconnected", cleanupAndExit);
+
+      // Make sure audio element is unmuted + ready.
+      void tryPlayRemoteAudio();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to join call";
       toast({ title: "Call failed", description: msg, variant: "destructive" });
@@ -252,12 +279,22 @@ export default function CallScreen() {
       <div className="h-full w-full flex flex-col bg-gradient-to-b from-secondary to-background">
         <CallHeader isVideo={isVideo} other={other} status={status} seconds={seconds} />
 
-        {isVideo && status === "connected" ? (
-          <RemoteVideo ref={remoteVideoEl} localPreviewRef={localVideoEl} />
-        ) : (
-          <div className="flex-1" />
+        <RemoteMedia
+          showVideo={isVideo && status === "connected"}
+          localPreviewRef={localVideoEl}
+          remoteVideoRef={remoteVideoEl}
+          remoteAudioRef={remoteAudioEl}
+        />
+
+        {needsTapForSound && status === "connected" && (
+          <button
+            onClick={tryPlayRemoteAudio}
+            className="mx-6 mb-2 px-4 py-2 rounded-full bg-primary text-primary-foreground text-xs font-medium flex items-center justify-center gap-2 animate-pulse"
+          >
+            <Volume2 className="w-4 h-4" />
+            Tap to enable sound
+          </button>
         )}
-        <div ref={remoteAudioEl} className="hidden" />
 
         <CallControls
           muted={muted}

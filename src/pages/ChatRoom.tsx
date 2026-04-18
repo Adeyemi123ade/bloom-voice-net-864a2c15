@@ -10,6 +10,12 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import {
+  AttachmentBubble,
+  FILE_PREFIX,
+  encodeFileMessage,
+  parseFileMessage,
+} from "@/components/chat/AttachmentBubble";
 
 type Message = {
   id: string;
@@ -305,6 +311,11 @@ export default function ChatRoom() {
   const fileRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const typingTimeout = useRef<number | null>(null);
+  const [pendingFile, setPendingFile] = useState<{
+    file: File;
+    previewUrl: string;
+  } | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) navigate("/login");
@@ -595,25 +606,60 @@ export default function ChatRoom() {
     if (error) toast({ title: "Send failed", description: error.message, variant: "destructive" });
   };
 
-  // Attachment upload (image/file -> sent as voice-style url, but we just send link for now)
-  const onPickFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Attachment upload — stage the file and show caption preview, send on confirm.
+  const onPickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     e.target.value = "";
-    if (!f || !user || !conversationId) return;
-    const path = `${user.id}/${conversationId}/${Date.now()}-${f.name}`;
-    const { error: upErr } = await supabase.storage
-      .from("chat-media")
-      .upload(path, f, { contentType: f.type });
-    if (upErr) {
-      toast({ title: "Upload failed", description: upErr.message, variant: "destructive" });
+    if (!f) return;
+    const MAX = 25 * 1024 * 1024; // 25MB
+    if (f.size > MAX) {
+      toast({ title: "File too large", description: "Max 25MB", variant: "destructive" });
       return;
     }
-    const { data: pub } = supabase.storage.from("chat-media").getPublicUrl(path);
-    await supabase.from("messages").insert({
-      conversation_id: conversationId,
-      sender_id: user.id,
-      content: pub.publicUrl,
-    });
+    setPendingFile({ file: f, previewUrl: URL.createObjectURL(f) });
+  };
+
+  const cancelPending = () => {
+    if (pendingFile) URL.revokeObjectURL(pendingFile.previewUrl);
+    setPendingFile(null);
+    setText("");
+  };
+
+  const sendPending = async () => {
+    if (!pendingFile || !user || !conversationId) return;
+    const f = pendingFile.file;
+    const caption = text.trim();
+    setUploading(true);
+    try {
+      const safeName = f.name.replace(/[^\w.\-]+/g, "_");
+      const path = `${user.id}/${conversationId}/${Date.now()}-${safeName}`;
+      const { error: upErr } = await supabase.storage
+        .from("chat-media")
+        .upload(path, f, { contentType: f.type || "application/octet-stream" });
+      if (upErr) throw upErr;
+      const { data: pub } = supabase.storage.from("chat-media").getPublicUrl(path);
+      const content = encodeFileMessage({
+        url: pub.publicUrl,
+        mime: f.type || "application/octet-stream",
+        name: f.name,
+        size: f.size,
+        caption,
+      });
+      const { error } = await supabase.from("messages").insert({
+        conversation_id: conversationId,
+        sender_id: user.id,
+        content,
+      });
+      if (error) throw error;
+      URL.revokeObjectURL(pendingFile.previewUrl);
+      setPendingFile(null);
+      setText("");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Upload failed";
+      toast({ title: "Upload failed", description: msg, variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
   };
 
   const visible = useMemo(() => messages.filter((m) => !hidden.has(m.id)), [messages, hidden]);
@@ -621,7 +667,9 @@ export default function ChatRoom() {
   const isSelectionMine = selected?.sender_id === user?.id;
   const isSelectionVoice = selected?.content.startsWith(VOICE_PREFIX);
   const isSelectionCall = selected?.content.startsWith(CALL_PREFIX);
+  const isSelectionFile = selected?.content.startsWith(FILE_PREFIX);
   const isSelectionDeleted = selected?.deleted_for_everyone;
+  const isUneditable = isSelectionVoice || isSelectionCall || isSelectionFile;
 
   return (
     <MobileFrame>
@@ -658,7 +706,7 @@ export default function ChatRoom() {
                 <Forward className="w-4 h-4 text-foreground" />
               </button>
             )}
-            {isSelectionMine && !isSelectionDeleted && !isSelectionVoice && !isSelectionCall && (
+            {isSelectionMine && !isSelectionDeleted && !isUneditable && (
               <button
                 aria-label="Edit"
                 onClick={() => selected && startEdit(selected)}
@@ -745,7 +793,9 @@ export default function ChatRoom() {
             const mine = m.sender_id === user?.id;
             const isVoice = m.content.startsWith(VOICE_PREFIX);
             const isCall = m.content.startsWith(CALL_PREFIX);
+            const isFile = m.content.startsWith(FILE_PREFIX);
             const voiceUrl = isVoice ? m.content.slice(VOICE_PREFIX.length) : "";
+            const fileMeta = isFile ? parseFileMessage(m.content) : null;
             const isDeleted = m.deleted_for_everyone;
             const isSelected = selectedId === m.id;
 
@@ -769,7 +819,7 @@ export default function ChatRoom() {
             // Parse quoted reply prefix: lines starting with "> " followed by message
             let quoted: string | null = null;
             let body = m.content;
-            if (!isVoice && !isDeleted && body.startsWith("> ")) {
+            if (!isVoice && !isFile && !isDeleted && body.startsWith("> ")) {
               const nl = body.indexOf("\n");
               if (nl > -1) {
                 quoted = body.slice(2, nl);
@@ -811,6 +861,8 @@ export default function ChatRoom() {
                     <p className="text-[12px]">🚫 This message was deleted</p>
                   ) : isVoice ? (
                     <VoiceBubble id={m.id} url={voiceUrl} mine={mine} />
+                  ) : isFile && fileMeta ? (
+                    <AttachmentBubble meta={fileMeta} mine={mine} />
                   ) : (
                     <p className="text-[13px] whitespace-pre-wrap break-words">{body}</p>
                   )}
@@ -876,10 +928,52 @@ export default function ChatRoom() {
                 Replying to {replyTo.sender_id === user?.id ? "yourself" : other?.display_name ?? "them"}
               </p>
               <p className="text-[11px] text-muted-foreground truncate">
-                {replyTo.content.startsWith(VOICE_PREFIX) ? "🎤 Voice note" : replyTo.content}
+                {replyTo.content.startsWith(VOICE_PREFIX)
+                  ? "🎤 Voice note"
+                  : replyTo.content.startsWith(FILE_PREFIX)
+                    ? `📎 ${parseFileMessage(replyTo.content)?.name ?? "Attachment"}`
+                    : replyTo.content}
               </p>
             </div>
             <button onClick={cancelReply} aria-label="Cancel reply" className="text-muted-foreground hover:text-foreground">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {/* Pending attachment preview (shown above composer) */}
+        {pendingFile && (
+          <div
+            className="px-3 py-2 bg-secondary/60 border-t border-border flex items-center gap-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-12 h-12 rounded-lg overflow-hidden bg-background flex items-center justify-center flex-shrink-0">
+              {pendingFile.file.type.startsWith("image/") ? (
+                <img
+                  src={pendingFile.previewUrl}
+                  alt={pendingFile.file.name}
+                  className="w-full h-full object-cover"
+                />
+              ) : pendingFile.file.type.startsWith("video/") ? (
+                <video src={pendingFile.previewUrl} className="w-full h-full object-cover" />
+              ) : (
+                <Paperclip className="w-5 h-5 text-muted-foreground" />
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[12px] font-medium text-foreground truncate">
+                {pendingFile.file.name}
+              </p>
+              <p className="text-[10px] text-muted-foreground">
+                {(pendingFile.file.size / 1024).toFixed(1)} KB
+              </p>
+            </div>
+            <button
+              onClick={cancelPending}
+              aria-label="Remove attachment"
+              className="w-7 h-7 rounded-full hover:bg-background flex items-center justify-center text-muted-foreground"
+              disabled={uploading}
+            >
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -916,30 +1010,49 @@ export default function ChatRoom() {
               <input
                 ref={fileRef}
                 type="file"
-                accept="image/*,video/*,audio/*,application/pdf"
+                accept="image/*,video/*,audio/*,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip"
                 className="hidden"
                 onChange={onPickFile}
               />
-              <button
-                onClick={() => fileRef.current?.click()}
-                aria-label="Attach file"
-                className="w-9 h-9 rounded-full hover:bg-secondary flex items-center justify-center"
-              >
-                <Paperclip className="w-4 h-4 text-foreground" />
-              </button>
+              {!pendingFile && (
+                <button
+                  onClick={() => fileRef.current?.click()}
+                  aria-label="Attach file"
+                  className="w-9 h-9 rounded-full hover:bg-secondary flex items-center justify-center"
+                >
+                  <Paperclip className="w-4 h-4 text-foreground" />
+                </button>
+              )}
               <Input
                 value={text}
-                onChange={(e) => onType(e.target.value)}
+                onChange={(e) => (pendingFile ? setText(e.target.value) : onType(e.target.value))}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
-                    send();
+                    if (pendingFile) sendPending();
+                    else send();
                   }
                 }}
-                placeholder={editing ? "Edit message" : "Type a message"}
+                placeholder={
+                  pendingFile
+                    ? "Add a caption (optional)…"
+                    : editing
+                      ? "Edit message"
+                      : "Type a message"
+                }
+                disabled={uploading}
                 className="h-9 text-xs bg-input border-border"
               />
-              {text.trim() || editing ? (
+              {pendingFile ? (
+                <button
+                  onClick={sendPending}
+                  aria-label="Send attachment"
+                  disabled={uploading}
+                  className="w-9 h-9 rounded-full bg-primary hover:bg-primary/90 flex items-center justify-center disabled:opacity-50"
+                >
+                  <Send className="w-4 h-4 text-primary-foreground" />
+                </button>
+              ) : text.trim() || editing ? (
                 <button
                   onClick={send}
                   aria-label="Send"
