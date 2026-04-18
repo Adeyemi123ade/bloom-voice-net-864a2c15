@@ -259,7 +259,7 @@ export default function Home() {
         <div className="px-4 pt-5 pb-3 flex items-center justify-between">
           <h1 className="text-[20px] font-bold text-foreground">Chats</h1>
           <div className="flex items-center gap-1.5">
-            <Dialog open={openNew} onOpenChange={(o) => { setOpenNew(o); if (o) loadPeople(); }}>
+            <Dialog open={openNew} onOpenChange={(o) => { setOpenNew(o); if (o) { setPeopleQuery(""); loadPeople(); } }}>
               <DialogTrigger asChild>
                 <button
                   aria-label="New chat"
@@ -268,26 +268,39 @@ export default function Home() {
                   <MessageSquarePlus className="w-4 h-4 text-foreground" />
                 </button>
               </DialogTrigger>
-              <DialogContent className="max-w-[300px] bg-card border-border">
+              <DialogContent className="max-w-[320px] bg-card border-border">
                 <DialogHeader>
                   <DialogTitle className="text-sm">Start a new chat</DialogTitle>
                 </DialogHeader>
-                <div className="max-h-[300px] overflow-y-auto -mx-2">
-                  {people.length === 0 && (
-                    <p className="text-[11px] text-muted-foreground px-2 py-3">
-                      No other users yet. Invite a friend to sign up!
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                  <Input
+                    autoFocus
+                    value={peopleQuery}
+                    onChange={(e) => setPeopleQuery(e.target.value)}
+                    placeholder="Search contacts"
+                    className="h-8 pl-8 text-xs bg-input border-border"
+                  />
+                </div>
+                <div className="max-h-[300px] overflow-y-auto -mx-2 mt-1">
+                  {filteredPeople.length === 0 && (
+                    <p className="text-[11px] text-muted-foreground px-2 py-3 text-center">
+                      {people.length === 0 ? "No other users yet." : "No contacts match."}
                     </p>
                   )}
-                  {people.map((p) => (
+                  {filteredPeople.map((p) => (
                     <button
                       key={p.id}
                       onClick={() => startChat(p.id)}
                       className="w-full flex items-center gap-2.5 px-2 py-2 rounded-md hover:bg-secondary text-left"
                     >
                       <div className="relative">
-                        <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-[11px] font-semibold text-foreground">
-                          {initials(p.display_name)}
-                        </div>
+                        <Avatar className="w-8 h-8">
+                          <AvatarImage src={p.avatar_url ?? undefined} />
+                          <AvatarFallback className="bg-primary/20 text-foreground text-[11px] font-semibold">
+                            {initials(p.display_name)}
+                          </AvatarFallback>
+                        </Avatar>
                         {p.is_online && (
                           <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-accent border border-card" />
                         )}
@@ -306,6 +319,13 @@ export default function Home() {
               </DialogContent>
             </Dialog>
             <button
+              aria-label="Profile"
+              onClick={() => navigate("/profile")}
+              className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
+            >
+              <UserCircle2 className="w-4 h-4 text-foreground" />
+            </button>
+            <button
               aria-label="Sign out"
               onClick={signOut}
               className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
@@ -322,7 +342,7 @@ export default function Home() {
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search conversations"
+              placeholder="Search chats and contacts"
               className="h-8 pl-8 text-xs bg-input border-border"
             />
           </div>
@@ -335,27 +355,33 @@ export default function Home() {
           )}
           {!fetching && filtered.length === 0 && (
             <div className="text-center mt-10 px-6">
-              <p className="text-xs font-semibold text-foreground">No chats yet</p>
+              <p className="text-xs font-semibold text-foreground">
+                {query ? "No matches" : "No chats yet"}
+              </p>
               <p className="text-[11px] text-muted-foreground mt-1">
-                Tap the new chat icon to start a conversation.
+                {query ? "Try a different name." : "Tap the new chat icon to start a conversation."}
               </p>
               <Button
-                onClick={() => { setOpenNew(true); loadPeople(); }}
+                onClick={() => { setOpenNew(true); setPeopleQuery(query); loadPeople(); }}
                 className="mt-4 h-8 text-xs bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg"
               >
-                Start chatting
+                {query ? "Search contacts" : "Start chatting"}
               </Button>
             </div>
           )}
           {filtered.map((c) => (
             <button
               key={c.conversation_id}
+              onClick={() => navigate(`/chat/${c.conversation_id}`)}
               className="w-full flex items-center gap-3 px-2 py-2.5 rounded-lg hover:bg-secondary text-left transition-colors"
             >
               <div className="relative shrink-0">
-                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-xs font-semibold text-foreground">
-                  {initials(c.other.display_name)}
-                </div>
+                <Avatar className="w-10 h-10">
+                  <AvatarImage src={c.other.avatar_url ?? undefined} />
+                  <AvatarFallback className="bg-primary/20 text-foreground text-xs font-semibold">
+                    {initials(c.other.display_name)}
+                  </AvatarFallback>
+                </Avatar>
                 {c.other.is_online && (
                   <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-accent border-2 border-background" />
                 )}
