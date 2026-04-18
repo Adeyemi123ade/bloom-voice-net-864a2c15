@@ -14,9 +14,9 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    const ACCOUNT_SID = Deno.env.get("TWILIO_ACCOUNT_SID");
-    const API_KEY_SID = Deno.env.get("TWILIO_API_KEY_SID");
-    const API_KEY_SECRET = Deno.env.get("TWILIO_API_KEY_SECRET");
+    const ACCOUNT_SID = Deno.env.get("TWILIO_ACCOUNT_SID")?.trim();
+    const API_KEY_SID = Deno.env.get("TWILIO_API_KEY_SID")?.trim();
+    const API_KEY_SECRET = Deno.env.get("TWILIO_API_KEY_SECRET")?.trim();
     if (!ACCOUNT_SID || !API_KEY_SID || !API_KEY_SECRET) {
       throw new Error("Twilio credentials not configured");
     }
