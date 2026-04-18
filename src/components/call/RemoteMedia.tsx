@@ -32,8 +32,7 @@ const RemoteMedia = forwardRef<HTMLDivElement, Props>(
           ref={remoteAudioRef}
           autoPlay
           playsInline
-          // @ts-expect-error non-standard but supported
-          webkit-playsinline="true"
+          {...({ "webkit-playsinline": "true" } as Record<string, string>)}
           className="hidden"
         />
       </>
