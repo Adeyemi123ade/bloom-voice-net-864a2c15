@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Mic, MicOff, Volume2, VolumeX, Video, VideoOff, PhoneOff, SwitchCamera } from "lucide-react";
 import {
   connect,
   createLocalAudioTrack,
@@ -13,22 +12,14 @@ import {
   type RemoteTrackPublication,
 } from "twilio-video";
 import MobileFrame from "@/components/MobileFrame";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import CallHeader from "@/components/call/CallHeader";
+import CallControls from "@/components/call/CallControls";
+import RemoteVideo from "@/components/call/RemoteVideo";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
 type Profile = { id: string; display_name: string | null; avatar_url: string | null };
-
-function initials(name?: string | null) {
-  if (!name) return "?";
-  return name.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
-}
-function fmt(s: number) {
-  const m = Math.floor(s / 60).toString().padStart(2, "0");
-  const ss = (s % 60).toString().padStart(2, "0");
-  return `${m}:${ss}`;
-}
 
 export default function CallScreen() {
   const { id: conversationId } = useParams();
@@ -65,7 +56,6 @@ export default function CallScreen() {
     document.title = `${isVideo ? "Video" : "Voice"} call — Chichat`;
   }, [isVideo]);
 
-  // Load other participant profile
   useEffect(() => {
     if (!user || !conversationId) return;
     (async () => {
@@ -85,7 +75,6 @@ export default function CallScreen() {
     })();
   }, [user, conversationId]);
 
-  // Subscribe to call status changes
   useEffect(() => {
     if (!callId) return;
     const ch = supabase
@@ -112,7 +101,6 @@ export default function CallScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [callId, status]);
 
-  // Callee auto-accepts on mount (toast brought them here)
   useEffect(() => {
     if (role !== "callee" || !callId) return;
     (async () => {
@@ -122,7 +110,6 @@ export default function CallScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [role, callId]);
 
-  // Tick when connected
   useEffect(() => {
     if (status !== "connected") return;
     tickTimer.current = window.setInterval(() => setSeconds((s) => s + 1), 1000);
@@ -249,97 +236,23 @@ export default function CallScreen() {
   return (
     <MobileFrame>
       <div className="h-full w-full flex flex-col bg-gradient-to-b from-secondary to-background">
-        <div className="pt-8 pb-4 flex flex-col items-center gap-3">
-          <p className="text-[11px] uppercase tracking-widest text-muted-foreground">
-            {isVideo ? "Video call" : "Voice call"}
-          </p>
-          <Avatar className="w-24 h-24 ring-4 ring-primary/30">
-            <AvatarImage src={other?.avatar_url ?? undefined} />
-            <AvatarFallback className="bg-primary/20 text-foreground text-2xl font-semibold">
-              {initials(other?.display_name)}
-            </AvatarFallback>
-          </Avatar>
-          <h1 className="text-base font-semibold text-foreground">
-            {other?.display_name ?? "Contact"}
-          </h1>
-          <p className="text-xs text-muted-foreground">
-            {status === "ringing" && "Ringing…"}
-            {status === "connecting" && "Connecting…"}
-            {status === "connected" && fmt(seconds)}
-            {status === "ended" && "Call ended"}
-          </p>
-          {status === "connected" && (
-            <span className="mt-1 inline-flex items-center gap-1.5 text-[10px] text-accent">
-              <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-              Connected
-            </span>
-          )}
-        </div>
+        <CallHeader isVideo={isVideo} other={other} status={status} seconds={seconds} />
 
-        {/* Remote video */}
-        {isVideo && status === "connected" && (
-          <div className="mx-6 mt-2 flex-1 rounded-2xl bg-black/40 border border-border relative overflow-hidden">
-            <div ref={remoteVideoEl} className="absolute inset-0" />
-            <div
-              ref={localVideoEl}
-              className="absolute bottom-2 right-2 w-20 h-28 rounded-lg bg-secondary border border-border overflow-hidden"
-            />
-          </div>
+        {isVideo && status === "connected" ? (
+          <RemoteVideo ref={remoteVideoEl} localPreviewRef={localVideoEl} />
+        ) : (
+          <div className="flex-1" />
         )}
-        {(!isVideo || status !== "connected") && <div className="flex-1" />}
-        {/* Hidden remote audio sink */}
         <div ref={remoteAudioEl} className="hidden" />
 
-        <div className="px-6 pb-6">
-          <div className="flex items-center justify-around">
-            <button
-              onClick={toggleMute}
-              className={`w-11 h-11 rounded-full flex items-center justify-center ${
-                muted
-                  ? "bg-destructive text-destructive-foreground"
-                  : "bg-secondary text-foreground hover:bg-secondary/80"
-              }`}
-              aria-label="Mute"
-            >
-              {muted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-            </button>
-            <button
-              className="w-11 h-11 rounded-full flex items-center justify-center bg-primary text-primary-foreground"
-              aria-label="Speaker"
-              disabled
-              title="Speaker (browser default)"
-            >
-              <Volume2 className="w-4 h-4" />
-            </button>
-            <button
-              onClick={toggleVideo}
-              disabled={!isVideo}
-              className={`w-11 h-11 rounded-full flex items-center justify-center ${
-                videoEnabled
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-secondary text-foreground hover:bg-secondary/80"
-              } ${!isVideo ? "opacity-40" : ""}`}
-              aria-label="Toggle video"
-            >
-              {videoEnabled ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
-            </button>
-            <button
-              className="w-11 h-11 rounded-full flex items-center justify-center bg-secondary text-foreground hover:bg-secondary/80 opacity-40"
-              aria-label="Switch camera"
-              disabled
-            >
-              <SwitchCamera className="w-4 h-4" />
-            </button>
-          </div>
-
-          <button
-            onClick={endCall}
-            className="mt-5 w-full h-12 rounded-full bg-destructive hover:bg-destructive/90 text-destructive-foreground flex items-center justify-center gap-2 font-medium text-sm"
-          >
-            <PhoneOff className="w-4 h-4" />
-            End call
-          </button>
-        </div>
+        <CallControls
+          muted={muted}
+          videoEnabled={videoEnabled}
+          isVideo={isVideo}
+          onToggleMute={toggleMute}
+          onToggleVideo={toggleVideo}
+          onEndCall={endCall}
+        />
       </div>
     </MobileFrame>
   );
