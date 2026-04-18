@@ -371,10 +371,19 @@ export default function ChatRoom() {
       return;
     }
 
+    let finalContent = content;
+    if (replyTo) {
+      const preview = replyTo.content.startsWith(VOICE_PREFIX)
+        ? "🎤 Voice note"
+        : replyTo.content.length > 80 ? replyTo.content.slice(0, 80) + "…" : replyTo.content;
+      finalContent = `> ${preview}\n${content}`;
+      setReplyTo(null);
+    }
+
     const { error } = await supabase.from("messages").insert({
       conversation_id: conversationId,
       sender_id: user.id,
-      content,
+      content: finalContent,
     });
     if (error) {
       toast({ title: "Failed to send", description: error.message, variant: "destructive" });
