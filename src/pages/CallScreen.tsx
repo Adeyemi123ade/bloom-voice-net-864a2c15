@@ -301,8 +301,7 @@ export default function CallScreen() {
               }`}
               aria-label="Mute"
             >
-              {muted ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
-              {/* visual: icon flips when muted */}
+              {muted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
             </button>
             <button
               className="w-11 h-11 rounded-full flex items-center justify-center bg-primary text-primary-foreground"
