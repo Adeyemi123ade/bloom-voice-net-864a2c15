@@ -667,7 +667,9 @@ export default function ChatRoom() {
   const isSelectionMine = selected?.sender_id === user?.id;
   const isSelectionVoice = selected?.content.startsWith(VOICE_PREFIX);
   const isSelectionCall = selected?.content.startsWith(CALL_PREFIX);
+  const isSelectionFile = selected?.content.startsWith(FILE_PREFIX);
   const isSelectionDeleted = selected?.deleted_for_everyone;
+  const isUneditable = isSelectionVoice || isSelectionCall || isSelectionFile;
 
   return (
     <MobileFrame>
@@ -704,7 +706,7 @@ export default function ChatRoom() {
                 <Forward className="w-4 h-4 text-foreground" />
               </button>
             )}
-            {isSelectionMine && !isSelectionDeleted && !isSelectionVoice && !isSelectionCall && (
+            {isSelectionMine && !isSelectionDeleted && !isUneditable && (
               <button
                 aria-label="Edit"
                 onClick={() => selected && startEdit(selected)}
@@ -926,7 +928,11 @@ export default function ChatRoom() {
                 Replying to {replyTo.sender_id === user?.id ? "yourself" : other?.display_name ?? "them"}
               </p>
               <p className="text-[11px] text-muted-foreground truncate">
-                {replyTo.content.startsWith(VOICE_PREFIX) ? "🎤 Voice note" : replyTo.content}
+                {replyTo.content.startsWith(VOICE_PREFIX)
+                  ? "🎤 Voice note"
+                  : replyTo.content.startsWith(FILE_PREFIX)
+                    ? `📎 ${parseFileMessage(replyTo.content)?.name ?? "Attachment"}`
+                    : replyTo.content}
               </p>
             </div>
             <button onClick={cancelReply} aria-label="Cancel reply" className="text-muted-foreground hover:text-foreground">
