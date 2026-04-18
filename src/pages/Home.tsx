@@ -227,9 +227,15 @@ export default function Home() {
     }
     setOpenNew(false);
     await loadChats();
-    // Future: navigate to /chat/:id
-    toast({ title: "Chat ready", description: "Chat room screen coming up next." });
+    if (conversationId) navigate(`/chat/${conversationId}`);
   };
+
+  const [peopleQuery, setPeopleQuery] = useState("");
+  const filteredPeople = useMemo(() => {
+    const q = peopleQuery.trim().toLowerCase();
+    if (!q) return people;
+    return people.filter((p) => p.display_name?.toLowerCase().includes(q));
+  }, [people, peopleQuery]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
