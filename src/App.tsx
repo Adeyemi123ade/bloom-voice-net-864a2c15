@@ -15,6 +15,7 @@ import CallScreen from "./pages/CallScreen.tsx";
 import Profile from "./pages/Profile.tsx";
 import ForgotPassword from "./pages/ForgotPassword.tsx";
 import ResetPassword from "./pages/ResetPassword.tsx";
+import MessageNotifier from "./components/MessageNotifier.tsx";
 
 const queryClient = new QueryClient();
 
@@ -25,6 +26,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <MessageNotifier />
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/register" element={<Register />} />
