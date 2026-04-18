@@ -131,13 +131,27 @@ export default function CallScreen() {
     setTimeout(() => navigate(`/chat/${conversationId}`), 500);
   };
 
+  const logCallMessage = async (kind: "ended" | "missed" | "declined", duration: number) => {
+    if (!user || !conversationId) return;
+    try {
+      await supabase.from("messages").insert({
+        conversation_id: conversationId,
+        sender_id: user.id,
+        content: `[call]${isVideo ? "video" : "voice"}|${kind}|${duration}`,
+      });
+    } catch {}
+  };
+
   const endCall = async () => {
+    const wasConnected = status === "connected";
+    const dur = seconds;
     if (callId) {
       await supabase
         .from("calls")
         .update({ status: "ended", ended_at: new Date().toISOString() })
         .eq("id", callId);
     }
+    await logCallMessage(wasConnected ? "ended" : role === "caller" ? "missed" : "declined", dur);
     cleanupAndExit();
   };
 

@@ -12,6 +12,7 @@ import Welcome from "./pages/Welcome.tsx";
 import Home from "./pages/Home.tsx";
 import ChatRoom from "./pages/ChatRoom.tsx";
 import CallScreen from "./pages/CallScreen.tsx";
+import Calls from "./pages/Calls.tsx";
 import Profile from "./pages/Profile.tsx";
 import ForgotPassword from "./pages/ForgotPassword.tsx";
 import ResetPassword from "./pages/ResetPassword.tsx";
@@ -37,6 +38,7 @@ const App = () => (
             <Route path="/home" element={<Home />} />
             <Route path="/chat/:id" element={<ChatRoom />} />
             <Route path="/call/:id" element={<CallScreen />} />
+            <Route path="/calls" element={<Calls />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
