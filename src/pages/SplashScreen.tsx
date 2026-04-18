@@ -116,6 +116,19 @@ const CSS = `
   background: linear-gradient(120deg, rgba(255,255,255,0.12) 0%, transparent 55%);
 }
 .chichat-splash .cta:active { transform: scale(0.97); }
+.chichat-splash .signin {
+  margin-top: 10px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 10px; font-weight: 500;
+  color: rgba(255,255,255,0.65);
+  text-align: center;
+}
+.chichat-splash .signin button {
+  background: none; border: none; padding: 0; margin-left: 4px;
+  color: #22C55E; font-weight: 700; cursor: pointer;
+  font-family: inherit; font-size: inherit;
+  text-decoration: underline; text-underline-offset: 3px;
+}
 @keyframes chichat-rise {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
@@ -124,9 +137,10 @@ const CSS = `
 
 interface Props {
   onGetStarted?: () => void;
+  onSignIn?: () => void;
 }
 
-export default function SplashScreen({ onGetStarted }: Props) {
+export default function SplashScreen({ onGetStarted, onSignIn }: Props) {
   useEffect(() => {
     if (document.getElementById(STYLE_ID)) return;
     const style = document.createElement("style");
@@ -206,9 +220,15 @@ export default function SplashScreen({ onGetStarted }: Props) {
       </div>
 
       <div className="cta-wrap">
-        <button className="cta" onClick={onGetStarted}>
-          Get Started
-        </button>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+          <button className="cta" onClick={onGetStarted}>
+            Get Started
+          </button>
+          <div className="signin">
+            Already have an account?
+            <button type="button" onClick={onSignIn}>Sign in</button>
+          </div>
+        </div>
       </div>
     </div>
   );
