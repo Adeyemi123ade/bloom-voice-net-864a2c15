@@ -7,6 +7,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import Index from "./pages/Index.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import Register from "./pages/Register.tsx";
+import Login from "./pages/Login.tsx";
 import Verify from "./pages/Verify.tsx";
 import Welcome from "./pages/Welcome.tsx";
 import Home from "./pages/Home.tsx";
@@ -23,6 +24,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/login" element={<Login />} />
             <Route path="/verify" element={<Verify />} />
             <Route path="/welcome" element={<Welcome />} />
             <Route path="/home" element={<Home />} />
