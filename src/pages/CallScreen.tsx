@@ -155,13 +155,17 @@ export default function CallScreen() {
   const endCall = async () => {
     const wasConnected = status === "connected";
     const dur = seconds;
+    // Stop the caller's ringback IMMEDIATELY by flipping status before any
+    // network calls — useRingback is gated on status === "ringing".
+    setStatus("ended");
+    // Fire-and-forget so UI/audio teardown isn't blocked by the network round-trip.
     if (callId) {
-      await supabase
+      void supabase
         .from("calls")
         .update({ status: "ended", ended_at: new Date().toISOString() })
         .eq("id", callId);
     }
-    await logCallMessage(wasConnected ? "ended" : role === "caller" ? "missed" : "declined", dur);
+    void logCallMessage(wasConnected ? "ended" : role === "caller" ? "missed" : "declined", dur);
     cleanupAndExit();
   };
 
