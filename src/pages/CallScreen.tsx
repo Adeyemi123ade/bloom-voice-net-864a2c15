@@ -17,6 +17,7 @@ import CallHeader from "@/components/call/CallHeader";
 import CallControls from "@/components/call/CallControls";
 import RemoteMedia from "@/components/call/RemoteMedia";
 import { useAuth } from "@/hooks/useAuth";
+import { useRingback } from "@/hooks/useRingback";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
@@ -49,6 +50,9 @@ export default function CallScreen() {
   const remoteAudioEl = useRef<HTMLAudioElement>(null);
   const tickTimer = useRef<number | null>(null);
   const endedRef = useRef(false);
+
+  // Caller hears classic phone ringback while waiting for the callee to pick up.
+  useRingback(role === "caller" && status === "ringing");
 
   useEffect(() => {
     if (!loading && !user) navigate("/login");
