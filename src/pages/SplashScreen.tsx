@@ -101,7 +101,7 @@ const CSS = `
   animation: chichat-rise 0.8s cubic-bezier(0.22,1,0.36,1) 1.70s both;
 }
 .chichat-splash .cta {
-  width: 83px; height: 42px; border-radius: 21px; border: none;
+  width: 141px; height: 42px; border-radius: 21px; border: none;
   background: linear-gradient(120deg, #22C55E 0%, #16A34A 100%);
   color: #fff;
   font-family: 'Syne', sans-serif;
