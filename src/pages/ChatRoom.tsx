@@ -439,7 +439,7 @@ export default function ChatRoom() {
       toast({ title: "Could not start call", description: error.message, variant: "destructive" });
       return;
     }
-    navigate(`/call/${conversationId}?type=${type}&callId=${data.id}&room=${encodeURIComponent(roomName)}&role=caller`);
+    navigate(`/call/${conversationId}?type=${type}&callId=${data.id}&room=${encodeURIComponent(roomName)}&role=caller`, { replace: true });
   };
 
   const send = async () => {
