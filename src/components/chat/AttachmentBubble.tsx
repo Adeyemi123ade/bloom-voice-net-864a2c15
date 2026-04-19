@@ -1,5 +1,7 @@
 import { FileText, Download, FileSpreadsheet, Presentation, FileArchive, FileCode, FileAudio, FileVideo, File as FileIcon } from "lucide-react";
 import { useState } from "react";
+import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
+import { X } from "lucide-react";
 
 export const FILE_PREFIX = "[file]";
 // Encoded as: [file]url|mime|name|size|caption
@@ -126,13 +128,36 @@ export function AttachmentBubble({
         )}
         {imgOpen && (
           <div
-            className="fixed inset-0 z-[200] flex items-center justify-center p-0"
-            onClick={(e) => {
-              e.stopPropagation();
-              setImgOpen(false);
-            }}
+            className="fixed inset-0 z-[200] bg-background"
+            onClick={(e) => e.stopPropagation()}
           >
-            <img src={meta.url} alt={meta.name} className="max-w-full max-h-full object-contain" />
+            <button
+              onClick={() => setImgOpen(false)}
+              className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-background/60 backdrop-blur flex items-center justify-center text-foreground"
+              aria-label="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <TransformWrapper
+              initialScale={1}
+              minScale={1}
+              maxScale={6}
+              doubleClick={{ mode: "toggle", step: 2 }}
+              wheel={{ step: 0.2 }}
+              pinch={{ step: 5 }}
+            >
+              <TransformComponent
+                wrapperStyle={{ width: "100vw", height: "100vh" }}
+                contentStyle={{ width: "100vw", height: "100vh" }}
+              >
+                <img
+                  src={meta.url}
+                  alt={meta.name}
+                  className="w-screen h-screen object-contain select-none"
+                  draggable={false}
+                />
+              </TransformComponent>
+            </TransformWrapper>
           </div>
         )}
       </>
