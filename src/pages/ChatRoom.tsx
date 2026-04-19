@@ -687,18 +687,21 @@ export default function ChatRoom() {
 
   const visible = useMemo(() => messages.filter((m) => !hidden.has(m.id)), [messages, hidden]);
 
-  const isSelectionMine = selected?.sender_id === user?.id;
-  const isSelectionVoice = selected?.content.startsWith(VOICE_PREFIX);
-  const isSelectionCall = selected?.content.startsWith(CALL_PREFIX);
-  const isSelectionFile = selected?.content.startsWith(FILE_PREFIX);
-  const isSelectionDeleted = selected?.deleted_for_everyone;
-  const isUneditable = isSelectionVoice || isSelectionCall || isSelectionFile;
+  const allMine = onlySelected
+    ? onlySelected.sender_id === user?.id
+    : selectedList.length > 0 && selectedList.every((m) => m.sender_id === user?.id);
+  const isOnlyVoice = onlySelected?.content.startsWith(VOICE_PREFIX);
+  const isOnlyCall = onlySelected?.content.startsWith(CALL_PREFIX);
+  const isOnlyFile = onlySelected?.content.startsWith(FILE_PREFIX);
+  const isOnlyDeleted = onlySelected?.deleted_for_everyone;
+  const isUneditable = isOnlyVoice || isOnlyCall || isOnlyFile;
+  const anyCall = selectedList.some((m) => m.content.startsWith(CALL_PREFIX));
 
   return (
     <MobileFrame>
       <div className="h-full w-full flex flex-col bg-background" onClick={clearSelection}>
         {/* Header OR Selection action bar */}
-        {selected ? (
+        {selectionCount > 0 ? (
           <div
             className="px-2 pt-4 pb-3 flex items-center gap-1 border-b border-border bg-card"
             onClick={(e) => e.stopPropagation()}
@@ -710,51 +713,44 @@ export default function ChatRoom() {
             >
               <X className="w-4 h-4 text-foreground" />
             </button>
+            <span className="text-xs font-semibold text-foreground ml-1">
+              {selectionCount}
+            </span>
             <div className="flex-1" />
-            {!isSelectionDeleted && !isSelectionCall && (
+            {selectionCount === 1 && !isOnlyDeleted && !isOnlyCall && (
               <button
                 aria-label="Copy"
-                onClick={() => selected && copyMsg(selected)}
+                onClick={() => onlySelected && copyMsg(onlySelected)}
                 className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
               >
                 <Copy className="w-4 h-4 text-foreground" />
               </button>
             )}
-            {!isSelectionDeleted && !isSelectionCall && (
+            {!anyCall && (
               <button
                 aria-label="Forward"
-                onClick={() => selected && shareMsg(selected)}
+                onClick={() => shareMsgs(selectedList.filter((m) => !m.deleted_for_everyone))}
                 className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
               >
                 <Forward className="w-4 h-4 text-foreground" />
               </button>
             )}
-            {isSelectionMine && !isSelectionDeleted && !isUneditable && (
+            {selectionCount === 1 && allMine && !isOnlyDeleted && !isUneditable && (
               <button
                 aria-label="Edit"
-                onClick={() => selected && startEdit(selected)}
+                onClick={() => onlySelected && startEdit(onlySelected)}
                 className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
               >
                 <Pencil className="w-4 h-4 text-foreground" />
               </button>
             )}
-            {isSelectionMine && !isSelectionDeleted ? (
-              <button
-                aria-label="Delete for everyone"
-                onClick={() => selected && deleteForEveryone(selected)}
-                className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
-              >
-                <Trash2 className="w-4 h-4 text-destructive" />
-              </button>
-            ) : (
-              <button
-                aria-label="Delete for me"
-                onClick={() => selected && deleteForMe(selected)}
-                className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
-              >
-                <Trash2 className="w-4 h-4 text-foreground" />
-              </button>
-            )}
+            <button
+              aria-label="Delete selected"
+              onClick={bulkDelete}
+              className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
+            >
+              <Trash2 className="w-4 h-4 text-destructive" />
+            </button>
           </div>
         ) : (
           <div className="px-3 pt-4 pb-3 flex items-center gap-2 border-b border-border">
