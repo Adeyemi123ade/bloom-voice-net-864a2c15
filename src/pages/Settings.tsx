@@ -27,8 +27,6 @@ import {
 export default function Settings() {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
-  const { theme, setTheme } = useTheme();
-  const [themeOpen, setThemeOpen] = useState(false);
   const [confirmStage, setConfirmStage] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -59,9 +57,6 @@ export default function Settings() {
     toast({ title: "Account removed", description: "You have been signed out." });
     navigate("/register");
   };
-
-  const themeLabel =
-    theme === "dark" ? "Dark" : theme === "light" ? "Light" : "System default";
 
   return (
     <MobileFrame>
@@ -96,17 +91,19 @@ export default function Settings() {
             <ChevronRight className="w-4 h-4 text-muted-foreground" />
           </button>
 
-          {/* Theme */}
+          {/* Phone settings (theme + ringtone) */}
           <button
-            onClick={() => setThemeOpen(true)}
+            onClick={() => navigate("/settings/phone")}
             className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-secondary text-left"
           >
             <span className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center">
-              <Palette className="w-4 h-4 text-primary" />
+              <Smartphone className="w-4 h-4 text-primary" />
             </span>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-foreground">Theme</p>
-              <p className="text-[11px] text-muted-foreground">{themeLabel}</p>
+              <p className="text-xs font-semibold text-foreground">Phone settings</p>
+              <p className="text-[11px] text-muted-foreground truncate">
+                Theme and ringtone
+              </p>
             </div>
             <ChevronRight className="w-4 h-4 text-muted-foreground" />
           </button>
@@ -174,41 +171,6 @@ export default function Settings() {
             </AlertDialog>
           </div>
         </div>
-
-        {/* Theme dialog */}
-        <Dialog open={themeOpen} onOpenChange={setThemeOpen}>
-          <DialogContent className="max-w-[300px] bg-card border-border">
-            <DialogHeader>
-              <DialogTitle className="text-sm">Choose theme</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-1">
-              {[
-                { value: "system", label: "System default", Icon: Monitor },
-                { value: "dark", label: "Dark", Icon: Moon },
-                { value: "light", label: "Light", Icon: Sun },
-              ].map(({ value, label, Icon }) => (
-                <button
-                  key={value}
-                  onClick={() => {
-                    setTheme(value);
-                    setThemeOpen(false);
-                  }}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-left text-xs ${
-                    theme === value
-                      ? "bg-primary/15 text-foreground"
-                      : "hover:bg-secondary text-foreground"
-                  }`}
-                >
-                  <Icon className="w-4 h-4 text-primary" />
-                  <span className="flex-1">{label}</span>
-                  {theme === value && (
-                    <span className="w-2 h-2 rounded-full bg-primary" />
-                  )}
-                </button>
-              ))}
-            </div>
-          </DialogContent>
-        </Dialog>
       </div>
     </MobileFrame>
   );

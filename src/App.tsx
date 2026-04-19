@@ -16,6 +16,7 @@ import CallScreen from "./pages/CallScreen.tsx";
 import Calls from "./pages/Calls.tsx";
 import Profile from "./pages/Profile.tsx";
 import Settings from "./pages/Settings.tsx";
+import PhoneSettings from "./pages/PhoneSettings.tsx";
 import ForgotPassword from "./pages/ForgotPassword.tsx";
 import ResetPassword from "./pages/ResetPassword.tsx";
 import MessageNotifier from "./components/MessageNotifier.tsx";
@@ -44,6 +45,7 @@ const App = () => (
               <Route path="/calls" element={<Calls />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="/settings/phone" element={<PhoneSettings />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
