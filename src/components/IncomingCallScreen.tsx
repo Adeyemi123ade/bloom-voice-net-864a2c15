@@ -18,78 +18,111 @@ function initials(name?: string | null) {
   return name.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
 }
 
-/** Generates a phone-like ringtone using the Web Audio API (no asset needed). */
+/**
+ * Generates a short looping ringtone WAV (two-tone phone ring) as a base64
+ * data URL. Built once at module load, then attached to an <audio loop>
+ * element. <audio>.play() has a more permissive autoplay policy than
+ * AudioContext and works once the user has interacted with the app at least
+ * once (which is true by the time a call arrives).
+ */
+function buildRingtoneDataUrl(): string {
+  const sampleRate = 22050;
+  const totalSeconds = 3; // 2s ring + 1s silence
+  const samples = sampleRate * totalSeconds;
+  const buffer = new ArrayBuffer(44 + samples * 2);
+  const view = new DataView(buffer);
+  const writeStr = (off: number, s: string) => {
+    for (let i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i));
+  };
+  writeStr(0, "RIFF");
+  view.setUint32(4, 36 + samples * 2, true);
+  writeStr(8, "WAVE");
+  writeStr(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeStr(36, "data");
+  view.setUint32(40, samples * 2, true);
+
+  // Two-tone ring: 440Hz + 480Hz for first 2s, then silence
+  for (let i = 0; i < samples; i++) {
+    const t = i / sampleRate;
+    let v = 0;
+    if (t < 2) {
+      const env = Math.min(1, t * 6) * Math.min(1, (2 - t) * 6);
+      v = (Math.sin(2 * Math.PI * 440 * t) + Math.sin(2 * Math.PI * 480 * t)) * 0.25 * env;
+    }
+    const s = Math.max(-1, Math.min(1, v));
+    view.setInt16(44 + i * 2, s * 0x7fff, true);
+  }
+  // Convert to base64
+  const bytes = new Uint8Array(buffer);
+  let bin = "";
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return `data:audio/wav;base64,${btoa(bin)}`;
+}
+
+const RINGTONE_URL = buildRingtoneDataUrl();
+
+/** Plays a looping ringtone + vibration while `active` is true. */
 function useRingtone(active: boolean) {
-  const ctxRef = useRef<AudioContext | null>(null);
-  const stopRef = useRef<(() => void) | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     if (!active) return;
-    let cancelled = false;
-    const Ctx = (window.AudioContext || (window as any).webkitAudioContext) as typeof AudioContext;
-    const ctx = new Ctx();
-    ctxRef.current = ctx;
+    const a = new Audio(RINGTONE_URL);
+    a.loop = true;
+    a.volume = 0.9;
+    audioRef.current = a;
+    // Try playing — if blocked, the visual UI still shows and tapping Accept
+    // is itself a user gesture which will succeed.
+    a.play().catch(() => {
+      /* autoplay blocked — no-op */
+    });
 
-    const playPair = (startAt: number) => {
-      [0, 0.4].forEach((offset) => {
-        const o1 = ctx.createOscillator();
-        const o2 = ctx.createOscillator();
-        const g = ctx.createGain();
-        o1.frequency.value = 440;
-        o2.frequency.value = 480;
-        o1.connect(g);
-        o2.connect(g);
-        g.connect(ctx.destination);
-        const t = startAt + offset;
-        g.gain.setValueAtTime(0.0001, t);
-        g.gain.exponentialRampToValueAtTime(0.18, t + 0.05);
-        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.32);
-        o1.start(t);
-        o2.start(t);
-        o1.stop(t + 0.35);
-        o2.stop(t + 0.35);
-      });
-    };
-
-    let cycle = 0;
-    const tick = () => {
-      if (cancelled) return;
-      const now = ctx.currentTime + 0.05;
-      playPair(now);
-      cycle += 1;
-      window.setTimeout(tick, 2400);
-    };
-    tick();
-
-    // Vibration pattern (Android)
+    let vInt: number | undefined;
     try {
-      (navigator as any).vibrate?.([600, 400, 600, 400, 600, 1500]);
-      const vInt = window.setInterval(() => {
+      (navigator as { vibrate?: (p: number | number[]) => boolean }).vibrate?.([
+        600, 400, 600, 400, 600, 1500,
+      ]);
+      vInt = window.setInterval(() => {
         try {
-          (navigator as any).vibrate?.([600, 400, 600, 400, 600, 1500]);
-        } catch {}
+          (navigator as { vibrate?: (p: number | number[]) => boolean }).vibrate?.([
+            600, 400, 600, 400, 600, 1500,
+          ]);
+        } catch {
+          /* ignore */
+        }
       }, 4000);
-      stopRef.current = () => {
-        window.clearInterval(vInt);
-        try {
-          (navigator as any).vibrate?.(0);
-        } catch {}
-      };
-    } catch {}
+    } catch {
+      /* ignore */
+    }
 
     return () => {
-      cancelled = true;
-      stopRef.current?.();
       try {
-        ctx.close();
-      } catch {}
+        a.pause();
+        a.currentTime = 0;
+      } catch {
+        /* ignore */
+      }
+      audioRef.current = null;
+      if (vInt) window.clearInterval(vInt);
+      try {
+        (navigator as { vibrate?: (p: number | number[]) => boolean }).vibrate?.(0);
+      } catch {
+        /* ignore */
+      }
     };
   }, [active]);
 }
 
 /**
  * Listens globally for incoming calls. When one arrives, renders a full-screen
- * accept/decline UI with a ringtone. Replaces the previous toast UX.
+ * accept/decline UI with a ringtone.
  */
 export default function IncomingCallScreen() {
   const { user } = useAuth();
@@ -115,10 +148,12 @@ export default function IncomingCallScreen() {
 
       const { data: call } = await supabase
         .from("calls")
-        .select("id, conversation_id, caller_id, room_name, call_type, status")
+        .select("id, conversation_id, caller_id, room_name, call_type, status, callee_id")
         .eq("id", callId)
         .maybeSingle();
-      if (!call || call.status !== "ringing") return;
+      if (!call) return;
+      if (call.callee_id !== user.id) return;
+      if (call.status !== "ringing") return;
 
       const { data: prof } = await supabase
         .from("profiles")
@@ -136,8 +171,23 @@ export default function IncomingCallScreen() {
       });
     };
 
+    // 1) Catch any ringing call that already exists (e.g. user just logged in
+    //    or page reloaded while a call was already incoming).
+    (async () => {
+      const { data } = await supabase
+        .from("calls")
+        .select("id")
+        .eq("callee_id", user.id)
+        .eq("status", "ringing")
+        .order("created_at", { ascending: false })
+        .limit(1);
+      const id = data?.[0]?.id;
+      if (id) handle(id);
+    })();
+
+    // 2) Subscribe to live INSERTs targeted at this user.
     const ch = supabase
-      .channel(`calls-${user.id}`)
+      .channel(`incoming-calls-${user.id}`)
       .on(
         "postgres_changes",
         {
@@ -147,7 +197,7 @@ export default function IncomingCallScreen() {
           filter: `callee_id=eq.${user.id}`,
         },
         (payload) => {
-          const row: any = payload.new;
+          const row = payload.new as { id: string; status: string };
           if (row?.status === "ringing") handle(row.id);
         },
       )
@@ -159,8 +209,7 @@ export default function IncomingCallScreen() {
           table: "calls",
         },
         (payload) => {
-          const row: any = payload.new;
-          // If caller cancels (ends before pickup), dismiss this UI.
+          const row = payload.new as { id: string; status: string };
           const cur = incomingRef.current;
           if (cur && row?.id === cur.id && row.status !== "ringing") {
             setIncoming(null);
