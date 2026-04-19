@@ -197,6 +197,7 @@ export default function IncomingCallScreen() {
       `/call/${c.conversation_id}?type=${c.call_type}&callId=${c.id}&room=${encodeURIComponent(
         c.room_name,
       )}&role=callee`,
+      { replace: true },
     );
   };
 
