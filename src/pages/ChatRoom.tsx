@@ -1112,24 +1112,20 @@ export default function ChatRoom() {
           )}
         </div>
       </div>
-      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <AlertDialogContent className="max-w-[320px]">
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              Delete {selectionCount > 1 ? `${selectionCount} messages` : "message"}?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              You can delete just for yourself, or for everyone in this chat.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="flex flex-col gap-2 mt-2">
+      {deleteOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-[60] bg-black/30"
+            onClick={() => setDeleteOpen(false)}
+          />
+          <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[61] w-[260px] rounded-xl bg-background border border-border shadow-lg overflow-hidden">
             {allMine && !isOnlyDeleted && (
               <button
                 onClick={async () => {
                   setDeleteOpen(false);
                   await deleteForEveryone(selectedList);
                 }}
-                className="w-full h-10 rounded-lg bg-destructive text-destructive-foreground text-sm font-medium"
+                className="w-full h-11 text-sm text-foreground hover:bg-secondary border-b border-border"
               >
                 Delete for everyone
               </button>
@@ -1139,16 +1135,19 @@ export default function ChatRoom() {
                 setDeleteOpen(false);
                 deleteForMe(selectedList);
               }}
-              className="w-full h-10 rounded-lg bg-secondary text-foreground text-sm font-medium"
+              className="w-full h-11 text-sm text-foreground hover:bg-secondary border-b border-border"
             >
               Delete for me
             </button>
+            <button
+              onClick={() => setDeleteOpen(false)}
+              className="w-full h-11 text-sm text-foreground hover:bg-secondary"
+            >
+              Cancel
+            </button>
           </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="w-full">Cancel</AlertDialogCancel>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        </>
+      )}
     </MobileFrame>
   );
 }
