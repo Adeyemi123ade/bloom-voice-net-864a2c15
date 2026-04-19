@@ -126,7 +126,7 @@ export function AttachmentBubble({
         )}
         {imgOpen && (
           <div
-            className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center p-4"
+            className="fixed inset-0 z-[200] flex items-center justify-center p-0"
             onClick={(e) => {
               e.stopPropagation();
               setImgOpen(false);
@@ -176,9 +176,7 @@ export function AttachmentBubble({
         target="_blank"
         rel="noopener noreferrer"
         onClick={(e) => e.stopPropagation()}
-        className={`flex items-center gap-2 px-2.5 py-2 rounded-xl min-w-[210px] ${
-          mine ? "bg-primary-foreground/15" : "bg-foreground/10"
-        }`}
+        className="flex items-center gap-2 min-w-[210px]"
       >
         <div
           className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 text-white ${style.bg}`}
