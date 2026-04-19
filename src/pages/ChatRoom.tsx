@@ -313,6 +313,7 @@ export default function ChatRoom() {
   const [editing, setEditing] = useState<Message | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [replyTo, setReplyTo] = useState<Message | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [recording, setRecording] = useState(false);
   const [recSec, setRecSec] = useState(0);
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -756,7 +757,7 @@ export default function ChatRoom() {
             )}
             <button
               aria-label="Delete selected"
-              onClick={bulkDelete}
+              onClick={() => setDeleteOpen(true)}
               className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
             >
               <Trash2 className="w-4 h-4 text-destructive" />
