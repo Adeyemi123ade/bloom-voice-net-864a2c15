@@ -101,6 +101,11 @@ export default function IncomingCallScreen() {
   useEffect(() => {
     if (!user) return;
 
+    // Native (Android) heads-up notifications — no-op on web.
+    import("@/lib/nativeCallNotifications").then((m) =>
+      m.startNativeCallNotifications(user.id),
+    );
+
     const handle = async (callId: string) => {
       if (handled.current.has(callId)) return;
       handled.current.add(callId);
