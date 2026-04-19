@@ -906,10 +906,11 @@ export default function ChatRoom() {
                         m.read_at ? (
                           <CheckCheck className="w-3 h-3 text-primary-foreground/90" />
                         ) : (
-                        <Check className="w-3 h-3 text-primary-foreground/70" />
-                      )
-                    )}
-                  </div>
+                          <Check className="w-3 h-3 text-primary-foreground/70" />
+                        )
+                      )}
+                    </div>
+                  )}
                 </div>
               </SwipeRow>
             );
