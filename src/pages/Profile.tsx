@@ -110,7 +110,7 @@ export default function Profile() {
         <div className="px-3 pt-4 pb-3 flex items-center gap-2 border-b border-border sticky top-0 bg-background z-10">
           <button
             aria-label="Back"
-            onClick={() => navigate("/home")}
+            onClick={() => navigate(-1)}
             className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
           >
             <ArrowLeft className="w-4 h-4 text-foreground" />
