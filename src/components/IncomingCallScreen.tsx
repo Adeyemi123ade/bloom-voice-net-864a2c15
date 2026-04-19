@@ -68,20 +68,67 @@ function buildRingtoneDataUrl(): string {
 
 const RINGTONE_URL = buildRingtoneDataUrl();
 
+/**
+ * Shared, persistent audio element. Created once and "primed" by the first
+ * user gesture anywhere in the app (click/touch/keydown). Priming = playing
+ * a muted no-op so the browser marks this <audio> as user-activated. After
+ * that, we can call .play() programmatically (e.g. when an incoming call
+ * arrives) without a fresh user gesture — which is exactly how a real phone
+ * ringtone behaves.
+ */
+let sharedAudio: HTMLAudioElement | null = null;
+let primed = false;
+
+function getSharedAudio(): HTMLAudioElement {
+  if (!sharedAudio) {
+    sharedAudio = new Audio();
+    sharedAudio.loop = true;
+    sharedAudio.preload = "auto";
+    sharedAudio.src = RINGTONE_URL;
+  }
+  return sharedAudio;
+}
+
+if (typeof window !== "undefined") {
+  const prime = () => {
+    if (primed) return;
+    const a = getSharedAudio();
+    const prevMuted = a.muted;
+    const prevVol = a.volume;
+    a.muted = true;
+    a.volume = 0;
+    a.play()
+      .then(() => {
+        a.pause();
+        a.currentTime = 0;
+        a.muted = prevMuted;
+        a.volume = prevVol;
+        primed = true;
+      })
+      .catch(() => {
+        /* will retry on next gesture */
+      });
+  };
+  const opts = { capture: true, passive: true } as AddEventListenerOptions;
+  window.addEventListener("pointerdown", prime, opts);
+  window.addEventListener("touchstart", prime, opts);
+  window.addEventListener("keydown", prime, opts);
+  window.addEventListener("click", prime, opts);
+}
+
 /** Plays a looping ringtone + vibration while `active` is true. */
 function useRingtone(active: boolean) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     if (!active) return;
-    const a = new Audio(RINGTONE_URL);
-    a.loop = true;
+    const a = getSharedAudio();
+    a.muted = false;
     a.volume = 0.9;
+    a.currentTime = 0;
     audioRef.current = a;
-    // Try playing — if blocked, the visual UI still shows and tapping Accept
-    // is itself a user gesture which will succeed.
     a.play().catch(() => {
-      /* autoplay blocked — no-op */
+      /* autoplay still blocked — visual UI + vibration will signal the call */
     });
 
     let vInt: number | undefined;
