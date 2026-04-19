@@ -8,6 +8,7 @@ import {
   Trash2,
   User as UserIcon,
 } from "lucide-react";
+import { Capacitor } from "@capacitor/core";
 import MobileFrame from "@/components/MobileFrame";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,6 +24,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+
+const isNativeMobile = Capacitor.isNativePlatform();
 
 export default function Settings() {
   const navigate = useNavigate();
