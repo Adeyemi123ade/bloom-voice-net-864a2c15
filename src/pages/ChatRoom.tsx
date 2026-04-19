@@ -301,7 +301,7 @@ export default function ChatRoom() {
   const [otherTyping, setOtherTyping] = useState(false);
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<Message | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [recording, setRecording] = useState(false);
   const [recSec, setRecSec] = useState(0);
@@ -492,11 +492,21 @@ export default function ChatRoom() {
   };
 
   // Selection / actions
-  const selected = useMemo(
-    () => (selectedId ? messages.find((m) => m.id === selectedId) ?? null : null),
-    [selectedId, messages],
+  const selectedList = useMemo(
+    () => messages.filter((m) => selectedIds.has(m.id)),
+    [selectedIds, messages],
   );
-  const clearSelection = () => setSelectedId(null);
+  const selectionCount = selectedList.length;
+  const onlySelected = selectionCount === 1 ? selectedList[0] : null;
+  const clearSelection = () => setSelectedIds(new Set());
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const startEdit = (m: Message) => {
     setEditing(m);
@@ -507,21 +517,30 @@ export default function ChatRoom() {
     setEditing(null);
     setText("");
   };
-  const deleteForMe = (m: Message) => {
+  const deleteForMe = (msgs: Message[]) => {
     if (!conversationId) return;
     const next = new Set(hidden);
-    next.add(m.id);
+    msgs.forEach((m) => next.add(m.id));
     setHidden(next);
     saveHidden(conversationId, next);
     clearSelection();
   };
-  const deleteForEveryone = async (m: Message) => {
+  const deleteForEveryone = async (msgs: Message[]) => {
+    const ids = msgs.map((m) => m.id);
+    if (ids.length === 0) return;
     const { error } = await supabase
       .from("messages")
       .update({ deleted_for_everyone: true, content: "" })
-      .eq("id", m.id);
+      .in("id", ids);
     if (error) toast({ title: "Delete failed", description: error.message, variant: "destructive" });
     clearSelection();
+  };
+  const bulkDelete = async () => {
+    if (!user) return;
+    const mine = selectedList.filter((m) => m.sender_id === user.id && !m.deleted_for_everyone);
+    const others = selectedList.filter((m) => m.sender_id !== user.id || m.deleted_for_everyone);
+    if (mine.length) await deleteForEveryone(mine);
+    if (others.length) deleteForMe(others);
   };
   const copyMsg = async (m: Message) => {
     const txt = m.content.startsWith(VOICE_PREFIX) ? m.content.slice(VOICE_PREFIX.length) : m.content;
@@ -533,8 +552,12 @@ export default function ChatRoom() {
     }
     clearSelection();
   };
-  const shareMsg = async (m: Message) => {
-    const txt = m.content.startsWith(VOICE_PREFIX) ? m.content.slice(VOICE_PREFIX.length) : m.content;
+  const shareMsgs = async (msgs: Message[]) => {
+    const txt = msgs
+      .map((m) =>
+        m.content.startsWith(VOICE_PREFIX) ? m.content.slice(VOICE_PREFIX.length) : m.content,
+      )
+      .join("\n\n");
     try {
       if ((navigator as any).share) {
         await (navigator as any).share({ text: txt });
