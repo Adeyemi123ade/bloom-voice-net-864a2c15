@@ -4,24 +4,14 @@ import {
   ArrowLeft,
   ChevronRight,
   LogOut,
-  Monitor,
-  Moon,
-  Sun,
+  Smartphone,
   Trash2,
   User as UserIcon,
-  Palette,
 } from "lucide-react";
-import { useTheme } from "next-themes";
 import MobileFrame from "@/components/MobileFrame";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
