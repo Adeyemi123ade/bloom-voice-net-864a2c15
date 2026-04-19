@@ -1,7 +1,7 @@
 import { FileText, Download, FileSpreadsheet, Presentation, FileArchive, FileCode, FileAudio, FileVideo, File as FileIcon } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
-import { X } from "lucide-react";
 
 export const FILE_PREFIX = "[file]";
 // Encoded as: [file]url|mime|name|size|caption
@@ -126,40 +126,7 @@ export function AttachmentBubble({
         {meta.caption && (
           <p className="text-[13px] whitespace-pre-wrap break-words mt-1">{meta.caption}</p>
         )}
-        {imgOpen && (
-          <div
-            className="fixed inset-0 z-[200] bg-background"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              onClick={() => setImgOpen(false)}
-              className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-background/60 backdrop-blur flex items-center justify-center text-foreground"
-              aria-label="Close"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            <TransformWrapper
-              initialScale={1}
-              minScale={1}
-              maxScale={6}
-              doubleClick={{ mode: "toggle", step: 2 }}
-              wheel={{ step: 0.2 }}
-              pinch={{ step: 5 }}
-            >
-              <TransformComponent
-                wrapperStyle={{ width: "100vw", height: "100vh" }}
-                contentStyle={{ width: "100vw", height: "100vh" }}
-              >
-                <img
-                  src={meta.url}
-                  alt={meta.name}
-                  className="w-screen h-screen object-contain select-none"
-                  draggable={false}
-                />
-              </TransformComponent>
-            </TransformWrapper>
-          </div>
-        )}
+        {imgOpen && <ImageViewer url={meta.url} name={meta.name} onClose={() => setImgOpen(false)} />}
       </>
     );
   }
@@ -227,5 +194,53 @@ export function AttachmentBubble({
         <p className="text-[13px] whitespace-pre-wrap break-words">{meta.caption}</p>
       )}
     </div>
+  );
+}
+
+function ImageViewer({ url, name, onClose }: { url: string; name: string; onClose: () => void }) {
+  // Push a history entry so the device/browser Back button closes the viewer.
+  useEffect(() => {
+    window.history.pushState({ chichatImageViewer: true }, "");
+    const onPop = () => onClose();
+    window.addEventListener("popstate", onPop);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("popstate", onPop);
+      document.body.style.overflow = prevOverflow;
+      // If we're closing programmatically (not from popstate), clean the entry.
+      if (window.history.state?.chichatImageViewer) window.history.back();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return createPortal(
+    <div
+      className="fixed inset-0 bg-black"
+      style={{ zIndex: 2147483647 }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <TransformWrapper
+        initialScale={1}
+        minScale={1}
+        maxScale={8}
+        doubleClick={{ mode: "toggle", step: 2 }}
+        wheel={{ step: 0.2 }}
+        pinch={{ step: 5 }}
+      >
+        <TransformComponent
+          wrapperStyle={{ width: "100vw", height: "100vh" }}
+          contentStyle={{ width: "100vw", height: "100vh" }}
+        >
+          <img
+            src={url}
+            alt={name}
+            className="w-screen h-screen object-contain select-none"
+            draggable={false}
+          />
+        </TransformComponent>
+      </TransformWrapper>
+    </div>,
+    document.body,
   );
 }
