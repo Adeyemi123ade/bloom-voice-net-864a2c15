@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Camera, Loader2, LogOut, Trash2 } from "lucide-react";
+import { ArrowLeft, Camera, Loader2 } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,17 +10,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 
 function initials(name?: string | null) {
   if (!name) return "?";
@@ -35,8 +24,6 @@ export default function Profile() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [confirmStage, setConfirmStage] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -116,26 +103,6 @@ export default function Profile() {
     }
   };
 
-  const signOut = async () => {
-    await supabase.auth.signOut();
-    navigate("/login");
-  };
-
-  const deleteAccount = async () => {
-    if (!user) return;
-    setDeleting(true);
-    // Soft-delete: clear profile data, sign out. (Hard delete needs admin function.)
-    await supabase
-      .from("profiles")
-      .upsert(
-        { id: user.id, display_name: "Deleted user", avatar_url: null, is_online: false },
-        { onConflict: "id" }
-      );
-    await supabase.auth.signOut();
-    setDeleting(false);
-    toast({ title: "Account removed", description: "You have been signed out." });
-    navigate("/register");
-  };
 
   return (
     <MobileFrame>
@@ -143,7 +110,7 @@ export default function Profile() {
         <div className="px-3 pt-4 pb-3 flex items-center gap-2 border-b border-border sticky top-0 bg-background z-10">
           <button
             aria-label="Back"
-            onClick={() => navigate("/home")}
+            onClick={() => navigate(-1)}
             className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
           >
             <ArrowLeft className="w-4 h-4 text-foreground" />
@@ -218,58 +185,6 @@ export default function Profile() {
             {saving ? "Saving…" : "Save changes"}
           </Button>
 
-          <div className="w-full mt-4 pt-4 border-t border-border space-y-2">
-            <button
-              onClick={signOut}
-              className="w-full h-10 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground text-xs flex items-center justify-center gap-2"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              Sign out
-            </button>
-
-            <AlertDialog onOpenChange={(o) => !o && setConfirmStage(false)}>
-              <AlertDialogTrigger asChild>
-                <button className="w-full h-10 rounded-lg bg-destructive/10 hover:bg-destructive/20 text-destructive text-xs flex items-center justify-center gap-2">
-                  <Trash2 className="w-3.5 h-3.5" />
-                  Delete account
-                </button>
-              </AlertDialogTrigger>
-              <AlertDialogContent className="max-w-[280px]">
-                <AlertDialogHeader>
-                  <AlertDialogTitle className="text-sm">
-                    {confirmStage ? "Are you absolutely sure?" : "Delete your account?"}
-                  </AlertDialogTitle>
-                  <AlertDialogDescription className="text-xs">
-                    {confirmStage
-                      ? "This permanently removes your profile and signs you out. This cannot be undone."
-                      : "Your profile and presence will be removed. You'll need to register again to come back."}
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel className="text-xs h-9">Cancel</AlertDialogCancel>
-                  {confirmStage ? (
-                    <AlertDialogAction
-                      onClick={deleteAccount}
-                      disabled={deleting}
-                      className="bg-destructive hover:bg-destructive/90 text-destructive-foreground text-xs h-9"
-                    >
-                      {deleting ? "Deleting…" : "Yes, delete"}
-                    </AlertDialogAction>
-                  ) : (
-                    <AlertDialogAction
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setConfirmStage(true);
-                      }}
-                      className="bg-destructive hover:bg-destructive/90 text-destructive-foreground text-xs h-9"
-                    >
-                      Continue
-                    </AlertDialogAction>
-                  )}
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
         </div>
       </div>
     </MobileFrame>

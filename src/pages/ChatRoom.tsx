@@ -301,7 +301,7 @@ export default function ChatRoom() {
   const [otherTyping, setOtherTyping] = useState(false);
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<Message | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [recording, setRecording] = useState(false);
   const [recSec, setRecSec] = useState(0);
@@ -492,11 +492,21 @@ export default function ChatRoom() {
   };
 
   // Selection / actions
-  const selected = useMemo(
-    () => (selectedId ? messages.find((m) => m.id === selectedId) ?? null : null),
-    [selectedId, messages],
+  const selectedList = useMemo(
+    () => messages.filter((m) => selectedIds.has(m.id)),
+    [selectedIds, messages],
   );
-  const clearSelection = () => setSelectedId(null);
+  const selectionCount = selectedList.length;
+  const onlySelected = selectionCount === 1 ? selectedList[0] : null;
+  const clearSelection = () => setSelectedIds(new Set());
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const startEdit = (m: Message) => {
     setEditing(m);
@@ -507,21 +517,30 @@ export default function ChatRoom() {
     setEditing(null);
     setText("");
   };
-  const deleteForMe = (m: Message) => {
+  const deleteForMe = (msgs: Message[]) => {
     if (!conversationId) return;
     const next = new Set(hidden);
-    next.add(m.id);
+    msgs.forEach((m) => next.add(m.id));
     setHidden(next);
     saveHidden(conversationId, next);
     clearSelection();
   };
-  const deleteForEveryone = async (m: Message) => {
+  const deleteForEveryone = async (msgs: Message[]) => {
+    const ids = msgs.map((m) => m.id);
+    if (ids.length === 0) return;
     const { error } = await supabase
       .from("messages")
       .update({ deleted_for_everyone: true, content: "" })
-      .eq("id", m.id);
+      .in("id", ids);
     if (error) toast({ title: "Delete failed", description: error.message, variant: "destructive" });
     clearSelection();
+  };
+  const bulkDelete = async () => {
+    if (!user) return;
+    const mine = selectedList.filter((m) => m.sender_id === user.id && !m.deleted_for_everyone);
+    const others = selectedList.filter((m) => m.sender_id !== user.id || m.deleted_for_everyone);
+    if (mine.length) await deleteForEveryone(mine);
+    if (others.length) deleteForMe(others);
   };
   const copyMsg = async (m: Message) => {
     const txt = m.content.startsWith(VOICE_PREFIX) ? m.content.slice(VOICE_PREFIX.length) : m.content;
@@ -533,8 +552,12 @@ export default function ChatRoom() {
     }
     clearSelection();
   };
-  const shareMsg = async (m: Message) => {
-    const txt = m.content.startsWith(VOICE_PREFIX) ? m.content.slice(VOICE_PREFIX.length) : m.content;
+  const shareMsgs = async (msgs: Message[]) => {
+    const txt = msgs
+      .map((m) =>
+        m.content.startsWith(VOICE_PREFIX) ? m.content.slice(VOICE_PREFIX.length) : m.content,
+      )
+      .join("\n\n");
     try {
       if ((navigator as any).share) {
         await (navigator as any).share({ text: txt });
@@ -664,18 +687,21 @@ export default function ChatRoom() {
 
   const visible = useMemo(() => messages.filter((m) => !hidden.has(m.id)), [messages, hidden]);
 
-  const isSelectionMine = selected?.sender_id === user?.id;
-  const isSelectionVoice = selected?.content.startsWith(VOICE_PREFIX);
-  const isSelectionCall = selected?.content.startsWith(CALL_PREFIX);
-  const isSelectionFile = selected?.content.startsWith(FILE_PREFIX);
-  const isSelectionDeleted = selected?.deleted_for_everyone;
-  const isUneditable = isSelectionVoice || isSelectionCall || isSelectionFile;
+  const allMine = onlySelected
+    ? onlySelected.sender_id === user?.id
+    : selectedList.length > 0 && selectedList.every((m) => m.sender_id === user?.id);
+  const isOnlyVoice = onlySelected?.content.startsWith(VOICE_PREFIX);
+  const isOnlyCall = onlySelected?.content.startsWith(CALL_PREFIX);
+  const isOnlyFile = onlySelected?.content.startsWith(FILE_PREFIX);
+  const isOnlyDeleted = onlySelected?.deleted_for_everyone;
+  const isUneditable = isOnlyVoice || isOnlyCall || isOnlyFile;
+  const anyCall = selectedList.some((m) => m.content.startsWith(CALL_PREFIX));
 
   return (
     <MobileFrame>
       <div className="h-full w-full flex flex-col bg-background" onClick={clearSelection}>
         {/* Header OR Selection action bar */}
-        {selected ? (
+        {selectionCount > 0 ? (
           <div
             className="px-2 pt-4 pb-3 flex items-center gap-1 border-b border-border bg-card"
             onClick={(e) => e.stopPropagation()}
@@ -687,51 +713,44 @@ export default function ChatRoom() {
             >
               <X className="w-4 h-4 text-foreground" />
             </button>
+            <span className="text-xs font-semibold text-foreground ml-1">
+              {selectionCount}
+            </span>
             <div className="flex-1" />
-            {!isSelectionDeleted && !isSelectionCall && (
+            {selectionCount === 1 && !isOnlyDeleted && !isOnlyCall && (
               <button
                 aria-label="Copy"
-                onClick={() => selected && copyMsg(selected)}
+                onClick={() => onlySelected && copyMsg(onlySelected)}
                 className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
               >
                 <Copy className="w-4 h-4 text-foreground" />
               </button>
             )}
-            {!isSelectionDeleted && !isSelectionCall && (
+            {!anyCall && (
               <button
                 aria-label="Forward"
-                onClick={() => selected && shareMsg(selected)}
+                onClick={() => shareMsgs(selectedList.filter((m) => !m.deleted_for_everyone))}
                 className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
               >
                 <Forward className="w-4 h-4 text-foreground" />
               </button>
             )}
-            {isSelectionMine && !isSelectionDeleted && !isUneditable && (
+            {selectionCount === 1 && allMine && !isOnlyDeleted && !isUneditable && (
               <button
                 aria-label="Edit"
-                onClick={() => selected && startEdit(selected)}
+                onClick={() => onlySelected && startEdit(onlySelected)}
                 className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
               >
                 <Pencil className="w-4 h-4 text-foreground" />
               </button>
             )}
-            {isSelectionMine && !isSelectionDeleted ? (
-              <button
-                aria-label="Delete for everyone"
-                onClick={() => selected && deleteForEveryone(selected)}
-                className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
-              >
-                <Trash2 className="w-4 h-4 text-destructive" />
-              </button>
-            ) : (
-              <button
-                aria-label="Delete for me"
-                onClick={() => selected && deleteForMe(selected)}
-                className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
-              >
-                <Trash2 className="w-4 h-4 text-foreground" />
-              </button>
-            )}
+            <button
+              aria-label="Delete selected"
+              onClick={bulkDelete}
+              className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
+            >
+              <Trash2 className="w-4 h-4 text-destructive" />
+            </button>
           </div>
         ) : (
           <div className="px-3 pt-4 pb-3 flex items-center gap-2 border-b border-border">
@@ -797,7 +816,7 @@ export default function ChatRoom() {
             const voiceUrl = isVoice ? m.content.slice(VOICE_PREFIX.length) : "";
             const fileMeta = isFile ? parseFileMessage(m.content) : null;
             const isDeleted = m.deleted_for_everyone;
-            const isSelected = selectedId === m.id;
+            const isSelected = selectedIds.has(m.id);
 
             if (isCall) {
               return (
@@ -806,7 +825,7 @@ export default function ChatRoom() {
                   className={`flex justify-center`}
                   onClick={(e) => {
                     e.stopPropagation();
-                    setSelectedId(isSelected ? null : m.id);
+                    toggleSelect(m.id);
                   }}
                 >
                   <div className={isSelected ? "ring-2 ring-primary rounded-2xl" : ""}>
@@ -834,7 +853,7 @@ export default function ChatRoom() {
                 onReply={() => replyMsg(m)}
                 onTap={(e) => {
                   e.stopPropagation();
-                  setSelectedId(isSelected ? null : m.id);
+                  toggleSelect(m.id);
                 }}
               >
                 <div
