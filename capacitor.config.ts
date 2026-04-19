@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
-  appId: "app.lovable.84da0127858b4a61998660ed33bc4997",
+  appId: "app.lovable.chichat",
   appName: "ChiChat",
   webDir: "dist",
   server: {
