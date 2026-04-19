@@ -2,13 +2,6 @@
  * Built-in ringtone library — generated entirely with WebAudio so we ship no
  * audio assets. Each ringtone returns a "stop" function. Patterns auto-loop
  * with a short pause until stopped.
- *
- * 5 presets:
- *   - melody-marimba    : warm marimba arpeggio
- *   - melody-chime      : gentle bell chime sequence
- *   - melody-pluck      : harp-like pluck loop
- *   - classic-twotone   : 440+480 Hz two-tone (US-style ring)
- *   - classic-trill     : 400+450 Hz dual-tone (UK/intl ringback style)
  */
 
 export type RingtoneId =
@@ -26,36 +19,11 @@ export type RingtonePreset = {
 };
 
 export const RINGTONES: RingtonePreset[] = [
-  {
-    id: "melody-marimba",
-    label: "Marimba",
-    category: "Melody",
-    description: "Warm wooden arpeggio",
-  },
-  {
-    id: "melody-chime",
-    label: "Chime",
-    category: "Melody",
-    description: "Gentle bell sequence",
-  },
-  {
-    id: "melody-pluck",
-    label: "Harp pluck",
-    category: "Melody",
-    description: "Soft plucked strings",
-  },
-  {
-    id: "classic-twotone",
-    label: "Classic two-tone",
-    category: "Classic",
-    description: "Familiar phone ring",
-  },
-  {
-    id: "classic-trill",
-    label: "Classic trill",
-    category: "Classic",
-    description: "Traditional dual-tone ring",
-  },
+  { id: "melody-marimba", label: "Marimba", category: "Melody", description: "Warm wooden arpeggio" },
+  { id: "melody-chime", label: "Chime", category: "Melody", description: "Gentle bell sequence" },
+  { id: "melody-pluck", label: "Harp pluck", category: "Melody", description: "Soft plucked strings" },
+  { id: "classic-twotone", label: "Classic two-tone", category: "Classic", description: "Familiar phone ring" },
+  { id: "classic-trill", label: "Classic trill", category: "Classic", description: "Traditional dual-tone ring" },
 ];
 
 const STORAGE_KEY = "chichat:ringtone";
@@ -81,12 +49,62 @@ export function setSelectedRingtone(id: RingtoneId) {
 
 type StopFn = () => void;
 
-function getAC(): AudioContext | null {
+/**
+ * Shared, gesture-primed AudioContext. Browsers (especially mobile Chrome)
+ * block AudioContext.resume() unless it was created/resumed during a real
+ * user gesture. We create ONE context the first time the user touches the
+ * page, immediately resume it, and play a brief silent buffer to fully
+ * "unlock" it. After that we can play ringtones at any time without a
+ * fresh gesture — including from a Realtime callback.
+ */
+let sharedCtx: AudioContext | null = null;
+let primed = false;
+
+function createCtx(): AudioContext | null {
   const AC =
     window.AudioContext ||
-    (window as unknown as { webkitAudioContext?: typeof AudioContext })
-      .webkitAudioContext;
+    (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
   return AC ? new AC() : null;
+}
+
+export function primeAudio() {
+  if (primed) return;
+  if (!sharedCtx) sharedCtx = createCtx();
+  if (!sharedCtx) return;
+  try {
+    void sharedCtx.resume();
+    // Play 50ms of silence to unlock iOS / Android Chrome
+    const buf = sharedCtx.createBuffer(1, 1, 22050);
+    const src = sharedCtx.createBufferSource();
+    src.buffer = buf;
+    src.connect(sharedCtx.destination);
+    src.start(0);
+    primed = true;
+  } catch {
+    /* ignore */
+  }
+}
+
+if (typeof window !== "undefined") {
+  const opts = { capture: true, passive: true } as AddEventListenerOptions;
+  const handler = () => {
+    primeAudio();
+    if (primed) {
+      window.removeEventListener("pointerdown", handler, opts);
+      window.removeEventListener("touchstart", handler, opts);
+      window.removeEventListener("keydown", handler, opts);
+      window.removeEventListener("click", handler, opts);
+    }
+  };
+  window.addEventListener("pointerdown", handler, opts);
+  window.addEventListener("touchstart", handler, opts);
+  window.addEventListener("keydown", handler, opts);
+  window.addEventListener("click", handler, opts);
+}
+
+function getCtx(): AudioContext | null {
+  if (!sharedCtx) sharedCtx = createCtx();
+  return sharedCtx;
 }
 
 /** Pluck-style envelope: fast attack, exponential decay. */
@@ -112,7 +130,6 @@ function playNote(
   o.stop(startAt + duration + 0.05);
 }
 
-/** Sustained dual-tone segment with soft attack/release. */
 function playDualTone(
   ctx: AudioContext,
   destination: AudioNode,
@@ -143,42 +160,27 @@ function playDualTone(
 }
 
 type Pattern = {
-  /** Length of one full cycle in seconds (tone+gap). */
   cycle: number;
-  /** Render one cycle starting at `startAt`. */
   render: (ctx: AudioContext, dest: AudioNode, startAt: number) => void;
 };
 
-// Notes (Hz)
 const N = {
-  C5: 523.25,
-  D5: 587.33,
-  E5: 659.25,
-  G5: 783.99,
-  A5: 880.0,
-  B5: 987.77,
-  C6: 1046.5,
-  E6: 1318.51,
-  G6: 1567.98,
+  C5: 523.25, D5: 587.33, E5: 659.25, G5: 783.99,
+  A5: 880.0, B5: 987.77, C6: 1046.5, E6: 1318.51, G6: 1567.98,
 };
 
 const PATTERNS: Record<RingtoneId, Pattern> = {
   "melody-marimba": {
     cycle: 4.0,
     render: (ctx, dest, t0) => {
-      // Bright arpeggio: C5 E5 G5 C6 G5 E5  then pause
       const seq = [N.C5, N.E5, N.G5, N.C6, N.G5, N.E5];
-      seq.forEach((f, i) => {
-        playNote(ctx, dest, f, t0 + i * 0.22, 0.45, "triangle", 0.25);
-      });
-      // accent
+      seq.forEach((f, i) => playNote(ctx, dest, f, t0 + i * 0.22, 0.45, "triangle", 0.25));
       playNote(ctx, dest, N.E6, t0 + 1.45, 0.6, "triangle", 0.2);
     },
   },
   "melody-chime": {
     cycle: 4.5,
     render: (ctx, dest, t0) => {
-      // Bell-like: E6 C6 G5 — let ring
       playNote(ctx, dest, N.E6, t0, 1.4, "sine", 0.28);
       playNote(ctx, dest, N.C6, t0 + 0.45, 1.4, "sine", 0.22);
       playNote(ctx, dest, N.G5, t0 + 0.9, 1.6, "sine", 0.2);
@@ -188,24 +190,17 @@ const PATTERNS: Record<RingtoneId, Pattern> = {
   "melody-pluck": {
     cycle: 3.6,
     render: (ctx, dest, t0) => {
-      // Pluck: D5 A5 D5 G5 A5 — rapid
       const seq = [N.D5, N.A5, N.D5, N.G5, N.A5, N.E5];
-      seq.forEach((f, i) => {
-        playNote(ctx, dest, f, t0 + i * 0.18, 0.35, "sawtooth", 0.16);
-      });
+      seq.forEach((f, i) => playNote(ctx, dest, f, t0 + i * 0.18, 0.35, "sawtooth", 0.16));
     },
   },
   "classic-twotone": {
     cycle: 4.0,
-    render: (ctx, dest, t0) => {
-      // 2s ring (440+480 Hz), 2s silence
-      playDualTone(ctx, dest, 440, 480, t0, 2.0, 0.22);
-    },
+    render: (ctx, dest, t0) => playDualTone(ctx, dest, 440, 480, t0, 2.0, 0.22),
   },
   "classic-trill": {
     cycle: 5.0,
     render: (ctx, dest, t0) => {
-      // brrring brrring: 400+450 Hz, two short tones, then silence
       playDualTone(ctx, dest, 400, 450, t0, 0.9, 0.22);
       playDualTone(ctx, dest, 400, 450, t0 + 1.1, 0.9, 0.22);
     },
@@ -214,10 +209,12 @@ const PATTERNS: Record<RingtoneId, Pattern> = {
 
 /**
  * Plays the given ringtone in a loop until the returned stop fn is called.
- * Optionally stops automatically after `maxSeconds` (used for previews).
+ * Uses the shared primed AudioContext so it works even when triggered from
+ * a Realtime callback (no fresh user gesture required, as long as the user
+ * has tapped the app at least once previously).
  */
 export function playRingtone(id: RingtoneId, maxSeconds?: number): StopFn {
-  const ctx = getAC();
+  const ctx = getCtx();
   if (!ctx) return () => {};
   const master = ctx.createGain();
   master.gain.value = 0.9;
@@ -226,6 +223,7 @@ export function playRingtone(id: RingtoneId, maxSeconds?: number): StopFn {
   const pattern = PATTERNS[id] ?? PATTERNS[DEFAULT_RINGTONE];
   let cancelled = false;
   let timer: number | undefined;
+  const activeNodes: AudioNode[] = [master];
 
   const tick = () => {
     if (cancelled) return;
@@ -233,6 +231,7 @@ export function playRingtone(id: RingtoneId, maxSeconds?: number): StopFn {
     timer = window.setTimeout(tick, pattern.cycle * 1000);
   };
 
+  // Always try to resume — no-op if already running.
   ctx.resume().finally(tick);
 
   let autoStop: number | undefined;
@@ -247,17 +246,19 @@ export function playRingtone(id: RingtoneId, maxSeconds?: number): StopFn {
     if (autoStop) window.clearTimeout(autoStop);
     try {
       master.gain.cancelScheduledValues(ctx.currentTime);
-      master.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.1);
+      master.gain.setValueAtTime(master.gain.value, ctx.currentTime);
+      master.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.08);
     } catch {
       /* ignore */
     }
     window.setTimeout(() => {
       try {
-        ctx.close();
+        activeNodes.forEach((n) => n.disconnect());
       } catch {
         /* ignore */
       }
-    }, 200);
+    }, 150);
+    // Do NOT close the shared ctx — we reuse it for the next call.
   };
 
   return stop;

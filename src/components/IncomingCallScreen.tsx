@@ -166,12 +166,14 @@ export default function IncomingCallScreen() {
           event: "UPDATE",
           schema: "public",
           table: "calls",
+          filter: `callee_id=eq.${user.id}`,
         },
         (payload) => {
           const row = payload.new as { id: string; status: string };
-          const cur = incomingRef.current;
-          if (cur && row?.id === cur.id && row.status !== "ringing") {
-            setIncoming(null);
+          if (row?.status && row.status !== "ringing") {
+            const cur = incomingRef.current;
+            if (cur && row.id === cur.id) setIncoming(null);
+            handled.current.add(row.id);
           }
         },
       )
