@@ -136,7 +136,7 @@ export default function CallScreen() {
     } catch {
       /* ignore */
     }
-    setTimeout(() => navigate(`/chat/${conversationId}`), 500);
+    setTimeout(() => navigate(`/chat/${conversationId}`, { replace: true }), 500);
   };
 
   const logCallMessage = async (kind: "ended" | "missed" | "declined", duration: number) => {
