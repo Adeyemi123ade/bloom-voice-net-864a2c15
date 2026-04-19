@@ -816,7 +816,7 @@ export default function ChatRoom() {
             const voiceUrl = isVoice ? m.content.slice(VOICE_PREFIX.length) : "";
             const fileMeta = isFile ? parseFileMessage(m.content) : null;
             const isDeleted = m.deleted_for_everyone;
-            const isSelected = selectedId === m.id;
+            const isSelected = selectedIds.has(m.id);
 
             if (isCall) {
               return (
@@ -825,7 +825,7 @@ export default function ChatRoom() {
                   className={`flex justify-center`}
                   onClick={(e) => {
                     e.stopPropagation();
-                    setSelectedId(isSelected ? null : m.id);
+                    toggleSelect(m.id);
                   }}
                 >
                   <div className={isSelected ? "ring-2 ring-primary rounded-2xl" : ""}>
@@ -853,7 +853,7 @@ export default function ChatRoom() {
                 onReply={() => replyMsg(m)}
                 onTap={(e) => {
                   e.stopPropagation();
-                  setSelectedId(isSelected ? null : m.id);
+                  toggleSelect(m.id);
                 }}
               >
                 <div
