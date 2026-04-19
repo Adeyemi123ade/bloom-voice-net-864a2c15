@@ -1,7 +1,7 @@
 // Mints a Twilio Video Access Token using a permanent API Key (SK.../secret).
 // Body: { roomName: string }  → { token: string, identity: string }
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
 import { create, getNumericDate } from "https://deno.land/x/djwt@v3.0.2/mod.ts";
 
 const corsHeaders = {
