@@ -218,58 +218,6 @@ export default function Profile() {
             {saving ? "Saving…" : "Save changes"}
           </Button>
 
-          <div className="w-full mt-4 pt-4 border-t border-border space-y-2">
-            <button
-              onClick={signOut}
-              className="w-full h-10 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground text-xs flex items-center justify-center gap-2"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              Sign out
-            </button>
-
-            <AlertDialog onOpenChange={(o) => !o && setConfirmStage(false)}>
-              <AlertDialogTrigger asChild>
-                <button className="w-full h-10 rounded-lg bg-destructive/10 hover:bg-destructive/20 text-destructive text-xs flex items-center justify-center gap-2">
-                  <Trash2 className="w-3.5 h-3.5" />
-                  Delete account
-                </button>
-              </AlertDialogTrigger>
-              <AlertDialogContent className="max-w-[280px]">
-                <AlertDialogHeader>
-                  <AlertDialogTitle className="text-sm">
-                    {confirmStage ? "Are you absolutely sure?" : "Delete your account?"}
-                  </AlertDialogTitle>
-                  <AlertDialogDescription className="text-xs">
-                    {confirmStage
-                      ? "This permanently removes your profile and signs you out. This cannot be undone."
-                      : "Your profile and presence will be removed. You'll need to register again to come back."}
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel className="text-xs h-9">Cancel</AlertDialogCancel>
-                  {confirmStage ? (
-                    <AlertDialogAction
-                      onClick={deleteAccount}
-                      disabled={deleting}
-                      className="bg-destructive hover:bg-destructive/90 text-destructive-foreground text-xs h-9"
-                    >
-                      {deleting ? "Deleting…" : "Yes, delete"}
-                    </AlertDialogAction>
-                  ) : (
-                    <AlertDialogAction
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setConfirmStage(true);
-                      }}
-                      className="bg-destructive hover:bg-destructive/90 text-destructive-foreground text-xs h-9"
-                    >
-                      Continue
-                    </AlertDialogAction>
-                  )}
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
         </div>
       </div>
     </MobileFrame>
