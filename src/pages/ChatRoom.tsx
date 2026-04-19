@@ -15,6 +15,7 @@ import {
   FILE_PREFIX,
   encodeFileMessage,
   parseFileMessage,
+  isBareAttachment,
 } from "@/components/chat/AttachmentBubble";
 
 type Message = {
@@ -846,6 +847,8 @@ export default function ChatRoom() {
               }
             }
 
+            const bareAttachment = isFile && fileMeta && isBareAttachment(fileMeta);
+
             return (
               <SwipeRow
                 key={m.id}
@@ -857,15 +860,19 @@ export default function ChatRoom() {
                 }}
               >
                 <div
-                  className={`max-w-[75%] px-3 py-2 rounded-2xl select-none transition-shadow ${
-                    mine
-                      ? "bg-primary text-primary-foreground rounded-br-sm"
-                      : "bg-secondary text-foreground rounded-bl-sm"
-                  } ${isDeleted ? "italic opacity-70" : ""} ${
-                    isSelected ? "ring-2 ring-accent" : ""
+                  className={`max-w-[75%] select-none transition-shadow ${
+                    bareAttachment
+                      ? `rounded-2xl ${isSelected ? "ring-2 ring-accent" : ""}`
+                      : `px-3 py-2 rounded-2xl ${
+                          mine
+                            ? "bg-primary text-primary-foreground rounded-br-sm"
+                            : "bg-secondary text-foreground rounded-bl-sm"
+                        } ${isDeleted ? "italic opacity-70" : ""} ${
+                          isSelected ? "ring-2 ring-accent" : ""
+                        }`
                   }`}
                 >
-                  {quoted && (
+                  {quoted && !bareAttachment && (
                     <div
                       className={`mb-1 px-2 py-1 rounded-md border-l-2 text-[11px] truncate ${
                         mine
@@ -885,23 +892,25 @@ export default function ChatRoom() {
                   ) : (
                     <p className="text-[13px] whitespace-pre-wrap break-words">{body}</p>
                   )}
-                  <div className={`flex items-center gap-1 mt-0.5 ${mine ? "justify-end" : "justify-start"}`}>
-                    {m.edited_at && !isDeleted && (
+                  {!bareAttachment && (
+                    <div className={`flex items-center gap-1 mt-0.5 ${mine ? "justify-end" : "justify-start"}`}>
+                      {m.edited_at && !isDeleted && (
+                        <span className={`text-[9px] ${mine ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
+                          edited
+                        </span>
+                      )}
                       <span className={`text-[9px] ${mine ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
-                        edited
+                        {formatTime(m.created_at)}
                       </span>
-                    )}
-                    <span className={`text-[9px] ${mine ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
-                      {formatTime(m.created_at)}
-                    </span>
-                    {mine && !isDeleted && (
-                      m.read_at ? (
-                        <CheckCheck className="w-3 h-3 text-primary-foreground/90" />
-                      ) : (
-                        <Check className="w-3 h-3 text-primary-foreground/70" />
-                      )
-                    )}
-                  </div>
+                      {mine && !isDeleted && (
+                        m.read_at ? (
+                          <CheckCheck className="w-3 h-3 text-primary-foreground/90" />
+                        ) : (
+                          <Check className="w-3 h-3 text-primary-foreground/70" />
+                        )
+                      )}
+                    </div>
+                  )}
                 </div>
               </SwipeRow>
             );
