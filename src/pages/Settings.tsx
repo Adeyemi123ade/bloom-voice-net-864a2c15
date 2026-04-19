@@ -108,20 +108,6 @@ export default function Settings() {
             <ChevronRight className="w-4 h-4 text-muted-foreground" />
           </button>
 
-          {/* Sign out */}
-          <button
-            onClick={signOut}
-            className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-secondary text-left mt-1"
-          >
-            <span className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center">
-              <LogOut className="w-4 h-4 text-foreground" />
-            </span>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-foreground">Sign out</p>
-              <p className="text-[11px] text-muted-foreground">End your current session</p>
-            </div>
-          </button>
-
           {/* Spacer pushes Delete account to the bottom */}
           <div className="flex-1" />
 
