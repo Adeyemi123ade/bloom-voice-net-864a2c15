@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getSelectedRingtone, playRingtone } from "@/lib/ringtones";
+import { startNativeCallNotifications } from "@/lib/nativeCallNotifications";
 
 type IncomingCall = {
   id: string;
@@ -102,9 +103,7 @@ export default function IncomingCallScreen() {
     if (!user) return;
 
     // Native (Android) heads-up notifications — no-op on web.
-    import("@/lib/nativeCallNotifications").then((m) =>
-      m.startNativeCallNotifications(user.id),
-    );
+    void startNativeCallNotifications(user.id);
 
     const handle = async (callId: string) => {
       if (handled.current.has(callId)) return;
