@@ -77,7 +77,7 @@ export function AttachmentBubble({
             src={meta.url}
             alt={meta.name}
             loading="lazy"
-            className="max-w-[240px] max-h-[280px] object-cover"
+            className="max-w-[160px] max-h-[160px] object-cover"
           />
         </button>
         {meta.caption && (
@@ -105,7 +105,7 @@ export function AttachmentBubble({
           src={meta.url}
           controls
           playsInline
-          className="max-w-[260px] max-h-[300px] rounded-xl bg-black"
+          className="max-w-[180px] max-h-[180px] rounded-xl bg-black"
         />
         {meta.caption && (
           <p className="text-[13px] whitespace-pre-wrap break-words">{meta.caption}</p>
