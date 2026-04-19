@@ -1029,7 +1029,7 @@ export default function ChatRoom() {
               <input
                 ref={fileRef}
                 type="file"
-                accept="image/*,video/*,audio/*,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip"
+                accept="*/*"
                 className="hidden"
                 onChange={onPickFile}
               />
