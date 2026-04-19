@@ -4,6 +4,7 @@ import { Phone, PhoneOff, Video } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { getSelectedRingtone, playRingtone } from "@/lib/ringtones";
 
 type IncomingCall = {
   id: string;
@@ -19,117 +20,30 @@ function initials(name?: string | null) {
 }
 
 /**
- * Generates a short looping ringtone WAV (two-tone phone ring) as a base64
- * data URL. Built once at module load, then attached to an <audio loop>
- * element. <audio>.play() has a more permissive autoplay policy than
- * AudioContext and works once the user has interacted with the app at least
- * once (which is true by the time a call arrives).
+ * "Primes" the audio system on first user gesture so that we can later start
+ * the WebAudio ringtone programmatically when a call arrives. Without a prior
+ * gesture, browsers block AudioContext.resume(). Once the user has tapped
+ * anywhere in the app, this flag flips true and ringtones can autoplay.
  */
-function buildRingtoneDataUrl(): string {
-  const sampleRate = 22050;
-  const totalSeconds = 3; // 2s ring + 1s silence
-  const samples = sampleRate * totalSeconds;
-  const buffer = new ArrayBuffer(44 + samples * 2);
-  const view = new DataView(buffer);
-  const writeStr = (off: number, s: string) => {
-    for (let i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i));
-  };
-  writeStr(0, "RIFF");
-  view.setUint32(4, 36 + samples * 2, true);
-  writeStr(8, "WAVE");
-  writeStr(12, "fmt ");
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);
-  view.setUint16(22, 1, true);
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * 2, true);
-  view.setUint16(32, 2, true);
-  view.setUint16(34, 16, true);
-  writeStr(36, "data");
-  view.setUint32(40, samples * 2, true);
-
-  // Two-tone ring: 440Hz + 480Hz for first 2s, then silence
-  for (let i = 0; i < samples; i++) {
-    const t = i / sampleRate;
-    let v = 0;
-    if (t < 2) {
-      const env = Math.min(1, t * 6) * Math.min(1, (2 - t) * 6);
-      v = (Math.sin(2 * Math.PI * 440 * t) + Math.sin(2 * Math.PI * 480 * t)) * 0.25 * env;
-    }
-    const s = Math.max(-1, Math.min(1, v));
-    view.setInt16(44 + i * 2, s * 0x7fff, true);
-  }
-  // Convert to base64
-  const bytes = new Uint8Array(buffer);
-  let bin = "";
-  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-  return `data:audio/wav;base64,${btoa(bin)}`;
-}
-
-const RINGTONE_URL = buildRingtoneDataUrl();
-
-/**
- * Shared, persistent audio element. Created once and "primed" by the first
- * user gesture anywhere in the app (click/touch/keydown). Priming = playing
- * a muted no-op so the browser marks this <audio> as user-activated. After
- * that, we can call .play() programmatically (e.g. when an incoming call
- * arrives) without a fresh user gesture — which is exactly how a real phone
- * ringtone behaves.
- */
-let sharedAudio: HTMLAudioElement | null = null;
-let primed = false;
-
-function getSharedAudio(): HTMLAudioElement {
-  if (!sharedAudio) {
-    sharedAudio = new Audio();
-    sharedAudio.loop = true;
-    sharedAudio.preload = "auto";
-    sharedAudio.src = RINGTONE_URL;
-  }
-  return sharedAudio;
-}
-
+let audioPrimed = false;
 if (typeof window !== "undefined") {
   const prime = () => {
-    if (primed) return;
-    const a = getSharedAudio();
-    const prevMuted = a.muted;
-    const prevVol = a.volume;
-    a.muted = true;
-    a.volume = 0;
-    a.play()
-      .then(() => {
-        a.pause();
-        a.currentTime = 0;
-        a.muted = prevMuted;
-        a.volume = prevVol;
-        primed = true;
-      })
-      .catch(() => {
-        /* will retry on next gesture */
-      });
+    if (audioPrimed) return;
+    audioPrimed = true;
   };
-  const opts = { capture: true, passive: true } as AddEventListenerOptions;
+  const opts = { capture: true, passive: true, once: true } as AddEventListenerOptions;
   window.addEventListener("pointerdown", prime, opts);
   window.addEventListener("touchstart", prime, opts);
   window.addEventListener("keydown", prime, opts);
   window.addEventListener("click", prime, opts);
 }
 
-/** Plays a looping ringtone + vibration while `active` is true. */
+/** Plays the user-selected ringtone + vibration while `active` is true. */
 function useRingtone(active: boolean) {
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-
   useEffect(() => {
     if (!active) return;
-    const a = getSharedAudio();
-    a.muted = false;
-    a.volume = 0.9;
-    a.currentTime = 0;
-    audioRef.current = a;
-    a.play().catch(() => {
-      /* autoplay still blocked — visual UI + vibration will signal the call */
-    });
+    const id = getSelectedRingtone();
+    const stop = playRingtone(id);
 
     let vInt: number | undefined;
     try {
@@ -151,12 +65,10 @@ function useRingtone(active: boolean) {
 
     return () => {
       try {
-        a.pause();
-        a.currentTime = 0;
+        stop();
       } catch {
         /* ignore */
       }
-      audioRef.current = null;
       if (vInt) window.clearInterval(vInt);
       try {
         (navigator as { vibrate?: (p: number | number[]) => boolean }).vibrate?.(0);
