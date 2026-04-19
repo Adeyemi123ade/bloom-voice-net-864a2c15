@@ -15,6 +15,7 @@ import {
   FILE_PREFIX,
   encodeFileMessage,
   parseFileMessage,
+  isBareAttachment,
 } from "@/components/chat/AttachmentBubble";
 
 type Message = {
