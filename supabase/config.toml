@@ -1,1 +1,4 @@
 project_id = "tlyqomftfabnpczxefkp"
+
+[functions.twilio-token]
+verify_jwt = false
