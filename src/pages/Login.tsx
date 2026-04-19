@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 import { z } from "zod";
 import { ArrowLeft, Eye, EyeOff } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
@@ -19,6 +20,10 @@ type FormErrors = Partial<Record<"email" | "password", string>>;
 
 export default function Login() {
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
+  useEffect(() => {
+    if (!authLoading && user) navigate("/home", { replace: true });
+  }, [authLoading, user, navigate]);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
