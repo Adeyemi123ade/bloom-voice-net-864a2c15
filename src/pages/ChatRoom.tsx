@@ -11,6 +11,15 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+} from "@/components/ui/alert-dialog";
+import {
   AttachmentBubble,
   FILE_PREFIX,
   encodeFileMessage,
@@ -304,6 +313,7 @@ export default function ChatRoom() {
   const [editing, setEditing] = useState<Message | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [replyTo, setReplyTo] = useState<Message | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [recording, setRecording] = useState(false);
   const [recSec, setRecSec] = useState(0);
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -747,7 +757,7 @@ export default function ChatRoom() {
             )}
             <button
               aria-label="Delete selected"
-              onClick={bulkDelete}
+              onClick={() => setDeleteOpen(true)}
               className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
             >
               <Trash2 className="w-4 h-4 text-destructive" />
@@ -1102,6 +1112,43 @@ export default function ChatRoom() {
           )}
         </div>
       </div>
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent className="max-w-[320px]">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete {selectionCount > 1 ? `${selectionCount} messages` : "message"}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              You can delete just for yourself, or for everyone in this chat.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex flex-col gap-2 mt-2">
+            {allMine && !isOnlyDeleted && (
+              <button
+                onClick={async () => {
+                  setDeleteOpen(false);
+                  await deleteForEveryone(selectedList);
+                }}
+                className="w-full h-10 rounded-lg bg-destructive text-destructive-foreground text-sm font-medium"
+              >
+                Delete for everyone
+              </button>
+            )}
+            <button
+              onClick={() => {
+                setDeleteOpen(false);
+                deleteForMe(selectedList);
+              }}
+              className="w-full h-10 rounded-lg bg-secondary text-foreground text-sm font-medium"
+            >
+              Delete for me
+            </button>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="w-full">Cancel</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </MobileFrame>
   );
 }
