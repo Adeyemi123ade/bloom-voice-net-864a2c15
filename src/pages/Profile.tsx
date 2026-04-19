@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Camera, Loader2, LogOut, Trash2 } from "lucide-react";
+import { ArrowLeft, Camera, Loader2 } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,17 +10,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 
 function initials(name?: string | null) {
   if (!name) return "?";
@@ -35,8 +24,6 @@ export default function Profile() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [confirmStage, setConfirmStage] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -116,26 +103,6 @@ export default function Profile() {
     }
   };
 
-  const signOut = async () => {
-    await supabase.auth.signOut();
-    navigate("/login");
-  };
-
-  const deleteAccount = async () => {
-    if (!user) return;
-    setDeleting(true);
-    // Soft-delete: clear profile data, sign out. (Hard delete needs admin function.)
-    await supabase
-      .from("profiles")
-      .upsert(
-        { id: user.id, display_name: "Deleted user", avatar_url: null, is_online: false },
-        { onConflict: "id" }
-      );
-    await supabase.auth.signOut();
-    setDeleting(false);
-    toast({ title: "Account removed", description: "You have been signed out." });
-    navigate("/register");
-  };
 
   return (
     <MobileFrame>
