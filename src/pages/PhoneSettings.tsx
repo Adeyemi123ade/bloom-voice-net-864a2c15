@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, ChevronRight, Music, Palette, Play, Square } from "lucide-react";
+import { ArrowLeft, Check, ChevronRight, Music, Palette, Play, Square, Upload, X } from "lucide-react";
 import { useTheme } from "next-themes";
 import MobileFrame from "@/components/MobileFrame";
 import {
@@ -10,13 +10,19 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Monitor, Moon, Sun } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 import {
   RINGTONES,
   RingtoneId,
   getSelectedRingtone,
   setSelectedRingtone,
   playRingtone,
+  getCustomRingtone,
+  setCustomRingtone,
+  CustomRingtone,
 } from "@/lib/ringtones";
+
+const MAX_CUSTOM_BYTES = 3 * 1024 * 1024; // 3MB cap (localStorage friendly)
 
 export default function PhoneSettings() {
   const navigate = useNavigate();
@@ -24,14 +30,15 @@ export default function PhoneSettings() {
   const [themeOpen, setThemeOpen] = useState(false);
   const [toneOpen, setToneOpen] = useState(false);
   const [selected, setSelected] = useState<RingtoneId>(getSelectedRingtone());
-  const [previewing, setPreviewing] = useState<RingtoneId | null>(null);
+  const [custom, setCustom] = useState<CustomRingtone | null>(getCustomRingtone());
+  const [previewing, setPreviewing] = useState<string | null>(null);
   const stopRef = useRef<(() => void) | null>(null);
+  const fileRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     document.title = "Phone settings — Chichat";
   }, []);
 
-  // Stop preview when dialog closes or component unmounts
   useEffect(() => {
     if (!toneOpen) stopPreview();
   }, [toneOpen]);
@@ -53,22 +60,61 @@ export default function PhoneSettings() {
     }
     stopPreview();
     setPreviewing(id);
-    // Auto-stop preview after one full cycle (~6s safe upper bound)
-    stopRef.current = playRingtone(id, 6);
+    stopRef.current = playRingtone(id, 8);
   };
 
   const choose = (id: RingtoneId) => {
     setSelected(id);
     setSelectedRingtone(id);
+    toast({ title: "Ringtone updated" });
+  };
+
+  const onPickFile = async (file: File) => {
+    if (!file.type.startsWith("audio/")) {
+      toast({ title: "Please choose an audio file", variant: "destructive" });
+      return;
+    }
+    if (file.size > MAX_CUSTOM_BYTES) {
+      toast({
+        title: "File too large",
+        description: "Please pick an audio file under 3 MB.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+    const c = { name: file.name, dataUrl };
+    setCustomRingtone(c);
+    setCustom(c);
+    choose("custom:user");
+  };
+
+  const removeCustom = () => {
+    setCustomRingtone(null);
+    setCustom(null);
+    if (selected === "custom:user") {
+      setSelected("melody-marimba");
+      setSelectedRingtone("melody-marimba");
+    }
   };
 
   const themeLabel =
     theme === "dark" ? "Dark" : theme === "light" ? "Light" : "System default";
-  const toneLabel = RINGTONES.find((r) => r.id === selected)?.label ?? "Default";
+  const toneLabel =
+    selected === "custom:user"
+      ? custom?.name ?? "From my music"
+      : RINGTONES.find((r) => r.id === selected)?.label ?? "Default";
 
   const grouped = {
     Melody: RINGTONES.filter((r) => r.category === "Melody"),
     Classic: RINGTONES.filter((r) => r.category === "Classic"),
+    Modern: RINGTONES.filter((r) => r.category === "Modern"),
+    Playful: RINGTONES.filter((r) => r.category === "Playful"),
   };
 
   return (
@@ -112,7 +158,7 @@ export default function PhoneSettings() {
             </span>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-semibold text-foreground">Ringtone</p>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-[11px] text-muted-foreground truncate">
                 {toneLabel} · plays on incoming calls
               </p>
             </div>
@@ -147,7 +193,7 @@ export default function PhoneSettings() {
                   <Icon className="w-4 h-4 text-primary" />
                   <span className="flex-1">{label}</span>
                   {theme === value && (
-                    <span className="w-2 h-2 rounded-full bg-primary" />
+                    <Check className="w-4 h-4 text-primary" />
                   )}
                 </button>
               ))}
@@ -157,65 +203,149 @@ export default function PhoneSettings() {
 
         {/* Ringtone dialog */}
         <Dialog open={toneOpen} onOpenChange={setToneOpen}>
-          <DialogContent className="max-w-[320px] bg-card border-border">
+          <DialogContent className="max-w-[340px] bg-card border-border">
             <DialogHeader>
               <DialogTitle className="text-sm">Choose ringtone</DialogTitle>
             </DialogHeader>
+
+            <input
+              ref={fileRef}
+              type="file"
+              accept="audio/*"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) onPickFile(f);
+                e.target.value = "";
+              }}
+            />
+
             <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+              {/* From device */}
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground px-1 mb-1">
+                  From my music
+                </p>
+                <div className="space-y-1">
+                  {custom && (
+                    <RingtoneRow
+                      label={custom.name}
+                      description="Custom audio"
+                      isSelected={selected === "custom:user"}
+                      isPlaying={previewing === "custom:user"}
+                      onPreview={() => togglePreview("custom:user")}
+                      onSelect={() => choose("custom:user")}
+                      trailing={
+                        <button
+                          onClick={removeCustom}
+                          aria-label="Remove custom ringtone"
+                          className="w-6 h-6 rounded-full hover:bg-destructive/20 flex items-center justify-center shrink-0"
+                        >
+                          <X className="w-3.5 h-3.5 text-destructive" />
+                        </button>
+                      }
+                    />
+                  )}
+                  <button
+                    onClick={() => fileRef.current?.click()}
+                    className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md hover:bg-secondary text-left"
+                  >
+                    <span className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                      <Upload className="w-3.5 h-3.5 text-primary" />
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-foreground">
+                        {custom ? "Replace audio…" : "Pick audio from device…"}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">
+                        Any audio file under 3 MB
+                      </p>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
               {(Object.keys(grouped) as Array<keyof typeof grouped>).map((cat) => (
                 <div key={cat}>
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground px-1 mb-1">
                     {cat}
                   </p>
                   <div className="space-y-1">
-                    {grouped[cat].map((r) => {
-                      const isSelected = selected === r.id;
-                      const isPlaying = previewing === r.id;
-                      return (
-                        <div
-                          key={r.id}
-                          className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-md ${
-                            isSelected ? "bg-primary/15" : "hover:bg-secondary"
-                          }`}
-                        >
-                          <button
-                            onClick={() => togglePreview(r.id)}
-                            aria-label={isPlaying ? "Stop preview" : "Preview"}
-                            className="w-7 h-7 rounded-full bg-primary/20 hover:bg-primary/30 flex items-center justify-center shrink-0"
-                          >
-                            {isPlaying ? (
-                              <Square className="w-3 h-3 text-primary fill-primary" />
-                            ) : (
-                              <Play className="w-3 h-3 text-primary fill-primary ml-0.5" />
-                            )}
-                          </button>
-                          <button
-                            onClick={() => choose(r.id)}
-                            className="flex-1 min-w-0 text-left"
-                          >
-                            <p className="text-xs font-medium text-foreground truncate">
-                              {r.label}
-                            </p>
-                            <p className="text-[10px] text-muted-foreground truncate">
-                              {r.description}
-                            </p>
-                          </button>
-                          {isSelected && (
-                            <span className="w-2 h-2 rounded-full bg-primary shrink-0" />
-                          )}
-                        </div>
-                      );
-                    })}
+                    {grouped[cat].map((r) => (
+                      <RingtoneRow
+                        key={r.id}
+                        label={r.label}
+                        description={r.description}
+                        isSelected={selected === r.id}
+                        isPlaying={previewing === r.id}
+                        onPreview={() => togglePreview(r.id)}
+                        onSelect={() => choose(r.id)}
+                      />
+                    ))}
                   </div>
                 </div>
               ))}
             </div>
             <p className="text-[10px] text-muted-foreground px-1 pt-1">
-              Tap ▶ to preview, tap the name to select.
+              Tap ▶ to preview, tap the name to select. ✓ marks the active ringtone.
             </p>
           </DialogContent>
         </Dialog>
       </div>
     </MobileFrame>
+  );
+}
+
+function RingtoneRow({
+  label,
+  description,
+  isSelected,
+  isPlaying,
+  onPreview,
+  onSelect,
+  trailing,
+}: {
+  label: string;
+  description: string;
+  isSelected: boolean;
+  isPlaying: boolean;
+  onPreview: () => void;
+  onSelect: () => void;
+  trailing?: React.ReactNode;
+}) {
+  return (
+    <div
+      className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-md ${
+        isSelected ? "bg-primary/15 ring-1 ring-primary/40" : "hover:bg-secondary"
+      }`}
+    >
+      <button
+        onClick={onPreview}
+        aria-label={isPlaying ? "Stop preview" : "Preview"}
+        className="w-7 h-7 rounded-full bg-primary/20 hover:bg-primary/30 flex items-center justify-center shrink-0"
+      >
+        {isPlaying ? (
+          <Square className="w-3 h-3 text-primary fill-primary" />
+        ) : (
+          <Play className="w-3 h-3 text-primary fill-primary ml-0.5" />
+        )}
+      </button>
+      <button onClick={onSelect} className="flex-1 min-w-0 text-left">
+        <p
+          className={`text-xs font-medium truncate ${
+            isSelected ? "text-primary" : "text-foreground"
+          }`}
+        >
+          {label}
+        </p>
+        <p className="text-[10px] text-muted-foreground truncate">{description}</p>
+      </button>
+      {isSelected && (
+        <span className="w-5 h-5 rounded-full bg-primary flex items-center justify-center shrink-0">
+          <Check className="w-3 h-3 text-primary-foreground" strokeWidth={3} />
+        </span>
+      )}
+      {trailing}
+    </div>
   );
 }
