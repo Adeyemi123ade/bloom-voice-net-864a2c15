@@ -101,6 +101,11 @@ export default function IncomingCallScreen() {
 
   useRingtone(!!incoming);
 
+  const incomingRef = useRef<IncomingCall | null>(null);
+  useEffect(() => {
+    incomingRef.current = incoming;
+  }, [incoming]);
+
   useEffect(() => {
     if (!user) return;
 
@@ -156,7 +161,8 @@ export default function IncomingCallScreen() {
         (payload) => {
           const row: any = payload.new;
           // If caller cancels (ends before pickup), dismiss this UI.
-          if (incoming && row?.id === incoming.id && row.status !== "ringing") {
+          const cur = incomingRef.current;
+          if (cur && row?.id === cur.id && row.status !== "ringing") {
             setIncoming(null);
           }
         },
@@ -166,7 +172,7 @@ export default function IncomingCallScreen() {
     return () => {
       supabase.removeChannel(ch);
     };
-  }, [user, incoming]);
+  }, [user]);
 
   if (!incoming) return null;
 
