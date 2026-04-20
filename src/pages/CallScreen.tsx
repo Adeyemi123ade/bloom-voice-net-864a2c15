@@ -94,6 +94,12 @@ export default function CallScreen() {
             joinRoom();
           } else if (row.status === "declined") {
             toast({ title: "Call declined" });
+            // Caller logs "rejected"; receiver's row was the one that triggered this.
+            if (role === "caller") void logCallMessage("rejected", 0);
+            cleanupAndExit();
+          } else if (row.status === "missed") {
+            // Receiver auto-timeout: callee never picked up.
+            if (role === "caller") void logCallMessage("no_answer", 0);
             cleanupAndExit();
           } else if (row.status === "ended") {
             cleanupAndExit();
@@ -105,7 +111,24 @@ export default function CallScreen() {
       supabase.removeChannel(ch);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [callId, status]);
+  }, [callId, status, role]);
+
+  // Caller-side 45s ring timeout — if callee doesn't accept, mark as "no answer".
+  useEffect(() => {
+    if (role !== "caller" || status !== "ringing" || !callId) return;
+    const t = window.setTimeout(async () => {
+      // Only flip if still ringing in DB.
+      await supabase
+        .from("calls")
+        .update({ status: "missed", ended_at: new Date().toISOString() })
+        .eq("id", callId)
+        .eq("status", "ringing");
+      void logCallMessage("no_answer", 0);
+      cleanupAndExit();
+    }, 45_000);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [role, status, callId]);
 
   useEffect(() => {
     if (role !== "callee" || !callId) return;
@@ -139,7 +162,19 @@ export default function CallScreen() {
     setTimeout(() => navigate(`/chat/${conversationId}`, { replace: true }), 500);
   };
 
-  const logCallMessage = async (kind: "ended" | "missed" | "declined", duration: number) => {
+  /**
+   * Call log "kind" semantics (rendered later in CallSystemBubble):
+   *  - ended       → connected then hung up by either party (shows duration)
+   *  - no_answer   → caller side, callee did not pick up before timeout/cancel
+   *  - missed      → receiver side, callee never answered
+   *  - rejected    → caller side, callee declined
+   *  - declined    → receiver side, callee declined
+   *  - received    → receiver side, callee picked up
+   */
+  const logCallMessage = async (
+    kind: "ended" | "missed" | "no_answer" | "declined" | "rejected" | "received",
+    duration: number,
+  ) => {
     if (!user || !conversationId) return;
     try {
       await supabase.from("messages").insert({
@@ -147,25 +182,28 @@ export default function CallScreen() {
         sender_id: user.id,
         content: `[call]${isVideo ? "video" : "voice"}|${kind}|${duration}`,
       });
-    } catch {
-      /* ignore */
-    }
+    } catch { /* ignore */ }
   };
 
   const endCall = async () => {
     const wasConnected = status === "connected";
     const dur = seconds;
-    // Stop the caller's ringback IMMEDIATELY by flipping status before any
-    // network calls — useRingback is gated on status === "ringing".
     setStatus("ended");
-    // Fire-and-forget so UI/audio teardown isn't blocked by the network round-trip.
     if (callId) {
       void supabase
         .from("calls")
         .update({ status: "ended", ended_at: new Date().toISOString() })
         .eq("id", callId);
     }
-    void logCallMessage(wasConnected ? "ended" : role === "caller" ? "missed" : "declined", dur);
+    if (wasConnected) {
+      void logCallMessage("ended", dur);
+    } else if (role === "caller") {
+      // Caller cancelled before pickup
+      void logCallMessage("no_answer", 0);
+    } else {
+      // Receiver hung up before connecting (decline)
+      void logCallMessage("declined", 0);
+    }
     cleanupAndExit();
   };
 
