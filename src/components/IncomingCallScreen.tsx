@@ -114,7 +114,7 @@ export default function IncomingCallScreen() {
       if (data && data.status !== "ringing") {
         setIncoming(null);
       }
-    }, 2000);
+    }, 300);
 
     return () => {
       if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
