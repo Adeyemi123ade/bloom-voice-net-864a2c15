@@ -319,6 +319,7 @@ export default function ChatRoom() {
   const { id: conversationId } = useParams();
   const navigate = useNavigate();
   const { user, loading } = useAuth();
+  const { showLastSeen: mySharesLastSeen } = useMyPrivacy();
   const [messages, setMessages] = useState<Message[]>([]);
   const [other, setOther] = useState<Profile | null>(null);
   const [text, setText] = useState("");
