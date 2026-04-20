@@ -780,13 +780,6 @@ export default function ChatRoom() {
           </div>
         ) : (
           <div className="px-3 pt-4 pb-3 flex items-center gap-2 border-b border-border">
-            <button
-              aria-label="Back"
-              onClick={() => navigate("/home")}
-              className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
-            >
-              <ArrowLeft className="w-4 h-4 text-foreground" />
-            </button>
             <div className="relative">
               <Avatar className="w-9 h-9">
                 <AvatarImage src={other?.avatar_url ?? undefined} />
@@ -794,7 +787,10 @@ export default function ChatRoom() {
                   {initials(other?.display_name)}
                 </AvatarFallback>
               </Avatar>
-              {other?.is_online && (
+              {other && (() => {
+                const ageMs = Date.now() - new Date(other.last_seen_at).getTime();
+                return other.is_online && ageMs < 5 * 60 * 1000;
+              })() && (
                 <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-accent border-2 border-background" />
               )}
             </div>
@@ -803,13 +799,7 @@ export default function ChatRoom() {
                 {other?.display_name ?? "Chat"}
               </p>
               <p className="text-[11px] text-muted-foreground truncate">
-                {otherTyping
-                  ? "typing…"
-                  : other?.is_online
-                    ? "online"
-                    : other
-                      ? `last seen ${timeAgo(other.last_seen_at)}`
-                      : ""}
+                {otherTyping ? "typing…" : presenceLabel(other, mySharesLastSeen)}
               </p>
             </div>
             <button
