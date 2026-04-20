@@ -8,6 +8,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { presenceLabel, isReallyOnline } from "@/lib/presence";
+import { useMyPrivacy } from "@/hooks/useMyPrivacy";
 import {
   Dialog,
   DialogContent,
@@ -56,6 +58,7 @@ function initials(name?: string | null) {
 export default function Home() {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
+  const { showLastSeen: mySharesLastSeen } = useMyPrivacy();
   const [chats, setChats] = useState<ChatRow[]>([]);
   const [query, setQuery] = useState("");
   const [people, setPeople] = useState<Profile[]>([]);
@@ -117,7 +120,7 @@ export default function Home() {
     const otherIds = Array.from(new Set((others ?? []).map((o) => o.user_id)));
     const { data: profiles } = await supabase
       .from("profiles")
-      .select("id, display_name, avatar_url, is_online, last_seen_at")
+      .select("id, display_name, avatar_url, is_online, last_seen_at, show_last_seen")
       .in("id", otherIds.length ? otherIds : ["00000000-0000-0000-0000-000000000000"]);
 
     const { data: lastMsgs } = await supabase
@@ -180,7 +183,7 @@ export default function Home() {
     if (!user) return;
     const { data } = await supabase
       .from("profiles")
-      .select("id, display_name, avatar_url, is_online, last_seen_at")
+      .select("id, display_name, avatar_url, is_online, last_seen_at, show_last_seen")
       .neq("id", user.id)
       .order("display_name", { ascending: true })
       .limit(50);
