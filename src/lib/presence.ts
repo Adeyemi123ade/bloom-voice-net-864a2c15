@@ -29,12 +29,13 @@ function fmtClock(d: Date): string {
 export function formatLastSeen(iso: string): string {
   const d = new Date(iso);
   const now = new Date();
+  const time = fmtClock(d);
   const sameDay = d.toDateString() === now.toDateString();
-  if (sameDay) return `last seen ${fmtClock(d)}`;
+  if (sameDay) return `last seen ${time}`;
   const yesterday = new Date(now);
   yesterday.setDate(now.getDate() - 1);
-  if (d.toDateString() === yesterday.toDateString()) return "last seen yesterday";
-  return `last seen ${d.toLocaleDateString([], { month: "short", day: "numeric" })}`;
+  if (d.toDateString() === yesterday.toDateString()) return `last seen yesterday ${time}`;
+  return `last seen ${d.toLocaleDateString([], { month: "short", day: "numeric" })} ${time}`;
 }
 
 /**

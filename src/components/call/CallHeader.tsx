@@ -8,6 +8,7 @@ type Props = {
   other: Profile | null;
   status: "connecting" | "ringing" | "connected" | "ended";
   seconds: number;
+  role?: "caller" | "callee";
 };
 
 function initials(name?: string | null) {
@@ -20,12 +21,18 @@ function fmt(s: number) {
   return `${m}:${ss}`;
 }
 
-export default function CallHeader({ isVideo, other, status, seconds }: Props) {
+export default function CallHeader({ isVideo, other, status, seconds, role = "caller" }: Props) {
   const Icon = isVideo ? Video : Phone;
+  const headerLabel =
+    status === "connected"
+      ? isVideo ? "Video call" : "Voice call"
+      : role === "callee"
+        ? "Incoming call"
+        : "Calling";
   return (
     <div className="pt-8 pb-4 flex flex-col items-center gap-3">
       <div className="flex items-center gap-2 text-[11px] uppercase tracking-widest text-muted-foreground">
-        <span>Calling</span>
+        <span>{headerLabel}</span>
         <Icon className="w-3.5 h-3.5" />
       </div>
       <Avatar className="w-24 h-24 ring-4 ring-primary/30">
