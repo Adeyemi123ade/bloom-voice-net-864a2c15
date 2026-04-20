@@ -22,6 +22,7 @@ type Profile = {
   avatar_url: string | null;
   is_online: boolean;
   last_seen_at: string;
+  show_last_seen?: boolean | null;
 };
 
 type ChatRow = {

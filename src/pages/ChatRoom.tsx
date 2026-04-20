@@ -903,7 +903,14 @@ export default function ChatRoom() {
                   ) : isVoice ? (
                     <VoiceBubble id={m.id} url={voiceUrl} mine={mine} />
                   ) : isFile && fileMeta ? (
-                    <AttachmentBubble meta={fileMeta} mine={mine} />
+                    <AttachmentBubble
+                      meta={fileMeta}
+                      mine={mine}
+                      onDelete={() => {
+                        setSelectedIds(new Set([m.id]));
+                        setDeleteOpen(true);
+                      }}
+                    />
                   ) : (
                     <p className="text-[13px] whitespace-pre-wrap break-words">{body}</p>
                   )}
