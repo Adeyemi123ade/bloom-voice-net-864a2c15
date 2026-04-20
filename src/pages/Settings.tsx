@@ -2,13 +2,11 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ChevronRight,
-  EyeOff,
   Smartphone,
   Trash2,
   User as UserIcon,
 } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
-import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -29,8 +27,6 @@ export default function Settings() {
   const { user, loading } = useAuth();
   const [confirmStage, setConfirmStage] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [showLastSeen, setShowLastSeen] = useState(true);
-  const [savingPrivacy, setSavingPrivacy] = useState(false);
 
   useEffect(() => {
     document.title = "Settings — Chichat";
@@ -39,33 +35,6 @@ export default function Settings() {
   useEffect(() => {
     if (!loading && !user) navigate("/login");
   }, [loading, user, navigate]);
-
-  useEffect(() => {
-    if (!user) return;
-    (async () => {
-      const { data } = await supabase
-        .from("profiles")
-        .select("show_last_seen")
-        .eq("id", user.id)
-        .maybeSingle();
-      setShowLastSeen((data as { show_last_seen?: boolean } | null)?.show_last_seen ?? true);
-    })();
-  }, [user]);
-
-  const togglePrivacy = async (next: boolean) => {
-    if (!user) return;
-    setShowLastSeen(next);
-    setSavingPrivacy(true);
-    const { error } = await supabase
-      .from("profiles")
-      .update({ show_last_seen: next })
-      .eq("id", user.id);
-    setSavingPrivacy(false);
-    if (error) {
-      setShowLastSeen(!next);
-      toast({ title: "Couldn't update", description: error.message, variant: "destructive" });
-    }
-  };
 
   const deleteAccount = async () => {
     if (!user) return;
@@ -123,24 +92,6 @@ export default function Settings() {
             </div>
             <ChevronRight className="w-4 h-4 text-muted-foreground" />
           </button>
-
-          {/* Privacy: Last seen */}
-          <div className="w-full flex items-center gap-3 px-3 py-3 rounded-lg">
-            <span className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center">
-              <EyeOff className="w-4 h-4 text-primary" />
-            </span>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-foreground">Show my last seen</p>
-              <p className="text-[11px] text-muted-foreground">
-                If off, you also won't see anyone else's
-              </p>
-            </div>
-            <Switch
-              checked={showLastSeen}
-              onCheckedChange={togglePrivacy}
-              disabled={savingPrivacy}
-            />
-          </div>
 
           <div className="flex-1" />
 

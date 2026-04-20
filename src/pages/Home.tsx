@@ -8,8 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { presenceLabel, isReallyOnline } from "@/lib/presence";
-import { useMyPrivacy } from "@/hooks/useMyPrivacy";
+import { isReallyOnline } from "@/lib/presence";
 import {
   Dialog,
   DialogContent,
@@ -58,7 +57,6 @@ function initials(name?: string | null) {
 export default function Home() {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
-  const { showLastSeen: mySharesLastSeen } = useMyPrivacy();
   const [chats, setChats] = useState<ChatRow[]>([]);
   const [query, setQuery] = useState("");
   const [people, setPeople] = useState<Profile[]>([]);
@@ -279,9 +277,9 @@ export default function Home() {
                         <p className="text-xs font-medium text-foreground truncate">
                           {p.display_name ?? "Unknown"}
                         </p>
-                        <p className="text-[10px] text-muted-foreground">
-                          {presenceLabel(p, mySharesLastSeen)}
-                        </p>
+                        {isReallyOnline(p) && (
+                          <p className="text-[10px] text-muted-foreground">online</p>
+                        )}
                       </div>
                     </button>
                   ))}
@@ -373,7 +371,7 @@ export default function Home() {
                   </span>
                 </div>
                 <p className="text-[11px] text-muted-foreground truncate mt-0.5">
-                  {c.last_message ?? presenceLabel(c.other, mySharesLastSeen)}
+                  {c.last_message ?? (isReallyOnline(c.other) ? "online" : "")}
                 </p>
               </div>
             </button>

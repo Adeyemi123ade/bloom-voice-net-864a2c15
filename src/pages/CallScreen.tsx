@@ -50,6 +50,31 @@ export default function CallScreen() {
   const remoteAudioEl = useRef<HTMLAudioElement>(null);
   const tickTimer = useRef<number | null>(null);
   const endedRef = useRef(false);
+  const handledStatusesRef = useRef<Set<string>>(new Set());
+
+  const handleCallStatus = (nextStatus: string) => {
+    if (nextStatus === "accepted" && status === "ringing") {
+      joinRoom();
+      return;
+    }
+    if (handledStatusesRef.current.has(nextStatus)) return;
+    handledStatusesRef.current.add(nextStatus);
+
+    if (nextStatus === "declined") {
+      toast({ title: "Call declined" });
+      if (role === "caller") void logCallMessage("rejected", 0);
+      cleanupAndExit();
+      return;
+    }
+    if (nextStatus === "missed") {
+      if (role === "caller") void logCallMessage("no_answer", 0);
+      cleanupAndExit();
+      return;
+    }
+    if (nextStatus === "ended") {
+      cleanupAndExit();
+    }
+  };
 
   // Caller hears classic phone ringback while waiting for the callee to pick up.
   useRingback(role === "caller" && status === "ringing");
@@ -90,20 +115,7 @@ export default function CallScreen() {
         { event: "UPDATE", schema: "public", table: "calls", filter: `id=eq.${callId}` },
         (payload) => {
           const row = payload.new as { status: string };
-          if (row.status === "accepted" && status === "ringing") {
-            joinRoom();
-          } else if (row.status === "declined") {
-            toast({ title: "Call declined" });
-            // Caller logs "rejected"; receiver's row was the one that triggered this.
-            if (role === "caller") void logCallMessage("rejected", 0);
-            cleanupAndExit();
-          } else if (row.status === "missed") {
-            // Receiver auto-timeout: callee never picked up.
-            if (role === "caller") void logCallMessage("no_answer", 0);
-            cleanupAndExit();
-          } else if (row.status === "ended") {
-            cleanupAndExit();
-          }
+          handleCallStatus(row.status);
         },
       )
       .subscribe();
@@ -111,6 +123,20 @@ export default function CallScreen() {
       supabase.removeChannel(ch);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [callId, status, role]);
+
+  useEffect(() => {
+    if (!callId || status === "ended") return;
+    const pollId = window.setInterval(async () => {
+      const { data } = await supabase
+        .from("calls")
+        .select("status")
+        .eq("id", callId)
+        .maybeSingle();
+      if (data?.status) handleCallStatus(data.status);
+    }, 400);
+
+    return () => window.clearInterval(pollId);
   }, [callId, status, role]);
 
   // Caller-side 45s ring timeout — if callee doesn't accept, mark as "no answer".
@@ -156,6 +182,12 @@ export default function CallScreen() {
       localAudioRef.current?.stop();
       localVideoRef.current?.stop();
       roomRef.current?.disconnect();
+      if (remoteAudioEl.current) {
+        remoteAudioEl.current.pause();
+        remoteAudioEl.current.srcObject = null;
+      }
+      if (localVideoEl.current) localVideoEl.current.innerHTML = "";
+      if (remoteVideoEl.current) remoteVideoEl.current.innerHTML = "";
     } catch {
       /* ignore */
     }
@@ -189,6 +221,13 @@ export default function CallScreen() {
     const wasConnected = status === "connected";
     const dur = seconds;
     setStatus("ended");
+    try {
+      localAudioRef.current?.stop();
+      localVideoRef.current?.stop();
+      roomRef.current?.disconnect();
+    } catch {
+      /* ignore */
+    }
     if (callId) {
       void supabase
         .from("calls")
