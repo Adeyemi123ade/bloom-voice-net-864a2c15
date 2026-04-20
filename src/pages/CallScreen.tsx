@@ -325,7 +325,7 @@ export default function CallScreen() {
   return (
     <MobileFrame>
       <div className="h-full w-full flex flex-col bg-gradient-to-b from-secondary to-background">
-        <CallHeader isVideo={isVideo} other={other} status={status} seconds={seconds} />
+        <CallHeader isVideo={isVideo} other={other} status={status} seconds={seconds} role={role} />
 
         <RemoteMedia
           showVideo={isVideo && status === "connected"}

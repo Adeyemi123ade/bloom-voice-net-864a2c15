@@ -80,6 +80,8 @@ export default function IncomingCallScreen() {
   useEffect(() => { incomingRef.current = incoming; }, [incoming]);
 
   // Auto-dismiss + mark "missed" if the receiver doesn't answer within 45s.
+  // Also poll the call row every 2s as a safety net in case the realtime
+  // UPDATE for "ended"/"declined" is missed (e.g. dropped websocket).
   useEffect(() => {
     if (!incoming) {
       if (timeoutRef.current) {
@@ -100,9 +102,24 @@ export default function IncomingCallScreen() {
           .eq("status", "ringing");
       } catch { /* ignore */ }
     }, RING_TIMEOUT_MS);
+
+    const pollId = window.setInterval(async () => {
+      const c = incomingRef.current;
+      if (!c) return;
+      const { data } = await supabase
+        .from("calls")
+        .select("status")
+        .eq("id", c.id)
+        .maybeSingle();
+      if (data && data.status !== "ringing") {
+        setIncoming(null);
+      }
+    }, 2000);
+
     return () => {
       if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
+      window.clearInterval(pollId);
     };
   }, [incoming]);
 
