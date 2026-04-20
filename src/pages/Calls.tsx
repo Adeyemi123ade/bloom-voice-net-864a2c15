@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Phone, Video, PhoneIncoming, PhoneOutgoing, PhoneMissed, MessageCircle } from "lucide-react";
+import { Phone, Video, PhoneIncoming, PhoneOutgoing, PhoneMissed, MessageCircle } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
@@ -32,7 +32,40 @@ function whenLabel(iso: string) {
   const today = new Date();
   const isToday = d.toDateString() === today.toDateString();
   if (isToday) return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  if (d.toDateString() === yesterday.toDateString()) return "yesterday";
   return d.toLocaleDateString([], { month: "short", day: "numeric" });
+}
+function fmtDuration(s: number) {
+  const m = Math.floor(s / 60);
+  const ss = (s % 60).toString().padStart(2, "0");
+  return `${m}:${ss}`;
+}
+
+/**
+ * Per-side label rules:
+ *  - Caller side (outgoing):
+ *      ringing/missed-no-answer  → "No answer"
+ *      declined                  → "Call rejected"
+ *      ended/accepted (no dur)   → "Call ended"
+ *      ended (with dur)          → "Voice/Video call ended"
+ *  - Receiver side (incoming):
+ *      ringing/missed            → "Missed voice/video call"
+ *      declined (by me)          → "Call ended"
+ *      ended/accepted            → "Received call"
+ */
+function labelFor(c: Call, outgoing: boolean): { label: string; missed: boolean } {
+  const isVideo = c.call_type === "video";
+  if (outgoing) {
+    if (c.status === "ringing" || c.status === "missed") return { label: "No answer", missed: true };
+    if (c.status === "declined") return { label: "Call rejected", missed: false };
+    return { label: isVideo ? "Video call ended" : "Voice call ended", missed: false };
+  }
+  if (c.status === "ringing" || c.status === "missed")
+    return { label: isVideo ? "Missed video call" : "Missed voice call", missed: true };
+  if (c.status === "declined") return { label: "Call ended", missed: false };
+  return { label: "Received call", missed: false };
 }
 
 export default function Calls() {
@@ -81,26 +114,23 @@ export default function Calls() {
       const outgoing = c.caller_id === user.id;
       const otherId = outgoing ? c.callee_id : c.caller_id;
       const other = profiles.get(otherId);
-      const missed = !outgoing && (c.status === "ringing" || c.status === "declined");
-      return { c, outgoing, other, missed };
+      const { label, missed } = labelFor(c, outgoing);
+      const dur =
+        c.ended_at && (c.status === "ended" || c.status === "accepted")
+          ? Math.max(0, Math.floor((new Date(c.ended_at).getTime() - new Date(c.created_at).getTime()) / 1000))
+          : 0;
+      return { c, outgoing, other, label, missed, dur };
     });
   }, [calls, profiles, user]);
 
   return (
     <MobileFrame>
       <div className="h-full w-full flex flex-col bg-background">
-        <div className="px-3 pt-4 pb-3 flex items-center gap-2 border-b border-border">
-          <button
-            aria-label="Back"
-            onClick={() => navigate("/home")}
-            className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
-          >
-            <ArrowLeft className="w-4 h-4 text-foreground" />
-          </button>
+        <div className="px-3 pt-4 pb-3 border-b border-border">
           <h1 className="text-[17px] font-bold text-foreground">Calls</h1>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-2 py-2">
+        <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2">
           {fetching && (
             <p className="text-[11px] text-muted-foreground text-center mt-6">Loading…</p>
           )}
@@ -112,72 +142,91 @@ export default function Calls() {
               </p>
             </div>
           )}
-          {items.map(({ c, outgoing, other, missed }) => {
+          {items.map(({ c, outgoing, other, label, missed, dur }) => {
             const Icon = missed ? PhoneMissed : outgoing ? PhoneOutgoing : PhoneIncoming;
-            const iconColor = missed
-              ? "text-destructive"
-              : outgoing
-                ? "text-muted-foreground"
-                : "text-primary";
+            const sub = missed
+              ? whenLabel(c.created_at)
+              : `${whenLabel(c.created_at)} · ${dur > 0 ? fmtDuration(dur) : "0:00"}`;
             return (
               <div
                 key={c.id}
-                className="w-full flex items-center gap-3 px-2 py-2.5 rounded-lg hover:bg-secondary"
+                className={`flex items-end gap-2 ${outgoing ? "justify-end" : "justify-start"}`}
               >
-                <Avatar className="w-10 h-10 shrink-0">
-                  <AvatarImage src={other?.avatar_url ?? undefined} />
-                  <AvatarFallback className="bg-primary/20 text-foreground text-xs font-semibold">
-                    {initials(other?.display_name)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 min-w-0">
-                  <p className={`text-xs font-semibold truncate ${missed ? "text-destructive" : "text-foreground"}`}>
-                    {other?.display_name ?? "Unknown"}
-                  </p>
-                  <div className="flex items-center gap-1 mt-0.5">
-                    <Icon className={`w-3 h-3 ${iconColor}`} />
-                    <span className="text-[10px] text-muted-foreground">
-                      {c.call_type === "video" ? "Video" : "Voice"} · {whenLabel(c.created_at)}
-                    </span>
+                {!outgoing && (
+                  <Avatar className="w-7 h-7 shrink-0">
+                    <AvatarImage src={other?.avatar_url ?? undefined} />
+                    <AvatarFallback className="bg-primary/20 text-foreground text-[10px] font-semibold">
+                      {initials(other?.display_name)}
+                    </AvatarFallback>
+                  </Avatar>
+                )}
+                <div
+                  className={`max-w-[78%] px-3 py-2 rounded-2xl ${
+                    outgoing
+                      ? "bg-primary/15 text-foreground rounded-br-sm"
+                      : "bg-secondary text-foreground rounded-bl-sm"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <Icon className={`w-4 h-4 ${missed ? "text-destructive" : "text-primary"}`} />
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-[12px] font-semibold truncate">
+                        {other?.display_name ?? "Unknown"}
+                      </span>
+                      <span className={`text-[11px] ${missed ? "text-destructive" : "text-muted-foreground"}`}>
+                        {label}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">{sub}</span>
+                    </div>
+                  </div>
+                  <div className={`flex items-center gap-1 mt-1 ${outgoing ? "justify-end" : "justify-start"}`}>
+                    <button
+                      aria-label="Open chat"
+                      onClick={() => navigate(`/chat/${c.conversation_id}`)}
+                      className="w-7 h-7 rounded-full hover:bg-background/50 flex items-center justify-center"
+                    >
+                      <MessageCircle className="w-3.5 h-3.5 text-foreground" />
+                    </button>
+                    <button
+                      aria-label="Call back"
+                      onClick={() => {
+                        const room = `chichat-${c.conversation_id}-${Date.now()}`;
+                        supabase
+                          .from("calls")
+                          .insert({
+                            conversation_id: c.conversation_id,
+                            caller_id: user!.id,
+                            callee_id: other?.id ?? (outgoing ? c.callee_id : c.caller_id),
+                            room_name: room,
+                            call_type: c.call_type,
+                          })
+                          .select("id")
+                          .single()
+                          .then(({ data, error }) => {
+                            if (error || !data) return;
+                            navigate(
+                              `/call/${c.conversation_id}?type=${c.call_type}&callId=${data.id}&room=${encodeURIComponent(room)}&role=caller`,
+                            );
+                          });
+                      }}
+                      className="w-7 h-7 rounded-full hover:bg-background/50 flex items-center justify-center"
+                    >
+                      {c.call_type === "video" ? (
+                        <Video className="w-3.5 h-3.5 text-primary" />
+                      ) : (
+                        <Phone className="w-3.5 h-3.5 text-primary" />
+                      )}
+                    </button>
                   </div>
                 </div>
-                <button
-                  aria-label="Open chat"
-                  onClick={() => navigate(`/chat/${c.conversation_id}`)}
-                  className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-background"
-                >
-                  <MessageCircle className="w-4 h-4 text-foreground" />
-                </button>
-                <button
-                  aria-label="Call back"
-                  onClick={() => {
-                    const room = `chichat-${c.conversation_id}-${Date.now()}`;
-                    supabase
-                      .from("calls")
-                      .insert({
-                        conversation_id: c.conversation_id,
-                        caller_id: user!.id,
-                        callee_id: other?.id ?? (outgoing ? c.callee_id : c.caller_id),
-                        room_name: room,
-                        call_type: c.call_type,
-                      })
-                      .select("id")
-                      .single()
-                      .then(({ data, error }) => {
-                        if (error || !data) return;
-                        navigate(
-                          `/call/${c.conversation_id}?type=${c.call_type}&callId=${data.id}&room=${encodeURIComponent(room)}&role=caller`,
-                        );
-                      });
-                  }}
-                  className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-background"
-                >
-                  {c.call_type === "video" ? (
-                    <Video className="w-4 h-4 text-primary" />
-                  ) : (
-                    <Phone className="w-4 h-4 text-primary" />
-                  )}
-                </button>
+                {outgoing && (
+                  <Avatar className="w-7 h-7 shrink-0">
+                    <AvatarImage src={other?.avatar_url ?? undefined} />
+                    <AvatarFallback className="bg-primary/20 text-foreground text-[10px] font-semibold">
+                      {initials(other?.display_name)}
+                    </AvatarFallback>
+                  </Avatar>
+                )}
               </div>
             );
           })}
