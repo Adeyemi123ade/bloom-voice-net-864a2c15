@@ -3,7 +3,7 @@
  *
  * Rules (from product spec):
  * - Online means is_online === true AND last_seen_at within the last 5 minutes
- * - Otherwise show "last seen HH:MM" if today, "yesterday" if yesterday, else date
+ * - Otherwise show "last seen HH:MM" in 24-hour format only
  * - Reciprocal privacy: if I hide my last seen, I cannot see anyone else's either.
  *   The other party's last seen is also hidden if they have it disabled.
  */
@@ -23,19 +23,16 @@ export function isReallyOnline(p: PresenceProfile): boolean {
 }
 
 function fmtClock(d: Date): string {
-  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return new Intl.DateTimeFormat([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(d);
 }
 
 export function formatLastSeen(iso: string): string {
   const d = new Date(iso);
-  const now = new Date();
-  const time = fmtClock(d);
-  const sameDay = d.toDateString() === now.toDateString();
-  if (sameDay) return `last seen ${time}`;
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  if (d.toDateString() === yesterday.toDateString()) return `last seen yesterday ${time}`;
-  return `last seen ${d.toLocaleDateString([], { month: "short", day: "numeric" })} ${time}`;
+  return `last seen ${fmtClock(d)}`;
 }
 
 /**
