@@ -151,7 +151,7 @@ export default function CallScreen() {
         .eq("status", "ringing");
       void logCallMessage("no_answer", 0);
       cleanupAndExit();
-    }, 45_000);
+    }, 10_000);
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [role, status, callId]);
