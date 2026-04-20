@@ -16,8 +16,8 @@ export type PresenceProfile = {
   show_last_seen?: boolean | null;
 };
 
-export function isReallyOnline(p: PresenceProfile): boolean {
-  if (!p.is_online) return false;
+export function isReallyOnline(p: PresenceProfile | null | undefined): boolean {
+  if (!p || !p.is_online) return false;
   const age = Date.now() - new Date(p.last_seen_at).getTime();
   return age < FIVE_MIN_MS;
 }
