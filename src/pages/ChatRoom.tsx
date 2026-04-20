@@ -203,23 +203,43 @@ function VoiceBubble({ id, url, mine }: { id: string; url: string; mine: boolean
 }
 
 function CallSystemBubble({ m, mine }: { m: Message; mine: boolean }) {
-  // [call]video|ended|45
+  // [call]video|<kind>|<duration>
+  // kind ∈ ended | no_answer | missed | rejected | declined | received
   const [, body] = m.content.split(CALL_PREFIX);
-  const [type, status, durStr] = (body ?? "").split("|");
+  const [type, kind, durStr] = (body ?? "").split("|");
   const isVideo = type === "video";
   const dur = parseInt(durStr || "0", 10);
-  const missed = status === "missed" || status === "declined";
-  const Icon = missed ? PhoneMissed : mine ? PhoneOutgoing : PhoneIncoming;
+  const isMissed = kind === "missed" || kind === "no_answer";
+  const Icon = isMissed ? PhoneMissed : mine ? PhoneOutgoing : PhoneIncoming;
+
+  // Per-side wording rules (sender-of-the-log perspective):
+  // - mine = caller's log    | !mine = receiver's log
+  let label = "";
+  if (kind === "ended") label = isVideo ? "Video call ended" : "Voice call ended";
+  else if (mine && kind === "no_answer") label = "No answer";
+  else if (mine && kind === "rejected") label = "Call rejected";
+  else if (!mine && kind === "missed") label = isVideo ? "Missed video call" : "Missed voice call";
+  else if (!mine && kind === "received") label = "Received call";
+  else if (!mine && kind === "declined") label = "Call ended";
+  else label = isVideo ? "Video call" : "Voice call";
+
+  // Missed shows timestamp only; everything else shows duration (0 for non-connected).
+  const sub = isMissed
+    ? formatTime(m.created_at)
+    : `${formatTime(m.created_at)} · ${dur > 0 ? fmtDuration(dur) : "0:00"}`;
+
   return (
-    <div className="flex items-center gap-2 px-3 py-2 rounded-2xl bg-secondary text-foreground">
-      <Icon className={`w-4 h-4 ${missed ? "text-destructive" : "text-primary"}`} />
+    <div
+      className={`flex items-center gap-2 px-3 py-2 rounded-2xl max-w-[75%] ${
+        mine
+          ? "bg-primary/15 text-foreground rounded-br-sm"
+          : "bg-secondary text-foreground rounded-bl-sm"
+      }`}
+    >
+      <Icon className={`w-4 h-4 ${isMissed ? "text-destructive" : "text-primary"}`} />
       <div className="flex flex-col">
-        <span className="text-[12px] font-medium">
-          {isVideo ? "Video call" : "Voice call"} {missed ? "· missed" : status === "ended" ? "· ended" : ""}
-        </span>
-        <span className="text-[10px] text-muted-foreground">
-          {dur > 0 ? fmtDuration(dur) : formatTime(m.created_at)}
-        </span>
+        <span className="text-[12px] font-medium">{label}</span>
+        <span className="text-[10px] text-muted-foreground">{sub}</span>
       </div>
     </div>
   );
