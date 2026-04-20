@@ -1,15 +1,14 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  ArrowLeft,
   ChevronRight,
-  LogOut,
+  EyeOff,
   Smartphone,
   Trash2,
   User as UserIcon,
 } from "lucide-react";
-import { Capacitor } from "@capacitor/core";
 import MobileFrame from "@/components/MobileFrame";
+import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -25,13 +24,13 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-const isNativeMobile = Capacitor.isNativePlatform();
-
 export default function Settings() {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
   const [confirmStage, setConfirmStage] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showLastSeen, setShowLastSeen] = useState(true);
+  const [savingPrivacy, setSavingPrivacy] = useState(false);
 
   useEffect(() => {
     document.title = "Settings — Chichat";
@@ -41,9 +40,31 @@ export default function Settings() {
     if (!loading && !user) navigate("/login");
   }, [loading, user, navigate]);
 
-  const signOut = async () => {
-    await supabase.auth.signOut();
-    navigate("/");
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("show_last_seen")
+        .eq("id", user.id)
+        .maybeSingle();
+      setShowLastSeen((data as { show_last_seen?: boolean } | null)?.show_last_seen ?? true);
+    })();
+  }, [user]);
+
+  const togglePrivacy = async (next: boolean) => {
+    if (!user) return;
+    setShowLastSeen(next);
+    setSavingPrivacy(true);
+    const { error } = await supabase
+      .from("profiles")
+      .update({ show_last_seen: next })
+      .eq("id", user.id);
+    setSavingPrivacy(false);
+    if (error) {
+      setShowLastSeen(!next);
+      toast({ title: "Couldn't update", description: error.message, variant: "destructive" });
+    }
   };
 
   const deleteAccount = async () => {
@@ -64,15 +85,7 @@ export default function Settings() {
   return (
     <MobileFrame>
       <div className="h-full w-full flex flex-col bg-background overflow-y-auto">
-        {/* Header */}
-        <div className="px-3 pt-4 pb-3 flex items-center gap-2 border-b border-border sticky top-0 bg-background z-10">
-          <button
-            aria-label="Back"
-            onClick={() => navigate(-1)}
-            className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
-          >
-            <ArrowLeft className="w-4 h-4 text-foreground" />
-          </button>
+        <div className="px-3 pt-4 pb-3 border-b border-border sticky top-0 bg-background z-10">
           <h1 className="text-sm font-semibold text-foreground">Settings</h1>
         </div>
 
@@ -94,7 +107,7 @@ export default function Settings() {
             <ChevronRight className="w-4 h-4 text-muted-foreground" />
           </button>
 
-          {/* Phone settings (theme + ringtone) */}
+          {/* Phone settings */}
           <button
             onClick={() => navigate("/settings/phone")}
             className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-secondary text-left"
@@ -111,26 +124,27 @@ export default function Settings() {
             <ChevronRight className="w-4 h-4 text-muted-foreground" />
           </button>
 
-          {/* Sign out — desktop/web only (mobile users uninstall instead) */}
-          {!isNativeMobile && (
-            <button
-              onClick={signOut}
-              className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-secondary text-left mt-1"
-            >
-              <span className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center">
-                <LogOut className="w-4 h-4 text-foreground" />
-              </span>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-foreground">Sign out</p>
-                <p className="text-[11px] text-muted-foreground">End your current session</p>
-              </div>
-            </button>
-          )}
+          {/* Privacy: Last seen */}
+          <div className="w-full flex items-center gap-3 px-3 py-3 rounded-lg">
+            <span className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center">
+              <EyeOff className="w-4 h-4 text-primary" />
+            </span>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-foreground">Show my last seen</p>
+              <p className="text-[11px] text-muted-foreground">
+                If off, you also won't see anyone else's
+              </p>
+            </div>
+            <Switch
+              checked={showLastSeen}
+              onCheckedChange={togglePrivacy}
+              disabled={savingPrivacy}
+            />
+          </div>
 
-          {/* Spacer pushes Delete account to the bottom */}
           <div className="flex-1" />
 
-          {/* Delete account (far down) */}
+          {/* Delete account */}
           <div className="pt-6 pb-2">
             <AlertDialog onOpenChange={(o) => !o && setConfirmStage(false)}>
               <AlertDialogTrigger asChild>

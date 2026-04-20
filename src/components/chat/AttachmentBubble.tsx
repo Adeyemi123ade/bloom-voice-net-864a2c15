@@ -1,11 +1,10 @@
-import { FileText, Download, FileSpreadsheet, Presentation, FileArchive, FileCode, FileAudio, FileVideo, File as FileIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Download, Eye, FileText, FileSpreadsheet, Presentation, FileArchive, FileCode, FileAudio, FileVideo, File as FileIcon, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 
 export const FILE_PREFIX = "[file]";
 // Encoded as: [file]url|mime|name|size|caption
-// caption may be empty; name is URL-encoded so it can safely contain spaces / pipes.
 
 export type FileMeta = {
   url: string;
@@ -51,7 +50,6 @@ function fmtSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-/** Returns true when the bubble should render WITHOUT the surrounding chat bubble (image/video). */
 export function isBareAttachment(meta: FileMeta): boolean {
   return meta.mime.startsWith("image/") || meta.mime.startsWith("video/");
 }
@@ -97,9 +95,11 @@ function docStyle(mime: string, name: string): DocStyle {
 export function AttachmentBubble({
   meta,
   mine,
+  onDelete,
 }: {
   meta: FileMeta;
   mine: boolean;
+  onDelete?: () => void;
 }) {
   const [imgOpen, setImgOpen] = useState(false);
   const isImage = meta.mime.startsWith("image/") && meta.mime !== "image/svg+xml";
@@ -126,7 +126,14 @@ export function AttachmentBubble({
         {meta.caption && (
           <p className="text-[13px] whitespace-pre-wrap break-words mt-1">{meta.caption}</p>
         )}
-        {imgOpen && <ImageViewer url={meta.url} name={meta.name} onClose={() => setImgOpen(false)} />}
+        {imgOpen && (
+          <ImageViewer
+            url={meta.url}
+            name={meta.name}
+            onClose={() => setImgOpen(false)}
+            onDelete={onDelete}
+          />
+        )}
       </>
     );
   }
@@ -158,7 +165,6 @@ export function AttachmentBubble({
     );
   }
 
-  // Generic doc card with type-specific icon + color
   const style = docStyle(meta.mime, meta.name);
   const Icon = style.Icon;
   return (
@@ -170,25 +176,17 @@ export function AttachmentBubble({
         onClick={(e) => e.stopPropagation()}
         className="flex items-center gap-2 min-w-[210px]"
       >
-        <div
-          className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 text-white ${style.bg}`}
-        >
+        <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 text-white ${style.bg}`}>
           <Icon className="w-4 h-4" />
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-[12px] font-medium truncate">{meta.name}</p>
-          <p
-            className={`text-[10px] ${mine ? "text-primary-foreground/70" : "text-muted-foreground"}`}
-          >
+          <p className={`text-[10px] ${mine ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
             {style.label}
             {meta.size ? ` · ${fmtSize(meta.size)}` : ""}
           </p>
         </div>
-        <Download
-          className={`w-4 h-4 flex-shrink-0 ${
-            mine ? "text-primary-foreground/80" : "text-muted-foreground"
-          }`}
-        />
+        <Download className={`w-4 h-4 flex-shrink-0 ${mine ? "text-primary-foreground/80" : "text-muted-foreground"}`} />
       </a>
       {meta.caption && (
         <p className="text-[13px] whitespace-pre-wrap break-words">{meta.caption}</p>
@@ -197,8 +195,30 @@ export function AttachmentBubble({
   );
 }
 
-function ImageViewer({ url, name, onClose }: { url: string; name: string; onClose: () => void }) {
-  // Push a history entry so the device/browser Back button closes the viewer.
+/**
+ * Full-screen image viewer:
+ * - Off-white background regardless of theme.
+ * - Pinch / pan / double-tap zoom.
+ * - Single tap on the image → toggles a delete-action overlay (highlight + trash).
+ * - Long-press on the image → opens a small menu with Preview / Download.
+ * - Device Back button (or popstate) closes.
+ */
+function ImageViewer({
+  url,
+  name,
+  onClose,
+  onDelete,
+}: {
+  url: string;
+  name: string;
+  onClose: () => void;
+  onDelete?: () => void;
+}) {
+  const [showDelete, setShowDelete] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const longPressTimer = useRef<number | null>(null);
+  const longPressed = useRef(false);
+
   useEffect(() => {
     window.history.pushState({ chichatImageViewer: true }, "");
     const onPop = () => onClose();
@@ -208,17 +228,57 @@ function ImageViewer({ url, name, onClose }: { url: string; name: string; onClos
     return () => {
       window.removeEventListener("popstate", onPop);
       document.body.style.overflow = prevOverflow;
-      // If we're closing programmatically (not from popstate), clean the entry.
       if (window.history.state?.chichatImageViewer) window.history.back();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const triggerDownload = async () => {
+    setMenuOpen(false);
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const a = document.createElement("a");
+      const objUrl = URL.createObjectURL(blob);
+      a.href = objUrl;
+      a.download = name || "image";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(objUrl), 1000);
+    } catch {
+      // Fallback: open in new tab
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
+  };
+
+  const startLongPress = () => {
+    longPressed.current = false;
+    if (longPressTimer.current) window.clearTimeout(longPressTimer.current);
+    longPressTimer.current = window.setTimeout(() => {
+      longPressed.current = true;
+      setMenuOpen(true);
+      try {
+        (navigator as { vibrate?: (p: number | number[]) => boolean }).vibrate?.(20);
+      } catch { /* ignore */ }
+    }, 500);
+  };
+  const cancelLongPress = () => {
+    if (longPressTimer.current) {
+      window.clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+
+  const onImageTap = () => {
+    if (longPressed.current) return;
+    setShowDelete((s) => !s);
+  };
+
   return createPortal(
     <div
-      className="fixed inset-0 bg-black"
-      style={{ zIndex: 2147483647 }}
-      onClick={(e) => e.stopPropagation()}
+      className="fixed inset-0"
+      style={{ zIndex: 2147483647, backgroundColor: "#F5F2EC" }}
     >
       <TransformWrapper
         initialScale={1}
@@ -235,11 +295,66 @@ function ImageViewer({ url, name, onClose }: { url: string; name: string; onClos
           <img
             src={url}
             alt={name}
-            className="w-screen h-screen object-contain select-none"
+            className={`w-screen h-screen object-contain select-none transition-shadow ${
+              showDelete ? "ring-4 ring-primary/60 rounded-sm" : ""
+            }`}
             draggable={false}
+            onClick={onImageTap}
+            onTouchStart={startLongPress}
+            onTouchEnd={cancelLongPress}
+            onTouchMove={cancelLongPress}
+            onMouseDown={startLongPress}
+            onMouseUp={cancelLongPress}
+            onMouseLeave={cancelLongPress}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setMenuOpen(true);
+            }}
           />
         </TransformComponent>
       </TransformWrapper>
+
+      {/* Delete-action overlay (single-tap toggle) */}
+      {showDelete && onDelete && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowDelete(false);
+            onDelete();
+            onClose();
+          }}
+          aria-label="Delete image"
+          className="absolute top-6 right-6 w-12 h-12 rounded-full bg-destructive/90 hover:bg-destructive flex items-center justify-center shadow-lg"
+        >
+          <Trash2 className="w-5 h-5 text-destructive-foreground" />
+        </button>
+      )}
+
+      {/* Long-press action sheet */}
+      {menuOpen && (
+        <>
+          <div
+            className="absolute inset-0 bg-black/20"
+            onClick={() => setMenuOpen(false)}
+          />
+          <div className="absolute left-1/2 -translate-x-1/2 bottom-8 w-[260px] rounded-xl bg-background border border-border shadow-xl overflow-hidden">
+            <button
+              onClick={() => setMenuOpen(false)}
+              className="w-full h-11 text-sm text-foreground hover:bg-secondary border-b border-border flex items-center justify-center gap-2"
+            >
+              <Eye className="w-4 h-4" />
+              Preview (pinch to zoom)
+            </button>
+            <button
+              onClick={triggerDownload}
+              className="w-full h-11 text-sm text-foreground hover:bg-secondary flex items-center justify-center gap-2"
+            >
+              <Download className="w-4 h-4" />
+              Download to phone
+            </button>
+          </div>
+        </>
+      )}
     </div>,
     document.body,
   );
