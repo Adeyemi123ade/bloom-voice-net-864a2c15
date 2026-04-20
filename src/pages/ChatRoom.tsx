@@ -366,7 +366,7 @@ export default function ChatRoom() {
       if (otherId) {
         const { data: prof } = await supabase
           .from("profiles")
-          .select("id, display_name, avatar_url, is_online, last_seen_at")
+          .select("id, display_name, avatar_url, is_online, last_seen_at, show_last_seen")
           .eq("id", otherId)
           .maybeSingle();
         if (prof) setOther(prof as Profile);
