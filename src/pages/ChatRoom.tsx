@@ -853,7 +853,7 @@ export default function ChatRoom() {
               return (
                 <div
                   key={m.id}
-                  className={`flex justify-center`}
+                  className={`flex ${mine ? "justify-end" : "justify-start"}`}
                   onClick={(e) => {
                     e.stopPropagation();
                     toggleSelect(m.id);
