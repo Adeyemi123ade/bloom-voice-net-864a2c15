@@ -287,6 +287,8 @@ export default function CallScreen() {
       });
       roomRef.current = room;
       setStatus("connected");
+      // Receiver logs that the call was received successfully (caller logs "ended" on hangup).
+      if (role === "callee") void logCallMessage("received", 0);
 
       room.participants.forEach(handleParticipant);
       room.on("participantConnected", handleParticipant);
