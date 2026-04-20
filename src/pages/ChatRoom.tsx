@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-  ArrowLeft, Send, Check, CheckCheck, Phone, Video, Mic, Square, Trash2, Pencil, X,
+  Send, Check, CheckCheck, Phone, Video, Mic, Square, Trash2, Pencil, X,
   Play, Pause, Paperclip, Copy, Reply, Forward, PhoneIncoming, PhoneOutgoing, PhoneMissed,
 } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
@@ -10,15 +10,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogCancel,
-} from "@/components/ui/alert-dialog";
+import { presenceLabel } from "@/lib/presence";
+import { useMyPrivacy } from "@/hooks/useMyPrivacy";
 import {
   AttachmentBubble,
   FILE_PREFIX,
@@ -44,6 +37,7 @@ type Profile = {
   avatar_url: string | null;
   is_online: boolean;
   last_seen_at: string;
+  show_last_seen?: boolean | null;
 };
 
 const HIDE_KEY = (cid: string) => `chichat:hidden:${cid}`;
