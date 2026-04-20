@@ -10,8 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { presenceLabel } from "@/lib/presence";
-import { useMyPrivacy } from "@/hooks/useMyPrivacy";
+import { isReallyOnline } from "@/lib/presence";
 import {
   AttachmentBubble,
   FILE_PREFIX,
@@ -319,7 +318,6 @@ export default function ChatRoom() {
   const { id: conversationId } = useParams();
   const navigate = useNavigate();
   const { user, loading } = useAuth();
-  const { showLastSeen: mySharesLastSeen } = useMyPrivacy();
   const [messages, setMessages] = useState<Message[]>([]);
   const [other, setOther] = useState<Profile | null>(null);
   const [text, setText] = useState("");
@@ -799,7 +797,7 @@ export default function ChatRoom() {
                 {other?.display_name ?? "Chat"}
               </p>
               <p className="text-[11px] text-muted-foreground truncate">
-                {otherTyping ? "typing…" : presenceLabel(other, mySharesLastSeen)}
+                {otherTyping ? "typing…" : isReallyOnline(other) ? "online" : ""}
               </p>
             </div>
             <button
