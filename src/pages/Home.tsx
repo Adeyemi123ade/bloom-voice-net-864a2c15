@@ -271,7 +271,7 @@ export default function Home() {
                             {initials(p.display_name)}
                           </AvatarFallback>
                         </Avatar>
-                        {p.is_online && (
+                        {isReallyOnline(p) && (
                           <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-accent border border-card" />
                         )}
                       </div>
@@ -280,7 +280,7 @@ export default function Home() {
                           {p.display_name ?? "Unknown"}
                         </p>
                         <p className="text-[10px] text-muted-foreground">
-                          {p.is_online ? "online" : `last seen ${timeAgo(p.last_seen_at)}`}
+                          {presenceLabel(p, mySharesLastSeen)}
                         </p>
                       </div>
                     </button>
