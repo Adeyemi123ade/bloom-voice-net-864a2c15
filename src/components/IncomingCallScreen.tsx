@@ -15,7 +15,7 @@ type IncomingCall = {
   call_type: "voice" | "video";
 };
 
-const RING_TIMEOUT_MS = 45_000;
+const RING_TIMEOUT_MS = 10_000;
 
 function initials(name?: string | null) {
   if (!name) return "?";
