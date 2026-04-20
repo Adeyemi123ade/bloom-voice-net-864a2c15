@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { z } from "zod";
-import { ArrowLeft } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -44,13 +43,6 @@ export default function ForgotPassword() {
   return (
     <MobileFrame>
       <div className="h-full w-full flex flex-col px-4 pt-5 pb-4 overflow-y-auto">
-        <button
-          onClick={() => navigate("/login")}
-          aria-label="Back"
-          className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary transition-colors -ml-1"
-        >
-          <ArrowLeft className="w-4 h-4 text-foreground" />
-        </button>
 
         <div className="mt-2">
           <h1 className="text-[18px] font-bold text-foreground leading-tight">

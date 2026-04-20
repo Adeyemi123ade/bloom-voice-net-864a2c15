@@ -1,3 +1,4 @@
+import { Phone, Video } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 type Profile = { id: string; display_name: string | null; avatar_url: string | null };
@@ -20,11 +21,13 @@ function fmt(s: number) {
 }
 
 export default function CallHeader({ isVideo, other, status, seconds }: Props) {
+  const Icon = isVideo ? Video : Phone;
   return (
     <div className="pt-8 pb-4 flex flex-col items-center gap-3">
-      <p className="text-[11px] uppercase tracking-widest text-muted-foreground">
-        {isVideo ? "Video call" : "Voice call"}
-      </p>
+      <div className="flex items-center gap-2 text-[11px] uppercase tracking-widest text-muted-foreground">
+        <span>Calling</span>
+        <Icon className="w-3.5 h-3.5" />
+      </div>
       <Avatar className="w-24 h-24 ring-4 ring-primary/30">
         <AvatarImage src={other?.avatar_url ?? undefined} />
         <AvatarFallback className="bg-primary/20 text-foreground text-2xl font-semibold">

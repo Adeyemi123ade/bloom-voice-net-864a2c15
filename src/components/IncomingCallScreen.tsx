@@ -15,17 +15,13 @@ type IncomingCall = {
   call_type: "voice" | "video";
 };
 
+const RING_TIMEOUT_MS = 45_000;
+
 function initials(name?: string | null) {
   if (!name) return "?";
   return name.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
 }
 
-/**
- * "Primes" the audio system on first user gesture so that we can later start
- * the WebAudio ringtone programmatically when a call arrives. Without a prior
- * gesture, browsers block AudioContext.resume(). Once the user has tapped
- * anywhere in the app, this flag flips true and ringtones can autoplay.
- */
 let audioPrimed = false;
 if (typeof window !== "undefined") {
   const prime = () => {
@@ -39,7 +35,6 @@ if (typeof window !== "undefined") {
   window.addEventListener("click", prime, opts);
 }
 
-/** Plays the user-selected ringtone + vibration while `active` is true. */
 function useRingtone(active: boolean) {
   useEffect(() => {
     if (!active) return;
@@ -56,34 +51,20 @@ function useRingtone(active: boolean) {
           (navigator as { vibrate?: (p: number | number[]) => boolean }).vibrate?.([
             600, 400, 600, 400, 600, 1500,
           ]);
-        } catch {
-          /* ignore */
-        }
+        } catch { /* ignore */ }
       }, 4000);
-    } catch {
-      /* ignore */
-    }
+    } catch { /* ignore */ }
 
     return () => {
-      try {
-        stop();
-      } catch {
-        /* ignore */
-      }
+      try { stop(); } catch { /* ignore */ }
       if (vInt) window.clearInterval(vInt);
       try {
         (navigator as { vibrate?: (p: number | number[]) => boolean }).vibrate?.(0);
-      } catch {
-        /* ignore */
-      }
+      } catch { /* ignore */ }
     };
   }, [active]);
 }
 
-/**
- * Listens globally for incoming calls. When one arrives, renders a full-screen
- * accept/decline UI with a ringtone.
- */
 export default function IncomingCallScreen() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -91,18 +72,43 @@ export default function IncomingCallScreen() {
   const [callerName, setCallerName] = useState<string | null>(null);
   const [callerAvatar, setCallerAvatar] = useState<string | null>(null);
   const handled = useRef<Set<string>>(new Set());
+  const timeoutRef = useRef<number | null>(null);
 
   useRingtone(!!incoming);
 
   const incomingRef = useRef<IncomingCall | null>(null);
+  useEffect(() => { incomingRef.current = incoming; }, [incoming]);
+
+  // Auto-dismiss + mark "missed" if the receiver doesn't answer within 45s.
   useEffect(() => {
-    incomingRef.current = incoming;
+    if (!incoming) {
+      if (timeoutRef.current) {
+        window.clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+      return;
+    }
+    timeoutRef.current = window.setTimeout(async () => {
+      const c = incomingRef.current;
+      if (!c) return;
+      setIncoming(null);
+      try {
+        await supabase
+          .from("calls")
+          .update({ status: "missed", ended_at: new Date().toISOString() })
+          .eq("id", c.id)
+          .eq("status", "ringing");
+      } catch { /* ignore */ }
+    }, RING_TIMEOUT_MS);
+    return () => {
+      if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    };
   }, [incoming]);
 
   useEffect(() => {
     if (!user) return;
 
-    // Native (Android) heads-up notifications — no-op on web.
     void startNativeCallNotifications(user.id);
 
     const handle = async (callId: string) => {
@@ -111,12 +117,22 @@ export default function IncomingCallScreen() {
 
       const { data: call } = await supabase
         .from("calls")
-        .select("id, conversation_id, caller_id, room_name, call_type, status, callee_id")
+        .select("id, conversation_id, caller_id, room_name, call_type, status, callee_id, created_at")
         .eq("id", callId)
         .maybeSingle();
       if (!call) return;
       if (call.callee_id !== user.id) return;
       if (call.status !== "ringing") return;
+      // If the call was created more than 45s ago, treat as already missed.
+      const age = Date.now() - new Date(call.created_at as string).getTime();
+      if (age > RING_TIMEOUT_MS) {
+        await supabase
+          .from("calls")
+          .update({ status: "missed", ended_at: new Date().toISOString() })
+          .eq("id", call.id)
+          .eq("status", "ringing");
+        return;
+      }
 
       const { data: prof } = await supabase
         .from("profiles")
@@ -134,8 +150,6 @@ export default function IncomingCallScreen() {
       });
     };
 
-    // 1) Catch any ringing call that already exists (e.g. user just logged in
-    //    or page reloaded while a call was already incoming).
     (async () => {
       const { data } = await supabase
         .from("calls")
@@ -148,17 +162,11 @@ export default function IncomingCallScreen() {
       if (id) handle(id);
     })();
 
-    // 2) Subscribe to live INSERTs targeted at this user.
     const ch = supabase
       .channel(`incoming-calls-${user.id}`)
       .on(
         "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "calls",
-          filter: `callee_id=eq.${user.id}`,
-        },
+        { event: "INSERT", schema: "public", table: "calls", filter: `callee_id=eq.${user.id}` },
         (payload) => {
           const row = payload.new as { id: string; status: string };
           if (row?.status === "ringing") handle(row.id);
@@ -166,14 +174,10 @@ export default function IncomingCallScreen() {
       )
       .on(
         "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "calls",
-          filter: `callee_id=eq.${user.id}`,
-        },
+        { event: "UPDATE", schema: "public", table: "calls", filter: `callee_id=eq.${user.id}` },
         (payload) => {
           const row = payload.new as { id: string; status: string };
+          // Any non-ringing transition (caller cancelled, ended, declined, missed, accepted) → dismiss UI.
           if (row?.status && row.status !== "ringing") {
             const cur = incomingRef.current;
             if (cur && row.id === cur.id) setIncoming(null);
@@ -194,9 +198,7 @@ export default function IncomingCallScreen() {
     const c = incoming;
     setIncoming(null);
     navigate(
-      `/call/${c.conversation_id}?type=${c.call_type}&callId=${c.id}&room=${encodeURIComponent(
-        c.room_name,
-      )}&role=callee`,
+      `/call/${c.conversation_id}?type=${c.call_type}&callId=${c.id}&room=${encodeURIComponent(c.room_name)}&role=callee`,
       { replace: true },
     );
   };
@@ -215,9 +217,10 @@ export default function IncomingCallScreen() {
   return (
     <div className="fixed inset-0 z-[100] bg-gradient-to-b from-secondary to-background flex flex-col items-center justify-between py-16 px-6">
       <div className="flex flex-col items-center gap-3 mt-8">
-        <p className="text-xs uppercase tracking-widest text-muted-foreground">
-          Incoming {isVideo ? "video" : "voice"} call
-        </p>
+        <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-muted-foreground">
+          <span>Calling</span>
+          {isVideo ? <Video className="w-3.5 h-3.5" /> : <Phone className="w-3.5 h-3.5" />}
+        </div>
         <Avatar className="w-28 h-28 ring-4 ring-primary/30">
           <AvatarImage src={callerAvatar ?? undefined} />
           <AvatarFallback className="bg-primary/20 text-foreground text-2xl font-semibold">
@@ -229,21 +232,13 @@ export default function IncomingCallScreen() {
       </div>
 
       <div className="flex items-center justify-around w-full max-w-xs">
-        <button
-          onClick={decline}
-          aria-label="Decline call"
-          className="flex flex-col items-center gap-2"
-        >
+        <button onClick={decline} aria-label="Decline call" className="flex flex-col items-center gap-2">
           <span className="w-16 h-16 rounded-full bg-destructive hover:bg-destructive/90 flex items-center justify-center shadow-lg">
             <PhoneOff className="w-7 h-7 text-destructive-foreground" />
           </span>
           <span className="text-xs text-foreground">Decline</span>
         </button>
-        <button
-          onClick={accept}
-          aria-label="Accept call"
-          className="flex flex-col items-center gap-2"
-        >
+        <button onClick={accept} aria-label="Accept call" className="flex flex-col items-center gap-2">
           <span className="w-16 h-16 rounded-full bg-primary hover:bg-primary/90 flex items-center justify-center shadow-lg animate-pulse">
             {isVideo ? (
               <Video className="w-7 h-7 text-primary-foreground" />

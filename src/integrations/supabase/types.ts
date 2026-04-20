@@ -146,6 +146,7 @@ export type Database = {
           id: string
           is_online: boolean
           last_seen_at: string
+          show_last_seen: boolean
           updated_at: string
         }
         Insert: {
@@ -155,6 +156,7 @@ export type Database = {
           id: string
           is_online?: boolean
           last_seen_at?: string
+          show_last_seen?: boolean
           updated_at?: string
         }
         Update: {
@@ -164,6 +166,7 @@ export type Database = {
           id?: string
           is_online?: boolean
           last_seen_at?: string
+          show_last_seen?: boolean
           updated_at?: string
         }
         Relationships: []

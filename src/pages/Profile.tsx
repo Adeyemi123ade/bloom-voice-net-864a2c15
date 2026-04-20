@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Camera, Loader2 } from "lucide-react";
+import { Camera, Loader2 } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -107,14 +107,7 @@ export default function Profile() {
   return (
     <MobileFrame>
       <div className="h-full w-full flex flex-col bg-background overflow-y-auto">
-        <div className="px-3 pt-4 pb-3 flex items-center gap-2 border-b border-border sticky top-0 bg-background z-10">
-          <button
-            aria-label="Back"
-            onClick={() => navigate(-1)}
-            className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
-          >
-            <ArrowLeft className="w-4 h-4 text-foreground" />
-          </button>
+        <div className="px-3 pt-4 pb-3 border-b border-border sticky top-0 bg-background z-10">
           <h1 className="text-sm font-semibold text-foreground">Profile</h1>
         </div>
 

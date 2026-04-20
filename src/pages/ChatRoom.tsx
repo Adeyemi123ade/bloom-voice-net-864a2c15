@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-  ArrowLeft, Send, Check, CheckCheck, Phone, Video, Mic, Square, Trash2, Pencil, X,
+  Send, Check, CheckCheck, Phone, Video, Mic, Square, Trash2, Pencil, X,
   Play, Pause, Paperclip, Copy, Reply, Forward, PhoneIncoming, PhoneOutgoing, PhoneMissed,
 } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
@@ -10,15 +10,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogCancel,
-} from "@/components/ui/alert-dialog";
+import { presenceLabel } from "@/lib/presence";
+import { useMyPrivacy } from "@/hooks/useMyPrivacy";
 import {
   AttachmentBubble,
   FILE_PREFIX,
@@ -44,6 +37,7 @@ type Profile = {
   avatar_url: string | null;
   is_online: boolean;
   last_seen_at: string;
+  show_last_seen?: boolean | null;
 };
 
 const HIDE_KEY = (cid: string) => `chichat:hidden:${cid}`;
@@ -203,23 +197,43 @@ function VoiceBubble({ id, url, mine }: { id: string; url: string; mine: boolean
 }
 
 function CallSystemBubble({ m, mine }: { m: Message; mine: boolean }) {
-  // [call]video|ended|45
+  // [call]video|<kind>|<duration>
+  // kind ∈ ended | no_answer | missed | rejected | declined | received
   const [, body] = m.content.split(CALL_PREFIX);
-  const [type, status, durStr] = (body ?? "").split("|");
+  const [type, kind, durStr] = (body ?? "").split("|");
   const isVideo = type === "video";
   const dur = parseInt(durStr || "0", 10);
-  const missed = status === "missed" || status === "declined";
-  const Icon = missed ? PhoneMissed : mine ? PhoneOutgoing : PhoneIncoming;
+  const isMissed = kind === "missed" || kind === "no_answer";
+  const Icon = isMissed ? PhoneMissed : mine ? PhoneOutgoing : PhoneIncoming;
+
+  // Per-side wording rules (sender-of-the-log perspective):
+  // - mine = caller's log    | !mine = receiver's log
+  let label = "";
+  if (kind === "ended") label = isVideo ? "Video call ended" : "Voice call ended";
+  else if (mine && kind === "no_answer") label = "No answer";
+  else if (mine && kind === "rejected") label = "Call rejected";
+  else if (!mine && kind === "missed") label = isVideo ? "Missed video call" : "Missed voice call";
+  else if (!mine && kind === "received") label = "Received call";
+  else if (!mine && kind === "declined") label = "Call ended";
+  else label = isVideo ? "Video call" : "Voice call";
+
+  // Missed shows timestamp only; everything else shows duration (0 for non-connected).
+  const sub = isMissed
+    ? formatTime(m.created_at)
+    : `${formatTime(m.created_at)} · ${dur > 0 ? fmtDuration(dur) : "0:00"}`;
+
   return (
-    <div className="flex items-center gap-2 px-3 py-2 rounded-2xl bg-secondary text-foreground">
-      <Icon className={`w-4 h-4 ${missed ? "text-destructive" : "text-primary"}`} />
+    <div
+      className={`flex items-center gap-2 px-3 py-2 rounded-2xl max-w-[75%] ${
+        mine
+          ? "bg-primary/15 text-foreground rounded-br-sm"
+          : "bg-secondary text-foreground rounded-bl-sm"
+      }`}
+    >
+      <Icon className={`w-4 h-4 ${isMissed ? "text-destructive" : "text-primary"}`} />
       <div className="flex flex-col">
-        <span className="text-[12px] font-medium">
-          {isVideo ? "Video call" : "Voice call"} {missed ? "· missed" : status === "ended" ? "· ended" : ""}
-        </span>
-        <span className="text-[10px] text-muted-foreground">
-          {dur > 0 ? fmtDuration(dur) : formatTime(m.created_at)}
-        </span>
+        <span className="text-[12px] font-medium">{label}</span>
+        <span className="text-[10px] text-muted-foreground">{sub}</span>
       </div>
     </div>
   );
@@ -305,6 +319,7 @@ export default function ChatRoom() {
   const { id: conversationId } = useParams();
   const navigate = useNavigate();
   const { user, loading } = useAuth();
+  const { showLastSeen: mySharesLastSeen } = useMyPrivacy();
   const [messages, setMessages] = useState<Message[]>([]);
   const [other, setOther] = useState<Profile | null>(null);
   const [text, setText] = useState("");
@@ -352,7 +367,7 @@ export default function ChatRoom() {
       if (otherId) {
         const { data: prof } = await supabase
           .from("profiles")
-          .select("id, display_name, avatar_url, is_online, last_seen_at")
+          .select("id, display_name, avatar_url, is_online, last_seen_at, show_last_seen")
           .eq("id", otherId)
           .maybeSingle();
         if (prof) setOther(prof as Profile);
@@ -765,13 +780,6 @@ export default function ChatRoom() {
           </div>
         ) : (
           <div className="px-3 pt-4 pb-3 flex items-center gap-2 border-b border-border">
-            <button
-              aria-label="Back"
-              onClick={() => navigate("/home")}
-              className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
-            >
-              <ArrowLeft className="w-4 h-4 text-foreground" />
-            </button>
             <div className="relative">
               <Avatar className="w-9 h-9">
                 <AvatarImage src={other?.avatar_url ?? undefined} />
@@ -779,7 +787,10 @@ export default function ChatRoom() {
                   {initials(other?.display_name)}
                 </AvatarFallback>
               </Avatar>
-              {other?.is_online && (
+              {other && (() => {
+                const ageMs = Date.now() - new Date(other.last_seen_at).getTime();
+                return other.is_online && ageMs < 5 * 60 * 1000;
+              })() && (
                 <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-accent border-2 border-background" />
               )}
             </div>
@@ -788,13 +799,7 @@ export default function ChatRoom() {
                 {other?.display_name ?? "Chat"}
               </p>
               <p className="text-[11px] text-muted-foreground truncate">
-                {otherTyping
-                  ? "typing…"
-                  : other?.is_online
-                    ? "online"
-                    : other
-                      ? `last seen ${timeAgo(other.last_seen_at)}`
-                      : ""}
+                {otherTyping ? "typing…" : presenceLabel(other, mySharesLastSeen)}
               </p>
             </div>
             <button
@@ -833,7 +838,7 @@ export default function ChatRoom() {
               return (
                 <div
                   key={m.id}
-                  className={`flex justify-center`}
+                  className={`flex ${mine ? "justify-end" : "justify-start"}`}
                   onClick={(e) => {
                     e.stopPropagation();
                     toggleSelect(m.id);
@@ -898,7 +903,14 @@ export default function ChatRoom() {
                   ) : isVoice ? (
                     <VoiceBubble id={m.id} url={voiceUrl} mine={mine} />
                   ) : isFile && fileMeta ? (
-                    <AttachmentBubble meta={fileMeta} mine={mine} />
+                    <AttachmentBubble
+                      meta={fileMeta}
+                      mine={mine}
+                      onDelete={() => {
+                        setSelectedIds(new Set([m.id]));
+                        setDeleteOpen(true);
+                      }}
+                    />
                   ) : (
                     <p className="text-[13px] whitespace-pre-wrap break-words">{body}</p>
                   )}
