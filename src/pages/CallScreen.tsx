@@ -20,6 +20,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useRingback } from "@/hooks/useRingback";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { clearPreparedCallMedia, consumePreparedCallMedia, formatCallMediaError } from "@/lib/callMedia";
 
 type Profile = { id: string; display_name: string | null; avatar_url: string | null };
 
@@ -186,6 +187,7 @@ export default function CallScreen() {
         remoteAudioEl.current.pause();
         remoteAudioEl.current.srcObject = null;
       }
+      clearPreparedCallMedia();
       if (localVideoEl.current) localVideoEl.current.innerHTML = "";
       if (remoteVideoEl.current) remoteVideoEl.current.innerHTML = "";
     } catch {
@@ -301,11 +303,12 @@ export default function CallScreen() {
       if (tokenErr) throw tokenErr;
       if (!tokenData?.token) throw new Error("No token returned");
 
-      const audio = await createLocalAudioTrack();
+      const preparedMedia = consumePreparedCallMedia();
+      const audio = preparedMedia?.audioTrack ?? await createLocalAudioTrack();
       localAudioRef.current = audio;
       const tracks: (LocalAudioTrack | LocalVideoTrack)[] = [audio];
       if (isVideo) {
-        const video = await createLocalVideoTrack({ width: 640 });
+        const video = preparedMedia?.videoTrack ?? await createLocalVideoTrack({ width: 640 });
         localVideoRef.current = video;
         tracks.push(video);
         if (localVideoEl.current) {
@@ -340,7 +343,7 @@ export default function CallScreen() {
       // Make sure audio element is unmuted + ready.
       void tryPlayRemoteAudio();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to join call";
+      const msg = formatCallMediaError(err, isVideo);
       toast({ title: "Call failed", description: msg, variant: "destructive" });
       cleanupAndExit();
     }
