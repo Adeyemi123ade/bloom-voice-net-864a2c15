@@ -4,8 +4,10 @@ import { Phone, PhoneOff, Video } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { toast } from "@/hooks/use-toast";
 import { getSelectedRingtone, playRingtone } from "@/lib/ringtones";
 import { startNativeCallNotifications } from "@/lib/nativeCallNotifications";
+import { formatCallMediaError, prepareCallMedia } from "@/lib/callMedia";
 
 type IncomingCall = {
   id: string;
@@ -211,8 +213,18 @@ export default function IncomingCallScreen() {
 
   if (!incoming) return null;
 
-  const accept = () => {
+  const accept = async () => {
     const c = incoming;
+    try {
+      await prepareCallMedia(c.call_type === "video");
+    } catch (error) {
+      toast({
+        title: "Call permission needed",
+        description: formatCallMediaError(error, c.call_type === "video"),
+        variant: "destructive",
+      });
+      return;
+    }
     setIncoming(null);
     navigate(
       `/call/${c.conversation_id}?type=${c.call_type}&callId=${c.id}&room=${encodeURIComponent(c.room_name)}&role=callee`,

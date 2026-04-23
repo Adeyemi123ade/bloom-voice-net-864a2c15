@@ -11,6 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { isReallyOnline } from "@/lib/presence";
+import { formatCallMediaError, prepareCallMedia } from "@/lib/callMedia";
 import {
   AttachmentBubble,
   FILE_PREFIX,
@@ -447,6 +448,17 @@ export default function ChatRoom() {
 
   const startCall = async (type: "voice" | "video") => {
     if (!user || !conversationId || !other) return;
+    try {
+      await prepareCallMedia(type === "video");
+    } catch (error) {
+      toast({
+        title: "Call permission needed",
+        description: formatCallMediaError(error, type === "video"),
+        variant: "destructive",
+      });
+      return;
+    }
+
     const roomName = `chichat-${conversationId}-${Date.now()}`;
     const { data, error } = await supabase
       .from("calls")
