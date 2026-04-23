@@ -11,7 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { isReallyOnline } from "@/lib/presence";
-import { formatCallMediaError, prepareCallMedia } from "@/lib/callMedia";
+import { clearPreparedCallMedia, formatCallMediaError, prepareCallMedia } from "@/lib/callMedia";
 import {
   AttachmentBubble,
   FILE_PREFIX,
@@ -472,6 +472,7 @@ export default function ChatRoom() {
       .select("id")
       .single();
     if (error) {
+      clearPreparedCallMedia();
       toast({ title: "Could not start call", description: error.message, variant: "destructive" });
       return;
     }
