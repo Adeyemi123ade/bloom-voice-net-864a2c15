@@ -5,6 +5,8 @@ import MobileFrame from "@/components/MobileFrame";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
+import { clearPreparedCallMedia, formatCallMediaError, prepareCallMedia } from "@/lib/callMedia";
 
 type Call = {
   id: string;
@@ -189,7 +191,18 @@ export default function Calls() {
                     </button>
                     <button
                       aria-label="Call back"
-                      onClick={() => {
+                      onClick={async () => {
+                        try {
+                          await prepareCallMedia(c.call_type === "video");
+                        } catch (error) {
+                          toast({
+                            title: "Call permission needed",
+                            description: formatCallMediaError(error, c.call_type === "video"),
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+
                         const room = `chichat-${c.conversation_id}-${Date.now()}`;
                         supabase
                           .from("calls")
@@ -203,7 +216,13 @@ export default function Calls() {
                           .select("id")
                           .single()
                           .then(({ data, error }) => {
-                            if (error || !data) return;
+                            if (error || !data) {
+                              clearPreparedCallMedia();
+                              if (error) {
+                                toast({ title: "Could not start call", description: error.message, variant: "destructive" });
+                              }
+                              return;
+                            }
                             navigate(
                               `/call/${c.conversation_id}?type=${c.call_type}&callId=${data.id}&room=${encodeURIComponent(room)}&role=caller`,
                             );
