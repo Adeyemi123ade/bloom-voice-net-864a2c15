@@ -333,6 +333,9 @@ export default function CallScreen() {
           (el as HTMLVideoElement).muted = true;
           localVideoEl.current.appendChild(el);
         }
+      } else if (preparedMedia?.videoTrack) {
+        // Voice call: never publish video. Stop any prepared video track immediately.
+        try { preparedMedia.videoTrack.stop(); } catch { /* ignore */ }
       }
 
       const room = await connect(tokenData.token, {
