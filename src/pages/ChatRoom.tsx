@@ -227,8 +227,6 @@ function CallSystemBubble({
   else if (!mine && kind === "declined") label = "Call ended";
   else label = isVideo ? "Video call" : "Voice call";
 
-  // Compact meta: duration when connected, otherwise nothing (timestamp sits to the right).
-  const meta = !isMissed && dur > 0 ? ` · ${fmtDuration(dur)}` : "";
 
   const handleTap = (e: React.MouseEvent) => {
     e.stopPropagation();
