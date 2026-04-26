@@ -231,8 +231,7 @@ function CallSystemBubble({
   const handleTap = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!onCallBack) return;
-    const ok = window.confirm(`Call ${otherName ?? "this contact"} again?`);
-    if (ok) onCallBack(callType);
+    onCallBack(callType);
   };
 
   // Line 2: duration in "X secs" / "M:SS" form, or hint for missed.
