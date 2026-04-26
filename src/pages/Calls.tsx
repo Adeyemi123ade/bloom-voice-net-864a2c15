@@ -77,6 +77,7 @@ export default function Calls() {
   const [calls, setCalls] = useState<Call[]>([]);
   const [profiles, setProfiles] = useState<Map<string, Profile>>(new Map());
   const [fetching, setFetching] = useState(true);
+  const [sheet, setSheet] = useState<{ name: string; type: "voice" | "video"; run: () => void } | null>(null);
 
   useEffect(() => {
     document.title = "Calls — Chichat";
