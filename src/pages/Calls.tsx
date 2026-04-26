@@ -229,6 +229,13 @@ export default function Calls() {
           })}
         </div>
       </div>
+      <CallBackSheet
+        open={!!sheet}
+        onOpenChange={(o) => !o && setSheet(null)}
+        name={sheet?.name ?? ""}
+        type={sheet?.type ?? "voice"}
+        onConfirm={() => sheet?.run()}
+      />
     </MobileFrame>
   );
 }
