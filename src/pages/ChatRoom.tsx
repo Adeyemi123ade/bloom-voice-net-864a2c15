@@ -887,7 +887,12 @@ export default function ChatRoom() {
                   }}
                 >
                   <div className={isSelected ? "ring-2 ring-primary rounded-2xl" : ""}>
-                    <CallSystemBubble m={m} mine={mine} />
+                    <CallSystemBubble
+                      m={m}
+                      mine={mine}
+                      otherName={other?.display_name}
+                      onCallBack={(t) => startCall(t)}
+                    />
                   </div>
                 </div>
               );
