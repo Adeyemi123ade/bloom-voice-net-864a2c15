@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { clearPreparedCallMedia, formatCallMediaError, prepareCallMedia } from "@/lib/callMedia";
+import CallBackSheet from "@/components/call/CallBackSheet";
 
 type Call = {
   id: string;
@@ -76,6 +77,7 @@ export default function Calls() {
   const [calls, setCalls] = useState<Call[]>([]);
   const [profiles, setProfiles] = useState<Map<string, Profile>>(new Map());
   const [fetching, setFetching] = useState(true);
+  const [sheet, setSheet] = useState<{ name: string; type: "voice" | "video"; run: () => void } | null>(null);
 
   useEffect(() => {
     document.title = "Calls — Chichat";
@@ -150,9 +152,7 @@ export default function Calls() {
             const name = other?.display_name ?? "Unknown";
             const datetime = whenLabel(c.created_at);
 
-            const callBack = async () => {
-              const ok = window.confirm(`Call ${name} again?`);
-              if (!ok) return;
+            const doCall = async () => {
               try {
                 await prepareCallMedia(c.call_type === "video");
               } catch (error) {
@@ -186,6 +186,8 @@ export default function Calls() {
                 `/call/${c.conversation_id}?type=${c.call_type}&callId=${data.id}&room=${encodeURIComponent(room)}&role=caller`,
               );
             };
+            const callBack = () =>
+              setSheet({ name, type: c.call_type === "video" ? "video" : "voice", run: doCall });
 
             return (
               <div
@@ -227,6 +229,13 @@ export default function Calls() {
           })}
         </div>
       </div>
+      <CallBackSheet
+        open={!!sheet}
+        onOpenChange={(o) => !o && setSheet(null)}
+        name={sheet?.name ?? ""}
+        type={sheet?.type ?? "voice"}
+        onConfirm={() => sheet?.run()}
+      />
     </MobileFrame>
   );
 }

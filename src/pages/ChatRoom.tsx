@@ -19,6 +19,7 @@ import {
   parseFileMessage,
   isBareAttachment,
 } from "@/components/chat/AttachmentBubble";
+import CallBackSheet from "@/components/call/CallBackSheet";
 
 type Message = {
   id: string;
@@ -231,8 +232,7 @@ function CallSystemBubble({
   const handleTap = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!onCallBack) return;
-    const ok = window.confirm(`Call ${otherName ?? "this contact"} again?`);
-    if (ok) onCallBack(callType);
+    onCallBack(callType);
   };
 
   // Line 2: duration in "X secs" / "M:SS" form, or hint for missed.
@@ -365,6 +365,7 @@ export default function ChatRoom() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [callSheet, setCallSheet] = useState<"voice" | "video" | null>(null);
   const [recording, setRecording] = useState(false);
   const [recSec, setRecSec] = useState(0);
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -908,7 +909,7 @@ export default function ChatRoom() {
                       m={m}
                       mine={mine}
                       otherName={other?.display_name}
-                      onCallBack={(t) => startCall(t)}
+                      onCallBack={(t) => setCallSheet(t)}
                     />
                   </div>
                 </div>
@@ -1224,6 +1225,13 @@ export default function ChatRoom() {
           </div>
         </>
       )}
+      <CallBackSheet
+        open={!!callSheet}
+        onOpenChange={(o) => !o && setCallSheet(null)}
+        name={other?.display_name ?? "Contact"}
+        type={callSheet ?? "voice"}
+        onConfirm={() => callSheet && startCall(callSheet)}
+      />
     </MobileFrame>
   );
 }
