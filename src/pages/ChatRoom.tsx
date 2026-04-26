@@ -460,6 +460,17 @@ export default function ChatRoom() {
     }
 
     const roomName = `chichat-${conversationId}-${Date.now()}`;
+
+    // Pre-create room with short timeouts so it auto-closes if no one joins / both leave.
+    const { error: roomErr } = await supabase.functions.invoke("twilio-room", {
+      body: { action: "create", roomName },
+    });
+    if (roomErr) {
+      clearPreparedCallMedia();
+      toast({ title: "Could not start call", description: roomErr.message, variant: "destructive" });
+      return;
+    }
+
     const { data, error } = await supabase
       .from("calls")
       .insert({

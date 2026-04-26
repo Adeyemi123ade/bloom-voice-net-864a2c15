@@ -174,6 +174,17 @@ export default function CallScreen() {
     };
   }, [status]);
 
+  const completeRoom = async () => {
+    if (!roomName) return;
+    try {
+      await supabase.functions.invoke("twilio-room", {
+        body: { action: "complete", roomName },
+      });
+    } catch (e) {
+      console.warn("twilio-room complete failed", e);
+    }
+  };
+
   const cleanupAndExit = async () => {
     if (endedRef.current) return;
     endedRef.current = true;
@@ -193,6 +204,8 @@ export default function CallScreen() {
     } catch {
       /* ignore */
     }
+    // Close the Twilio room so it can't keep billing as a ghost room.
+    void completeRoom();
     setTimeout(() => navigate(`/chat/${conversationId}`, { replace: true }), 500);
   };
 
@@ -320,6 +333,9 @@ export default function CallScreen() {
           (el as HTMLVideoElement).muted = true;
           localVideoEl.current.appendChild(el);
         }
+      } else if (preparedMedia?.videoTrack) {
+        // Voice call: never publish video. Stop any prepared video track immediately.
+        try { preparedMedia.videoTrack.stop(); } catch { /* ignore */ }
       }
 
       const room = await connect(tokenData.token, {
