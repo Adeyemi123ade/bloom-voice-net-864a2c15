@@ -146,106 +146,85 @@ export default function Calls() {
           )}
           {items.map(({ c, outgoing, other, label, missed, dur }) => {
             const Icon = missed ? PhoneMissed : outgoing ? PhoneOutgoing : PhoneIncoming;
-            const sub = missed
-              ? whenLabel(c.created_at)
-              : `${whenLabel(c.created_at)} · ${dur > 0 ? fmtDuration(dur) : "0:00"}`;
+            const TypeIcon = c.call_type === "video" ? Video : Phone;
+            const name = other?.display_name ?? "Unknown";
+            const datetime = whenLabel(c.created_at);
+            const sub = dur > 0 ? `${label} · ${fmtDuration(dur)}` : label;
+
+            const callBack = async () => {
+              const ok = window.confirm(`Call ${name} again?`);
+              if (!ok) return;
+              try {
+                await prepareCallMedia(c.call_type === "video");
+              } catch (error) {
+                toast({
+                  title: "Call permission needed",
+                  description: formatCallMediaError(error, c.call_type === "video"),
+                  variant: "destructive",
+                });
+                return;
+              }
+              const room = `chichat-${c.conversation_id}-${Date.now()}`;
+              const { data, error } = await supabase
+                .from("calls")
+                .insert({
+                  conversation_id: c.conversation_id,
+                  caller_id: user!.id,
+                  callee_id: other?.id ?? (outgoing ? c.callee_id : c.caller_id),
+                  room_name: room,
+                  call_type: c.call_type,
+                })
+                .select("id")
+                .single();
+              if (error || !data) {
+                clearPreparedCallMedia();
+                if (error) {
+                  toast({ title: "Could not start call", description: error.message, variant: "destructive" });
+                }
+                return;
+              }
+              navigate(
+                `/call/${c.conversation_id}?type=${c.call_type}&callId=${data.id}&room=${encodeURIComponent(room)}&role=caller`,
+              );
+            };
+
             return (
               <div
                 key={c.id}
-                className={`flex items-end gap-2 ${outgoing ? "justify-end" : "justify-start"}`}
+                className="w-full flex items-center gap-3 px-2 py-2.5 rounded-lg hover:bg-secondary/60 transition-colors"
               >
-                {!outgoing && (
-                  <Avatar className="w-7 h-7 shrink-0">
-                    <AvatarImage src={other?.avatar_url ?? undefined} />
-                    <AvatarFallback className="bg-primary/20 text-foreground text-[10px] font-semibold">
-                      {initials(other?.display_name)}
-                    </AvatarFallback>
-                  </Avatar>
-                )}
-                <div
-                  className={`max-w-[78%] px-3 py-2 rounded-2xl ${
-                    outgoing
-                      ? "bg-primary/15 text-foreground rounded-br-sm"
-                      : "bg-secondary text-foreground rounded-bl-sm"
-                  }`}
+                <Avatar className="w-10 h-10 shrink-0">
+                  <AvatarImage src={other?.avatar_url ?? undefined} />
+                  <AvatarFallback className="bg-primary/20 text-foreground text-[11px] font-semibold">
+                    {initials(name)}
+                  </AvatarFallback>
+                </Avatar>
+                <button
+                  onClick={() => navigate(`/chat/${c.conversation_id}`)}
+                  className="flex-1 min-w-0 text-left"
                 >
-                  <div className="flex items-center gap-2">
-                    <Icon className={`w-4 h-4 ${missed ? "text-destructive" : "text-primary"}`} />
-                    <div className="flex flex-col min-w-0">
-                      <span className="text-[12px] font-semibold truncate">
-                        {other?.display_name ?? "Unknown"}
-                      </span>
-                      <span className={`text-[11px] ${missed ? "text-destructive" : "text-muted-foreground"}`}>
-                        {label}
-                      </span>
-                      <span className="text-[10px] text-muted-foreground">{sub}</span>
-                    </div>
+                  {/* Line 1: icon + name + datetime */}
+                  <div className="flex items-center gap-1.5 w-full">
+                    <Icon className={`w-3.5 h-3.5 shrink-0 ${missed ? "text-destructive" : "text-primary"}`} />
+                    <span className="text-[13px] font-semibold text-foreground truncate flex-1">
+                      {name}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground shrink-0">
+                      {datetime}
+                    </span>
                   </div>
-                  <div className={`flex items-center gap-1 mt-1 ${outgoing ? "justify-end" : "justify-start"}`}>
-                    <button
-                      aria-label="Open chat"
-                      onClick={() => navigate(`/chat/${c.conversation_id}`)}
-                      className="w-7 h-7 rounded-full hover:bg-background/50 flex items-center justify-center"
-                    >
-                      <MessageCircle className="w-3.5 h-3.5 text-foreground" />
-                    </button>
-                    <button
-                      aria-label="Call back"
-                      onClick={async () => {
-                        try {
-                          await prepareCallMedia(c.call_type === "video");
-                        } catch (error) {
-                          toast({
-                            title: "Call permission needed",
-                            description: formatCallMediaError(error, c.call_type === "video"),
-                            variant: "destructive",
-                          });
-                          return;
-                        }
-
-                        const room = `chichat-${c.conversation_id}-${Date.now()}`;
-                        supabase
-                          .from("calls")
-                          .insert({
-                            conversation_id: c.conversation_id,
-                            caller_id: user!.id,
-                            callee_id: other?.id ?? (outgoing ? c.callee_id : c.caller_id),
-                            room_name: room,
-                            call_type: c.call_type,
-                          })
-                          .select("id")
-                          .single()
-                          .then(({ data, error }) => {
-                            if (error || !data) {
-                              clearPreparedCallMedia();
-                              if (error) {
-                                toast({ title: "Could not start call", description: error.message, variant: "destructive" });
-                              }
-                              return;
-                            }
-                            navigate(
-                              `/call/${c.conversation_id}?type=${c.call_type}&callId=${data.id}&room=${encodeURIComponent(room)}&role=caller`,
-                            );
-                          });
-                      }}
-                      className="w-7 h-7 rounded-full hover:bg-background/50 flex items-center justify-center"
-                    >
-                      {c.call_type === "video" ? (
-                        <Video className="w-3.5 h-3.5 text-primary" />
-                      ) : (
-                        <Phone className="w-3.5 h-3.5 text-primary" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-                {outgoing && (
-                  <Avatar className="w-7 h-7 shrink-0">
-                    <AvatarImage src={other?.avatar_url ?? undefined} />
-                    <AvatarFallback className="bg-primary/20 text-foreground text-[10px] font-semibold">
-                      {initials(other?.display_name)}
-                    </AvatarFallback>
-                  </Avatar>
-                )}
+                  {/* Line 2: status + duration */}
+                  <p className={`pl-5 mt-0.5 text-[11px] truncate ${missed ? "text-destructive" : "text-muted-foreground"}`}>
+                    {sub}
+                  </p>
+                </button>
+                <button
+                  aria-label="Call back"
+                  onClick={callBack}
+                  className="w-8 h-8 rounded-full hover:bg-background/50 flex items-center justify-center shrink-0"
+                >
+                  <TypeIcon className="w-4 h-4 text-primary" />
+                </button>
               </div>
             );
           })}
