@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, MessageSquarePlus, Settings as SettingsIcon, UserCircle2, Phone } from "lucide-react";
+import { Search, MessageSquarePlus, Settings as SettingsIcon, UserCircle2, Phone, PhoneIncoming, PhoneOutgoing, PhoneMissed, Video, Mic, Paperclip } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,51 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { FILE_PREFIX, parseFileMessage } from "@/components/chat/AttachmentBubble";
+
+const VOICE_PREFIX = "[voice]";
+const CALL_PREFIX = "[call]";
+
+type PreviewKind = "text" | "voice" | "file" | "call";
+type Preview = {
+  kind: PreviewKind;
+  text: string;
+  // call-specific
+  callType?: "voice" | "video";
+  callKind?: string;
+  missed?: boolean;
+  outgoing?: boolean;
+};
+
+function buildPreview(content: string | null, senderId: string | null, myId: string): Preview {
+  if (!content) return { kind: "text", text: "" };
+  if (content.startsWith(CALL_PREFIX)) {
+    const [, body] = content.split(CALL_PREFIX);
+    const [type, kind] = (body ?? "").split("|");
+    const isVideo = type === "video";
+    const outgoing = senderId === myId;
+    const missed = kind === "missed" || kind === "no_answer";
+    let label = isVideo ? "Video call" : "Voice call";
+    if (missed) label = isVideo ? "Missed video call" : "Missed voice call";
+    else if (kind === "rejected" || kind === "declined") label = "Call rejected";
+    return { kind: "call", text: label, callType: isVideo ? "video" : "voice", callKind: kind, missed, outgoing };
+  }
+  if (content.startsWith(VOICE_PREFIX)) return { kind: "voice", text: "Voice note" };
+  if (content.startsWith(FILE_PREFIX)) {
+    const meta = parseFileMessage(content);
+    if (meta) {
+      if (meta.mime.startsWith("image/")) return { kind: "file", text: meta.caption || "Photo" };
+      if (meta.mime.startsWith("video/")) return { kind: "file", text: meta.caption || "Video" };
+      return { kind: "file", text: meta.name || "File" };
+    }
+    return { kind: "file", text: "Attachment" };
+  }
+  // strip reply-quote prefix "> ...\n"
+  const cleaned = content.startsWith("> ")
+    ? content.split("\n").slice(1).join("\n").trim() || content
+    : content;
+  return { kind: "text", text: cleaned };
+}
 
 type Profile = {
   id: string;
@@ -30,6 +75,7 @@ type ChatRow = {
   conversation_id: string;
   other: Profile;
   last_message: string | null;
+  last_sender_id: string | null;
   last_message_at: string;
 };
 
@@ -123,14 +169,14 @@ export default function Home() {
 
     const { data: lastMsgs } = await supabase
       .from("messages")
-      .select("conversation_id, content, created_at")
+      .select("conversation_id, content, created_at, sender_id")
       .in("conversation_id", convIds)
       .order("created_at", { ascending: false });
 
-    const lastByConv = new Map<string, { content: string; created_at: string }>();
+    const lastByConv = new Map<string, { content: string; created_at: string; sender_id: string }>();
     (lastMsgs ?? []).forEach((m) => {
       if (!lastByConv.has(m.conversation_id))
-        lastByConv.set(m.conversation_id, { content: m.content, created_at: m.created_at });
+        lastByConv.set(m.conversation_id, { content: m.content, created_at: m.created_at, sender_id: m.sender_id });
     });
 
     const profById = new Map((profiles ?? []).map((p) => [p.id, p as Profile]));
@@ -147,6 +193,7 @@ export default function Home() {
           conversation_id: c.id,
           other,
           last_message: lm?.content ?? null,
+          last_sender_id: lm?.sender_id ?? null,
           last_message_at: lm?.created_at ?? c.last_message_at,
         };
       })
