@@ -152,9 +152,7 @@ export default function Calls() {
             const name = other?.display_name ?? "Unknown";
             const datetime = whenLabel(c.created_at);
 
-            const callBack = async () => {
-              const ok = window.confirm(`Call ${name} again?`);
-              if (!ok) return;
+            const doCall = async () => {
               try {
                 await prepareCallMedia(c.call_type === "video");
               } catch (error) {
@@ -188,6 +186,8 @@ export default function Calls() {
                 `/call/${c.conversation_id}?type=${c.call_type}&callId=${data.id}&room=${encodeURIComponent(room)}&role=caller`,
               );
             };
+            const callBack = () =>
+              setSheet({ name, type: c.call_type === "video" ? "video" : "voice", run: doCall });
 
             return (
               <div
