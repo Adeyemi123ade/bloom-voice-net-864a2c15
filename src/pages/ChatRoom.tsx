@@ -227,8 +227,6 @@ function CallSystemBubble({
   else if (!mine && kind === "declined") label = "Call ended";
   else label = isVideo ? "Video call" : "Voice call";
 
-  // Compact meta: duration when connected, otherwise nothing (timestamp sits to the right).
-  const meta = !isMissed && dur > 0 ? ` · ${fmtDuration(dur)}` : "";
 
   const handleTap = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -237,24 +235,42 @@ function CallSystemBubble({
     if (ok) onCallBack(callType);
   };
 
+  // Line 2 hint: duration for connected calls, "Tap to call back" for missed/no-answer,
+  // empty otherwise (keeps it 2 lines max).
+  const hint = isMissed
+    ? "Tap to call back"
+    : dur > 0
+      ? fmtDuration(dur)
+      : kind === "ended"
+        ? "0:00"
+        : "";
+
   return (
     <button
       type="button"
       onClick={handleTap}
-      className={`flex items-center gap-2 px-3 py-1.5 rounded-2xl max-w-[85%] text-left ${
+      className={`w-[88%] max-w-[88%] flex flex-col gap-0.5 px-3 py-2 rounded-2xl text-left ${
         mine
           ? "bg-primary/15 text-foreground rounded-br-sm"
           : "bg-secondary text-foreground rounded-bl-sm"
       } hover:opacity-90 transition`}
     >
-      <Icon className={`w-4 h-4 shrink-0 ${isMissed ? "text-destructive" : "text-primary"}`} />
-      <span className={`text-[12px] font-medium truncate ${isMissed ? "text-destructive" : ""}`}>
-        {label}
-        {meta && <span className="text-muted-foreground font-normal">{meta}</span>}
-      </span>
-      <span className="text-[10px] text-muted-foreground shrink-0 ml-1">
-        {formatTime(m.created_at)}
-      </span>
+      {/* Line 1: icon + label + time on the right */}
+      <div className="flex items-center gap-2 w-full">
+        <Icon className={`w-4 h-4 shrink-0 ${isMissed ? "text-destructive" : "text-primary"}`} />
+        <span className={`text-[12px] font-semibold truncate flex-1 ${isMissed ? "text-destructive" : ""}`}>
+          {label}
+        </span>
+        <span className="text-[10px] text-muted-foreground shrink-0">
+          {formatTime(m.created_at)}
+        </span>
+      </div>
+      {/* Line 2: small hint / duration */}
+      {hint && (
+        <div className="pl-6 text-[10px] text-muted-foreground">
+          {hint}
+        </div>
+      )}
     </button>
   );
 }
