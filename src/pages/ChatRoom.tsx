@@ -908,7 +908,7 @@ export default function ChatRoom() {
                       m={m}
                       mine={mine}
                       otherName={other?.display_name}
-                      onCallBack={(t) => startCall(t)}
+                      onCallBack={(t) => setCallSheet(t)}
                     />
                   </div>
                 </div>
