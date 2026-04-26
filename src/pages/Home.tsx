@@ -262,9 +262,9 @@ export default function Home() {
     return chats.filter(
       (c) =>
         c.other.display_name?.toLowerCase().includes(q) ||
-        c.last_message?.toLowerCase().includes(q),
+        (c.last_message && buildPreview(c.last_message, c.last_sender_id, user?.id ?? "").text.toLowerCase().includes(q)),
     );
-  }, [chats, query]);
+  }, [chats, query, user]);
 
 
   return (
@@ -391,7 +391,25 @@ export default function Home() {
               </Button>
             </div>
           )}
-          {filtered.map((c) => (
+          {filtered.map((c) => {
+            const preview = buildPreview(c.last_message, c.last_sender_id, user?.id ?? "");
+            let PreviewIcon: typeof Phone | null = null;
+            let iconClass = "text-muted-foreground";
+            if (preview.kind === "call") {
+              PreviewIcon = preview.missed
+                ? PhoneMissed
+                : preview.callType === "video"
+                  ? Video
+                  : preview.outgoing
+                    ? PhoneOutgoing
+                    : PhoneIncoming;
+              iconClass = preview.missed ? "text-destructive" : "text-primary";
+            } else if (preview.kind === "voice") {
+              PreviewIcon = Mic;
+            } else if (preview.kind === "file") {
+              PreviewIcon = Paperclip;
+            }
+            return (
             <button
               key={c.conversation_id}
               onClick={() => navigate(`/chat/${c.conversation_id}`)}
@@ -417,12 +435,18 @@ export default function Home() {
                     {timeAgo(c.last_message_at)}
                   </span>
                 </div>
-                <p className="text-[11px] text-muted-foreground truncate mt-0.5">
-                  {c.last_message ?? (isReallyOnline(c.other) ? "online" : "")}
-                </p>
+                <div className="flex items-center gap-1 mt-0.5 min-w-0">
+                  {PreviewIcon && (
+                    <PreviewIcon className={`w-3 h-3 shrink-0 ${iconClass}`} />
+                  )}
+                  <p className={`text-[11px] truncate ${preview.kind === "call" && preview.missed ? "text-destructive" : "text-muted-foreground"}`}>
+                    {preview.text || (isReallyOnline(c.other) ? "online" : "")}
+                  </p>
+                </div>
               </div>
             </button>
-          ))}
+            );
+          })}
         </div>
       </div>
     </MobileFrame>
