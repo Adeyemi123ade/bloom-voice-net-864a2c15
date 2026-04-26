@@ -235,42 +235,43 @@ function CallSystemBubble({
     if (ok) onCallBack(callType);
   };
 
-  // Line 2 hint: duration for connected calls, "Tap to call back" for missed/no-answer,
-  // empty otherwise (keeps it 2 lines max).
-  const hint = isMissed
+  // Line 2: duration in "X secs" / "M:SS" form, or hint for missed.
+  const subtitle = isMissed
     ? "Tap to call back"
     : dur > 0
-      ? fmtDuration(dur)
-      : kind === "ended"
-        ? "0:00"
-        : "";
+      ? dur < 60
+        ? `${dur} sec${dur === 1 ? "" : "s"}`
+        : fmtDuration(dur)
+      : "0 secs";
 
   return (
     <button
       type="button"
       onClick={handleTap}
-      className={`w-[88%] max-w-[88%] flex flex-col gap-0.5 px-3 py-2 rounded-2xl text-left ${
+      className={`min-w-[60%] max-w-[80%] flex items-center gap-3 pl-2 pr-3 py-2 rounded-2xl text-left ${
         mine
           ? "bg-primary/15 text-foreground rounded-br-sm"
           : "bg-secondary text-foreground rounded-bl-sm"
       } hover:opacity-90 transition`}
     >
-      {/* Line 1: icon + label + time on the right */}
-      <div className="flex items-center gap-2 w-full">
-        <Icon className={`w-4 h-4 shrink-0 ${isMissed ? "text-destructive" : "text-primary"}`} />
-        <span className={`text-[12px] font-semibold truncate flex-1 ${isMissed ? "text-destructive" : ""}`}>
-          {label}
-        </span>
-        <span className="text-[10px] text-muted-foreground shrink-0">
-          {formatTime(m.created_at)}
-        </span>
+      {/* Left: circular icon */}
+      <div className={`w-9 h-9 shrink-0 rounded-full flex items-center justify-center ${
+        isMissed ? "bg-destructive/15" : "bg-background/60"
+      }`}>
+        <Icon className={`w-4 h-4 ${isMissed ? "text-destructive" : "text-primary"}`} />
       </div>
-      {/* Line 2: small hint / duration */}
-      {hint && (
-        <div className="pl-6 text-[10px] text-muted-foreground">
-          {hint}
+      {/* Right: 2 lines — label + subtitle, with time bottom-right */}
+      <div className="flex-1 min-w-0">
+        <div className={`text-[13px] font-semibold truncate ${isMissed ? "text-destructive" : ""}`}>
+          {label}
         </div>
-      )}
+        <div className="flex items-end justify-between gap-2 mt-0.5">
+          <span className="text-[11px] text-muted-foreground truncate">{subtitle}</span>
+          <span className="text-[10px] text-muted-foreground shrink-0">
+            {formatTime(m.created_at)}
+          </span>
+        </div>
+      </div>
     </button>
   );
 }
