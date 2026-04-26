@@ -196,18 +196,28 @@ function VoiceBubble({ id, url, mine }: { id: string; url: string; mine: boolean
   );
 }
 
-function CallSystemBubble({ m, mine }: { m: Message; mine: boolean }) {
+function CallSystemBubble({
+  m,
+  mine,
+  otherName,
+  onCallBack,
+}: {
+  m: Message;
+  mine: boolean;
+  otherName?: string | null;
+  onCallBack?: (type: "voice" | "video") => void;
+}) {
   // [call]video|<kind>|<duration>
   // kind ∈ ended | no_answer | missed | rejected | declined | received
   const [, body] = m.content.split(CALL_PREFIX);
   const [type, kind, durStr] = (body ?? "").split("|");
   const isVideo = type === "video";
+  const callType: "voice" | "video" = isVideo ? "video" : "voice";
   const dur = parseInt(durStr || "0", 10);
   const isMissed = kind === "missed" || kind === "no_answer";
   const Icon = isMissed ? PhoneMissed : mine ? PhoneOutgoing : PhoneIncoming;
 
-  // Per-side wording rules (sender-of-the-log perspective):
-  // - mine = caller's log    | !mine = receiver's log
+  // Per-side wording (sender-of-the-log perspective).
   let label = "";
   if (kind === "ended") label = isVideo ? "Video call ended" : "Voice call ended";
   else if (mine && kind === "no_answer") label = "No answer";
@@ -217,25 +227,35 @@ function CallSystemBubble({ m, mine }: { m: Message; mine: boolean }) {
   else if (!mine && kind === "declined") label = "Call ended";
   else label = isVideo ? "Video call" : "Voice call";
 
-  // Missed shows timestamp only; everything else shows duration (0 for non-connected).
-  const sub = isMissed
-    ? formatTime(m.created_at)
-    : `${formatTime(m.created_at)} · ${dur > 0 ? fmtDuration(dur) : "0:00"}`;
+  // Compact meta: duration when connected, otherwise nothing (timestamp sits to the right).
+  const meta = !isMissed && dur > 0 ? ` · ${fmtDuration(dur)}` : "";
+
+  const handleTap = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!onCallBack) return;
+    const ok = window.confirm(`Call ${otherName ?? "this contact"} again?`);
+    if (ok) onCallBack(callType);
+  };
 
   return (
-    <div
-      className={`flex items-center gap-2 px-3 py-2 rounded-2xl max-w-[75%] ${
+    <button
+      type="button"
+      onClick={handleTap}
+      className={`flex items-center gap-2 px-3 py-1.5 rounded-2xl max-w-[85%] text-left ${
         mine
           ? "bg-primary/15 text-foreground rounded-br-sm"
           : "bg-secondary text-foreground rounded-bl-sm"
-      }`}
+      } hover:opacity-90 transition`}
     >
-      <Icon className={`w-4 h-4 ${isMissed ? "text-destructive" : "text-primary"}`} />
-      <div className="flex flex-col">
-        <span className="text-[12px] font-medium">{label}</span>
-        <span className="text-[10px] text-muted-foreground">{sub}</span>
-      </div>
-    </div>
+      <Icon className={`w-4 h-4 shrink-0 ${isMissed ? "text-destructive" : "text-primary"}`} />
+      <span className={`text-[12px] font-medium truncate ${isMissed ? "text-destructive" : ""}`}>
+        {label}
+        {meta && <span className="text-muted-foreground font-normal">{meta}</span>}
+      </span>
+      <span className="text-[10px] text-muted-foreground shrink-0 ml-1">
+        {formatTime(m.created_at)}
+      </span>
+    </button>
   );
 }
 
