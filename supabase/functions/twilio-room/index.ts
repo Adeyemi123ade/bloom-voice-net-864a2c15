@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
       // Group room (SFU) so EmptyRoomTimeout / UnusedRoomTimeout apply.
       const params = new URLSearchParams({
         UniqueName: roomName,
-        Type: "group-small",
+        Type: "group",
         EmptyRoomTimeout: "1",
         UnusedRoomTimeout: "1",
       });
