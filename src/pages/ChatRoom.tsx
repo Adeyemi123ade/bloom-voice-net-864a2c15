@@ -365,6 +365,7 @@ export default function ChatRoom() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [callSheet, setCallSheet] = useState<"voice" | "video" | null>(null);
   const [recording, setRecording] = useState(false);
   const [recSec, setRecSec] = useState(0);
   const recorderRef = useRef<MediaRecorder | null>(null);
