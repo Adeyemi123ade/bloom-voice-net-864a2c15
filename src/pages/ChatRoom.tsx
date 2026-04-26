@@ -1225,6 +1225,13 @@ export default function ChatRoom() {
           </div>
         </>
       )}
+      <CallBackSheet
+        open={!!callSheet}
+        onOpenChange={(o) => !o && setCallSheet(null)}
+        name={other?.display_name ?? "Contact"}
+        type={callSheet ?? "voice"}
+        onConfirm={() => callSheet && startCall(callSheet)}
+      />
     </MobileFrame>
   );
 }
