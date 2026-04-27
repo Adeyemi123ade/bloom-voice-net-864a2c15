@@ -360,6 +360,11 @@ export default function Contacts() {
         });
 
       const roomName = `room-${conversationId}-${Date.now()}`;
+      const { error: roomErr } = await supabase.functions.invoke("twilio-room", {
+        body: { action: "create", roomName },
+      });
+      if (roomErr) throw roomErr;
+
       const { data: callRow, error: callErr } = await supabase
         .from("calls")
         .insert({
@@ -383,7 +388,7 @@ export default function Contacts() {
           roomName,
         },
       }).catch((e) => console.warn("[call-push] failed", e));
-      navigate(`/call/${callRow.id}`);
+      navigate(`/call/${conversationId}?type=voice&callId=${callRow.id}&room=${encodeURIComponent(roomName)}&role=caller`, { replace: true });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Could not start call";
       toast({ title: "Call failed", description: msg, variant: "destructive" });
