@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { isReallyOnline } from "@/lib/presence";
 import { clearPreparedCallMedia, formatCallMediaError, prepareCallMedia } from "@/lib/callMedia";
+import { requestIgnoreBatteryOptimizations } from "@/lib/nativeCalls";
 import {
   AttachmentBubble,
   FILE_PREFIX,
@@ -513,6 +514,12 @@ export default function ChatRoom() {
 
   const startCall = async (type: "voice" | "video") => {
     if (!user || !conversationId || !other) return;
+    // First-call hint: ask Android to exempt us from battery optimizations so
+    // FCM pushes wake the device reliably. No-op on web/iOS.
+    if (!localStorage.getItem("chichat:battery-prompt-shown")) {
+      void requestIgnoreBatteryOptimizations();
+      localStorage.setItem("chichat:battery-prompt-shown", "1");
+    }
     try {
       await prepareCallMedia(type === "video");
     } catch (error) {
