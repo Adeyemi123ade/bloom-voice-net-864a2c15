@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
-  appId: "app.lovable.chichat",
+  appId: "com.bloomvoicenet.chat",
   appName: "ChiChat",
   webDir: "dist",
   plugins: {
