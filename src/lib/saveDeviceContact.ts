@@ -14,12 +14,11 @@ export async function saveDeviceContact(
     const Contacts = mod.Contacts;
     const perm = await Contacts.requestPermissions();
     if (perm.contacts !== "granted") return false;
-    // The plugin createContact API
-    // @ts-expect-error - createContact exists on the plugin
+    const [given, ...rest] = name.trim().split(/\s+/);
     await Contacts.createContact({
       contact: {
-        name: { display: name },
-        phones: [{ type: "mobile", number: phoneE164 }],
+        name: { given: given || name, family: rest.join(" ") || undefined },
+        phones: [{ type: "home", number: phoneE164 }],
       },
     });
     return true;
