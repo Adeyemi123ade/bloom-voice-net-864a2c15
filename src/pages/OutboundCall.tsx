@@ -48,6 +48,10 @@ export default function OutboundCall() {
 
   useEffect(() => {
     if (!user || !e164) return;
+    // Hard guard: only ever dial once per mount. Prevents auto-redial after
+    // a drop / re-render / StrictMode double-invoke.
+    if (dialedRef.current) return;
+    dialedRef.current = true;
     let cancelled = false;
 
     (async () => {
@@ -68,12 +72,12 @@ export default function OutboundCall() {
         device.on("error", (e) => {
           console.error("Device error", e);
           setErrorMsg(e?.message ?? "Device error");
-          setStatus("failed");
+          endLocally("failed");
         });
 
         await device.register();
 
-        if (cancelled) return;
+        if (cancelled || endedRef.current) return;
 
         const call = await device.connect({ params: { To: e164 } });
         callRef.current = call;
@@ -97,7 +101,7 @@ export default function OutboundCall() {
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Could not start call";
         setErrorMsg(msg);
-        setStatus("failed");
+        endLocally("failed");
         toast({ title: "Call failed", description: msg, variant: "destructive" });
       }
     })();
