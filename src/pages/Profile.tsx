@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { toE164, formatDisplay } from "@/lib/phone";
 
 function initials(name?: string | null) {
   if (!name) return "?";
@@ -21,6 +22,7 @@ export default function Profile() {
   const { user, loading } = useAuth();
   const [displayName, setDisplayName] = useState("");
   const [about, setAbout] = useState("");
+  const [phone, setPhone] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -39,12 +41,13 @@ export default function Profile() {
     (async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("display_name, avatar_url")
+        .select("display_name, avatar_url, phone")
         .eq("id", user.id)
         .maybeSingle();
       if (data) {
         setDisplayName(data.display_name ?? "");
         setAvatarUrl(data.avatar_url);
+        setPhone((data as { phone?: string | null }).phone ?? "");
       }
       // About is stored in user metadata for now (no schema change)
       setAbout((user.user_metadata as any)?.about ?? "");
@@ -87,18 +90,38 @@ export default function Profile() {
 
   const save = async () => {
     if (!user) return;
+    let normalizedPhone: string | null = null;
+    if (phone.trim()) {
+      normalizedPhone = toE164(phone.trim());
+      if (!normalizedPhone) {
+        toast({
+          title: "Invalid phone number",
+          description: "Use international format, e.g. +234 801 234 5678",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
     setSaving(true);
     const { error } = await supabase
       .from("profiles")
       .upsert(
-        { id: user.id, display_name: displayName.trim() || null },
+        {
+          id: user.id,
+          display_name: displayName.trim() || null,
+          phone: normalizedPhone,
+        },
         { onConflict: "id" }
       );
     await supabase.auth.updateUser({ data: { about: about.trim() } });
     setSaving(false);
     if (error) {
-      toast({ title: "Save failed", description: error.message, variant: "destructive" });
+      const msg = error.message.includes("profiles_phone_unique")
+        ? "That phone number is already linked to another account."
+        : error.message;
+      toast({ title: "Save failed", description: msg, variant: "destructive" });
     } else {
+      if (normalizedPhone) setPhone(normalizedPhone);
       toast({ title: "Profile saved" });
     }
   };
@@ -163,6 +186,28 @@ export default function Profile() {
               placeholder="Hey there! I'm using Chichat."
               className="min-h-[56px] text-xs bg-input border-border resize-none"
             />
+          </div>
+
+          <div className="w-full mt-3 space-y-1.5">
+            <Label htmlFor="phone" className="text-[11px] text-muted-foreground">
+              Phone number
+            </Label>
+            <Input
+              id="phone"
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="+234 801 234 5678"
+              className="h-9 text-xs bg-input border-border"
+            />
+            <p className="text-[10px] text-muted-foreground">
+              Required so friends can find you when they sync their contacts.
+              {phone && toE164(phone) && (
+                <span className="block text-foreground/70 mt-0.5">
+                  Saved as {formatDisplay(toE164(phone)!)}
+                </span>
+              )}
+            </p>
           </div>
 
           <div className="w-full mt-3 space-y-1.5">
