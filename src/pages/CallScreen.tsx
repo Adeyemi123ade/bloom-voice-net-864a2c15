@@ -11,7 +11,7 @@ import {
   type RemoteTrack,
   type RemoteTrackPublication,
 } from "twilio-video";
-import { Volume2 } from "lucide-react";
+import { MessageCircle, Volume2 } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
 import CallHeader from "@/components/call/CallHeader";
 import CallControls from "@/components/call/CallControls";
@@ -380,9 +380,23 @@ export default function CallScreen() {
     setVideoEnabled(!videoEnabled);
   };
 
+  const goToChatHistory = () => {
+    navigate("/home");
+  };
+
   return (
     <MobileFrame>
       <div className="h-full w-full flex flex-col bg-gradient-to-b from-secondary to-background">
+        <div className="px-4 pt-4 flex justify-end">
+          <button
+            onClick={goToChatHistory}
+            className="h-9 px-3 rounded-lg bg-secondary text-foreground hover:bg-secondary/80 flex items-center gap-2 text-xs font-medium"
+            aria-label="Go to chats"
+          >
+            <MessageCircle className="w-4 h-4" />
+            Chats
+          </button>
+        </div>
         <CallHeader isVideo={isVideo} other={other} status={status} seconds={seconds} role={role} />
 
         <RemoteMedia
