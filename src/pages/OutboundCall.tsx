@@ -26,6 +26,8 @@ export default function OutboundCall() {
   const deviceRef = useRef<Device | null>(null);
   const callRef = useRef<Call | null>(null);
   const tickRef = useRef<number | null>(null);
+  const dialedRef = useRef(false);
+  const endedRef = useRef(false);
 
   const e164 = number ? toE164(decodeURIComponent(number)) ?? decodeURIComponent(number) : "";
   const display = e164 ? formatDisplay(e164) : "";
