@@ -47,6 +47,7 @@ import Dialpad from "@/components/Dialpad";
 import ContactActionSheet, { ContactAction } from "@/components/ContactActionSheet";
 import SaveContactDialog from "@/components/SaveContactDialog";
 import { useLongPress } from "@/hooks/useLongPress";
+import { requestIgnoreBatteryOptimizations } from "@/lib/nativeCalls";
 
 interface MatchedUser {
   phone: string;
@@ -346,6 +347,10 @@ export default function Contacts() {
 
   const callActive = async (c: ActiveContact) => {
     if (!user) return;
+    if (!localStorage.getItem("chichat:battery-prompt-shown")) {
+      void requestIgnoreBatteryOptimizations();
+      localStorage.setItem("chichat:battery-prompt-shown", "1");
+    }
     try {
       const conversationId = await supabase
         .rpc("start_direct_conversation", { _other_user: c.user_id })
@@ -355,6 +360,11 @@ export default function Contacts() {
         });
 
       const roomName = `room-${conversationId}-${Date.now()}`;
+      const { error: roomErr } = await supabase.functions.invoke("twilio-room", {
+        body: { action: "create", roomName },
+      });
+      if (roomErr) throw roomErr;
+
       const { data: callRow, error: callErr } = await supabase
         .from("calls")
         .insert({
@@ -378,7 +388,7 @@ export default function Contacts() {
           roomName,
         },
       }).catch((e) => console.warn("[call-push] failed", e));
-      navigate(`/call/${callRow.id}`);
+      navigate(`/call/${conversationId}?type=voice&callId=${callRow.id}&room=${encodeURIComponent(roomName)}&role=caller`, { replace: true });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Could not start call";
       toast({ title: "Call failed", description: msg, variant: "destructive" });

@@ -5,6 +5,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.PowerManager;
 import android.provider.Settings;
+import android.widget.Toast;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -33,6 +34,7 @@ public class ChiChatCallsPlugin extends Plugin {
             PowerManager pm = (PowerManager) getContext().getSystemService(android.content.Context.POWER_SERVICE);
             String pkg = getContext().getPackageName();
             if (!pm.isIgnoringBatteryOptimizations(pkg)) {
+                Toast.makeText(getContext(), "Allow ChiChat to run in the background so calls can ring when your screen is off.", Toast.LENGTH_LONG).show();
                 Intent i = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
                 i.setData(Uri.parse("package:" + pkg));
                 getActivity().startActivity(i);
