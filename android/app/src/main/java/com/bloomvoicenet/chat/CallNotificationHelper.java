@@ -89,7 +89,7 @@ public class CallNotificationHelper {
         nm.cancel(notificationId(callId));
     }
 
-    private static void createChannel(Context context) {
+    static void createChannel(Context context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
         NotificationManager nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         NotificationChannel ch = new NotificationChannel(CHANNEL_ID, "Incoming calls", NotificationManager.IMPORTANCE_HIGH);
