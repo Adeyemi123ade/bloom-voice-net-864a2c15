@@ -126,7 +126,7 @@ export default function OutboundCall() {
     }
     try {
       deviceRef.current?.removeAllListeners?.();
-      deviceRef.current?.disconnect?.();
+      deviceRef.current?.disconnectAll?.();
       deviceRef.current?.unregister?.();
       deviceRef.current?.destroy();
     } catch {
