@@ -2,12 +2,15 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
+  Edit3,
+  Grid3x3,
   Loader2,
   Phone,
   RefreshCw,
   Search,
   Send,
   Smartphone,
+  Trash2,
   UserPlus,
   Users,
   X,
@@ -40,6 +43,10 @@ import {
   removeManualContact,
   saveCachedContacts,
 } from "@/lib/deviceContacts";
+import Dialpad from "@/components/Dialpad";
+import ContactActionSheet, { ContactAction } from "@/components/ContactActionSheet";
+import SaveContactDialog from "@/components/SaveContactDialog";
+import { useLongPress } from "@/hooks/useLongPress";
 
 interface MatchedUser {
   phone: string;
@@ -102,6 +109,13 @@ export default function Contacts() {
   const [addName, setAddName] = useState("");
   const [addPhone, setAddPhone] = useState("");
   const [missingOwnPhone, setMissingOwnPhone] = useState(false);
+  const [dialOpen, setDialOpen] = useState(false);
+  const [actionSheet, setActionSheet] = useState<{
+    title: string;
+    subtitle?: string;
+    actions: ContactAction[];
+  } | null>(null);
+  const [editTarget, setEditTarget] = useState<{ phone: string } | null>(null);
 
   useEffect(() => {
     document.title = "Contacts — Chichat";
