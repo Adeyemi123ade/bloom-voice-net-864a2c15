@@ -144,10 +144,8 @@ export default function OutboundCall() {
     if (s === "failed" && seconds < 3 && errorMsg == null) {
       setErrorMsg("Call dropped — if you're on a Twilio trial, consider upgrading for longer calls.");
     }
-    if (s === "ended" && !isKnown && e164) {
-      // Offer to save unknown number — explicit user action only.
-      setTimeout(() => setAskSave(true), 400);
-    }
+    // Do NOT auto-prompt to save the number after a call ends.
+    // The user can tap the "Save contact" button if they want to.
   };
 
   const hangUp = () => {

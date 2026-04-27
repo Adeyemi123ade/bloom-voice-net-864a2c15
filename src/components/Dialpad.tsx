@@ -1,16 +1,19 @@
-import { useRef, useState } from "react";
-import { Phone, Delete, X, ClipboardPaste } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { useMemo, useRef, useState } from "react";
+import { Phone, X, UserPlus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toE164, formatDisplay } from "@/lib/phone";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
+import {
+  loadCachedContacts,
+  loadManualContacts,
+  type DeviceContact,
+} from "@/lib/deviceContacts";
+import AddNumberDialog from "@/components/AddNumberDialog";
 
 interface Props {
   open: boolean;
@@ -26,10 +29,82 @@ const KEYS: { d: string; sub?: string }[] = [
   { d: "*" }, { d: "0", sub: "+" }, { d: "#" },
 ];
 
-export default function Dialpad({ open, onOpenChange, initial = "" }: Props) {
-  const [value, setValue] = useState(initial);
+function initial(name: string) {
+  return name.trim().charAt(0).toUpperCase() || "?";
+}
+
+/** Tone-on-tap for digit keys (cheap WebAudio beep). */
+function playKeyTone() {
+  try {
+    const AC =
+      (window as unknown as { AudioContext?: typeof AudioContext })
+        .AudioContext ??
+      (window as unknown as { webkitAudioContext?: typeof AudioContext })
+        .webkitAudioContext;
+    if (!AC) return;
+    const ctx = new AC();
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.frequency.value = 600;
+    g.gain.value = 0.04;
+    o.connect(g);
+    g.connect(ctx.destination);
+    o.start();
+    setTimeout(() => {
+      o.stop();
+      ctx.close();
+    }, 60);
+  } catch {
+    /* ignore */
+  }
+}
+
+export default function Dialpad({ open, onOpenChange, initial: init = "" }: Props) {
+  const [value, setValue] = useState(init);
+  const [askAdd, setAskAdd] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+
+  // Load contacts once per open
+  const allContacts = useMemo<DeviceContact[]>(() => {
+    if (!open) return [];
+    return [...(loadCachedContacts() ?? []), ...loadManualContacts()];
+  }, [open]);
+
+  // Suggested = contacts whose name OR any phone digit-substring matches what's typed.
+  // When nothing typed, show first 6 contacts (alphabetical).
+  const suggested = useMemo(() => {
+    const q = value.replace(/[^\d]/g, "");
+    if (!q) {
+      return [...allContacts]
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .slice(0, 6);
+    }
+    const matches: { c: DeviceContact; phone: string }[] = [];
+    for (const c of allContacts) {
+      for (const p of c.phones) {
+        if (p.replace(/[^\d]/g, "").includes(q)) {
+          matches.push({ c, phone: p });
+          break;
+        }
+      }
+      if (matches.length >= 8) break;
+    }
+    if (matches.length === 0) {
+      // fall back to name match
+      const lower = value.toLowerCase();
+      return allContacts
+        .filter((c) => c.name.toLowerCase().includes(lower))
+        .slice(0, 6);
+    }
+    return matches.map((m) => ({ ...m.c, phones: [m.phone, ...m.c.phones.filter((p) => p !== m.phone)] }));
+  }, [allContacts, value]);
+
+  const e164Preview = value ? toE164(value) : null;
+  const isKnown = useMemo(() => {
+    if (!e164Preview) return false;
+    return allContacts.some((c) => c.phones.includes(e164Preview));
+  }, [allContacts, e164Preview]);
 
   /** Insert a string at the current cursor position (or append). */
   const insertAtCursor = (chunk: string) => {
@@ -42,7 +117,6 @@ export default function Dialpad({ open, onOpenChange, initial = "" }: Props) {
     const end = el.selectionEnd ?? value.length;
     const next = value.slice(0, start) + chunk + value.slice(end);
     setValue(next);
-    // Restore caret right after the inserted chunk
     requestAnimationFrame(() => {
       const pos = start + chunk.length;
       el.focus();
@@ -52,7 +126,6 @@ export default function Dialpad({ open, onOpenChange, initial = "" }: Props) {
     });
   };
 
-  /** Delete one char before caret, or selection if any. */
   const backspace = () => {
     const el = inputRef.current;
     if (!el) {
@@ -79,9 +152,12 @@ export default function Dialpad({ open, onOpenChange, initial = "" }: Props) {
     });
   };
 
-  const press = (k: string) => insertAtCursor(k);
+  const press = (k: string) => {
+    playKeyTone();
+    insertAtCursor(k);
+  };
+
   const longZero = () => {
-    // Replace the just-inserted "0" with "+" if caret follows a 0, else insert "+"
     const el = inputRef.current;
     const caret = el?.selectionStart ?? value.length;
     if (caret > 0 && value[caret - 1] === "0") {
@@ -96,31 +172,8 @@ export default function Dialpad({ open, onOpenChange, initial = "" }: Props) {
     }
   };
 
-  const clear = () => {
-    setValue("");
-    requestAnimationFrame(() => inputRef.current?.focus());
-  };
-
-  const paste = async () => {
-    try {
-      const text = await navigator.clipboard.readText();
-      const cleaned = text.replace(/[^\d+*#]/g, "");
-      if (!cleaned) {
-        toast({ title: "Clipboard empty", description: "No phone number found." });
-        return;
-      }
-      insertAtCursor(cleaned);
-    } catch {
-      toast({
-        title: "Paste blocked",
-        description: "Allow clipboard access or long-press the field to paste.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const call = () => {
-    const e164 = toE164(value.trim());
+  const placeCall = (raw: string) => {
+    const e164 = toE164(raw.trim());
     if (!e164) {
       toast({
         title: "Invalid number",
@@ -133,98 +186,146 @@ export default function Dialpad({ open, onOpenChange, initial = "" }: Props) {
     navigate(`/dial/${encodeURIComponent(e164)}`);
   };
 
-  const preview = value ? formatDisplay(value) : "";
+  const callTyped = () => placeCall(value);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[340px] p-0 gap-0 bg-background top-auto bottom-4 translate-y-0 sm:bottom-6">
-        <DialogHeader className="px-4 pt-3 pb-1">
-          <DialogTitle className="text-xs font-semibold">Dialer</DialogTitle>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent
+          className="max-w-[400px] p-0 gap-0 bg-background top-auto bottom-0 translate-y-0 rounded-b-none rounded-t-2xl border-0 shadow-2xl max-h-[92vh] flex flex-col"
+        >
+          <DialogTitle className="sr-only">Dialer</DialogTitle>
 
-        {/* Editable phone input */}
-        <div className="px-4 pt-2 pb-1 flex items-center gap-2">
-          <Input
-            ref={inputRef}
-            type="tel"
-            inputMode="tel"
-            autoComplete="off"
-            value={value}
-            onChange={(e) => {
-              // Allow only digits and + * #
-              const cleaned = e.target.value.replace(/[^\d+*#]/g, "");
-              setValue(cleaned);
-            }}
-            placeholder="Enter number"
-            className="flex-1 h-12 text-2xl font-light tracking-wide text-center bg-transparent border-0 border-b border-border rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 px-1"
-          />
-          {value && (
-            <button
-              aria-label="Clear"
-              onClick={clear}
-              className="w-7 h-7 rounded-full hover:bg-secondary flex items-center justify-center shrink-0"
-            >
-              <X className="w-3.5 h-3.5 text-muted-foreground" />
-            </button>
-          )}
-        </div>
+          {/* Suggested contacts */}
+          <div className="px-4 pt-3 pb-2 overflow-y-auto" style={{ maxHeight: "30vh" }}>
+            <p className="text-[11px] font-medium text-muted-foreground mb-2">
+              Suggested
+            </p>
+            {suggested.length === 0 ? (
+              <p className="text-[10px] text-muted-foreground/70 italic py-2">
+                {value ? "No matching contact" : "Your contacts will appear here"}
+              </p>
+            ) : (
+              <ul className="space-y-1.5">
+                {suggested.map((c) => (
+                  <li key={`${c.name}-${c.phones[0]}`}>
+                    <button
+                      onClick={() => placeCall(c.phones[0])}
+                      className="w-full flex items-center gap-3 p-2 rounded-xl bg-secondary/40 hover:bg-secondary text-left"
+                    >
+                      <span className="w-9 h-9 rounded-full bg-accent/30 text-accent-foreground text-xs font-semibold flex items-center justify-center shrink-0">
+                        {initial(c.name)}
+                      </span>
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-xs font-semibold truncate">
+                          {c.name}
+                        </span>
+                        <span className="block text-[10px] text-muted-foreground truncate">
+                          {formatDisplay(c.phones[0])}
+                        </span>
+                      </span>
+                      <Phone className="w-4 h-4 text-muted-foreground shrink-0" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
 
-        {/* Live formatted preview */}
-        <div className="px-4 pb-2 h-4 text-[10px] text-muted-foreground text-center truncate">
-          {preview && preview !== value ? preview : "\u00A0"}
-        </div>
-
-        <div className="px-5 pb-1 grid grid-cols-3 gap-x-3 gap-y-1.5">
-          {KEYS.map((k) => (
-            <button
-              key={k.d}
-              onClick={() => press(k.d)}
-              onContextMenu={(e) => {
-                if (k.d === "0") {
-                  e.preventDefault();
-                  longZero();
-                }
+          {/* Number display + clear / add affordances */}
+          <div className="px-4 pt-2 pb-1 flex items-center gap-2 border-t border-border/40">
+            <input
+              ref={inputRef}
+              type="tel"
+              inputMode="tel"
+              autoComplete="off"
+              value={value}
+              onChange={(e) => {
+                const cleaned = e.target.value.replace(/[^\d+*#]/g, "");
+                setValue(cleaned);
               }}
-              className="h-11 rounded-full bg-secondary hover:bg-secondary/80 active:bg-primary/20 flex flex-col items-center justify-center transition-colors"
-            >
-              <span className="text-lg font-semibold text-foreground leading-none">
-                {k.d}
-              </span>
-              {k.sub && (
-                <span className="text-[8px] text-muted-foreground tracking-wider leading-none mt-0.5">
-                  {k.sub}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
+              placeholder=" "
+              className="flex-1 h-12 text-2xl font-light tracking-wide text-center bg-transparent border-0 focus:outline-none px-1"
+            />
+            {value && (
+              <button
+                aria-label="Backspace"
+                onClick={backspace}
+                className="w-9 h-9 rounded-full hover:bg-secondary flex items-center justify-center shrink-0"
+              >
+                <X className="w-4 h-4 text-muted-foreground" />
+              </button>
+            )}
+          </div>
 
-        <div className="px-5 py-2 flex items-center justify-between">
-          <button
-            aria-label="Paste"
-            onClick={paste}
-            className="w-10 h-10 rounded-full hover:bg-secondary flex items-center justify-center"
-          >
-            <ClipboardPaste className="w-4 h-4 text-foreground" />
-          </button>
-          <Button
-            onClick={call}
-            disabled={!value}
-            className="w-12 h-12 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground p-0 shadow-lg disabled:opacity-40"
-            aria-label="Call"
-          >
-            <Phone className="w-5 h-5" />
-          </Button>
-          <button
-            aria-label="Delete"
-            onClick={backspace}
-            disabled={!value}
-            className="w-10 h-10 rounded-full hover:bg-secondary flex items-center justify-center disabled:opacity-30"
-          >
-            <Delete className="w-4 h-4 text-foreground" />
-          </button>
-        </div>
-      </DialogContent>
-    </Dialog>
+          {/* Add to contacts row — only when typed number is valid AND unknown */}
+          {e164Preview && !isKnown && (
+            <div className="px-4 pb-1 flex items-center justify-center">
+              <button
+                onClick={() => setAskAdd(true)}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-secondary/60 hover:bg-secondary text-[11px] font-medium"
+              >
+                <UserPlus className="w-3.5 h-3.5 text-primary" />
+                Add to contacts
+              </button>
+            </div>
+          )}
+
+          {/* Live formatted preview */}
+          <div className="px-4 pb-1 h-4 text-[10px] text-muted-foreground text-center truncate">
+            {e164Preview && formatDisplay(e164Preview) !== value
+              ? formatDisplay(e164Preview)
+              : "\u00A0"}
+          </div>
+
+          {/* Keypad */}
+          <div className="px-4 pb-2 grid grid-cols-3 gap-x-3 gap-y-2">
+            {KEYS.map((k) => (
+              <button
+                key={k.d}
+                onClick={() => press(k.d)}
+                onContextMenu={(e) => {
+                  if (k.d === "0") {
+                    e.preventDefault();
+                    longZero();
+                  }
+                }}
+                className="h-12 rounded-full bg-secondary/60 hover:bg-secondary active:bg-primary/20 flex flex-col items-center justify-center transition-colors"
+              >
+                <span className="text-xl font-medium text-foreground leading-none">
+                  {k.d}
+                </span>
+                {k.sub && (
+                  <span className="text-[8px] text-muted-foreground tracking-[0.15em] leading-none mt-0.5">
+                    {k.sub}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* Big green Call pill */}
+          <div className="px-4 pb-5 pt-1 flex items-center justify-center">
+            <button
+              onClick={callTyped}
+              disabled={!value}
+              aria-label="Call"
+              className="h-14 px-8 min-w-[140px] rounded-full bg-primary hover:bg-primary/90 active:bg-primary/95 text-primary-foreground flex items-center justify-center gap-2 shadow-lg disabled:opacity-40 transition-colors"
+            >
+              <Phone className="w-5 h-5" />
+              <span className="text-sm font-semibold">Call</span>
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {e164Preview && (
+        <AddNumberDialog
+          open={askAdd}
+          onOpenChange={setAskAdd}
+          phoneE164={e164Preview}
+        />
+      )}
+    </>
   );
 }

@@ -127,3 +127,21 @@ export function removeManualContact(e164: string): DeviceContact[] {
   saveManualContacts(list);
   return list;
 }
+
+/** Add a phone number to an existing manual contact (matched by name). */
+export function addPhoneToManualContact(
+  name: string,
+  e164: string,
+): DeviceContact[] {
+  const list = loadManualContacts();
+  const existing = list.find(
+    (c) => c.name.trim().toLowerCase() === name.trim().toLowerCase(),
+  );
+  if (existing) {
+    if (!existing.phones.includes(e164)) existing.phones.push(e164);
+  } else {
+    list.push({ name: name || e164, phones: [e164] });
+  }
+  saveManualContacts(list);
+  return list;
+}
