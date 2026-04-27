@@ -47,6 +47,7 @@ import Dialpad from "@/components/Dialpad";
 import ContactActionSheet, { ContactAction } from "@/components/ContactActionSheet";
 import SaveContactDialog from "@/components/SaveContactDialog";
 import { useLongPress } from "@/hooks/useLongPress";
+import { requestIgnoreBatteryOptimizations } from "@/lib/nativeCalls";
 
 interface MatchedUser {
   phone: string;
@@ -346,6 +347,10 @@ export default function Contacts() {
 
   const callActive = async (c: ActiveContact) => {
     if (!user) return;
+    if (!localStorage.getItem("chichat:battery-prompt-shown")) {
+      void requestIgnoreBatteryOptimizations();
+      localStorage.setItem("chichat:battery-prompt-shown", "1");
+    }
     try {
       const conversationId = await supabase
         .rpc("start_direct_conversation", { _other_user: c.user_id })
