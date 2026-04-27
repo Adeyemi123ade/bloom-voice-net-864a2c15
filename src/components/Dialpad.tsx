@@ -1,6 +1,7 @@
-import { useState } from "react";
-import { Phone, Delete, X } from "lucide-react";
+import { useRef, useState } from "react";
+import { Phone, Delete, X, ClipboardPaste } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -27,12 +28,96 @@ const KEYS: { d: string; sub?: string }[] = [
 
 export default function Dialpad({ open, onOpenChange, initial = "" }: Props) {
   const [value, setValue] = useState(initial);
+  const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
-  const press = (k: string) => setValue((v) => v + k);
-  const longZero = () => setValue((v) => v + "+");
-  const back = () => setValue((v) => v.slice(0, -1));
-  const clear = () => setValue("");
+  /** Insert a string at the current cursor position (or append). */
+  const insertAtCursor = (chunk: string) => {
+    const el = inputRef.current;
+    if (!el) {
+      setValue((v) => v + chunk);
+      return;
+    }
+    const start = el.selectionStart ?? value.length;
+    const end = el.selectionEnd ?? value.length;
+    const next = value.slice(0, start) + chunk + value.slice(end);
+    setValue(next);
+    // Restore caret right after the inserted chunk
+    requestAnimationFrame(() => {
+      const pos = start + chunk.length;
+      el.focus();
+      try {
+        el.setSelectionRange(pos, pos);
+      } catch { /* ignore */ }
+    });
+  };
+
+  /** Delete one char before caret, or selection if any. */
+  const backspace = () => {
+    const el = inputRef.current;
+    if (!el) {
+      setValue((v) => v.slice(0, -1));
+      return;
+    }
+    const start = el.selectionStart ?? value.length;
+    const end = el.selectionEnd ?? value.length;
+    if (start !== end) {
+      const next = value.slice(0, start) + value.slice(end);
+      setValue(next);
+      requestAnimationFrame(() => {
+        el.focus();
+        try { el.setSelectionRange(start, start); } catch { /* ignore */ }
+      });
+      return;
+    }
+    if (start === 0) return;
+    const next = value.slice(0, start - 1) + value.slice(start);
+    setValue(next);
+    requestAnimationFrame(() => {
+      el.focus();
+      try { el.setSelectionRange(start - 1, start - 1); } catch { /* ignore */ }
+    });
+  };
+
+  const press = (k: string) => insertAtCursor(k);
+  const longZero = () => {
+    // Replace the just-inserted "0" with "+" if caret follows a 0, else insert "+"
+    const el = inputRef.current;
+    const caret = el?.selectionStart ?? value.length;
+    if (caret > 0 && value[caret - 1] === "0") {
+      const next = value.slice(0, caret - 1) + "+" + value.slice(caret);
+      setValue(next);
+      requestAnimationFrame(() => {
+        el?.focus();
+        try { el?.setSelectionRange(caret, caret); } catch { /* ignore */ }
+      });
+    } else {
+      insertAtCursor("+");
+    }
+  };
+
+  const clear = () => {
+    setValue("");
+    requestAnimationFrame(() => inputRef.current?.focus());
+  };
+
+  const paste = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      const cleaned = text.replace(/[^\d+*#]/g, "");
+      if (!cleaned) {
+        toast({ title: "Clipboard empty", description: "No phone number found." });
+        return;
+      }
+      insertAtCursor(cleaned);
+    } catch {
+      toast({
+        title: "Paste blocked",
+        description: "Allow clipboard access or long-press the field to paste.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const call = () => {
     const e164 = toE164(value.trim());
@@ -48,7 +133,7 @@ export default function Dialpad({ open, onOpenChange, initial = "" }: Props) {
     navigate(`/dial/${encodeURIComponent(e164)}`);
   };
 
-  const display = value ? formatDisplay(value) || value : "Enter number";
+  const preview = value ? formatDisplay(value) : "";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -56,23 +141,37 @@ export default function Dialpad({ open, onOpenChange, initial = "" }: Props) {
         <DialogHeader className="px-4 pt-3 pb-1">
           <DialogTitle className="text-xs font-semibold">Dialer</DialogTitle>
         </DialogHeader>
-        <div className="px-4 pt-2 pb-3 flex items-center gap-2">
-          <div
-            className={`flex-1 text-center text-2xl font-light tracking-wide truncate ${
-              value ? "text-foreground" : "text-muted-foreground"
-            }`}
-          >
-            {display}
-          </div>
+
+        {/* Editable phone input */}
+        <div className="px-4 pt-2 pb-1 flex items-center gap-2">
+          <Input
+            ref={inputRef}
+            type="tel"
+            inputMode="tel"
+            autoComplete="off"
+            value={value}
+            onChange={(e) => {
+              // Allow only digits and + * #
+              const cleaned = e.target.value.replace(/[^\d+*#]/g, "");
+              setValue(cleaned);
+            }}
+            placeholder="Enter number"
+            className="flex-1 h-12 text-2xl font-light tracking-wide text-center bg-transparent border-0 border-b border-border rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 px-1"
+          />
           {value && (
             <button
               aria-label="Clear"
               onClick={clear}
-              className="w-7 h-7 rounded-full hover:bg-secondary flex items-center justify-center"
+              className="w-7 h-7 rounded-full hover:bg-secondary flex items-center justify-center shrink-0"
             >
               <X className="w-3.5 h-3.5 text-muted-foreground" />
             </button>
           )}
+        </div>
+
+        {/* Live formatted preview */}
+        <div className="px-4 pb-2 h-4 text-[10px] text-muted-foreground text-center truncate">
+          {preview && preview !== value ? preview : "\u00A0"}
         </div>
 
         <div className="px-6 pb-2 grid grid-cols-3 gap-y-3 gap-x-4">
@@ -101,7 +200,13 @@ export default function Dialpad({ open, onOpenChange, initial = "" }: Props) {
         </div>
 
         <div className="px-6 py-3 flex items-center justify-between">
-          <div className="w-12" />
+          <button
+            aria-label="Paste"
+            onClick={paste}
+            className="w-12 h-12 rounded-full hover:bg-secondary flex items-center justify-center"
+          >
+            <ClipboardPaste className="w-5 h-5 text-foreground" />
+          </button>
           <Button
             onClick={call}
             disabled={!value}
@@ -112,7 +217,7 @@ export default function Dialpad({ open, onOpenChange, initial = "" }: Props) {
           </Button>
           <button
             aria-label="Delete"
-            onClick={back}
+            onClick={backspace}
             disabled={!value}
             className="w-12 h-12 rounded-full hover:bg-secondary flex items-center justify-center disabled:opacity-30"
           >
