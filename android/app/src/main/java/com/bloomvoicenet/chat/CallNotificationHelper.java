@@ -7,10 +7,12 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.media.AudioAttributes;
+import android.os.Bundle;
 import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.PowerManager;
+import android.provider.Settings;
 import androidx.core.app.NotificationCompat;
 import java.util.Map;
 
@@ -45,12 +47,19 @@ public class CallNotificationHelper {
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
 
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.startForegroundService(new Intent(context, CallForegroundService.class).putExtras(Extras.from(data)));
+        } else {
+            context.startService(new Intent(context, CallForegroundService.class).putExtras(Extras.from(data)));
+        }
+
         Notification notification = new NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_call)
             .setContentTitle("Incoming " + ("video".equals(data.get("callType")) ? "video " : "") + "call")
             .setContentText((data.get("callerName") == null ? "Someone" : data.get("callerName")) + " is calling…")
             .setCategory(NotificationCompat.CATEGORY_CALL)
             .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
             .setOngoing(true)
             .setAutoCancel(false)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -65,7 +74,15 @@ public class CallNotificationHelper {
         NotificationManager nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         nm.notify(id, notification);
         wakeBriefly(context, callId);
-        context.startActivity(fullScreen);
+        try {
+            Bundle opts = new Bundle();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                opts.putInt("android.pendingIntent.backgroundActivityStartMode", 1);
+            }
+            fullScreenPi.send(context, 0, null, null, null, null, opts);
+        } catch (Exception e) {
+            try { context.startActivity(fullScreen); } catch (Exception ignored) {}
+        }
     }
 
     static void cancel(Context context, String callId) {
@@ -90,7 +107,7 @@ public class CallNotificationHelper {
         try {
             PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
             PowerManager.WakeLock wl = pm.newWakeLock(
-                PowerManager.SCREEN_BRIGHT_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP,
+                PowerManager.FULL_WAKE_LOCK | PowerManager.SCREEN_BRIGHT_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP | PowerManager.ON_AFTER_RELEASE,
                 "ChiChat:IncomingCall:" + callId
             );
             wl.acquire(12000);
