@@ -37,8 +37,13 @@ public class CallNotificationHelper {
             context, id, fullScreen, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
 
-        PendingIntent acceptPi = PendingIntent.getBroadcast(
-            context, id + 1, new Intent(context, CallActionReceiver.class).setAction(ACTION_ACCEPT).putExtras(Extras.from(data)),
+        Intent accept = new Intent(context, MainActivity.class);
+        accept.putExtras(Extras.from(data));
+        accept.putExtra("openCall", true);
+        accept.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+
+        PendingIntent acceptPi = PendingIntent.getActivity(
+            context, id + 1, accept,
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
         PendingIntent declinePi = PendingIntent.getBroadcast(
