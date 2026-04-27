@@ -208,8 +208,8 @@ export default function Contacts() {
         toast({ title: `Synced ${list.length} contacts` });
       } else {
         toast({
-          title: "Device sync only works in the mobile app",
-          description: "On the web, add contacts manually below.",
+          title: "Device sync runs in the mobile app",
+          description: "On the web you can add contacts manually below.",
         });
         setAddOpen(true);
       }
