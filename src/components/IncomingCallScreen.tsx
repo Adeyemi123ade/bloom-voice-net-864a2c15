@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "@/hooks/use-toast";
 import { getSelectedRingtone, playRingtone } from "@/lib/ringtones";
 import { startNativeCallNotifications } from "@/lib/nativeCallNotifications";
+import { registerForCallPush } from "@/lib/fcmRegistration";
 import { formatCallMediaError, prepareCallMedia } from "@/lib/callMedia";
 
 type IncomingCall = {
@@ -129,6 +130,7 @@ export default function IncomingCallScreen() {
     if (!user) return;
 
     void startNativeCallNotifications(user.id);
+    void registerForCallPush(user.id);
 
     const handle = async (callId: string) => {
       if (handled.current.has(callId)) return;
