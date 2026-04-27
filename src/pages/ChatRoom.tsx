@@ -248,7 +248,7 @@ function CallSystemBubble({
     <button
       type="button"
       onClick={handleTap}
-      className={`min-w-[60%] max-w-[80%] flex items-center gap-3 pl-2 pr-3 py-2 rounded-2xl text-left ${
+      className={`min-w-[70%] max-w-[85%] flex items-center gap-3 pl-2 pr-3 py-2 rounded-2xl text-left ${
         mine
           ? "bg-primary/15 text-foreground rounded-br-sm"
           : "bg-secondary text-foreground rounded-bl-sm"
@@ -979,7 +979,7 @@ export default function ChatRoom() {
                 }}
               >
                 <div
-                  className={`max-w-[75%] select-none transition-shadow ${
+                  className={`max-w-[85%] select-none transition-shadow ${
                     bareAttachment
                       ? `rounded-2xl ${isSelected ? "ring-2 ring-accent" : ""}`
                       : `px-3 py-2 rounded-2xl ${
