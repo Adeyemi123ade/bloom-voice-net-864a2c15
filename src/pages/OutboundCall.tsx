@@ -26,6 +26,8 @@ export default function OutboundCall() {
   const deviceRef = useRef<Device | null>(null);
   const callRef = useRef<Call | null>(null);
   const tickRef = useRef<number | null>(null);
+  const dialedRef = useRef(false);
+  const endedRef = useRef(false);
 
   const e164 = number ? toE164(decodeURIComponent(number)) ?? decodeURIComponent(number) : "";
   const display = e164 ? formatDisplay(e164) : "";
@@ -46,6 +48,10 @@ export default function OutboundCall() {
 
   useEffect(() => {
     if (!user || !e164) return;
+    // Hard guard: only ever dial once per mount. Prevents auto-redial after
+    // a drop / re-render / StrictMode double-invoke.
+    if (dialedRef.current) return;
+    dialedRef.current = true;
     let cancelled = false;
 
     (async () => {
@@ -66,12 +72,12 @@ export default function OutboundCall() {
         device.on("error", (e) => {
           console.error("Device error", e);
           setErrorMsg(e?.message ?? "Device error");
-          setStatus("failed");
+          endLocally("failed");
         });
 
         await device.register();
 
-        if (cancelled) return;
+        if (cancelled || endedRef.current) return;
 
         const call = await device.connect({ params: { To: e164 } });
         callRef.current = call;
@@ -95,7 +101,7 @@ export default function OutboundCall() {
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Could not start call";
         setErrorMsg(msg);
-        setStatus("failed");
+        endLocally("failed");
         toast({ title: "Call failed", description: msg, variant: "destructive" });
       }
     })();
@@ -113,11 +119,15 @@ export default function OutboundCall() {
       tickRef.current = null;
     }
     try {
+      callRef.current?.removeAllListeners?.();
       callRef.current?.disconnect();
     } catch {
       /* ignore */
     }
     try {
+      deviceRef.current?.removeAllListeners?.();
+      deviceRef.current?.disconnectAll?.();
+      deviceRef.current?.unregister?.();
       deviceRef.current?.destroy();
     } catch {
       /* ignore */
@@ -127,20 +137,20 @@ export default function OutboundCall() {
   };
 
   const endLocally = (s: Status) => {
+    if (endedRef.current) return;
+    endedRef.current = true;
     cleanup();
     setStatus(s);
+    if (s === "failed" && seconds < 3 && errorMsg == null) {
+      setErrorMsg("Call dropped — if you're on a Twilio trial, consider upgrading for longer calls.");
+    }
     if (s === "ended" && !isKnown && e164) {
-      // Offer to save unknown number
+      // Offer to save unknown number — explicit user action only.
       setTimeout(() => setAskSave(true), 400);
     }
   };
 
   const hangUp = () => {
-    try {
-      callRef.current?.disconnect();
-    } catch {
-      /* ignore */
-    }
     endLocally("ended");
   };
 
