@@ -390,6 +390,57 @@ export default function Contacts() {
     setInvitedPhones((prev) => new Set(prev).add(c.phone));
   };
 
+  const openActiveActions = (c: ActiveContact) => {
+    setActionSheet({
+      title: c.display_name,
+      subtitle: formatDisplay(c.phone),
+      actions: [
+        { label: "Call (in-app)", icon: Phone, onClick: () => callActive(c) },
+        {
+          label: "Edit name",
+          icon: Edit3,
+          onClick: () => setEditTarget({ phone: c.phone }),
+        },
+        {
+          label: "Remove from my contacts",
+          icon: Trash2,
+          destructive: true,
+          onClick: () => handleRemoveManual(c.phone),
+        },
+      ],
+    });
+  };
+
+  const openInviteActions = (c: InviteContact) => {
+    setActionSheet({
+      title: c.name,
+      subtitle: formatDisplay(c.phone),
+      actions: [
+        {
+          label: "Call this number",
+          icon: Phone,
+          onClick: () => navigate(`/dial/${encodeURIComponent(c.phone)}`),
+        },
+        {
+          label: c.invited ? "Re-invite to ChiChat" : "Invite to ChiChat",
+          icon: Send,
+          onClick: () => inviteContact(c),
+        },
+        {
+          label: "Edit name",
+          icon: Edit3,
+          onClick: () => setEditTarget({ phone: c.phone }),
+        },
+        {
+          label: "Remove from my contacts",
+          icon: Trash2,
+          destructive: true,
+          onClick: () => handleRemoveManual(c.phone),
+        },
+      ],
+    });
+  };
+
   return (
     <MobileFrame>
       <div className="h-full w-full flex flex-col bg-background">
