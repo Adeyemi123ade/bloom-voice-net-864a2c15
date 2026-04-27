@@ -882,12 +882,24 @@ export default function ChatRoom() {
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-foreground truncate">
+              <p className="text-sm font-semibold text-foreground truncate leading-tight">
                 {other?.display_name ?? "Chat"}
               </p>
-              <p className="text-[11px] text-muted-foreground truncate">
-                {otherTyping ? "typing…" : isReallyOnline(other) ? "online" : ""}
-              </p>
+              {/* Fixed-height status row — never changes header height */}
+              <div className="h-[14px] flex items-center">
+                {otherTyping ? (
+                  <span className="text-[11px] text-primary truncate flex items-center gap-1">
+                    <span className="flex gap-0.5">
+                      <span className="w-1 h-1 rounded-full bg-primary animate-bounce [animation-delay:-0.3s]" />
+                      <span className="w-1 h-1 rounded-full bg-primary animate-bounce [animation-delay:-0.15s]" />
+                      <span className="w-1 h-1 rounded-full bg-primary animate-bounce" />
+                    </span>
+                    typing
+                  </span>
+                ) : isReallyOnline(other) ? (
+                  <span className="text-[11px] text-muted-foreground truncate">online</span>
+                ) : null}
+              </div>
             </div>
             <button
               aria-label="Voice call"
