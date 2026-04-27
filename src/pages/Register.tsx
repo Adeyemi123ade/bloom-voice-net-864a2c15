@@ -188,6 +188,29 @@ export default function Register() {
             </div>
 
             <div>
+              <Label htmlFor="phone" className="text-[10px] text-muted-foreground">
+                Phone number
+              </Label>
+              <Input
+                id="phone"
+                type="tel"
+                autoComplete="tel"
+                inputMode="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+234 801 234 5678"
+                maxLength={20}
+                className="mt-1 h-9 text-xs bg-input border-border text-foreground placeholder:text-muted-foreground"
+                aria-invalid={!!errors.phone}
+              />
+              {errors.phone ? (
+                <p className="text-[10px] text-destructive mt-1">{errors.phone}</p>
+              ) : (
+                <p className="text-[9px] text-muted-foreground mt-1">Include country code so friends can find you.</p>
+              )}
+            </div>
+
+            <div>
               <Label htmlFor="password" className="text-[10px] text-muted-foreground">
                 Password
               </Label>
