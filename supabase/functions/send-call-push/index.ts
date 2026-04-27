@@ -96,13 +96,34 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { calleeId, callId, callType, callerName } = await req.json();
+    const { calleeId, callId, callType, callerName, conversationId, roomName } = await req.json();
     if (!calleeId || !callId) {
       return new Response(JSON.stringify({ error: "missing fields" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // Sign a short token so the native "Decline" button can call call-action
+    // without needing a full user session on the device.
+    const secret = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const hmacKey = await crypto.subtle.importKey(
+      "raw",
+      new TextEncoder().encode(secret),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"],
+    );
+    const sigBuf = await crypto.subtle.sign(
+      "HMAC",
+      hmacKey,
+      new TextEncoder().encode(`${callId}:${calleeId}:decline`),
+    );
+    const actionToken = btoa(String.fromCharCode(...new Uint8Array(sigBuf)))
+      .replace(/=+$/, "")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_");
+    const actionUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/call-action`;
 
     const { data: tokens } = await supabase
       .from("device_push_tokens")
@@ -141,8 +162,13 @@ Deno.serve(async (req) => {
             data: {
               type: "incoming_call",
               callId: String(callId),
+              calleeId: String(calleeId),
               callType: String(callType ?? "voice"),
               callerName: String(callerName ?? "Someone"),
+              conversationId: String(conversationId ?? ""),
+              roomName: String(roomName ?? ""),
+              actionUrl,
+              actionToken,
             },
             android: {
               priority: "HIGH",

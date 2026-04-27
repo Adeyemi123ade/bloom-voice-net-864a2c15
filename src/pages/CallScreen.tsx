@@ -21,6 +21,7 @@ import { useRingback } from "@/hooks/useRingback";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { clearPreparedCallMedia, consumePreparedCallMedia, formatCallMediaError } from "@/lib/callMedia";
+import { startCallForegroundService, stopCallForegroundService } from "@/lib/nativeCalls";
 
 type Profile = { id: string; display_name: string | null; avatar_url: string | null };
 
@@ -169,6 +170,7 @@ export default function CallScreen() {
   useEffect(() => {
     if (status !== "connected") return;
     tickTimer.current = window.setInterval(() => setSeconds((s) => s + 1), 1000);
+    void startCallForegroundService();
     return () => {
       if (tickTimer.current) window.clearInterval(tickTimer.current);
     };
@@ -206,6 +208,7 @@ export default function CallScreen() {
     }
     // Close the Twilio room so it can't keep billing as a ghost room.
     void completeRoom();
+    void stopCallForegroundService();
     setTimeout(() => navigate(`/chat/${conversationId}`, { replace: true }), 500);
   };
 
