@@ -559,7 +559,9 @@ export default function ChatRoom() {
         calleeId: other.id,
         callId: data.id,
         callType: type,
-        callerName: "Someone",
+        callerName: other.display_name ?? "Someone",
+        conversationId,
+        roomName,
       },
     }).catch((e) => console.warn("[call-push] failed", e));
     navigate(`/call/${conversationId}?type=${type}&callId=${data.id}&room=${encodeURIComponent(roomName)}&role=caller`, { replace: true });

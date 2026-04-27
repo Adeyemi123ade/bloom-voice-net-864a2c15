@@ -374,6 +374,8 @@ export default function Contacts() {
           callId: callRow.id,
           callType: "voice",
           callerName: c.display_name ?? "Someone",
+          conversationId,
+          roomName,
         },
       }).catch((e) => console.warn("[call-push] failed", e));
       navigate(`/call/${callRow.id}`);
