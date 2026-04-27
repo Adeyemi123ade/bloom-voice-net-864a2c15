@@ -586,43 +586,12 @@ export default function Contacts() {
                 />
               )}
               {filteredActive.map((c) => (
-                <div
+                <ActiveRow
                   key={c.user_id}
-                  className="flex items-center gap-3 px-2 py-2.5 rounded-lg hover:bg-secondary"
-                >
-                  <Avatar className="w-10 h-10">
-                    <AvatarImage src={c.avatar_url ?? undefined} />
-                    <AvatarFallback className="bg-primary/20 text-foreground text-[11px] font-semibold">
-                      {initials(c.display_name)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <p className="text-xs font-semibold text-foreground truncate">
-                        {c.display_name}
-                      </p>
-                      {c.call_count >= 3 && (
-                        <Badge
-                          variant="secondary"
-                          className="h-4 px-1.5 text-[9px] font-semibold"
-                        >
-                          Frequent · {c.call_count}
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-[10px] text-muted-foreground truncate">
-                      {formatDisplay(c.phone)}
-                    </p>
-                  </div>
-                  <Button
-                    onClick={() => callActive(c)}
-                    aria-label={`Call ${c.display_name}`}
-                    className="h-9 px-3 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-[11px]"
-                  >
-                    <Phone className="w-3.5 h-3.5" />
-                    Call
-                  </Button>
-                </div>
+                  c={c}
+                  onCall={() => callActive(c)}
+                  onLongPress={() => openActiveActions(c)}
+                />
               ))}
             </TabsContent>
 
