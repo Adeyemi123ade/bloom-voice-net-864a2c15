@@ -33,6 +33,14 @@ public class IncomingCallActivity extends AppCompatActivity {
         render();
     }
 
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        callIntent = intent;
+        setIntent(intent);
+        render();
+    }
+
     private void render() {
         String caller = callIntent.getStringExtra("callerName");
         LinearLayout root = new LinearLayout(this);
@@ -63,6 +71,7 @@ public class IncomingCallActivity extends AppCompatActivity {
         decline.setOnClickListener(v -> {
             CallActionReceiver.declineInBackground(callIntent);
             CallNotificationHelper.cancel(this, callIntent.getStringExtra("callId"));
+            stopService(new Intent(this, CallForegroundService.class));
             finishAndRemoveTask();
         });
 
