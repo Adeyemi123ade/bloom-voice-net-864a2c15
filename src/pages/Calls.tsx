@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Phone, Video, PhoneIncoming, PhoneOutgoing, PhoneMissed } from "lucide-react";
+import { Phone, Video, PhoneIncoming, PhoneOutgoing, PhoneMissed, Grid3x3 } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { clearPreparedCallMedia, formatCallMediaError, prepareCallMedia } from "@/lib/callMedia";
 import CallBackSheet from "@/components/call/CallBackSheet";
+import Dialpad from "@/components/Dialpad";
 
 type Call = {
   id: string;
@@ -78,6 +79,7 @@ export default function Calls() {
   const [profiles, setProfiles] = useState<Map<string, Profile>>(new Map());
   const [fetching, setFetching] = useState(true);
   const [sheet, setSheet] = useState<{ name: string; type: "voice" | "video"; run: () => void } | null>(null);
+  const [dialOpen, setDialOpen] = useState(false);
 
   useEffect(() => {
     document.title = "Calls — Chichat";
@@ -129,8 +131,8 @@ export default function Calls() {
 
   return (
     <MobileFrame>
-      <div className="h-full w-full flex flex-col bg-background">
-        <div className="px-3 pt-4 pb-3 border-b border-border">
+      <div className="h-full w-full flex flex-col bg-background relative">
+        <div className="px-3 pt-4 pb-3 border-b border-border flex items-center justify-between">
           <h1 className="text-[17px] font-bold text-foreground">Calls</h1>
         </div>
 
@@ -228,6 +230,13 @@ export default function Calls() {
             );
           })}
         </div>
+        <button
+          aria-label="Open dialer"
+          onClick={() => setDialOpen(true)}
+          className="absolute bottom-4 right-4 w-14 h-14 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg flex items-center justify-center"
+        >
+          <Grid3x3 className="w-6 h-6" />
+        </button>
       </div>
       <CallBackSheet
         open={!!sheet}
@@ -236,6 +245,7 @@ export default function Calls() {
         type={sheet?.type ?? "voice"}
         onConfirm={() => sheet?.run()}
       />
+      <Dialpad open={dialOpen} onOpenChange={setDialOpen} />
     </MobileFrame>
   );
 }
