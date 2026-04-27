@@ -46,12 +46,6 @@ public class CallNotificationHelper {
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.startForegroundService(new Intent(context, CallForegroundService.class).putExtras(Extras.from(data)));
-        } else {
-            context.startService(new Intent(context, CallForegroundService.class).putExtras(Extras.from(data)));
-        }
-
         Notification notification = new NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_call)
             .setContentTitle("Incoming " + ("video".equals(data.get("callType")) ? "video " : "") + "call")
