@@ -32,17 +32,30 @@ type Preview = {
   outgoing?: boolean;
 };
 
+function callDurationLabel(seconds?: number) {
+  if (!seconds || seconds <= 0) return null;
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
+}
+
 function buildPreview(content: string | null, senderId: string | null, myId: string): Preview {
   if (!content) return { kind: "text", text: "" };
   if (content.startsWith(CALL_PREFIX)) {
     const [, body] = content.split(CALL_PREFIX);
-    const [type, kind] = (body ?? "").split("|");
+    const [type, kind, durationRaw] = (body ?? "").split("|");
     const isVideo = type === "video";
     const outgoing = senderId === myId;
+    const durationText = callDurationLabel(Number(durationRaw ?? 0));
     const missed = (kind === "missed" || kind === "no_answer") && !outgoing;
+    const declined = kind === "declined" || kind === "rejected";
     let label: string;
     if (missed) {
-      label = isVideo ? "Missed video call" : "Missed voice call";
+      label = isVideo ? "Missed video call" : "Missed call";
+    } else if (durationText) {
+      label = durationText;
+    } else if (declined) {
+      label = outgoing ? "Call declined" : "Declined call";
     } else {
       label = isVideo ? "Video call" : "Voice call";
     }
