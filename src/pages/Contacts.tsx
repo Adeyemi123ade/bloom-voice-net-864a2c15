@@ -368,6 +368,14 @@ export default function Contacts() {
         .select("id")
         .single();
       if (callErr) throw callErr;
+      void supabase.functions.invoke("send-call-push", {
+        body: {
+          calleeId: c.user_id,
+          callId: callRow.id,
+          callType: "voice",
+          callerName: c.display_name ?? "Someone",
+        },
+      }).catch((e) => console.warn("[call-push] failed", e));
       navigate(`/call/${callRow.id}`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Could not start call";
