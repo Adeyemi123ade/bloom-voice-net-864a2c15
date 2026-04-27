@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
+import { toE164 } from "@/lib/phone";
 
 const registerSchema = z.object({
   name: z
@@ -22,6 +23,11 @@ const registerSchema = z.object({
     .trim()
     .email({ message: "Enter a valid email address" })
     .max(255, { message: "Email must be less than 255 characters" }),
+  phone: z
+    .string()
+    .trim()
+    .min(6, { message: "Enter a valid phone number" })
+    .max(20, { message: "Phone number is too long" }),
   password: z
     .string()
     .min(8, { message: "Password must be at least 8 characters" })
@@ -30,7 +36,7 @@ const registerSchema = z.object({
     .regex(/[0-9]/, { message: "Include at least one number" }),
 });
 
-type FormErrors = Partial<Record<"name" | "email" | "password", string>>;
+type FormErrors = Partial<Record<"name" | "email" | "phone" | "password", string>>;
 
 export default function Register() {
   const navigate = useNavigate();
@@ -40,6 +46,7 @@ export default function Register() {
   }, [authLoading, user, navigate]);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
@@ -63,13 +70,17 @@ export default function Register() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const result = registerSchema.safeParse({ name, email, password });
+    const result = registerSchema.safeParse({ name, email, phone, password });
     const fieldErrors: FormErrors & { confirmPassword?: string } = {};
     if (!result.success) {
       result.error.issues.forEach((issue) => {
         const key = issue.path[0] as keyof FormErrors;
         if (!fieldErrors[key]) fieldErrors[key] = issue.message;
       });
+    }
+    const e164 = result.success ? toE164(result.data.phone) : null;
+    if (result.success && !e164) {
+      fieldErrors.phone = "Enter a valid phone number with country code (e.g. +234...)";
     }
     if (password !== confirmPassword) {
       fieldErrors.confirmPassword = "Passwords don't match";
@@ -80,16 +91,16 @@ export default function Register() {
     }
     setErrors({});
     setSubmitting(true);
-    const { error } = await supabase.auth.signUp({
+    const { data: signUpData, error } = await supabase.auth.signUp({
       email: result.data!.email,
       password: result.data!.password,
       options: {
-        data: { full_name: result.data!.name },
+        data: { full_name: result.data!.name, phone: e164 },
         emailRedirectTo: `${window.location.origin}/welcome`,
       },
     });
-    setSubmitting(false);
     if (error) {
+      setSubmitting(false);
       toast({
         title: "Sign up failed",
         description: error.message,
@@ -97,6 +108,19 @@ export default function Register() {
       });
       return;
     }
+    // Save phone to profile (handle_new_user trigger created the row)
+    if (signUpData.user?.id && e164) {
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .update({ phone: e164 })
+        .eq("id", signUpData.user.id);
+      if (profileError && profileError.code === "23505") {
+        setSubmitting(false);
+        setErrors({ phone: "This phone number is already registered" });
+        return;
+      }
+    }
+    setSubmitting(false);
     toast({ title: "Account created", description: "Welcome to Chichat!" });
     navigate("/welcome", { state: { name: result.data!.name, email: result.data!.email } });
   };
@@ -160,6 +184,29 @@ export default function Register() {
               />
               {errors.email && (
                 <p className="text-[10px] text-destructive mt-1">{errors.email}</p>
+              )}
+            </div>
+
+            <div>
+              <Label htmlFor="phone" className="text-[10px] text-muted-foreground">
+                Phone number
+              </Label>
+              <Input
+                id="phone"
+                type="tel"
+                autoComplete="tel"
+                inputMode="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+234 801 234 5678"
+                maxLength={20}
+                className="mt-1 h-9 text-xs bg-input border-border text-foreground placeholder:text-muted-foreground"
+                aria-invalid={!!errors.phone}
+              />
+              {errors.phone ? (
+                <p className="text-[10px] text-destructive mt-1">{errors.phone}</p>
+              ) : (
+                <p className="text-[9px] text-muted-foreground mt-1">Include country code so friends can find you.</p>
               )}
             </div>
 
