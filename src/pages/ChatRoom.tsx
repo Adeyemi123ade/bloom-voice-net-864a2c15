@@ -248,7 +248,7 @@ function CallSystemBubble({
     <button
       type="button"
       onClick={handleTap}
-      className={`min-w-[60%] max-w-[80%] flex items-center gap-3 pl-2 pr-3 py-2 rounded-2xl text-left ${
+      className={`min-w-[70%] max-w-[85%] flex items-center gap-3 pl-2 pr-3 py-2 rounded-2xl text-left ${
         mine
           ? "bg-primary/15 text-foreground rounded-br-sm"
           : "bg-secondary text-foreground rounded-bl-sm"
@@ -262,12 +262,12 @@ function CallSystemBubble({
       </div>
       {/* Right: 2 lines — label + subtitle, with time bottom-right */}
       <div className="flex-1 min-w-0">
-        <div className={`text-[13px] font-semibold truncate ${isMissed ? "text-destructive" : ""}`}>
+        <div className={`text-[13px] font-semibold leading-snug break-words ${isMissed ? "text-destructive" : ""}`}>
           {label}
         </div>
         <div className="flex items-end justify-between gap-2 mt-0.5">
-          <span className="text-[11px] text-muted-foreground truncate">{subtitle}</span>
-          <span className="text-[10px] text-muted-foreground shrink-0">
+          <span className="text-[11px] text-muted-foreground break-words">{subtitle}</span>
+          <span className="text-[10px] text-muted-foreground shrink-0 whitespace-nowrap">
             {formatTime(m.created_at)}
           </span>
         </div>
@@ -480,9 +480,36 @@ export default function ChatRoom() {
     };
   }, [user, conversationId, other?.id]);
 
+  // Track whether the initial messages have been positioned at the bottom yet.
+  // First load: instant jump to the last message (no animation).
+  // Subsequent new messages: smooth scroll only if user is already near bottom.
+  const didInitialScroll = useRef(false);
+  const prevMsgCount = useRef(0);
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages, otherTyping]);
+    const el = scrollRef.current;
+    if (!el) return;
+    if (!didInitialScroll.current && messages.length > 0) {
+      // Jump instantly — do not animate through old messages.
+      el.scrollTop = el.scrollHeight;
+      didInitialScroll.current = true;
+      prevMsgCount.current = messages.length;
+      return;
+    }
+    if (messages.length > prevMsgCount.current) {
+      const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+      const nearBottom = distanceFromBottom < 160;
+      if (nearBottom) {
+        el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+      }
+      prevMsgCount.current = messages.length;
+    }
+  }, [messages]);
+
+  // Reset the initial-scroll guard when switching conversations.
+  useEffect(() => {
+    didInitialScroll.current = false;
+    prevMsgCount.current = 0;
+  }, [conversationId]);
 
   const startCall = async (type: "voice" | "video") => {
     if (!user || !conversationId || !other) return;
@@ -855,12 +882,24 @@ export default function ChatRoom() {
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-foreground truncate">
+              <p className="text-sm font-semibold text-foreground truncate leading-tight">
                 {other?.display_name ?? "Chat"}
               </p>
-              <p className="text-[11px] text-muted-foreground truncate">
-                {otherTyping ? "typing…" : isReallyOnline(other) ? "online" : ""}
-              </p>
+              {/* Fixed-height status row — never changes header height */}
+              <div className="h-[14px] flex items-center">
+                {otherTyping ? (
+                  <span className="text-[11px] text-primary truncate flex items-center gap-1">
+                    <span className="flex gap-0.5">
+                      <span className="w-1 h-1 rounded-full bg-primary animate-bounce [animation-delay:-0.3s]" />
+                      <span className="w-1 h-1 rounded-full bg-primary animate-bounce [animation-delay:-0.15s]" />
+                      <span className="w-1 h-1 rounded-full bg-primary animate-bounce" />
+                    </span>
+                    typing
+                  </span>
+                ) : isReallyOnline(other) ? (
+                  <span className="text-[11px] text-muted-foreground truncate">online</span>
+                ) : null}
+              </div>
             </div>
             <button
               aria-label="Voice call"
@@ -940,7 +979,7 @@ export default function ChatRoom() {
                 }}
               >
                 <div
-                  className={`max-w-[75%] select-none transition-shadow ${
+                  className={`max-w-[85%] select-none transition-shadow ${
                     bareAttachment
                       ? `rounded-2xl ${isSelected ? "ring-2 ring-accent" : ""}`
                       : `px-3 py-2 rounded-2xl ${

@@ -208,8 +208,8 @@ export default function Contacts() {
         toast({ title: `Synced ${list.length} contacts` });
       } else {
         toast({
-          title: "Device sync only works in the mobile app",
-          description: "On the web, add contacts manually below.",
+          title: "Device sync runs in the mobile app",
+          description: "On the web you can add contacts manually below.",
         });
         setAddOpen(true);
       }
@@ -429,17 +429,30 @@ export default function Contacts() {
               ) : (
                 <Smartphone className="w-4 h-4" />
               )}
-              {isNativePlatform() ? "Sync device contacts" : "Sync contacts"}
+              {syncing
+                ? "Syncing contacts from your phone…"
+                : isNativePlatform()
+                  ? "Sync contacts"
+                  : "Sync contacts"}
             </Button>
 
-            <Button
-              onClick={() => setAddOpen(true)}
-              variant="outline"
-              className="w-full h-9 rounded-lg text-[11px] border-border"
-            >
-              <UserPlus className="w-3.5 h-3.5" />
-              Add a contact manually
-            </Button>
+            {syncing && (
+              <p className="text-[10.5px] text-muted-foreground text-center">
+                This may take a few seconds.
+              </p>
+            )}
+
+            {/* Manual add is a fallback only when device sync isn't available (web). */}
+            {!isNativePlatform() && (
+              <Button
+                onClick={() => setAddOpen(true)}
+                variant="outline"
+                className="w-full h-9 rounded-lg text-[11px] border-border"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                Add a contact manually
+              </Button>
+            )}
 
             {showPrivacy && (
               <div className="relative p-3 rounded-lg bg-secondary border border-border">
@@ -451,9 +464,8 @@ export default function Contacts() {
                   <X className="w-3 h-3 text-muted-foreground" />
                 </button>
                 <p className="text-[10.5px] text-muted-foreground leading-relaxed pr-5">
-                  We only use your contacts to help you call friends and invite
-                  them to Chichat. We never store your full contact list on our
-                  servers.
+                  We access your contacts only to help you call and invite friends.
+                  We never store your full contact list.
                 </p>
               </div>
             )}
