@@ -174,7 +174,7 @@ export default function Dialpad({ open, onOpenChange, initial = "" }: Props) {
           {preview && preview !== value ? preview : "\u00A0"}
         </div>
 
-        <div className="px-6 pb-2 grid grid-cols-3 gap-y-3 gap-x-4">
+        <div className="px-5 pb-1 grid grid-cols-3 gap-x-3 gap-y-1.5">
           {KEYS.map((k) => (
             <button
               key={k.d}
@@ -185,13 +185,13 @@ export default function Dialpad({ open, onOpenChange, initial = "" }: Props) {
                   longZero();
                 }
               }}
-              className="aspect-square rounded-full bg-secondary hover:bg-secondary/80 active:bg-primary/20 flex flex-col items-center justify-center transition-colors"
+              className="h-11 rounded-full bg-secondary hover:bg-secondary/80 active:bg-primary/20 flex flex-col items-center justify-center transition-colors"
             >
-              <span className="text-xl font-semibold text-foreground leading-none">
+              <span className="text-lg font-semibold text-foreground leading-none">
                 {k.d}
               </span>
               {k.sub && (
-                <span className="text-[9px] text-muted-foreground tracking-wider mt-0.5">
+                <span className="text-[8px] text-muted-foreground tracking-wider leading-none mt-0.5">
                   {k.sub}
                 </span>
               )}
@@ -199,29 +199,29 @@ export default function Dialpad({ open, onOpenChange, initial = "" }: Props) {
           ))}
         </div>
 
-        <div className="px-6 py-3 flex items-center justify-between">
+        <div className="px-5 py-2 flex items-center justify-between">
           <button
             aria-label="Paste"
             onClick={paste}
-            className="w-12 h-12 rounded-full hover:bg-secondary flex items-center justify-center"
+            className="w-10 h-10 rounded-full hover:bg-secondary flex items-center justify-center"
           >
-            <ClipboardPaste className="w-5 h-5 text-foreground" />
+            <ClipboardPaste className="w-4 h-4 text-foreground" />
           </button>
           <Button
             onClick={call}
             disabled={!value}
-            className="w-14 h-14 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground p-0 shadow-lg disabled:opacity-40"
+            className="w-12 h-12 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground p-0 shadow-lg disabled:opacity-40"
             aria-label="Call"
           >
-            <Phone className="w-6 h-6" />
+            <Phone className="w-5 h-5" />
           </Button>
           <button
             aria-label="Delete"
             onClick={backspace}
             disabled={!value}
-            className="w-12 h-12 rounded-full hover:bg-secondary flex items-center justify-center disabled:opacity-30"
+            className="w-10 h-10 rounded-full hover:bg-secondary flex items-center justify-center disabled:opacity-30"
           >
-            <Delete className="w-5 h-5 text-foreground" />
+            <Delete className="w-4 h-4 text-foreground" />
           </button>
         </div>
       </DialogContent>
