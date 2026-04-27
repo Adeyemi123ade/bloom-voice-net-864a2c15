@@ -18,6 +18,7 @@ public class CallActionReceiver extends BroadcastReceiver {
             IncomingCallActivity.openAcceptedCall(context, intent);
         } else if (CallNotificationHelper.ACTION_DECLINE.equals(action)) {
             declineInBackground(intent);
+            context.stopService(new Intent(context, CallForegroundService.class));
         }
     }
 
