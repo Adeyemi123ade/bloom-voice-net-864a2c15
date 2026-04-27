@@ -11,14 +11,14 @@ export async function saveDeviceContact(
   try {
     if (!Capacitor.isNativePlatform()) return false;
     const mod = await import("@capacitor-community/contacts");
-    const Contacts = mod.Contacts;
+    const { Contacts, PhoneType } = mod;
     const perm = await Contacts.requestPermissions();
     if (perm.contacts !== "granted") return false;
     const [given, ...rest] = name.trim().split(/\s+/);
     await Contacts.createContact({
       contact: {
         name: { given: given || name, family: rest.join(" ") || undefined },
-        phones: [{ type: "home", number: phoneE164 }],
+        phones: [{ type: PhoneType.Mobile, number: phoneE164 }],
       },
     });
     return true;
