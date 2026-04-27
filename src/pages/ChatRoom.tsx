@@ -480,9 +480,36 @@ export default function ChatRoom() {
     };
   }, [user, conversationId, other?.id]);
 
+  // Track whether the initial messages have been positioned at the bottom yet.
+  // First load: instant jump to the last message (no animation).
+  // Subsequent new messages: smooth scroll only if user is already near bottom.
+  const didInitialScroll = useRef(false);
+  const prevMsgCount = useRef(0);
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages, otherTyping]);
+    const el = scrollRef.current;
+    if (!el) return;
+    if (!didInitialScroll.current && messages.length > 0) {
+      // Jump instantly — do not animate through old messages.
+      el.scrollTop = el.scrollHeight;
+      didInitialScroll.current = true;
+      prevMsgCount.current = messages.length;
+      return;
+    }
+    if (messages.length > prevMsgCount.current) {
+      const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+      const nearBottom = distanceFromBottom < 160;
+      if (nearBottom) {
+        el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+      }
+      prevMsgCount.current = messages.length;
+    }
+  }, [messages]);
+
+  // Reset the initial-scroll guard when switching conversations.
+  useEffect(() => {
+    didInitialScroll.current = false;
+    prevMsgCount.current = 0;
+  }, [conversationId]);
 
   const startCall = async (type: "voice" | "video") => {
     if (!user || !conversationId || !other) return;
