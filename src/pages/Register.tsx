@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
+import { toE164 } from "@/lib/phone";
 
 const registerSchema = z.object({
   name: z
@@ -22,6 +23,11 @@ const registerSchema = z.object({
     .trim()
     .email({ message: "Enter a valid email address" })
     .max(255, { message: "Email must be less than 255 characters" }),
+  phone: z
+    .string()
+    .trim()
+    .min(6, { message: "Enter a valid phone number" })
+    .max(20, { message: "Phone number is too long" }),
   password: z
     .string()
     .min(8, { message: "Password must be at least 8 characters" })
@@ -30,7 +36,7 @@ const registerSchema = z.object({
     .regex(/[0-9]/, { message: "Include at least one number" }),
 });
 
-type FormErrors = Partial<Record<"name" | "email" | "password", string>>;
+type FormErrors = Partial<Record<"name" | "email" | "phone" | "password", string>>;
 
 export default function Register() {
   const navigate = useNavigate();
