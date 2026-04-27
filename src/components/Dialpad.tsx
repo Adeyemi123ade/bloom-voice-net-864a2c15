@@ -137,7 +137,7 @@ export default function Dialpad({ open, onOpenChange, initial = "" }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[340px] p-0 gap-0 bg-background">
+      <DialogContent className="max-w-[340px] p-0 gap-0 bg-background top-auto bottom-4 translate-y-0 sm:bottom-6">
         <DialogHeader className="px-4 pt-3 pb-1">
           <DialogTitle className="text-xs font-semibold">Dialer</DialogTitle>
         </DialogHeader>
