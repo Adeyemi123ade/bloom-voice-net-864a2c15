@@ -192,14 +192,32 @@ export default function Profile() {
             <Label htmlFor="phone" className="text-[11px] text-muted-foreground">
               Phone number
             </Label>
-            <Input
-              id="phone"
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+234 801 234 5678"
-              className="h-9 text-xs bg-input border-border"
-            />
+            <div className="flex items-center gap-2">
+              <Input
+                id="phone"
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                value={phone}
+                onChange={(e) => {
+                  // Allow digits, +, spaces, dashes, parens while typing
+                  const cleaned = e.target.value.replace(/[^\d+\s\-()]/g, "");
+                  setPhone(cleaned);
+                }}
+                placeholder="+234 801 234 5678"
+                className="h-9 text-xs bg-input border-border flex-1"
+              />
+              {phone && (
+                <button
+                  type="button"
+                  onClick={() => setPhone("")}
+                  className="text-[10px] text-muted-foreground hover:text-foreground px-2 h-9"
+                  aria-label="Clear phone"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
             <p className="text-[10px] text-muted-foreground">
               Required so friends can find you when they sync their contacts.
               {phone && toE164(phone) && (
