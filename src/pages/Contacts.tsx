@@ -616,45 +616,14 @@ export default function Contacts() {
               {filteredInvite.map((c) => {
                 const isManual = c.phone && loadManualContacts().some((m) => m.phones[0] === c.phone);
                 return (
-                  <div
+                  <InviteRow
                     key={c.phone}
-                    className="flex items-center gap-3 px-2 py-2.5 rounded-lg hover:bg-secondary"
-                  >
-                    <Avatar className="w-10 h-10">
-                      <AvatarFallback className="bg-muted text-muted-foreground text-[11px] font-semibold">
-                        {initials(c.name)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-foreground truncate">
-                        {c.name}
-                      </p>
-                      <p className="text-[10px] text-muted-foreground truncate">
-                        {formatDisplay(c.phone)}
-                      </p>
-                    </div>
-                    {isManual && (
-                      <button
-                        aria-label="Remove"
-                        onClick={() => handleRemoveManual(c.phone)}
-                        className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-background"
-                      >
-                        <X className="w-3.5 h-3.5 text-muted-foreground" />
-                      </button>
-                    )}
-                    <Button
-                      onClick={() => inviteContact(c)}
-                      variant={c.invited ? "outline" : "default"}
-                      className={
-                        c.invited
-                          ? "h-9 px-3 rounded-lg text-[11px] border-border"
-                          : "h-9 px-3 bg-accent hover:bg-accent/90 text-accent-foreground rounded-lg text-[11px]"
-                      }
-                    >
-                      <Send className="w-3.5 h-3.5" />
-                      {c.invited ? "Re-invite" : "Invite"}
-                    </Button>
-                  </div>
+                    c={c}
+                    isManual={!!isManual}
+                    onInvite={() => inviteContact(c)}
+                    onRemove={() => handleRemoveManual(c.phone)}
+                    onLongPress={() => openInviteActions(c)}
+                  />
                 );
               })}
             </TabsContent>
