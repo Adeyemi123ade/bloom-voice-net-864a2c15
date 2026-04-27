@@ -680,13 +680,6 @@ export default function Contacts() {
           </DialogContent>
         </Dialog>
       </div>
-    </MobileFrame>
-  );
-}
-
-          </DialogContent>
-        </Dialog>
-      </div>
       <Dialpad open={dialOpen} onOpenChange={setDialOpen} />
       <ContactActionSheet
         open={!!actionSheet}
@@ -709,6 +702,15 @@ export default function Contacts() {
         />
       )}
     </MobileFrame>
+  );
+}
+
+function EmptyState({ title, hint }: { title: string; hint: string }) {
+  return (
+    <div className="text-center py-10 px-4">
+      <p className="text-xs font-semibold text-foreground">{title}</p>
+      <p className="text-[11px] text-muted-foreground mt-1">{hint}</p>
+    </div>
   );
 }
 
