@@ -11,6 +11,7 @@ public class CallForegroundService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        CallNotificationHelper.createChannel(this);
         Notification n = new NotificationCompat.Builder(this, CallNotificationHelper.CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_call)
             .setContentTitle("ChiChat call in progress")
