@@ -119,11 +119,15 @@ export default function OutboundCall() {
       tickRef.current = null;
     }
     try {
+      callRef.current?.removeAllListeners?.();
       callRef.current?.disconnect();
     } catch {
       /* ignore */
     }
     try {
+      deviceRef.current?.removeAllListeners?.();
+      deviceRef.current?.disconnect?.();
+      deviceRef.current?.unregister?.();
       deviceRef.current?.destroy();
     } catch {
       /* ignore */
@@ -133,20 +137,20 @@ export default function OutboundCall() {
   };
 
   const endLocally = (s: Status) => {
+    if (endedRef.current) return;
+    endedRef.current = true;
     cleanup();
     setStatus(s);
+    if (s === "failed" && seconds < 3 && errorMsg == null) {
+      setErrorMsg("Call dropped — if you're on a Twilio trial, consider upgrading for longer calls.");
+    }
     if (s === "ended" && !isKnown && e164) {
-      // Offer to save unknown number
+      // Offer to save unknown number — explicit user action only.
       setTimeout(() => setAskSave(true), 400);
     }
   };
 
   const hangUp = () => {
-    try {
-      callRef.current?.disconnect();
-    } catch {
-      /* ignore */
-    }
     endLocally("ended");
   };
 
