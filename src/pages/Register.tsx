@@ -70,13 +70,17 @@ export default function Register() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const result = registerSchema.safeParse({ name, email, password });
+    const result = registerSchema.safeParse({ name, email, phone, password });
     const fieldErrors: FormErrors & { confirmPassword?: string } = {};
     if (!result.success) {
       result.error.issues.forEach((issue) => {
         const key = issue.path[0] as keyof FormErrors;
         if (!fieldErrors[key]) fieldErrors[key] = issue.message;
       });
+    }
+    const e164 = result.success ? toE164(result.data.phone) : null;
+    if (result.success && !e164) {
+      fieldErrors.phone = "Enter a valid phone number with country code (e.g. +234...)";
     }
     if (password !== confirmPassword) {
       fieldErrors.confirmPassword = "Passwords don't match";
@@ -87,16 +91,16 @@ export default function Register() {
     }
     setErrors({});
     setSubmitting(true);
-    const { error } = await supabase.auth.signUp({
+    const { data: signUpData, error } = await supabase.auth.signUp({
       email: result.data!.email,
       password: result.data!.password,
       options: {
-        data: { full_name: result.data!.name },
+        data: { full_name: result.data!.name, phone: e164 },
         emailRedirectTo: `${window.location.origin}/welcome`,
       },
     });
-    setSubmitting(false);
     if (error) {
+      setSubmitting(false);
       toast({
         title: "Sign up failed",
         description: error.message,
@@ -104,6 +108,19 @@ export default function Register() {
       });
       return;
     }
+    // Save phone to profile (handle_new_user trigger created the row)
+    if (signUpData.user?.id && e164) {
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .update({ phone: e164 })
+        .eq("id", signUpData.user.id);
+      if (profileError && profileError.code === "23505") {
+        setSubmitting(false);
+        setErrors({ phone: "This phone number is already registered" });
+        return;
+      }
+    }
+    setSubmitting(false);
     toast({ title: "Account created", description: "Welcome to Chichat!" });
     navigate("/welcome", { state: { name: result.data!.name, email: result.data!.email } });
   };
