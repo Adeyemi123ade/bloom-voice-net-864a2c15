@@ -39,10 +39,13 @@ function buildPreview(content: string | null, senderId: string | null, myId: str
     const [type, kind] = (body ?? "").split("|");
     const isVideo = type === "video";
     const outgoing = senderId === myId;
-    const missed = kind === "missed" || kind === "no_answer";
-    let label = isVideo ? "Video call" : "Voice call";
-    if (missed) label = isVideo ? "Missed video call" : "Missed voice call";
-    else if (kind === "rejected" || kind === "declined") label = "Call rejected";
+    const missed = (kind === "missed" || kind === "no_answer") && !outgoing;
+    let label: string;
+    if (missed) {
+      label = isVideo ? "Missed video call" : "Missed voice call";
+    } else {
+      label = isVideo ? "Video call" : "Voice call";
+    }
     return { kind: "call", text: label, callType: isVideo ? "video" : "voice", callKind: kind, missed, outgoing };
   }
   if (content.startsWith(VOICE_PREFIX)) return { kind: "voice", text: "Voice note" };
