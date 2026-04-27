@@ -262,12 +262,12 @@ function CallSystemBubble({
       </div>
       {/* Right: 2 lines — label + subtitle, with time bottom-right */}
       <div className="flex-1 min-w-0">
-        <div className={`text-[13px] font-semibold truncate ${isMissed ? "text-destructive" : ""}`}>
+        <div className={`text-[13px] font-semibold leading-snug break-words ${isMissed ? "text-destructive" : ""}`}>
           {label}
         </div>
         <div className="flex items-end justify-between gap-2 mt-0.5">
-          <span className="text-[11px] text-muted-foreground truncate">{subtitle}</span>
-          <span className="text-[10px] text-muted-foreground shrink-0">
+          <span className="text-[11px] text-muted-foreground break-words">{subtitle}</span>
+          <span className="text-[10px] text-muted-foreground shrink-0 whitespace-nowrap">
             {formatTime(m.created_at)}
           </span>
         </div>
