@@ -14,6 +14,7 @@ import Home from "./pages/Home.tsx";
 import ChatRoom from "./pages/ChatRoom.tsx";
 import CallScreen from "./pages/CallScreen.tsx";
 import Calls from "./pages/Calls.tsx";
+import Contacts from "./pages/Contacts.tsx";
 import Profile from "./pages/Profile.tsx";
 import Settings from "./pages/Settings.tsx";
 import PhoneSettings from "./pages/PhoneSettings.tsx";
@@ -43,6 +44,7 @@ const App = () => (
               <Route path="/chat/:id" element={<ChatRoom />} />
               <Route path="/call/:id" element={<CallScreen />} />
               <Route path="/calls" element={<Calls />} />
+              <Route path="/contacts" element={<Contacts />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/settings/phone" element={<PhoneSettings />} />
