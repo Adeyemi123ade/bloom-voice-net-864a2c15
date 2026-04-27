@@ -74,7 +74,7 @@ public class CallNotificationHelper {
         wakeBriefly(context, callId);
         try {
             Bundle opts = new Bundle();
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            if (Build.VERSION.SDK_INT >= 34) {
                 opts.putInt("android.pendingIntent.backgroundActivityStartMode", 1);
             }
             fullScreenPi.send(context, 0, null, null, null, null, opts);
