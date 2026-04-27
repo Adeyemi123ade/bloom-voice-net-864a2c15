@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      call_stats: {
+        Row: {
+          call_count: number
+          callee_id: string
+          caller_id: string
+          last_called_at: string
+        }
+        Insert: {
+          call_count?: number
+          callee_id: string
+          caller_id: string
+          last_called_at?: string
+        }
+        Update: {
+          call_count?: number
+          callee_id?: string
+          caller_id?: string
+          last_called_at?: string
+        }
+        Relationships: []
+      }
       calls: {
         Row: {
           call_type: string
@@ -97,6 +118,30 @@ export type Database = {
         }
         Relationships: []
       }
+      invites: {
+        Row: {
+          contact_name: string | null
+          id: string
+          invited_at: string
+          inviter_id: string
+          phone: string
+        }
+        Insert: {
+          contact_name?: string | null
+          id?: string
+          invited_at?: string
+          inviter_id: string
+          phone: string
+        }
+        Update: {
+          contact_name?: string | null
+          id?: string
+          invited_at?: string
+          inviter_id?: string
+          phone?: string
+        }
+        Relationships: []
+      }
       messages: {
         Row: {
           content: string
@@ -146,6 +191,7 @@ export type Database = {
           id: string
           is_online: boolean
           last_seen_at: string
+          phone: string | null
           show_last_seen: boolean
           updated_at: string
         }
@@ -156,6 +202,7 @@ export type Database = {
           id: string
           is_online?: boolean
           last_seen_at?: string
+          phone?: string | null
           show_last_seen?: boolean
           updated_at?: string
         }
@@ -166,6 +213,7 @@ export type Database = {
           id?: string
           is_online?: boolean
           last_seen_at?: string
+          phone?: string | null
           show_last_seen?: boolean
           updated_at?: string
         }
@@ -197,6 +245,15 @@ export type Database = {
       is_conversation_participant: {
         Args: { _conversation_id: string; _user_id: string }
         Returns: boolean
+      }
+      match_contacts_by_phone: {
+        Args: { _phones: string[] }
+        Returns: {
+          avatar_url: string
+          display_name: string
+          phone: string
+          user_id: string
+        }[]
       }
       start_direct_conversation: {
         Args: { _other_user: string }
