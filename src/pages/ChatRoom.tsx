@@ -552,6 +552,16 @@ export default function ChatRoom() {
       toast({ title: "Could not start call", description: error.message, variant: "destructive" });
       return;
     }
+    // Fire-and-forget high-priority FCM push so the callee's Android device
+    // wakes up and rings even if the app is backgrounded or screen is off.
+    void supabase.functions.invoke("send-call-push", {
+      body: {
+        calleeId: other.id,
+        callId: data.id,
+        callType: type,
+        callerName: profiles[user.id]?.display_name ?? "Someone",
+      },
+    }).catch((e) => console.warn("[call-push] failed", e));
     navigate(`/call/${conversationId}?type=${type}&callId=${data.id}&room=${encodeURIComponent(roomName)}&role=caller`, { replace: true });
   };
 
