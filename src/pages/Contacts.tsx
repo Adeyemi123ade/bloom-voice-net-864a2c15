@@ -2,12 +2,15 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
+  Edit3,
+  Grid3x3,
   Loader2,
   Phone,
   RefreshCw,
   Search,
   Send,
   Smartphone,
+  Trash2,
   UserPlus,
   Users,
   X,
@@ -40,6 +43,10 @@ import {
   removeManualContact,
   saveCachedContacts,
 } from "@/lib/deviceContacts";
+import Dialpad from "@/components/Dialpad";
+import ContactActionSheet, { ContactAction } from "@/components/ContactActionSheet";
+import SaveContactDialog from "@/components/SaveContactDialog";
+import { useLongPress } from "@/hooks/useLongPress";
 
 interface MatchedUser {
   phone: string;
@@ -102,6 +109,13 @@ export default function Contacts() {
   const [addName, setAddName] = useState("");
   const [addPhone, setAddPhone] = useState("");
   const [missingOwnPhone, setMissingOwnPhone] = useState(false);
+  const [dialOpen, setDialOpen] = useState(false);
+  const [actionSheet, setActionSheet] = useState<{
+    title: string;
+    subtitle?: string;
+    actions: ContactAction[];
+  } | null>(null);
+  const [editTarget, setEditTarget] = useState<{ phone: string } | null>(null);
 
   useEffect(() => {
     document.title = "Contacts — Chichat";
@@ -376,9 +390,67 @@ export default function Contacts() {
     setInvitedPhones((prev) => new Set(prev).add(c.phone));
   };
 
+  const openActiveActions = (c: ActiveContact) => {
+    setActionSheet({
+      title: c.display_name,
+      subtitle: formatDisplay(c.phone),
+      actions: [
+        { label: "Call (in-app)", icon: Phone, onClick: () => callActive(c) },
+        {
+          label: "Edit name",
+          icon: Edit3,
+          onClick: () => setEditTarget({ phone: c.phone }),
+        },
+        {
+          label: "Remove from my contacts",
+          icon: Trash2,
+          destructive: true,
+          onClick: () => handleRemoveManual(c.phone),
+        },
+      ],
+    });
+  };
+
+  const openInviteActions = (c: InviteContact) => {
+    setActionSheet({
+      title: c.name,
+      subtitle: formatDisplay(c.phone),
+      actions: [
+        {
+          label: "Call this number",
+          icon: Phone,
+          onClick: () => navigate(`/dial/${encodeURIComponent(c.phone)}`),
+        },
+        {
+          label: c.invited ? "Re-invite to ChiChat" : "Invite to ChiChat",
+          icon: Send,
+          onClick: () => inviteContact(c),
+        },
+        {
+          label: "Edit name",
+          icon: Edit3,
+          onClick: () => setEditTarget({ phone: c.phone }),
+        },
+        {
+          label: "Remove from my contacts",
+          icon: Trash2,
+          destructive: true,
+          onClick: () => handleRemoveManual(c.phone),
+        },
+      ],
+    });
+  };
+
   return (
     <MobileFrame>
-      <div className="h-full w-full flex flex-col bg-background">
+      <div className="h-full w-full flex flex-col bg-background relative">
+        <button
+          aria-label="Open dialer"
+          onClick={() => setDialOpen(true)}
+          className="absolute bottom-4 right-4 z-20 w-14 h-14 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg flex items-center justify-center"
+        >
+          <Grid3x3 className="w-6 h-6" />
+        </button>
         {/* Header */}
         <div className="px-3 pt-4 pb-3 border-b border-border flex items-center gap-2">
           <button
@@ -521,43 +593,12 @@ export default function Contacts() {
                 />
               )}
               {filteredActive.map((c) => (
-                <div
+                <ActiveRow
                   key={c.user_id}
-                  className="flex items-center gap-3 px-2 py-2.5 rounded-lg hover:bg-secondary"
-                >
-                  <Avatar className="w-10 h-10">
-                    <AvatarImage src={c.avatar_url ?? undefined} />
-                    <AvatarFallback className="bg-primary/20 text-foreground text-[11px] font-semibold">
-                      {initials(c.display_name)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <p className="text-xs font-semibold text-foreground truncate">
-                        {c.display_name}
-                      </p>
-                      {c.call_count >= 3 && (
-                        <Badge
-                          variant="secondary"
-                          className="h-4 px-1.5 text-[9px] font-semibold"
-                        >
-                          Frequent · {c.call_count}
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-[10px] text-muted-foreground truncate">
-                      {formatDisplay(c.phone)}
-                    </p>
-                  </div>
-                  <Button
-                    onClick={() => callActive(c)}
-                    aria-label={`Call ${c.display_name}`}
-                    className="h-9 px-3 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-[11px]"
-                  >
-                    <Phone className="w-3.5 h-3.5" />
-                    Call
-                  </Button>
-                </div>
+                  c={c}
+                  onCall={() => callActive(c)}
+                  onLongPress={() => openActiveActions(c)}
+                />
               ))}
             </TabsContent>
 
@@ -582,45 +623,14 @@ export default function Contacts() {
               {filteredInvite.map((c) => {
                 const isManual = c.phone && loadManualContacts().some((m) => m.phones[0] === c.phone);
                 return (
-                  <div
+                  <InviteRow
                     key={c.phone}
-                    className="flex items-center gap-3 px-2 py-2.5 rounded-lg hover:bg-secondary"
-                  >
-                    <Avatar className="w-10 h-10">
-                      <AvatarFallback className="bg-muted text-muted-foreground text-[11px] font-semibold">
-                        {initials(c.name)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-foreground truncate">
-                        {c.name}
-                      </p>
-                      <p className="text-[10px] text-muted-foreground truncate">
-                        {formatDisplay(c.phone)}
-                      </p>
-                    </div>
-                    {isManual && (
-                      <button
-                        aria-label="Remove"
-                        onClick={() => handleRemoveManual(c.phone)}
-                        className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-background"
-                      >
-                        <X className="w-3.5 h-3.5 text-muted-foreground" />
-                      </button>
-                    )}
-                    <Button
-                      onClick={() => inviteContact(c)}
-                      variant={c.invited ? "outline" : "default"}
-                      className={
-                        c.invited
-                          ? "h-9 px-3 rounded-lg text-[11px] border-border"
-                          : "h-9 px-3 bg-accent hover:bg-accent/90 text-accent-foreground rounded-lg text-[11px]"
-                      }
-                    >
-                      <Send className="w-3.5 h-3.5" />
-                      {c.invited ? "Re-invite" : "Invite"}
-                    </Button>
-                  </div>
+                    c={c}
+                    isManual={!!isManual}
+                    onInvite={() => inviteContact(c)}
+                    onRemove={() => handleRemoveManual(c.phone)}
+                    onLongPress={() => openInviteActions(c)}
+                  />
                 );
               })}
             </TabsContent>
@@ -670,6 +680,27 @@ export default function Contacts() {
           </DialogContent>
         </Dialog>
       </div>
+      <Dialpad open={dialOpen} onOpenChange={setDialOpen} />
+      <ContactActionSheet
+        open={!!actionSheet}
+        onOpenChange={(o) => !o && setActionSheet(null)}
+        title={actionSheet?.title ?? ""}
+        subtitle={actionSheet?.subtitle}
+        actions={actionSheet?.actions ?? []}
+      />
+      {editTarget && (
+        <SaveContactDialog
+          open={!!editTarget}
+          onOpenChange={(o) => !o && setEditTarget(null)}
+          phoneE164={editTarget.phone}
+          onSaved={() => {
+            const cached = loadCachedContacts() ?? [];
+            const manual = loadManualContacts();
+            setContacts(mergeContacts(cached, manual));
+            setEditTarget(null);
+          }}
+        />
+      )}
     </MobileFrame>
   );
 }
@@ -679,6 +710,109 @@ function EmptyState({ title, hint }: { title: string; hint: string }) {
     <div className="text-center py-10 px-4">
       <p className="text-xs font-semibold text-foreground">{title}</p>
       <p className="text-[11px] text-muted-foreground mt-1">{hint}</p>
+    </div>
+  );
+}
+
+function ActiveRow({
+  c,
+  onCall,
+  onLongPress,
+}: {
+  c: ActiveContact;
+  onCall: () => void;
+  onLongPress: () => void;
+}) {
+  const lp = useLongPress(onLongPress);
+  return (
+    <div
+      {...lp}
+      className="flex items-center gap-3 px-2 py-2.5 rounded-lg hover:bg-secondary select-none"
+    >
+      <Avatar className="w-10 h-10">
+        <AvatarImage src={c.avatar_url ?? undefined} />
+        <AvatarFallback className="bg-primary/20 text-foreground text-[11px] font-semibold">
+          {initials(c.display_name)}
+        </AvatarFallback>
+      </Avatar>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5">
+          <p className="text-xs font-semibold text-foreground truncate">
+            {c.display_name}
+          </p>
+          {c.call_count >= 3 && (
+            <Badge variant="secondary" className="h-4 px-1.5 text-[9px] font-semibold">
+              Frequent · {c.call_count}
+            </Badge>
+          )}
+        </div>
+        <p className="text-[10px] text-muted-foreground truncate">
+          {formatDisplay(c.phone)}
+        </p>
+      </div>
+      <Button
+        onClick={onCall}
+        aria-label={`Call ${c.display_name}`}
+        className="h-9 px-3 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-[11px]"
+      >
+        <Phone className="w-3.5 h-3.5" />
+        Call
+      </Button>
+    </div>
+  );
+}
+
+function InviteRow({
+  c,
+  isManual,
+  onInvite,
+  onRemove,
+  onLongPress,
+}: {
+  c: InviteContact;
+  isManual: boolean;
+  onInvite: () => void;
+  onRemove: () => void;
+  onLongPress: () => void;
+}) {
+  const lp = useLongPress(onLongPress);
+  return (
+    <div
+      {...lp}
+      className="flex items-center gap-3 px-2 py-2.5 rounded-lg hover:bg-secondary select-none"
+    >
+      <Avatar className="w-10 h-10">
+        <AvatarFallback className="bg-muted text-muted-foreground text-[11px] font-semibold">
+          {initials(c.name)}
+        </AvatarFallback>
+      </Avatar>
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-semibold text-foreground truncate">{c.name}</p>
+        <p className="text-[10px] text-muted-foreground truncate">
+          {formatDisplay(c.phone)}
+        </p>
+      </div>
+      {isManual && (
+        <button
+          aria-label="Remove"
+          onClick={onRemove}
+          className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-background"
+        >
+          <X className="w-3.5 h-3.5 text-muted-foreground" />
+        </button>
+      )}
+      <Button
+        onClick={onInvite}
+        variant={c.invited ? "outline" : "default"}
+        className={
+          c.invited
+            ? "h-9 px-3 rounded-lg text-[11px] border-border"
+            : "h-9 px-3 bg-accent hover:bg-accent/90 text-accent-foreground rounded-lg text-[11px]"
+        }
+      >
+        <Send className="w-3.5 h-3.5" />
+        {c.invited ? "Re-invite" : "Invite"}
+      </Button>
     </div>
   );
 }

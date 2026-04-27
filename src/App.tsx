@@ -20,6 +20,7 @@ import Settings from "./pages/Settings.tsx";
 import PhoneSettings from "./pages/PhoneSettings.tsx";
 import ForgotPassword from "./pages/ForgotPassword.tsx";
 import ResetPassword from "./pages/ResetPassword.tsx";
+import OutboundCall from "./pages/OutboundCall.tsx";
 import MessageNotifier from "./components/MessageNotifier.tsx";
 import IncomingCallScreen from "./components/IncomingCallScreen.tsx";
 
@@ -50,6 +51,7 @@ const App = () => (
               <Route path="/settings/phone" element={<PhoneSettings />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/dial/:number" element={<OutboundCall />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
