@@ -39,28 +39,18 @@ export async function hasNewChangesSinceBackup(
   lastBackupAt: string | null,
 ): Promise<boolean> {
   if (!lastBackupAt) return true;
-  // Find conversations the user participates in.
   const { data: parts } = await supabase
     .from("conversation_participants")
     .select("conversation_id")
     .eq("user_id", userId);
   const ids = (parts ?? []).map((p) => p.conversation_id);
   if (ids.length === 0) return false;
-  const { data, error } = await supabase
+  const { count, error } = await supabase
     .from("messages")
-    .select("id", { head: true, count: "exact" })
-    .in("conversation_id", ids)
-    .gt("created_at", lastBackupAt)
-    .limit(1);
-  if (error) return true; // err on the side of trying
-  // When head:true, supabase returns count via the response object — fall back
-  // to a non-head check if needed.
-  if (data && Array.isArray(data) && data.length > 0) return true;
-  const { count } = await supabase
-    .from("messages")
-    .select("id", { head: true, count: "exact" })
+    .select("id", { count: "exact", head: true })
     .in("conversation_id", ids)
     .gt("created_at", lastBackupAt);
+  if (error) return true; // err on the side of trying
   return (count ?? 0) > 0;
 }
 
