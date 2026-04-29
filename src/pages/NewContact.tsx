@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Camera, User } from "lucide-react";
 import {
@@ -6,11 +6,13 @@ import {
   getDefaultContactAvatar,
 } from "@/lib/deviceContacts";
 import { saveDeviceContact } from "@/lib/saveDeviceContact";
-import { toE164 } from "@/lib/phone";
 import { toast } from "@/hooks/use-toast";
 import { syncGoogleContacts, startGoogleContactsConnect } from "@/lib/googleContacts";
 import { supabase } from "@/integrations/supabase/client";
 import MobileFrame from "@/components/MobileFrame";
+import CountryPicker from "@/components/CountryPicker";
+import { allCountries, findByDialPrefix, type CountryEntry } from "@/lib/countries";
+import { parsePhoneNumberFromString, type CountryCode } from "libphonenumber-js";
 
 async function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -25,15 +27,66 @@ export default function NewContact() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const [name, setName] = useState("");
-  const [phone, setPhone] = useState(params.get("phone") ?? "+971 ");
+  const initialPhone = params.get("phone") ?? "";
+  const [country, setCountry] = useState<CountryEntry | null>(null);
+  const [phoneLocal, setPhoneLocal] = useState("");
   const [avatar, setAvatar] = useState<string | null>(null);
   const [busy, setBusy] = useState<"google" | "phone" | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Pre-fill default avatar set in Settings
+  // Pre-fill default avatar + sensible default country (from prefilled number, then saved profile, then locale)
   useEffect(() => {
     setAvatar(getDefaultContactAvatar());
+    (async () => {
+      // 1. From URL prefill
+      if (initialPhone.startsWith("+")) {
+        const hit = findByDialPrefix(initialPhone);
+        if (hit) {
+          setCountry(hit);
+          setPhoneLocal(initialPhone.slice(1 + hit.dial.length).trim());
+          return;
+        }
+      }
+      // 2. From signed-in user's saved profile phone
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data } = await supabase
+            .from("profiles")
+            .select("phone")
+            .eq("id", user.id)
+            .maybeSingle();
+          const myPhone = (data as { phone?: string | null } | null)?.phone;
+          if (myPhone) {
+            const hit = findByDialPrefix(myPhone);
+            if (hit) {
+              setCountry(hit);
+              return;
+            }
+          }
+        }
+      } catch { /* ignore */ }
+      // 3. From browser locale
+      try {
+        const loc = (navigator.languages?.[0] ?? navigator.language ?? "").split("-")[1]?.toUpperCase();
+        const all = allCountries();
+        const hit = all.find((c) => c.code === loc) ?? all.find((c) => c.code === "US");
+        if (hit) setCountry(hit);
+      } catch { /* ignore */ }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const e164 = useMemo(() => {
+    if (!country) return null;
+    const digits = phoneLocal.replace(/[^\d]/g, "");
+    if (!digits) return null;
+    try {
+      const p = parsePhoneNumberFromString(digits, country.code as CountryCode);
+      if (p?.isValid()) return p.number;
+    } catch { /* ignore */ }
+    return null;
+  }, [country, phoneLocal]);
 
   const onPickImage = () => fileRef.current?.click();
 
@@ -60,11 +113,14 @@ export default function NewContact() {
       toast({ title: "Name required", variant: "destructive" });
       return null;
     }
-    const e164 = toE164(phone);
+    if (!country) {
+      toast({ title: "Select a country", variant: "destructive" });
+      return null;
+    }
     if (!e164) {
       toast({
         title: "Invalid phone number",
-        description: "Use international format like +971 50 123 4567.",
+        description: `Enter a valid number for ${country.name}.`,
         variant: "destructive",
       });
       return null;
@@ -193,14 +249,20 @@ export default function NewContact() {
               <label className="text-[11px] font-semibold tracking-[0.15em] text-muted-foreground">
                 PHONE NUMBER
               </label>
-              <input
-                type="tel"
-                inputMode="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="+971 ..."
-                className="w-full h-12 px-4 rounded-xl bg-secondary/40 border border-border/40 text-sm placeholder:text-muted-foreground/70 focus:outline-none focus:border-primary/50"
-              />
+              <div className="flex gap-2">
+                <CountryPicker value={country?.code ?? null} onChange={setCountry} />
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  value={phoneLocal}
+                  onChange={(e) => setPhoneLocal(e.target.value)}
+                  placeholder="Phone number"
+                  className="flex-1 min-w-0 h-12 px-4 rounded-xl bg-secondary/40 border border-border/40 text-sm placeholder:text-muted-foreground/70 focus:outline-none focus:border-primary/50"
+                />
+              </div>
+              {e164 && (
+                <p className="text-[10px] text-muted-foreground pl-1">Will save as {e164}</p>
+              )}
             </div>
 
             <div className="space-y-3 pt-2">

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, MessageSquarePlus, Settings as SettingsIcon, UserCircle2, Phone, PhoneIncoming, PhoneOutgoing, PhoneMissed, Video, Mic, Paperclip, Users } from "lucide-react";
+import { Search, MessageSquarePlus, Settings as SettingsIcon, Phone, PhoneIncoming, PhoneOutgoing, PhoneMissed, Video, Mic, Paperclip, Users } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -152,29 +152,7 @@ export default function Home() {
     import("@/lib/chatBackup").then((m) => m.maybeRunDailyBackup());
   }, [user]);
 
-  // Offer restore on first sign-in if a backup exists
-  useEffect(() => {
-    if (!user) return;
-    const askedKey = `chichat:restore-asked:${user.id}`;
-    if (localStorage.getItem(askedKey)) return;
-    (async () => {
-      const { getMyBackup, runRestore } = await import("@/lib/chatBackup");
-      const row = await getMyBackup();
-      if (!row || row.message_count === 0) return;
-      localStorage.setItem(askedKey, "1");
-      const ok = window.confirm(
-        `We found a backup from ${new Date(row.last_backup_at).toLocaleString()} ` +
-          `(${row.message_count} messages). Restore now?`,
-      );
-      if (!ok) return;
-      try {
-        const r = await runRestore();
-        toast({ title: "Restored", description: `${r.restored} messages restored.` });
-      } catch (e) {
-        toast({ title: "Restore failed", description: String(e), variant: "destructive" });
-      }
-    })();
-  }, [user]);
+  // Note: backup-restore prompt removed — restore is now manual from Settings.
 
   // Mark online + heartbeat
   useEffect(() => {
@@ -405,13 +383,6 @@ export default function Home() {
               className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
             >
               <Phone className="w-4 h-4 text-foreground" />
-            </button>
-            <button
-              aria-label="Profile"
-              onClick={() => navigate("/profile")}
-              className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
-            >
-              <UserCircle2 className="w-4 h-4 text-foreground" />
             </button>
             <button
               aria-label="Settings"
