@@ -17,6 +17,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { FILE_PREFIX, parseFileMessage } from "@/components/chat/AttachmentBubble";
+import Dialpad from "@/components/Dialpad";
 
 const VOICE_PREFIX = "[voice]";
 const CALL_PREFIX = "[call]";
@@ -134,6 +135,7 @@ export default function Home() {
   const [query, setQuery] = useState("");
   const [people, setPeople] = useState<Profile[]>([]);
   const [openNew, setOpenNew] = useState(false);
+  const [dialpadOpen, setDialpadOpen] = useState(false);
   const [fetching, setFetching] = useState(true);
 
   useEffect(() => {
@@ -392,14 +394,14 @@ export default function Home() {
             </Dialog>
             <button
               aria-label="Contacts"
-              onClick={() => navigate("/contacts")}
+              onClick={() => setDialpadOpen(true)}
               className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
             >
               <Users className="w-4 h-4 text-foreground" />
             </button>
             <button
-              aria-label="Calls"
-              onClick={() => navigate("/calls")}
+              aria-label="Dialpad"
+              onClick={() => setDialpadOpen(true)}
               className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
             >
               <Phone className="w-4 h-4 text-foreground" />
@@ -513,6 +515,7 @@ export default function Home() {
           })}
         </div>
       </div>
+      <Dialpad open={dialpadOpen} onOpenChange={setDialpadOpen} />
     </MobileFrame>
   );
 }
