@@ -286,15 +286,14 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
               placeholder="Enter number"
               className="w-full h-10 text-2xl font-light tracking-wide text-center bg-transparent border-0 focus:outline-none placeholder:text-muted-foreground/60"
             />
-            {value && (
-              <button
-                aria-label="Backspace"
-                onClick={backspace}
-                className="absolute right-1 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full hover:bg-secondary flex items-center justify-center"
-              >
-                <Delete className="w-4 h-4 text-muted-foreground" />
-              </button>
-            )}
+            <button
+              aria-label="Backspace"
+              onClick={backspace}
+              disabled={!value}
+              className="absolute right-1 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full hover:bg-secondary flex items-center justify-center disabled:opacity-30"
+            >
+              <Delete className="w-4 h-4 text-muted-foreground" />
+            </button>
           </div>
 
           {/* Live formatted preview */}
