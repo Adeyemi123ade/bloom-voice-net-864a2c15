@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { Phone, Delete, UserPlus, Search } from "lucide-react";
+import { Phone, Delete, Search, ArrowLeft } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -13,6 +13,7 @@ import {
   loadManualContacts,
   type DeviceContact,
 } from "@/lib/deviceContacts";
+import BottomNav from "@/components/BottomNav";
 
 interface Props {
   open: boolean;
@@ -188,28 +189,22 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
 
   const callTyped = () => placeCall(value);
 
-  const goAddContact = () => {
-    onOpenChange(false);
-    const q = e164Preview ? `?phone=${encodeURIComponent(e164Preview)}` : "";
-    navigate(`/contacts/new${q}`);
-  };
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="max-w-[420px] w-full h-[100dvh] sm:h-[92vh] p-0 gap-0 bg-background top-0 left-1/2 -translate-x-1/2 translate-y-0 rounded-none sm:rounded-2xl border-0 shadow-2xl flex flex-col overflow-hidden"
+        className="max-w-[420px] w-full h-[100dvh] sm:h-[92vh] p-0 gap-0 bg-background top-0 left-1/2 -translate-x-1/2 translate-y-0 rounded-none sm:rounded-2xl border-0 shadow-2xl flex flex-col overflow-hidden pb-[72px] [&>button.absolute]:hidden"
       >
-        <DialogTitle className="sr-only">Dialpad</DialogTitle>
+        <DialogTitle className="sr-only">Call</DialogTitle>
 
-        {/* Header */}
-        <header className="px-5 pt-5 pb-3 flex items-center justify-between shrink-0">
-          <h1 className="text-2xl font-bold text-foreground">Dialpad</h1>
+        {/* Header — back arrow only, no title or add-contact action */}
+        <header className="px-4 pt-4 pb-2 flex items-center shrink-0">
           <button
-            onClick={goAddContact}
-            className="flex items-center gap-1.5 px-3.5 h-10 rounded-xl border border-primary/60 bg-primary/10 hover:bg-primary/15 text-primary text-sm font-semibold transition-colors"
+            type="button"
+            aria-label="Back"
+            onClick={() => onOpenChange(false)}
+            className="w-10 h-10 rounded-full hover:bg-secondary flex items-center justify-center"
           >
-            <UserPlus className="w-4 h-4" />
-            Add Contact
+            <ArrowLeft className="w-5 h-5 text-foreground" />
           </button>
         </header>
 
@@ -341,6 +336,8 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
             </button>
           </div>
         </div>
+        {/* Bottom nav inside dialer — closes overlay on tap, then routes. */}
+        <BottomNav active="calls" onBeforeNavigate={() => onOpenChange(false)} />
       </DialogContent>
     </Dialog>
   );

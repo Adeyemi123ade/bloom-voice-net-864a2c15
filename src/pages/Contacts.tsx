@@ -6,43 +6,34 @@ import {
   Grid3x3,
   Loader2,
   Phone,
-  RefreshCw,
   Search,
   Send,
-  Smartphone,
   Trash2,
-  UserPlus,
   Users,
   X,
 } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { toE164, formatDisplay } from "@/lib/phone";
+import { formatDisplay } from "@/lib/phone";
 import {
   DeviceContact,
-  addManualContact,
   clearContactsCache,
-  isNativePlatform,
   loadCachedContacts,
   loadManualContacts,
-  loadNativeContacts,
   removeManualContact,
-  saveCachedContacts,
 } from "@/lib/deviceContacts";
+import {
+  isGoogleConnected,
+  startGoogleContactsConnect,
+  syncGoogleContacts,
+} from "@/lib/googleContacts";
 import Dialpad from "@/components/Dialpad";
 import ContactActionSheet, { ContactAction } from "@/components/ContactActionSheet";
 import SaveContactDialog from "@/components/SaveContactDialog";
@@ -106,11 +97,10 @@ export default function Contacts() {
   const [showPrivacy, setShowPrivacy] = useState(
     () => !localStorage.getItem(PRIVACY_DISMISSED_KEY),
   );
-  const [addOpen, setAddOpen] = useState(false);
-  const [addName, setAddName] = useState("");
-  const [addPhone, setAddPhone] = useState("");
   const [missingOwnPhone, setMissingOwnPhone] = useState(false);
   const [dialOpen, setDialOpen] = useState(false);
+  const [googleConnected, setGoogleConnected] = useState<boolean | null>(null);
+  const [connectingGoogle, setConnectingGoogle] = useState(false);
   const [actionSheet, setActionSheet] = useState<{
     title: string;
     subtitle?: string;
@@ -126,7 +116,7 @@ export default function Contacts() {
     if (!loading && !user) navigate("/login");
   }, [loading, user, navigate]);
 
-  // Initial load: cached contacts + manual + matching
+  // Initial load: cached contacts + auto-sync from Google when connected.
   useEffect(() => {
     if (!user) return;
     (async () => {
@@ -138,12 +128,34 @@ export default function Contacts() {
         .maybeSingle();
       setMissingOwnPhone(!(me as { phone?: string | null } | null)?.phone);
 
+      // Show whatever is cached immediately
       const cached = loadCachedContacts() ?? [];
       const manual = loadManualContacts();
       const merged = mergeContacts(cached, manual);
       setContacts(merged);
       if (merged.length) await runMatch(merged);
       await loadInvited();
+
+      // Then check Google connection and silently refresh from People API.
+      try {
+        const connected = await isGoogleConnected();
+        setGoogleConnected(connected);
+        if (connected) {
+          setSyncing(true);
+          try {
+            const list = await syncGoogleContacts();
+            const fresh = mergeContacts(list, loadManualContacts());
+            setContacts(fresh);
+            if (fresh.length) await runMatch(fresh);
+          } catch {
+            // Silent — user can retry from Settings; surfacing errors here would clutter.
+          } finally {
+            setSyncing(false);
+          }
+        }
+      } catch {
+        setGoogleConnected(false);
+      }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
@@ -207,70 +219,33 @@ export default function Contacts() {
     }
   };
 
-  const handleSync = async () => {
+  /** Pull a fresh copy of contacts from the user's Google account. */
+  const refreshFromGoogle = async () => {
     setSyncing(true);
     try {
-      if (isNativePlatform()) {
-        const list = await loadNativeContacts();
-        if (!list.length) {
-          toast({ title: "No contacts found on device" });
-        }
-        const manual = loadManualContacts();
-        const merged = mergeContacts(list, manual);
-        saveCachedContacts(list);
-        setContacts(merged);
-        await runMatch(merged);
-        toast({ title: `Synced ${list.length} contacts` });
-      } else {
-        toast({
-          title: "Device sync runs in the mobile app",
-          description: "On the web you can add contacts manually below.",
-        });
-        setAddOpen(true);
-      }
+      const list = await syncGoogleContacts();
+      const merged = mergeContacts(list, loadManualContacts());
+      setContacts(merged);
+      await runMatch(merged);
+      toast({ title: `Loaded ${list.length} contacts from Google` });
     } catch (err) {
-      const code = err instanceof Error ? err.message : "";
-      if (code === "PERMISSION_DENIED") {
-        toast({
-          title: "Permission denied",
-          description: "Allow contacts access in your phone settings to sync.",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Sync failed",
-          description: code || "Try again.",
-          variant: "destructive",
-        });
-      }
+      const msg = err instanceof Error ? err.message : "Could not load contacts";
+      toast({ title: "Sync failed", description: msg, variant: "destructive" });
     } finally {
       setSyncing(false);
     }
   };
 
-  const handleRefresh = async () => {
-    clearContactsCache();
-    await handleSync();
-  };
-
-  const handleAddManual = () => {
-    const e164 = toE164(addPhone.trim());
-    if (!e164) {
-      toast({
-        title: "Invalid phone number",
-        description: "Use international format like +234 801 234 5678",
-        variant: "destructive",
-      });
-      return;
+  /** Kick off Google OAuth from this screen so the user never hits a dead end. */
+  const connectGoogle = async () => {
+    setConnectingGoogle(true);
+    try {
+      await startGoogleContactsConnect();
+    } catch (err) {
+      setConnectingGoogle(false);
+      const msg = err instanceof Error ? err.message : "Could not start Google sign-in";
+      toast({ title: "Google sign-in failed", description: msg, variant: "destructive" });
     }
-    const updated = addManualContact(addName.trim() || e164, e164);
-    const cached = loadCachedContacts() ?? [];
-    const merged = mergeContacts(cached, updated);
-    setContacts(merged);
-    setAddName("");
-    setAddPhone("");
-    setAddOpen(false);
-    runMatch(merged);
   };
 
   const handleRemoveManual = (e164: string) => {
@@ -481,16 +456,21 @@ export default function Contacts() {
             <ArrowLeft className="w-4 h-4 text-foreground" />
           </button>
           <h1 className="text-sm font-semibold text-foreground flex-1">Contacts</h1>
-          <button
-            aria-label="Refresh"
-            onClick={handleRefresh}
-            disabled={syncing || matching}
-            className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary disabled:opacity-50"
-          >
-            <RefreshCw
-              className={`w-4 h-4 text-foreground ${syncing ? "animate-spin" : ""}`}
-            />
-          </button>
+          {googleConnected && (
+            <button
+              aria-label="Refresh contacts"
+              onClick={refreshFromGoogle}
+              disabled={syncing || matching}
+              className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary disabled:opacity-50"
+            >
+              <Loader2
+                className={`w-4 h-4 text-foreground ${syncing ? "animate-spin" : "hidden"}`}
+              />
+              {!syncing && (
+                <Send className="w-4 h-4 text-foreground rotate-45 opacity-0" />
+              )}
+            </button>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto">
@@ -509,44 +489,39 @@ export default function Contacts() {
             </div>
           )}
 
-          {/* Sync section */}
-          <div className="px-3 pt-3 space-y-2">
-            <Button
-              onClick={handleSync}
-              disabled={syncing}
-              className="w-full h-11 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-xs font-semibold"
-            >
-              {syncing ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Smartphone className="w-4 h-4" />
-              )}
-              {syncing
-                ? "Syncing contacts from your phone…"
-                : isNativePlatform()
-                  ? "Sync contacts"
-                  : "Sync contacts"}
-            </Button>
+          {/* Google connection prompt — only when not yet linked. Always offers a way back. */}
+          {googleConnected === false && (
+            <div className="px-3 pt-3 space-y-2">
+              <div className="p-3 rounded-lg bg-secondary border border-border">
+                <p className="text-sm font-semibold text-foreground">
+                  Connect your Google account
+                </p>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                  We'll show your Google contacts here so you can call friends already on
+                  Chichat or invite the rest with one tap.
+                </p>
+                <Button
+                  onClick={connectGoogle}
+                  disabled={connectingGoogle}
+                  className="mt-3 w-full h-10 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-xs font-semibold"
+                >
+                  {connectingGoogle ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : null}
+                  {connectingGoogle ? "Opening Google…" : "Connect Google"}
+                </Button>
+              </div>
+            </div>
+          )}
 
-            {syncing && (
-              <p className="text-[10.5px] text-muted-foreground text-center">
-                This may take a few seconds.
-              </p>
-            )}
+          {syncing && (
+            <p className="px-3 pt-3 text-xs text-muted-foreground text-center">
+              Loading contacts from Google…
+            </p>
+          )}
 
-            {/* Manual add is a fallback only when device sync isn't available (web). */}
-            {!isNativePlatform() && (
-              <Button
-                onClick={() => setAddOpen(true)}
-                variant="outline"
-                className="w-full h-9 rounded-lg text-xs border-border"
-              >
-                <UserPlus className="w-3.5 h-3.5" />
-                Add a contact manually
-              </Button>
-            )}
-
-            {showPrivacy && (
+          {showPrivacy && googleConnected && (
+            <div className="px-3 pt-3">
               <div className="relative p-3 rounded-lg bg-secondary border border-border">
                 <button
                   aria-label="Dismiss"
@@ -555,14 +530,13 @@ export default function Contacts() {
                 >
                   <X className="w-3 h-3 text-muted-foreground" />
                 </button>
-                <p className="text-[10.5px] text-muted-foreground leading-relaxed pr-5">
-                  We access your contacts only to help you call and invite friends.
-                  We never store your full contact list.
+                <p className="text-xs text-muted-foreground leading-relaxed pr-5">
+                  We use your Google contacts only to find friends already on Chichat
+                  and let you invite the rest. We never share your contact list.
                 </p>
               </div>
-            )}
-          </div>
-
+            </div>
+          )}
           {/* Search */}
           <div className="px-3 pt-3">
             <div className="relative">
@@ -657,48 +631,7 @@ export default function Contacts() {
           </Tabs>
         </div>
 
-        {/* Manual add dialog */}
-        <Dialog open={addOpen} onOpenChange={setAddOpen}>
-          <DialogContent className="max-w-[320px] bg-card border-border">
-            <DialogHeader>
-              <DialogTitle className="text-sm">Add a contact</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="add-name" className="text-xs text-muted-foreground">
-                  Name
-                </Label>
-                <Input
-                  id="add-name"
-                  autoFocus
-                  value={addName}
-                  onChange={(e) => setAddName(e.target.value)}
-                  placeholder="Jane Doe"
-                  className="h-9 text-xs bg-input border-border"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="add-phone" className="text-xs text-muted-foreground">
-                  Phone number
-                </Label>
-                <Input
-                  id="add-phone"
-                  type="tel"
-                  value={addPhone}
-                  onChange={(e) => setAddPhone(e.target.value)}
-                  placeholder="+234 801 234 5678"
-                  className="h-9 text-xs bg-input border-border"
-                />
-              </div>
-              <Button
-                onClick={handleAddManual}
-                className="w-full h-9 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-xs"
-              >
-                Add contact
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        {/* Manual add removed — contacts come from Google. */}
       </div>
       <Dialpad open={dialOpen} onOpenChange={setDialOpen} />
       <ContactActionSheet

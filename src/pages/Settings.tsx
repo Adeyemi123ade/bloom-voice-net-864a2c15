@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   ChevronRight,
@@ -8,8 +8,6 @@ import {
   Cloud,
   Contact2,
   RefreshCw,
-  Camera,
-  ImagePlus,
   Loader2,
 } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
@@ -41,20 +39,7 @@ import {
   hasNewChangesSinceBackup,
   type BackupRow,
 } from "@/lib/chatBackup";
-import {
-  getDefaultContactAvatar,
-  setDefaultContactAvatar,
-  clearContactsCache,
-} from "@/lib/deviceContacts";
-
-async function fileToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => resolve(String(r.result));
-    r.onerror = () => reject(r.error);
-    r.readAsDataURL(file);
-  });
-}
+import { clearContactsCache } from "@/lib/deviceContacts";
 
 function bytesLabel(n: number) {
   if (n < 1024) return `${n} B`;
@@ -79,39 +64,9 @@ export default function Settings() {
   const [restoring, setRestoring] = useState(false);
   const [restoreOpen, setRestoreOpen] = useState(false);
 
-  const [defaultAvatar, setDefaultAvatarState] = useState<string | null>(null);
-  const avatarFileRef = useRef<HTMLInputElement>(null);
-
   useEffect(() => {
     document.title = "Settings — Chichat";
-    setDefaultAvatarState(getDefaultContactAvatar());
   }, []);
-
-  const onPickAvatar = () => avatarFileRef.current?.click();
-
-  const onAvatarFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    if (f.size > 2 * 1024 * 1024) {
-      toast({ title: "Image too large", description: "Pick under 2MB.", variant: "destructive" });
-      return;
-    }
-    try {
-      const url = await fileToDataUrl(f);
-      setDefaultContactAvatar(url);
-      setDefaultAvatarState(url);
-      toast({ title: "Default contact photo updated" });
-    } catch {
-      toast({ title: "Could not load image", variant: "destructive" });
-    } finally {
-      e.target.value = "";
-    }
-  };
-
-  const removeAvatar = () => {
-    setDefaultContactAvatar(null);
-    setDefaultAvatarState(null);
-  };
 
   useEffect(() => {
     if (!loading && !user) navigate("/login");
@@ -288,48 +243,7 @@ export default function Settings() {
             <ChevronRight className="w-5 h-5 text-muted-foreground" />
           </button>
 
-          {/* Default new-contact photo */}
-          <div className="px-3 py-3 rounded-lg bg-secondary/40">
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={onPickAvatar}
-                className="relative w-14 h-14 rounded-xl border-2 border-dashed border-primary/50 bg-primary/10 hover:bg-primary/15 flex items-center justify-center overflow-hidden"
-                aria-label="Choose default contact photo"
-              >
-                {defaultAvatar ? (
-                  <img src={defaultAvatar} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <ImagePlus className="w-6 h-6 text-primary" />
-                )}
-                <span className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
-                  <Camera className="w-3 h-3" />
-                </span>
-              </button>
-              <div className="flex-1 min-w-0">
-                <p className="text-base font-semibold">Default contact photo</p>
-                <p className="text-sm text-muted-foreground truncate">
-                  Used as the avatar when adding a new contact.
-                </p>
-              </div>
-              {defaultAvatar && (
-                <button
-                  type="button"
-                  onClick={removeAvatar}
-                  className="text-xs text-muted-foreground hover:text-destructive px-2 h-8"
-                >
-                  Remove
-                </button>
-              )}
-              <input
-                ref={avatarFileRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={onAvatarFile}
-              />
-            </div>
-          </div>
+          {/* Default contact photo removed — user's profile photo is the single source of truth. */}
 
           {/* Connected accounts — Google */}
           <div className="px-3 py-3 rounded-lg bg-secondary/40">
