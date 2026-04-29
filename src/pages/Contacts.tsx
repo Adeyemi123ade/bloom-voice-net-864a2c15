@@ -116,7 +116,7 @@ export default function Contacts() {
     if (!loading && !user) navigate("/login");
   }, [loading, user, navigate]);
 
-  // Initial load: cached contacts + manual + matching
+  // Initial load: cached contacts + auto-sync from Google when connected.
   useEffect(() => {
     if (!user) return;
     (async () => {
@@ -128,12 +128,34 @@ export default function Contacts() {
         .maybeSingle();
       setMissingOwnPhone(!(me as { phone?: string | null } | null)?.phone);
 
+      // Show whatever is cached immediately
       const cached = loadCachedContacts() ?? [];
       const manual = loadManualContacts();
       const merged = mergeContacts(cached, manual);
       setContacts(merged);
       if (merged.length) await runMatch(merged);
       await loadInvited();
+
+      // Then check Google connection and silently refresh from People API.
+      try {
+        const connected = await isGoogleConnected();
+        setGoogleConnected(connected);
+        if (connected) {
+          setSyncing(true);
+          try {
+            const list = await syncGoogleContacts();
+            const fresh = mergeContacts(list, loadManualContacts());
+            setContacts(fresh);
+            if (fresh.length) await runMatch(fresh);
+          } catch {
+            // Silent — user can retry from Settings; surfacing errors here would clutter.
+          } finally {
+            setSyncing(false);
+          }
+        }
+      } catch {
+        setGoogleConnected(false);
+      }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
