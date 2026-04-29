@@ -195,31 +195,8 @@ export default function SplashScreen({ onGetStarted, onSignIn }: Props) {
 
       <div className="tint" />
 
-      <svg
-        className="frame-svg"
-        viewBox="0 0 390 844"
-        preserveAspectRatio="xMidYMid meet"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <rect
-          className="line-outer"
-          x="28" y="18"
-          width="334" height="764"
-          rx="52" ry="52"
-          fill="none"
-          stroke="rgba(255,255,255,0.28)"
-          strokeWidth="1.2"
-        />
-        <rect
-          className="line-inner"
-          x="40" y="30"
-          width="310" height="740"
-          rx="44" ry="44"
-          fill="none"
-          stroke="rgba(255,255,255,0.14)"
-          strokeWidth="0.9"
-        />
-      </svg>
+      <div className="frame-outer" />
+      <div className="frame-inner" />
 
       <div className="content">
         <div style={{ height: 0 }} />
