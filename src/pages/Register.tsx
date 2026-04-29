@@ -296,11 +296,16 @@ export default function Register() {
                 Sign in
               </Link>
             </p>
-            <p className="text-[9px] text-muted-foreground text-center mt-1.5">
-              By continuing, you agree to our Terms & Privacy Policy.
+            <p className="text-[11px] text-foreground text-center mt-2 font-semibold">
+              By continuing, you agree to our{" "}
+              <Link to="/terms" className="text-primary underline underline-offset-2">
+                Terms &amp; Privacy Policy
+              </Link>
+              .
             </p>
           </div>
         </form>
+        </div>
       </div>
     </MobileFrame>
   );
