@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   ChevronRight,
@@ -8,6 +8,8 @@ import {
   Cloud,
   Contact2,
   RefreshCw,
+  Camera,
+  ImagePlus,
 } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
 import { useAuth } from "@/hooks/useAuth";
@@ -37,6 +39,19 @@ import {
   setAutoBackup,
   type BackupRow,
 } from "@/lib/chatBackup";
+import {
+  getDefaultContactAvatar,
+  setDefaultContactAvatar,
+} from "@/lib/deviceContacts";
+
+async function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(file);
+  });
+}
 
 function bytesLabel(n: number) {
   if (n < 1024) return `${n} B`;
