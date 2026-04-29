@@ -46,19 +46,32 @@ const CSS = `
     rgba(7,9,12,0.97) 100%
   );
 }
-.chichat-splash .frame-svg {
-  position: absolute; inset: 0; z-index: 2;
-  pointer-events: none; width: 100%; height: 100%;
+.chichat-splash .frame-outer,
+.chichat-splash .frame-inner {
+  position: absolute; z-index: 2;
+  pointer-events: none;
+  border-radius: 52px;
 }
-.chichat-splash .line-outer {
-  stroke-dasharray: 2200; stroke-dashoffset: 2200;
-  animation: chichat-draw 2.8s cubic-bezier(0.4,0,0.2,1) 0.2s forwards;
+.chichat-splash .frame-outer {
+  top: max(env(safe-area-inset-top), 18px);
+  bottom: max(env(safe-area-inset-bottom), 18px);
+  left: max(env(safe-area-inset-left), 18px);
+  right: max(env(safe-area-inset-right), 18px);
+  border: 1.2px solid rgba(255,255,255,0.28);
+  opacity: 0;
+  animation: chichat-fadein 1.6s ease 0.2s forwards;
 }
-.chichat-splash .line-inner {
-  stroke-dasharray: 2000; stroke-dashoffset: 2000;
-  animation: chichat-draw 2.8s cubic-bezier(0.4,0,0.2,1) 0.5s forwards;
+.chichat-splash .frame-inner {
+  top: max(env(safe-area-inset-top), 30px);
+  bottom: max(env(safe-area-inset-bottom), 30px);
+  left: max(env(safe-area-inset-left), 30px);
+  right: max(env(safe-area-inset-right), 30px);
+  border-radius: 44px;
+  border: 0.9px solid rgba(255,255,255,0.14);
+  opacity: 0;
+  animation: chichat-fadein 1.6s ease 0.5s forwards;
 }
-@keyframes chichat-draw { to { stroke-dashoffset: 0; } }
+@keyframes chichat-fadein { to { opacity: 1; } }
 .chichat-splash .content {
   position: absolute;
   top: max(env(safe-area-inset-top), 28px);
