@@ -462,7 +462,7 @@ export default function Contacts() {
   };
 
   return (
-    <MobileFrame>
+    <MobileFrame bottomNav="contacts">
       <div className="h-full w-full flex flex-col bg-background relative">
         <button
           aria-label="Open dialer"
