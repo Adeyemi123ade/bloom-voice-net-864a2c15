@@ -462,7 +462,7 @@ export default function Contacts() {
   };
 
   return (
-    <MobileFrame>
+    <MobileFrame bottomNav="contacts">
       <div className="h-full w-full flex flex-col bg-background relative">
         <button
           aria-label="Open dialer"
@@ -496,13 +496,13 @@ export default function Contacts() {
         <div className="flex-1 overflow-y-auto">
           {missingOwnPhone && (
             <div className="mx-3 mt-3 p-3 rounded-lg bg-accent/10 border border-accent/30">
-              <p className="text-[11px] text-foreground">
+              <p className="text-xs text-foreground">
                 Add your phone number on your profile so friends can find you when
                 they sync their contacts.
               </p>
               <Button
                 onClick={() => navigate("/profile")}
-                className="mt-2 h-8 px-3 text-[11px] bg-accent hover:bg-accent/90 text-accent-foreground"
+                className="mt-2 h-8 px-3 text-xs bg-accent hover:bg-accent/90 text-accent-foreground"
               >
                 Add phone number
               </Button>
@@ -539,7 +539,7 @@ export default function Contacts() {
               <Button
                 onClick={() => setAddOpen(true)}
                 variant="outline"
-                className="w-full h-9 rounded-lg text-[11px] border-border"
+                className="w-full h-9 rounded-lg text-xs border-border"
               >
                 <UserPlus className="w-3.5 h-3.5" />
                 Add a contact manually
@@ -579,11 +579,11 @@ export default function Contacts() {
           {/* Tabs */}
           <Tabs defaultValue="active" className="px-3 pt-3 pb-4">
             <TabsList className="grid grid-cols-2 w-full h-9 bg-secondary">
-              <TabsTrigger value="active" className="text-[11px]">
+              <TabsTrigger value="active" className="text-xs">
                 <Users className="w-3.5 h-3.5 mr-1" />
                 Active ({active.length})
               </TabsTrigger>
-              <TabsTrigger value="invite" className="text-[11px]">
+              <TabsTrigger value="invite" className="text-xs">
                 <Send className="w-3.5 h-3.5 mr-1" />
                 Invite ({invite.length})
               </TabsTrigger>
@@ -592,7 +592,7 @@ export default function Contacts() {
             {/* Active tab */}
             <TabsContent value="active" className="mt-3 space-y-1">
               {matching && (
-                <p className="text-[11px] text-muted-foreground text-center py-3">
+                <p className="text-xs text-muted-foreground text-center py-3">
                   Checking who's on Chichat…
                 </p>
               )}
@@ -665,7 +665,7 @@ export default function Contacts() {
             </DialogHeader>
             <div className="space-y-3">
               <div className="space-y-1.5">
-                <Label htmlFor="add-name" className="text-[11px] text-muted-foreground">
+                <Label htmlFor="add-name" className="text-xs text-muted-foreground">
                   Name
                 </Label>
                 <Input
@@ -678,7 +678,7 @@ export default function Contacts() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="add-phone" className="text-[11px] text-muted-foreground">
+                <Label htmlFor="add-phone" className="text-xs text-muted-foreground">
                   Phone number
                 </Label>
                 <Input
@@ -729,7 +729,7 @@ function EmptyState({ title, hint }: { title: string; hint: string }) {
   return (
     <div className="text-center py-10 px-4">
       <p className="text-xs font-semibold text-foreground">{title}</p>
-      <p className="text-[11px] text-muted-foreground mt-1">{hint}</p>
+      <p className="text-xs text-muted-foreground mt-1">{hint}</p>
     </div>
   );
 }
@@ -751,7 +751,7 @@ function ActiveRow({
     >
       <Avatar className="w-10 h-10">
         <AvatarImage src={c.avatar_url ?? undefined} />
-        <AvatarFallback className="bg-primary/20 text-foreground text-[11px] font-semibold">
+        <AvatarFallback className="bg-primary/20 text-foreground text-xs font-semibold">
           {initials(c.display_name)}
         </AvatarFallback>
       </Avatar>
@@ -766,14 +766,14 @@ function ActiveRow({
             </Badge>
           )}
         </div>
-        <p className="text-[10px] text-muted-foreground truncate">
+        <p className="text-2xs text-muted-foreground truncate">
           {formatDisplay(c.phone)}
         </p>
       </div>
       <Button
         onClick={onCall}
         aria-label={`Call ${c.display_name}`}
-        className="h-9 px-3 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-[11px]"
+        className="h-9 px-3 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-xs"
       >
         <Phone className="w-3.5 h-3.5" />
         Call
@@ -802,13 +802,13 @@ function InviteRow({
       className="flex items-center gap-3 px-2 py-2.5 rounded-lg hover:bg-secondary select-none"
     >
       <Avatar className="w-10 h-10">
-        <AvatarFallback className="bg-muted text-muted-foreground text-[11px] font-semibold">
+        <AvatarFallback className="bg-muted text-muted-foreground text-xs font-semibold">
           {initials(c.name)}
         </AvatarFallback>
       </Avatar>
       <div className="flex-1 min-w-0">
         <p className="text-xs font-semibold text-foreground truncate">{c.name}</p>
-        <p className="text-[10px] text-muted-foreground truncate">
+        <p className="text-2xs text-muted-foreground truncate">
           {formatDisplay(c.phone)}
         </p>
       </div>
@@ -826,8 +826,8 @@ function InviteRow({
         variant={c.invited ? "outline" : "default"}
         className={
           c.invited
-            ? "h-9 px-3 rounded-lg text-[11px] border-border"
-            : "h-9 px-3 bg-accent hover:bg-accent/90 text-accent-foreground rounded-lg text-[11px]"
+            ? "h-9 px-3 rounded-lg text-xs border-border"
+            : "h-9 px-3 bg-accent hover:bg-accent/90 text-accent-foreground rounded-lg text-xs"
         }
       >
         <Send className="w-3.5 h-3.5" />

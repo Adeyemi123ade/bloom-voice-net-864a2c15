@@ -31,7 +31,7 @@ export default function CallHeader({ isVideo, other, status, seconds, role = "ca
         : "Calling";
   return (
     <div className="pt-8 pb-4 flex flex-col items-center gap-3">
-      <div className="flex items-center gap-2 text-[11px] uppercase tracking-widest text-muted-foreground">
+      <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-muted-foreground">
         <span>{headerLabel}</span>
         <Icon className="w-3.5 h-3.5" />
       </div>
@@ -51,7 +51,7 @@ export default function CallHeader({ isVideo, other, status, seconds, role = "ca
         {status === "ended" && "Call ended"}
       </p>
       {status === "connected" && (
-        <span className="mt-1 inline-flex items-center gap-1.5 text-[10px] text-accent">
+        <span className="mt-1 inline-flex items-center gap-1.5 text-2xs text-accent">
           <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
           Connected
         </span>

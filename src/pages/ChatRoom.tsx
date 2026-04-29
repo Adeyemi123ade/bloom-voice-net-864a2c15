@@ -267,8 +267,8 @@ function CallSystemBubble({
           {label}
         </div>
         <div className="flex items-end justify-between gap-2 mt-0.5">
-          <span className="text-[11px] text-muted-foreground break-words">{subtitle}</span>
-          <span className="text-[10px] text-muted-foreground shrink-0 whitespace-nowrap">
+          <span className="text-xs text-muted-foreground break-words">{subtitle}</span>
+          <span className="text-2xs text-muted-foreground shrink-0 whitespace-nowrap">
             {formatTime(m.created_at)}
           </span>
         </div>
@@ -889,7 +889,7 @@ export default function ChatRoom() {
             <div className="relative">
               <Avatar className="w-9 h-9">
                 <AvatarImage src={other?.avatar_url ?? undefined} />
-                <AvatarFallback className="bg-primary/20 text-foreground text-[11px] font-semibold">
+                <AvatarFallback className="bg-primary/20 text-foreground text-xs font-semibold">
                   {initials(other?.display_name)}
                 </AvatarFallback>
               </Avatar>
@@ -907,7 +907,7 @@ export default function ChatRoom() {
               {/* Fixed-height status row — never changes header height */}
               <div className="h-[14px] flex items-center">
                 {otherTyping ? (
-                  <span className="text-[11px] text-primary truncate flex items-center gap-1">
+                  <span className="text-xs text-primary truncate flex items-center gap-1">
                     <span className="flex gap-0.5">
                       <span className="w-1 h-1 rounded-full bg-primary animate-bounce [animation-delay:-0.3s]" />
                       <span className="w-1 h-1 rounded-full bg-primary animate-bounce [animation-delay:-0.15s]" />
@@ -916,7 +916,7 @@ export default function ChatRoom() {
                     typing
                   </span>
                 ) : isReallyOnline(other) ? (
-                  <span className="text-[11px] text-muted-foreground truncate">online</span>
+                  <span className="text-xs text-muted-foreground truncate">online</span>
                 ) : null}
               </div>
             </div>
@@ -940,7 +940,7 @@ export default function ChatRoom() {
         {/* Messages */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-3 space-y-2">
           {visible.length === 0 && (
-            <p className="text-[11px] text-muted-foreground text-center mt-6">Say hello 👋</p>
+            <p className="text-xs text-muted-foreground text-center mt-6">Say hello 👋</p>
           )}
           {visible.map((m) => {
             const mine = m.sender_id === user?.id;
@@ -1012,7 +1012,7 @@ export default function ChatRoom() {
                 >
                   {quoted && !bareAttachment && (
                     <div
-                      className={`mb-1 px-2 py-1 rounded-md border-l-2 text-[11px] truncate ${
+                      className={`mb-1 px-2 py-1 rounded-md border-l-2 text-xs truncate ${
                         mine
                           ? "bg-primary-foreground/10 border-primary-foreground/60 text-primary-foreground/85"
                           : "bg-foreground/5 border-primary text-muted-foreground"
@@ -1080,7 +1080,7 @@ export default function ChatRoom() {
             onClick={(e) => e.stopPropagation()}
           >
             <Pencil className="w-3 h-3 text-primary" />
-            <span className="text-[10px] text-muted-foreground flex-1 truncate">
+            <span className="text-2xs text-muted-foreground flex-1 truncate">
               Editing: {editing.content}
             </span>
             <button onClick={cancelEdit} className="text-muted-foreground hover:text-foreground">
@@ -1097,10 +1097,10 @@ export default function ChatRoom() {
           >
             <div className="w-1 self-stretch rounded bg-primary" />
             <div className="flex-1 min-w-0">
-              <p className="text-[10px] font-semibold text-primary">
+              <p className="text-2xs font-semibold text-primary">
                 Replying to {replyTo.sender_id === user?.id ? "yourself" : other?.display_name ?? "them"}
               </p>
-              <p className="text-[11px] text-muted-foreground truncate">
+              <p className="text-xs text-muted-foreground truncate">
                 {replyTo.content.startsWith(VOICE_PREFIX)
                   ? "🎤 Voice note"
                   : replyTo.content.startsWith(FILE_PREFIX)
@@ -1137,7 +1137,7 @@ export default function ChatRoom() {
               <p className="text-[12px] font-medium text-foreground truncate">
                 {pendingFile.file.name}
               </p>
-              <p className="text-[10px] text-muted-foreground">
+              <p className="text-2xs text-muted-foreground">
                 {(pendingFile.file.size / 1024).toFixed(1)} KB
               </p>
             </div>

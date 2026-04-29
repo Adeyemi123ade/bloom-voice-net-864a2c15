@@ -91,7 +91,7 @@ export default function Login() {
           <h1 className="text-[18px] font-bold text-foreground leading-tight">
             Welcome back
           </h1>
-          <p className="text-[11px] text-muted-foreground mt-1">
+          <p className="text-xs text-muted-foreground mt-1">
             Sign in to continue to Chichat.
           </p>
         </div>
@@ -99,7 +99,7 @@ export default function Login() {
         <form onSubmit={handleSubmit} className="mt-3 flex-1 flex flex-col">
           <div className="space-y-2.5">
             <div>
-              <Label htmlFor="email" className="text-[10px] text-muted-foreground">
+              <Label htmlFor="email" className="text-2xs text-muted-foreground">
                 Email address
               </Label>
               <Input
@@ -114,12 +114,12 @@ export default function Login() {
                 aria-invalid={!!errors.email}
               />
               {errors.email && (
-                <p className="text-[10px] text-destructive mt-1">{errors.email}</p>
+                <p className="text-2xs text-destructive mt-1">{errors.email}</p>
               )}
             </div>
 
             <div>
-              <Label htmlFor="password" className="text-[10px] text-muted-foreground">
+              <Label htmlFor="password" className="text-2xs text-muted-foreground">
                 Password
               </Label>
               <div className="relative mt-1">
@@ -144,10 +144,10 @@ export default function Login() {
                 </button>
               </div>
               {errors.password && (
-                <p className="text-[10px] text-destructive mt-1">{errors.password}</p>
+                <p className="text-2xs text-destructive mt-1">{errors.password}</p>
               )}
               <div className="text-right mt-1.5">
-                <Link to="/forgot-password" className="text-[10px] text-accent font-semibold hover:underline">
+                <Link to="/forgot-password" className="text-2xs text-accent font-semibold hover:underline">
                   Forgot password?
                 </Link>
               </div>
@@ -182,7 +182,7 @@ export default function Login() {
               </svg>
               {googleLoading ? "Connecting…" : "Continue with Google"}
             </Button>
-            <p className="text-[10px] text-muted-foreground text-center mt-2">
+            <p className="text-2xs text-muted-foreground text-center mt-2">
               Don't have an account?{" "}
               <Link to="/register" className="text-accent font-semibold hover:underline">
                 Create one

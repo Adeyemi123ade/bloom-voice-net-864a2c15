@@ -141,7 +141,7 @@ export default function Register() {
           <h1 className="text-[18px] font-bold text-foreground leading-tight">
             Create your account
           </h1>
-          <p className="text-[11px] text-muted-foreground mt-1">
+          <p className="text-xs text-muted-foreground mt-1">
             Join Chichat and experience the possibilities.
           </p>
         </div>
@@ -149,7 +149,7 @@ export default function Register() {
         <form onSubmit={handleSubmit} className="mt-3 flex-1 flex flex-col">
           <div className="space-y-2.5">
             <div>
-              <Label htmlFor="name" className="text-[10px] text-muted-foreground">
+              <Label htmlFor="name" className="text-2xs text-muted-foreground">
                 Full name
               </Label>
               <Input
@@ -164,12 +164,12 @@ export default function Register() {
                 aria-invalid={!!errors.name}
               />
               {errors.name && (
-                <p className="text-[10px] text-destructive mt-1">{errors.name}</p>
+                <p className="text-2xs text-destructive mt-1">{errors.name}</p>
               )}
             </div>
 
             <div>
-              <Label htmlFor="email" className="text-[10px] text-muted-foreground">
+              <Label htmlFor="email" className="text-2xs text-muted-foreground">
                 Email address
               </Label>
               <Input
@@ -184,12 +184,12 @@ export default function Register() {
                 aria-invalid={!!errors.email}
               />
               {errors.email && (
-                <p className="text-[10px] text-destructive mt-1">{errors.email}</p>
+                <p className="text-2xs text-destructive mt-1">{errors.email}</p>
               )}
             </div>
 
             <div>
-              <Label htmlFor="phone" className="text-[10px] text-muted-foreground">
+              <Label htmlFor="phone" className="text-2xs text-muted-foreground">
                 Phone number
               </Label>
               <Input
@@ -205,14 +205,14 @@ export default function Register() {
                 aria-invalid={!!errors.phone}
               />
               {errors.phone ? (
-                <p className="text-[10px] text-destructive mt-1">{errors.phone}</p>
+                <p className="text-2xs text-destructive mt-1">{errors.phone}</p>
               ) : (
                 <p className="text-[9px] text-muted-foreground mt-1">Include country code so friends can find you.</p>
               )}
             </div>
 
             <div>
-              <Label htmlFor="password" className="text-[10px] text-muted-foreground">
+              <Label htmlFor="password" className="text-2xs text-muted-foreground">
                 Password
               </Label>
               <div className="relative mt-1">
@@ -237,12 +237,12 @@ export default function Register() {
                 </button>
               </div>
               {errors.password && (
-                <p className="text-[10px] text-destructive mt-1">{errors.password}</p>
+                <p className="text-2xs text-destructive mt-1">{errors.password}</p>
               )}
             </div>
 
             <div>
-              <Label htmlFor="confirmPassword" className="text-[10px] text-muted-foreground">
+              <Label htmlFor="confirmPassword" className="text-2xs text-muted-foreground">
                 Confirm password
               </Label>
               <Input
@@ -257,7 +257,7 @@ export default function Register() {
                 aria-invalid={!!errors.confirmPassword}
               />
               {errors.confirmPassword && (
-                <p className="text-[10px] text-destructive mt-1">{errors.confirmPassword}</p>
+                <p className="text-2xs text-destructive mt-1">{errors.confirmPassword}</p>
               )}
             </div>
           </div>
@@ -290,13 +290,13 @@ export default function Register() {
               </svg>
               {googleLoading ? "Connecting…" : "Continue with Google"}
             </Button>
-            <p className="text-[10px] text-muted-foreground text-center mt-2">
+            <p className="text-2xs text-muted-foreground text-center mt-2">
               Already have an account?{" "}
               <Link to="/login" className="text-accent font-semibold hover:underline">
                 Sign in
               </Link>
             </p>
-            <p className="text-[11px] text-foreground text-center mt-2 font-semibold">
+            <p className="text-xs text-foreground text-center mt-2 font-semibold">
               By continuing, you agree to our{" "}
               <Link to="/terms" className="text-primary underline underline-offset-2">
                 Terms &amp; Privacy Policy

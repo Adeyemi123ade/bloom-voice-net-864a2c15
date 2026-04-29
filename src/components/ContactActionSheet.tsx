@@ -34,7 +34,7 @@ export default function ContactActionSheet({
         <SheetHeader className="text-left">
           <SheetTitle className="text-sm">{title}</SheetTitle>
           {subtitle && (
-            <p className="text-[11px] text-muted-foreground">{subtitle}</p>
+            <p className="text-xs text-muted-foreground">{subtitle}</p>
           )}
         </SheetHeader>
         <div className="mt-3 space-y-1">

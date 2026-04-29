@@ -10,6 +10,7 @@ import {
   RefreshCw,
   Camera,
   ImagePlus,
+  Loader2,
 } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
 import { useAuth } from "@/hooks/useAuth";
@@ -37,11 +38,13 @@ import {
   runBackup,
   runRestore,
   setAutoBackup,
+  hasNewChangesSinceBackup,
   type BackupRow,
 } from "@/lib/chatBackup";
 import {
   getDefaultContactAvatar,
   setDefaultContactAvatar,
+  clearContactsCache,
 } from "@/lib/deviceContacts";
 
 async function fileToDataUrl(file: File): Promise<string> {
@@ -74,6 +77,7 @@ export default function Settings() {
   const [backup, setBackup] = useState<BackupRow | null>(null);
   const [backingUp, setBackingUp] = useState(false);
   const [restoring, setRestoring] = useState(false);
+  const [restoreOpen, setRestoreOpen] = useState(false);
 
   const [defaultAvatar, setDefaultAvatarState] = useState<string | null>(null);
   const avatarFileRef = useRef<HTMLInputElement>(null);
@@ -135,12 +139,11 @@ export default function Settings() {
         const r = await completeGoogleContactsConnect(code);
         setGoogleEmail(r.email);
         toast({ title: "Google connected", description: r.email ?? "Account linked." });
-        // Auto sync once after connecting
         setSyncing(true);
         const list = await syncGoogleContacts();
         toast({ title: "Contacts synced", description: `${list.length} contacts loaded.` });
       } catch (e) {
-        toast({ title: "Google connect failed", description: String(e), variant: "destructive" });
+        toast({ title: "Google connect failed", description: friendly(e), variant: "destructive" });
       } finally {
         setSyncing(false);
         params.delete("code");
@@ -157,7 +160,7 @@ export default function Settings() {
     try { await startGoogleContactsConnect(); }
     catch (e) {
       setConnecting(false);
-      toast({ title: "Could not start Google sign-in", description: String(e), variant: "destructive" });
+      toast({ title: "Could not start Google sign-in", description: friendly(e), variant: "destructive" });
     }
   };
 
@@ -167,29 +170,42 @@ export default function Settings() {
       const list = await syncGoogleContacts();
       toast({ title: "Contacts synced", description: `${list.length} contacts loaded.` });
     } catch (e) {
-      toast({ title: "Sync failed", description: String(e), variant: "destructive" });
+      toast({ title: "Sync failed", description: friendly(e), variant: "destructive" });
     } finally { setSyncing(false); }
   };
 
   const onBackup = async () => {
+    if (!user) return;
     setBackingUp(true);
     try {
+      // Fast client-side check for "up to date".
+      const current = backup ?? (await getMyBackup());
+      const hasChanges = await hasNewChangesSinceBackup(user.id, current?.last_backup_at ?? null);
+      if (current && !hasChanges) {
+        toast({ title: "Account is up to date" });
+        setBackingUp(false);
+        return;
+      }
       const r = await runBackup();
-      toast({ title: "Backup complete", description: `${r.message_count} messages, ${r.media_count} media.` });
-      setBackup(await getMyBackup());
+      const fresh = await getMyBackup();
+      setBackup(fresh);
+      toast({
+        title: "Account backed up successfully",
+        description: `${r.message_count} messages saved (${bytesLabel(fresh?.total_bytes ?? 0)}). A reboot is recommended.`,
+      });
     } catch (e) {
-      toast({ title: "Backup failed", description: String(e), variant: "destructive" });
+      toast({ title: "Backup failed", description: friendly(e), variant: "destructive" });
     } finally { setBackingUp(false); }
   };
 
-  const onRestore = async () => {
-    if (!window.confirm("Restore chats from your latest backup?")) return;
+  const onConfirmRestore = async () => {
+    setRestoreOpen(false);
     setRestoring(true);
     try {
       const r = await runRestore();
       toast({ title: "Restore complete", description: `${r.restored} of ${r.total} messages restored.` });
     } catch (e) {
-      toast({ title: "Restore failed", description: String(e), variant: "destructive" });
+      toast({ title: "Restore failed", description: friendly(e), variant: "destructive" });
     } finally { setRestoring(false); }
   };
 
@@ -198,86 +214,101 @@ export default function Settings() {
       await setAutoBackup(v);
       setBackup((b) => (b ? { ...b, auto_backup_enabled: v } : b));
     } catch (e) {
-      toast({ title: "Could not update setting", description: String(e), variant: "destructive" });
+      toast({ title: "Could not update setting", description: friendly(e), variant: "destructive" });
     }
   };
 
   const deleteAccount = async () => {
     if (!user) return;
     setDeleting(true);
-    await supabase
-      .from("profiles")
-      .upsert(
-        { id: user.id, display_name: "Deleted user", avatar_url: null, is_online: false },
-        { onConflict: "id" },
-      );
-    await supabase.auth.signOut();
-    setDeleting(false);
-    toast({ title: "Account removed", description: "You have been signed out." });
-    navigate("/register");
+    try {
+      // Try to fully wipe the account server-side so a reinstall behaves as a
+      // brand-new user (no "Deleted user" appearing in friends' contact lists).
+      // The edge function deletes profile, backups, tokens, then auth.user.
+      try {
+        await supabase.functions.invoke("delete-account", {});
+      } catch {
+        // Fallback: at minimum remove identifying profile data.
+        await supabase
+          .from("profiles")
+          .update({ display_name: null, avatar_url: null, phone: null, is_online: false })
+          .eq("id", user.id);
+      }
+      await supabase.auth.signOut();
+      // Wipe every local trace so reinstall feels fresh.
+      try {
+        clearContactsCache();
+        localStorage.clear();
+        sessionStorage.clear();
+      } catch { /* ignore */ }
+      toast({ title: "Account removed", description: "You have been signed out." });
+      navigate("/register", { replace: true });
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
-    <MobileFrame>
+    <MobileFrame bottomNav="settings">
       <div className="h-full w-full flex flex-col bg-background overflow-y-auto">
-        <div className="px-3 pt-4 pb-3 border-b border-border sticky top-0 bg-background z-10">
-          <h1 className="text-sm font-semibold text-foreground">Settings</h1>
+        <div className="px-4 pt-5 pb-4 border-b border-border sticky top-0 bg-background z-10">
+          <h1 className="text-lg font-bold text-foreground">Settings</h1>
         </div>
 
-        <div className="flex-1 px-3 py-4 flex flex-col">
+        <div className="flex-1 px-4 py-4 flex flex-col gap-3">
           <button
             onClick={() => navigate("/profile")}
-            className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-secondary text-left"
+            className="w-full flex items-center gap-3 px-3 py-3.5 rounded-lg hover:bg-secondary text-left"
           >
-            <span className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center">
-              <UserIcon className="w-4 h-4 text-primary" />
+            <span className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center">
+              <UserIcon className="w-5 h-5 text-primary" />
             </span>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-foreground">Profile setting</p>
-              <p className="text-[11px] text-muted-foreground truncate">
+              <p className="text-base font-semibold text-foreground">Profile setting</p>
+              <p className="text-sm text-muted-foreground truncate">
                 Edit name, photo and about
               </p>
             </div>
-            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+            <ChevronRight className="w-5 h-5 text-muted-foreground" />
           </button>
 
           <button
             onClick={() => navigate("/settings/phone")}
-            className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-secondary text-left"
+            className="w-full flex items-center gap-3 px-3 py-3.5 rounded-lg hover:bg-secondary text-left"
           >
-            <span className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center">
-              <Smartphone className="w-4 h-4 text-primary" />
+            <span className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center">
+              <Smartphone className="w-5 h-5 text-primary" />
             </span>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-foreground">Phone settings</p>
-              <p className="text-[11px] text-muted-foreground truncate">
+              <p className="text-base font-semibold text-foreground">Phone settings</p>
+              <p className="text-sm text-muted-foreground truncate">
                 Theme and ringtone
               </p>
             </div>
-            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+            <ChevronRight className="w-5 h-5 text-muted-foreground" />
           </button>
 
           {/* Default new-contact photo */}
-          <div className="mt-4 px-3 py-3 rounded-lg bg-secondary/40">
+          <div className="px-3 py-3 rounded-lg bg-secondary/40">
             <div className="flex items-center gap-3">
               <button
                 type="button"
                 onClick={onPickAvatar}
-                className="relative w-12 h-12 rounded-xl border-2 border-dashed border-primary/50 bg-primary/10 hover:bg-primary/15 flex items-center justify-center overflow-hidden"
+                className="relative w-14 h-14 rounded-xl border-2 border-dashed border-primary/50 bg-primary/10 hover:bg-primary/15 flex items-center justify-center overflow-hidden"
                 aria-label="Choose default contact photo"
               >
                 {defaultAvatar ? (
                   <img src={defaultAvatar} alt="" className="w-full h-full object-cover" />
                 ) : (
-                  <ImagePlus className="w-5 h-5 text-primary" />
+                  <ImagePlus className="w-6 h-6 text-primary" />
                 )}
                 <span className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
-                  <Camera className="w-2.5 h-2.5" />
+                  <Camera className="w-3 h-3" />
                 </span>
               </button>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold">Default contact photo</p>
-                <p className="text-[11px] text-muted-foreground truncate">
+                <p className="text-base font-semibold">Default contact photo</p>
+                <p className="text-sm text-muted-foreground truncate">
                   Used as the avatar when adding a new contact.
                 </p>
               </div>
@@ -285,7 +316,7 @@ export default function Settings() {
                 <button
                   type="button"
                   onClick={removeAvatar}
-                  className="text-[10px] text-muted-foreground hover:text-destructive px-2 h-7"
+                  className="text-xs text-muted-foreground hover:text-destructive px-2 h-8"
                 >
                   Remove
                 </button>
@@ -301,14 +332,14 @@ export default function Settings() {
           </div>
 
           {/* Connected accounts — Google */}
-          <div className="mt-4 px-3 py-3 rounded-lg bg-secondary/40">
+          <div className="px-3 py-3 rounded-lg bg-secondary/40">
             <div className="flex items-center gap-3 mb-2">
-              <span className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center">
-                <Contact2 className="w-4 h-4 text-primary" />
+              <span className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center">
+                <Contact2 className="w-5 h-5 text-primary" />
               </span>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold">Google contacts</p>
-                <p className="text-[11px] text-muted-foreground truncate">
+                <p className="text-base font-semibold">Google contacts</p>
+                <p className="text-sm text-muted-foreground truncate">
                   {googleEmail ? `Connected as ${googleEmail}` : "Not connected"}
                 </p>
               </div>
@@ -318,16 +349,16 @@ export default function Settings() {
                 <button
                   onClick={syncNow}
                   disabled={syncing}
-                  className="flex-1 h-8 rounded-md bg-primary text-primary-foreground text-[11px] font-medium disabled:opacity-60 inline-flex items-center justify-center gap-1"
+                  className="flex-1 h-10 rounded-md bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-60 inline-flex items-center justify-center gap-1.5"
                 >
-                  <RefreshCw className={`w-3 h-3 ${syncing ? "animate-spin" : ""}`} />
+                  <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} />
                   {syncing ? "Syncing…" : "Sync now"}
                 </button>
               ) : (
                 <button
                   onClick={connectGoogle}
                   disabled={connecting}
-                  className="flex-1 h-8 rounded-md bg-primary text-primary-foreground text-[11px] font-medium disabled:opacity-60"
+                  className="flex-1 h-10 rounded-md bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-60"
                 >
                   {connecting ? "Opening Google…" : "Connect Google"}
                 </button>
@@ -336,14 +367,14 @@ export default function Settings() {
           </div>
 
           {/* Chat backup */}
-          <div className="mt-3 px-3 py-3 rounded-lg bg-secondary/40">
+          <div className="px-3 py-3 rounded-lg bg-secondary/40">
             <div className="flex items-center gap-3 mb-2">
-              <span className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center">
-                <Cloud className="w-4 h-4 text-primary" />
+              <span className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center">
+                <Cloud className="w-5 h-5 text-primary" />
               </span>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold">Chat backup</p>
-                <p className="text-[11px] text-muted-foreground truncate">
+                <p className="text-base font-semibold">Chat backup</p>
+                <p className="text-sm text-muted-foreground truncate">
                   {backup
                     ? `Last: ${new Date(backup.last_backup_at).toLocaleString()} · ${backup.message_count} msgs · ${bytesLabel(backup.total_bytes)}`
                     : "No backup yet"}
@@ -351,30 +382,69 @@ export default function Settings() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between py-1.5">
-              <span className="text-[11px] text-foreground">Auto-backup daily</span>
+            <div className="flex items-center justify-between py-2">
+              <span className="text-sm text-foreground">Auto-backup daily</span>
               <Switch
                 checked={backup?.auto_backup_enabled ?? true}
                 onCheckedChange={onToggleAuto}
               />
             </div>
 
+            {backingUp && (
+              <div className="mt-2 mb-2 px-3 py-3 rounded-lg bg-primary/10 border border-primary/30">
+                <div className="flex items-center gap-2 mb-2">
+                  <Loader2 className="w-4 h-4 text-primary animate-spin" />
+                  <p className="text-sm font-semibold text-foreground">Backing up your chats…</p>
+                </div>
+                <div className="h-1.5 w-full rounded-full bg-secondary overflow-hidden">
+                  <div className="h-full w-1/3 bg-primary animate-[indeterminate_1.4s_ease-in-out_infinite]" />
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Please don't close the app until this finishes.
+                </p>
+              </div>
+            )}
+
             <div className="flex gap-2 mt-1">
               <button
                 onClick={onBackup}
                 disabled={backingUp}
-                className="flex-1 h-8 rounded-md bg-primary text-primary-foreground text-[11px] font-medium disabled:opacity-60"
+                className="flex-1 h-10 rounded-md bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-60"
               >
                 {backingUp ? "Backing up…" : "Back up now"}
               </button>
               <button
-                onClick={onRestore}
+                onClick={() => setRestoreOpen(true)}
                 disabled={restoring || !backup}
-                className="flex-1 h-8 rounded-md border border-border bg-background text-[11px] font-medium disabled:opacity-50"
+                className="flex-1 h-10 rounded-md border border-border bg-background text-sm font-semibold disabled:opacity-50"
               >
                 {restoring ? "Restoring…" : "Restore"}
               </button>
             </div>
+
+            {/* Clean restore confirmation — no embedded URL chrome. */}
+            <AlertDialog open={restoreOpen} onOpenChange={setRestoreOpen}>
+              <AlertDialogContent className="max-w-[320px]">
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="text-base">
+                    Restore chats from your latest backup?
+                  </AlertDialogTitle>
+                  <AlertDialogDescription className="text-sm">
+                    This will pull in your most recent saved chats. Existing messages
+                    on this device won't be removed.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel className="text-sm h-10">Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={onConfirmRestore}
+                    className="text-sm h-10"
+                  >
+                    OK
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
 
           <div className="flex-1" />
@@ -382,29 +452,29 @@ export default function Settings() {
           <div className="pt-6 pb-2">
             <AlertDialog onOpenChange={(o) => !o && setConfirmStage(false)}>
               <AlertDialogTrigger asChild>
-                <button className="w-full h-10 rounded-lg bg-destructive/10 hover:bg-destructive/20 text-destructive text-xs flex items-center justify-center gap-2">
-                  <Trash2 className="w-3.5 h-3.5" />
+                <button className="w-full h-12 rounded-lg bg-destructive/10 hover:bg-destructive/20 text-destructive text-sm font-semibold flex items-center justify-center gap-2">
+                  <Trash2 className="w-4 h-4" />
                   Delete account
                 </button>
               </AlertDialogTrigger>
-              <AlertDialogContent className="max-w-[280px]">
+              <AlertDialogContent className="max-w-[320px]">
                 <AlertDialogHeader>
-                  <AlertDialogTitle className="text-sm">
+                  <AlertDialogTitle className="text-base">
                     {confirmStage ? "Are you absolutely sure?" : "Delete your account?"}
                   </AlertDialogTitle>
-                  <AlertDialogDescription className="text-xs">
+                  <AlertDialogDescription className="text-sm">
                     {confirmStage
                       ? "This permanently removes your profile and signs you out. This cannot be undone."
                       : "Your profile and presence will be removed. You'll need to register again to come back. Tip: back up your chats first."}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel className="text-xs h-9">Cancel</AlertDialogCancel>
+                  <AlertDialogCancel className="text-sm h-10">Cancel</AlertDialogCancel>
                   {confirmStage ? (
                     <AlertDialogAction
                       onClick={deleteAccount}
                       disabled={deleting}
-                      className="bg-destructive hover:bg-destructive/90 text-destructive-foreground text-xs h-9"
+                      className="bg-destructive hover:bg-destructive/90 text-destructive-foreground text-sm h-10"
                     >
                       {deleting ? "Deleting…" : "Yes, delete"}
                     </AlertDialogAction>
@@ -414,7 +484,7 @@ export default function Settings() {
                         e.preventDefault();
                         setConfirmStage(true);
                       }}
-                      className="bg-destructive hover:bg-destructive/90 text-destructive-foreground text-xs h-9"
+                      className="bg-destructive hover:bg-destructive/90 text-destructive-foreground text-sm h-10"
                     >
                       Continue
                     </AlertDialogAction>
@@ -427,4 +497,14 @@ export default function Settings() {
       </div>
     </MobileFrame>
   );
+}
+
+/** Strip technical noise (URLs, UUIDs, JSON blobs) before showing errors to users. */
+function friendly(e: unknown): string {
+  const raw = e instanceof Error ? e.message : String(e ?? "");
+  return raw
+    .replace(/https?:\/\/\S+/gi, "")
+    .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim() || "Please try again.";
 }

@@ -59,7 +59,7 @@ export default function CountryPicker({ value, onChange }: Props) {
         </div>
         <div className="max-h-[260px] overflow-y-auto">
           {filtered.length === 0 ? (
-            <p className="text-[11px] text-muted-foreground p-3 text-center">No matches</p>
+            <p className="text-xs text-muted-foreground p-3 text-center">No matches</p>
           ) : (
             filtered.map((c) => (
               <button

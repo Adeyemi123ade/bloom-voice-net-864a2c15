@@ -48,14 +48,14 @@ export default function ForgotPassword() {
           <h1 className="text-[18px] font-bold text-foreground leading-tight">
             Forgot your password?
           </h1>
-          <p className="text-[11px] text-muted-foreground mt-1">
+          <p className="text-xs text-muted-foreground mt-1">
             Enter your email and we'll send you a reset link.
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="mt-3 flex-1 flex flex-col">
           <div>
-            <Label htmlFor="email" className="text-[10px] text-muted-foreground">
+            <Label htmlFor="email" className="text-2xs text-muted-foreground">
               Email address
             </Label>
             <Input
@@ -69,9 +69,9 @@ export default function ForgotPassword() {
               className="mt-1 h-9 text-xs bg-input border-border text-foreground placeholder:text-muted-foreground"
               aria-invalid={!!error}
             />
-            {error && <p className="text-[10px] text-destructive mt-1">{error}</p>}
+            {error && <p className="text-2xs text-destructive mt-1">{error}</p>}
             {sent && (
-              <p className="text-[10px] text-accent mt-2">
+              <p className="text-2xs text-accent mt-2">
                 If an account exists for {email}, a reset link is on its way.
               </p>
             )}
@@ -85,7 +85,7 @@ export default function ForgotPassword() {
             >
               {submitting ? "Sending…" : "Send reset link"}
             </Button>
-            <p className="text-[10px] text-muted-foreground text-center mt-2">
+            <p className="text-2xs text-muted-foreground text-center mt-2">
               Remembered it?{" "}
               <Link to="/login" className="text-accent font-semibold hover:underline">
                 Sign in
