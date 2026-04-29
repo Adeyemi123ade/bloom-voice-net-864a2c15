@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  ArrowLeft,
   Edit3,
   Grid3x3,
   Loader2,
@@ -25,9 +24,12 @@ import { formatDisplay } from "@/lib/phone";
 import {
   DeviceContact,
   clearContactsCache,
+  isNativePlatform,
   loadCachedContacts,
   loadManualContacts,
+  loadNativeContacts,
   removeManualContact,
+  saveCachedContacts,
 } from "@/lib/deviceContacts";
 import {
   isGoogleConnected,
