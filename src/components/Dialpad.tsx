@@ -13,6 +13,7 @@ import {
   loadManualContacts,
   type DeviceContact,
 } from "@/lib/deviceContacts";
+import BottomNav from "@/components/BottomNav";
 
 interface Props {
   open: boolean;
@@ -335,6 +336,8 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
             </button>
           </div>
         </div>
+        {/* Bottom nav inside dialer — closes overlay on tap, then routes. */}
+        <BottomNav active="calls" onBeforeNavigate={() => onOpenChange(false)} />
       </DialogContent>
     </Dialog>
   );
