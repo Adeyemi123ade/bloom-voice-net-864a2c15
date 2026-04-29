@@ -4,6 +4,7 @@ import { toE164 } from "./phone";
 export interface DeviceContact {
   name: string;
   phones: string[]; // E.164
+  avatar?: string | null; // data URL or remote URL
 }
 
 /** True when running inside a Capacitor native shell (iOS/Android). */
@@ -110,16 +111,40 @@ export function saveManualContacts(list: DeviceContact[]) {
   }
 }
 
-export function addManualContact(name: string, e164: string): DeviceContact[] {
+export function addManualContact(
+  name: string,
+  e164: string,
+  avatar?: string | null,
+): DeviceContact[] {
   const list = loadManualContacts();
   const existing = list.find((c) => c.phones[0] === e164);
   if (existing) {
     if (name && !existing.name) existing.name = name;
+    if (avatar) existing.avatar = avatar;
   } else {
-    list.push({ name: name || e164, phones: [e164] });
+    list.push({ name: name || e164, phones: [e164], avatar: avatar ?? null });
   }
   saveManualContacts(list);
   return list;
+}
+
+const DEFAULT_AVATAR_KEY = "chichat:contacts:defaultAvatar:v1";
+
+export function getDefaultContactAvatar(): string | null {
+  try {
+    return localStorage.getItem(DEFAULT_AVATAR_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setDefaultContactAvatar(dataUrl: string | null) {
+  try {
+    if (dataUrl) localStorage.setItem(DEFAULT_AVATAR_KEY, dataUrl);
+    else localStorage.removeItem(DEFAULT_AVATAR_KEY);
+  } catch {
+    /* ignore */
+  }
 }
 
 export function removeManualContact(e164: string): DeviceContact[] {
