@@ -6,43 +6,34 @@ import {
   Grid3x3,
   Loader2,
   Phone,
-  RefreshCw,
   Search,
   Send,
-  Smartphone,
   Trash2,
-  UserPlus,
   Users,
   X,
 } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { toE164, formatDisplay } from "@/lib/phone";
+import { formatDisplay } from "@/lib/phone";
 import {
   DeviceContact,
-  addManualContact,
   clearContactsCache,
-  isNativePlatform,
   loadCachedContacts,
   loadManualContacts,
-  loadNativeContacts,
   removeManualContact,
-  saveCachedContacts,
 } from "@/lib/deviceContacts";
+import {
+  isGoogleConnected,
+  startGoogleContactsConnect,
+  syncGoogleContacts,
+} from "@/lib/googleContacts";
 import Dialpad from "@/components/Dialpad";
 import ContactActionSheet, { ContactAction } from "@/components/ContactActionSheet";
 import SaveContactDialog from "@/components/SaveContactDialog";
