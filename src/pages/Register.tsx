@@ -127,7 +127,8 @@ export default function Register() {
 
   return (
     <MobileFrame>
-      <div className="h-full w-full flex flex-col px-4 pt-5 pb-4 overflow-y-auto">
+      <div className="h-full w-full overflow-y-auto flex justify-center bg-background">
+        <div className="w-full max-w-sm sm:max-w-md flex flex-col px-5 sm:px-6 pt-6 pb-6 min-h-full">
         <button
           onClick={() => navigate("/")}
           aria-label="Back"
@@ -295,11 +296,16 @@ export default function Register() {
                 Sign in
               </Link>
             </p>
-            <p className="text-[9px] text-muted-foreground text-center mt-1.5">
-              By continuing, you agree to our Terms & Privacy Policy.
+            <p className="text-[11px] text-foreground text-center mt-2 font-semibold">
+              By continuing, you agree to our{" "}
+              <Link to="/terms" className="text-primary underline underline-offset-2">
+                Terms &amp; Privacy Policy
+              </Link>
+              .
             </p>
           </div>
         </form>
+        </div>
       </div>
     </MobileFrame>
   );
