@@ -456,16 +456,21 @@ export default function Contacts() {
             <ArrowLeft className="w-4 h-4 text-foreground" />
           </button>
           <h1 className="text-sm font-semibold text-foreground flex-1">Contacts</h1>
-          <button
-            aria-label="Refresh"
-            onClick={handleRefresh}
-            disabled={syncing || matching}
-            className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary disabled:opacity-50"
-          >
-            <RefreshCw
-              className={`w-4 h-4 text-foreground ${syncing ? "animate-spin" : ""}`}
-            />
-          </button>
+          {googleConnected && (
+            <button
+              aria-label="Refresh contacts"
+              onClick={refreshFromGoogle}
+              disabled={syncing || matching}
+              className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary disabled:opacity-50"
+            >
+              <Loader2
+                className={`w-4 h-4 text-foreground ${syncing ? "animate-spin" : "hidden"}`}
+              />
+              {!syncing && (
+                <Send className="w-4 h-4 text-foreground rotate-45 opacity-0" />
+              )}
+            </button>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto">
