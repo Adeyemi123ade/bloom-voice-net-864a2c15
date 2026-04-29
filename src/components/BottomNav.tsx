@@ -25,7 +25,14 @@ const TABS: Tab[] = [
  * on is hidden — never highlighted — so the bar always shows "where you can go
  * next" instead of "where you are".
  */
-export default function BottomNav({ active }: { active: TabKey }) {
+export default function BottomNav({
+  active,
+  onBeforeNavigate,
+}: {
+  active: TabKey;
+  /** Called before any tab navigates — useful to close overlays first. */
+  onBeforeNavigate?: () => void;
+}) {
   const navigate = useNavigate();
   const location = useLocation();
   const [dialOpen, setDialOpen] = useState(false);
@@ -34,10 +41,14 @@ export default function BottomNav({ active }: { active: TabKey }) {
 
   const onTap = (t: Tab) => {
     if (t.key === "calls") {
+      onBeforeNavigate?.();
       setDialOpen(true);
       return;
     }
-    if (t.to && location.pathname !== t.to) navigate(t.to);
+    if (t.to && location.pathname !== t.to) {
+      onBeforeNavigate?.();
+      navigate(t.to);
+    }
   };
 
   return (
