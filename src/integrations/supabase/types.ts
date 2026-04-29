@@ -74,6 +74,42 @@ export type Database = {
         }
         Relationships: []
       }
+      chat_backups: {
+        Row: {
+          auto_backup_enabled: boolean
+          created_at: string
+          last_backup_at: string
+          manifest_path: string
+          media_count: number
+          message_count: number
+          total_bytes: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          auto_backup_enabled?: boolean
+          created_at?: string
+          last_backup_at?: string
+          manifest_path: string
+          media_count?: number
+          message_count?: number
+          total_bytes?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          auto_backup_enabled?: boolean
+          created_at?: string
+          last_backup_at?: string
+          manifest_path?: string
+          media_count?: number
+          message_count?: number
+          total_bytes?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       conversation_participants: {
         Row: {
           conversation_id: string
@@ -141,6 +177,42 @@ export type Database = {
           id?: string
           last_seen_at?: string
           platform?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      google_oauth_tokens: {
+        Row: {
+          access_token: string
+          created_at: string
+          expires_at: string
+          google_email: string | null
+          refresh_token: string | null
+          scope: string | null
+          token_type: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string
+          expires_at: string
+          google_email?: string | null
+          refresh_token?: string | null
+          scope?: string | null
+          token_type?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string
+          expires_at?: string
+          google_email?: string | null
+          refresh_token?: string | null
+          scope?: string | null
+          token_type?: string | null
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
