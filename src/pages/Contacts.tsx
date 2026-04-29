@@ -249,15 +249,18 @@ export default function Contacts() {
     }
   };
 
-  /** Pull a fresh copy of contacts from the user's Google account. */
+  /** Pull a fresh copy of contacts — from device on native, Google on web. */
   const refreshFromGoogle = async () => {
     setSyncing(true);
     try {
-      const list = await syncGoogleContacts();
+      const list = isNativePlatform()
+        ? await loadNativeContacts()
+        : await syncGoogleContacts();
+      if (isNativePlatform()) saveCachedContacts(list);
       const merged = mergeContacts(list, loadManualContacts());
       setContacts(merged);
       await runMatch(merged);
-      toast({ title: `Loaded ${list.length} contacts from Google` });
+      toast({ title: `Loaded ${list.length} contacts` });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Could not load contacts";
       toast({ title: "Sync failed", description: msg, variant: "destructive" });
@@ -476,22 +479,15 @@ export default function Contacts() {
         >
           <Grid3x3 className="w-6 h-6" />
         </button>
-        {/* Header */}
-        <div className="px-3 pt-4 pb-3 border-b border-border flex items-center gap-2">
-          <button
-            aria-label="Back"
-            onClick={() => navigate(-1)}
-            className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
-          >
-            <ArrowLeft className="w-4 h-4 text-foreground" />
-          </button>
-          <h1 className="text-sm font-semibold text-foreground flex-1">Contacts</h1>
+        {/* Header — no back arrow; navigation is handled by bottom nav + system back. */}
+        <div className="px-4 pt-4 pb-3 border-b border-border flex items-center gap-2">
+          <h1 className="text-base font-semibold text-foreground flex-1">Contacts</h1>
           {googleConnected && (
             <button
               aria-label="Refresh contacts"
               onClick={refreshFromGoogle}
               disabled={syncing || matching}
-              className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary disabled:opacity-50"
+              className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-secondary disabled:opacity-50"
             >
               <Loader2
                 className={`w-4 h-4 text-foreground ${syncing ? "animate-spin" : "hidden"}`}
