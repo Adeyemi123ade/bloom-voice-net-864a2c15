@@ -47,6 +47,7 @@ const App = () => (
               <Route path="/call/:id" element={<CallScreen />} />
               <Route path="/calls" element={<Calls />} />
               <Route path="/contacts" element={<Contacts />} />
+              <Route path="/contacts/new" element={<NewContact />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/settings/phone" element={<PhoneSettings />} />
