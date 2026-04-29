@@ -489,44 +489,39 @@ export default function Contacts() {
             </div>
           )}
 
-          {/* Sync section */}
-          <div className="px-3 pt-3 space-y-2">
-            <Button
-              onClick={handleSync}
-              disabled={syncing}
-              className="w-full h-11 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-xs font-semibold"
-            >
-              {syncing ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Smartphone className="w-4 h-4" />
-              )}
-              {syncing
-                ? "Syncing contacts from your phone…"
-                : isNativePlatform()
-                  ? "Sync contacts"
-                  : "Sync contacts"}
-            </Button>
+          {/* Google connection prompt — only when not yet linked. Always offers a way back. */}
+          {googleConnected === false && (
+            <div className="px-3 pt-3 space-y-2">
+              <div className="p-3 rounded-lg bg-secondary border border-border">
+                <p className="text-sm font-semibold text-foreground">
+                  Connect your Google account
+                </p>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                  We'll show your Google contacts here so you can call friends already on
+                  Chichat or invite the rest with one tap.
+                </p>
+                <Button
+                  onClick={connectGoogle}
+                  disabled={connectingGoogle}
+                  className="mt-3 w-full h-10 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-xs font-semibold"
+                >
+                  {connectingGoogle ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : null}
+                  {connectingGoogle ? "Opening Google…" : "Connect Google"}
+                </Button>
+              </div>
+            </div>
+          )}
 
-            {syncing && (
-              <p className="text-[10.5px] text-muted-foreground text-center">
-                This may take a few seconds.
-              </p>
-            )}
+          {syncing && (
+            <p className="px-3 pt-3 text-xs text-muted-foreground text-center">
+              Loading contacts from Google…
+            </p>
+          )}
 
-            {/* Manual add is a fallback only when device sync isn't available (web). */}
-            {!isNativePlatform() && (
-              <Button
-                onClick={() => setAddOpen(true)}
-                variant="outline"
-                className="w-full h-9 rounded-lg text-xs border-border"
-              >
-                <UserPlus className="w-3.5 h-3.5" />
-                Add a contact manually
-              </Button>
-            )}
-
-            {showPrivacy && (
+          {showPrivacy && googleConnected && (
+            <div className="px-3 pt-3">
               <div className="relative p-3 rounded-lg bg-secondary border border-border">
                 <button
                   aria-label="Dismiss"
@@ -535,14 +530,13 @@ export default function Contacts() {
                 >
                   <X className="w-3 h-3 text-muted-foreground" />
                 </button>
-                <p className="text-[10.5px] text-muted-foreground leading-relaxed pr-5">
-                  We access your contacts only to help you call and invite friends.
-                  We never store your full contact list.
+                <p className="text-xs text-muted-foreground leading-relaxed pr-5">
+                  We use your Google contacts only to find friends already on Chichat
+                  and let you invite the rest. We never share your contact list.
                 </p>
               </div>
-            )}
-          </div>
-
+            </div>
+          )}
           {/* Search */}
           <div className="px-3 pt-3">
             <div className="relative">
