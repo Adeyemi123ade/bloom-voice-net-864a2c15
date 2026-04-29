@@ -242,9 +242,13 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
                   className="flex items-center gap-3 p-2.5 rounded-2xl bg-secondary/30"
                 >
                   <span
-                    className={`w-12 h-12 rounded-2xl border flex items-center justify-center shrink-0 text-lg font-bold ${tint.bg} ${tint.border} ${tint.text}`}
+                    className={`w-12 h-12 rounded-2xl border flex items-center justify-center shrink-0 text-lg font-bold overflow-hidden ${tint.bg} ${tint.border} ${tint.text}`}
                   >
-                    {initialOf(c.name)}
+                    {c.avatar ? (
+                      <img src={c.avatar} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      initialOf(c.name)
+                    )}
                   </span>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold truncate text-foreground">{c.name}</p>
