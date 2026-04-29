@@ -30,6 +30,40 @@ export async function runRestore(): Promise<{ restored: number; total: number }>
   return { restored: data?.restored ?? 0, total: data?.total ?? 0 };
 }
 
+/**
+ * Returns true if the user has any messages newer than `lastBackupAt`
+ * (i.e. there's something new worth backing up).
+ */
+export async function hasNewChangesSinceBackup(
+  userId: string,
+  lastBackupAt: string | null,
+): Promise<boolean> {
+  if (!lastBackupAt) return true;
+  // Find conversations the user participates in.
+  const { data: parts } = await supabase
+    .from("conversation_participants")
+    .select("conversation_id")
+    .eq("user_id", userId);
+  const ids = (parts ?? []).map((p) => p.conversation_id);
+  if (ids.length === 0) return false;
+  const { data, error } = await supabase
+    .from("messages")
+    .select("id", { head: true, count: "exact" })
+    .in("conversation_id", ids)
+    .gt("created_at", lastBackupAt)
+    .limit(1);
+  if (error) return true; // err on the side of trying
+  // When head:true, supabase returns count via the response object — fall back
+  // to a non-head check if needed.
+  if (data && Array.isArray(data) && data.length > 0) return true;
+  const { count } = await supabase
+    .from("messages")
+    .select("id", { head: true, count: "exact" })
+    .in("conversation_id", ids)
+    .gt("created_at", lastBackupAt);
+  return (count ?? 0) > 0;
+}
+
 export async function setAutoBackup(enabled: boolean): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
