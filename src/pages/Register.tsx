@@ -127,7 +127,8 @@ export default function Register() {
 
   return (
     <MobileFrame>
-      <div className="h-full w-full flex flex-col px-4 pt-5 pb-4 overflow-y-auto">
+      <div className="h-full w-full overflow-y-auto flex justify-center bg-background">
+        <div className="w-full max-w-sm sm:max-w-md flex flex-col px-5 sm:px-6 pt-6 pb-6 min-h-full">
         <button
           onClick={() => navigate("/")}
           aria-label="Back"
