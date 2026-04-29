@@ -59,24 +59,30 @@ const CSS = `
   animation: chichat-draw 2.8s cubic-bezier(0.4,0,0.2,1) 0.5s forwards;
 }
 @keyframes chichat-draw { to { stroke-dashoffset: 0; } }
+.chichat-splash .content {
+  position: absolute; inset: 0; z-index: 3;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: space-between;
+  padding: max(32px, 6vh) 24px max(28px, 5vh);
+}
 .chichat-splash .brand {
-  position: absolute; z-index: 3;
-  left: 40px; right: 40px; top: 50%;
-  transform: translate(0, -55%);
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  padding: 0 24px;
+  flex: 1; width: 100%; min-height: 0;
+  padding: 12px 0;
 }
 .chichat-splash .logo-icon {
   margin-bottom: 14px;
   animation: chichat-rise 0.8s cubic-bezier(0.22,1,0.36,1) 1.2s both;
 }
 .chichat-splash .logo-icon svg {
-  width: 64px; height: 64px;
+  width: clamp(40px, 8vh, 64px);
+  height: clamp(40px, 8vh, 64px);
   filter: drop-shadow(0 4px 18px rgba(34,197,94,0.65));
 }
 .chichat-splash .wordmark {
   font-family: 'DM Sans', sans-serif;
-  font-size: 44px; font-weight: 500;
+  font-size: clamp(28px, 6vh, 44px);
+  font-weight: 500;
   color: #fff; letter-spacing: 2.5px; line-height: 1.15;
   margin-bottom: 10px;
   animation: chichat-rise 0.8s cubic-bezier(0.22,1,0.36,1) 1.35s both;
@@ -84,7 +90,8 @@ const CSS = `
 .chichat-splash .wordmark em { color: #22C55E; font-style: normal; }
 .chichat-splash .tagline {
   font-family: 'DM Sans', sans-serif;
-  font-size: 12px; font-weight: 700;
+  font-size: clamp(10px, 1.6vh, 12px);
+  font-weight: 700;
   color: rgba(255,255,255,0.60);
   letter-spacing: 0.10em;
   text-align: center;
@@ -95,10 +102,16 @@ const CSS = `
   animation: chichat-rise 0.8s cubic-bezier(0.22,1,0.36,1) 1.50s both;
 }
 .chichat-splash .cta-wrap {
-  position: absolute; z-index: 4;
-  bottom: calc(50px + 5%); left: 0; right: 0;
-  display: flex; justify-content: center;
+  display: flex; justify-content: center; width: 100%;
+  flex-shrink: 0;
   animation: chichat-rise 0.8s cubic-bezier(0.22,1,0.36,1) 1.70s both;
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  .chichat-splash .content { padding: 16px 24px; }
+  .chichat-splash .logo-icon { margin-bottom: 6px; }
+  .chichat-splash .wordmark { margin-bottom: 4px; letter-spacing: 1.5px; }
+  .chichat-splash .cta { height: 36px; width: 130px; font-size: 12px; }
+  .chichat-splash .signin { margin-top: 6px; }
 }
 .chichat-splash .cta {
   width: 141px; height: 42px; border-radius: 21px; border: none;
@@ -190,43 +203,46 @@ export default function SplashScreen({ onGetStarted, onSignIn }: Props) {
         />
       </svg>
 
-      <div className="brand">
-        <div className="logo-icon">
-          <svg viewBox="0 0 58 58" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect x="3" y="3" width="45" height="40" rx="12" fill="#22C55E" />
-            <rect x="9" y="9" width="33" height="28" rx="8" fill="#07090C" />
-            <circle cx="18" cy="23" r="3.5" fill="#22C55E" />
-            <circle cx="29" cy="23" r="3.5" fill="#22C55E" />
-            <circle cx="40" cy="23" r="3.5" fill="#22C55E" />
-            <path d="M14 43 L8 54 L26 47" fill="#22C55E" />
-            <circle cx="47" cy="11" r="10" fill="#07090C" />
-            <circle cx="47" cy="11" r="8" fill="#16A34A" />
-            <text
-              x="47" y="15.5"
-              textAnchor="middle"
-              fill="white"
-              fontFamily="Syne,sans-serif"
-              fontSize="10"
-              fontWeight="800"
-            >
-              C
-            </text>
-          </svg>
+      <div className="content">
+        <div style={{ height: 0 }} />
+        <div className="brand">
+          <div className="logo-icon">
+            <svg viewBox="0 0 58 58" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="3" y="3" width="45" height="40" rx="12" fill="#22C55E" />
+              <rect x="9" y="9" width="33" height="28" rx="8" fill="#07090C" />
+              <circle cx="18" cy="23" r="3.5" fill="#22C55E" />
+              <circle cx="29" cy="23" r="3.5" fill="#22C55E" />
+              <circle cx="40" cy="23" r="3.5" fill="#22C55E" />
+              <path d="M14 43 L8 54 L26 47" fill="#22C55E" />
+              <circle cx="47" cy="11" r="10" fill="#07090C" />
+              <circle cx="47" cy="11" r="8" fill="#16A34A" />
+              <text
+                x="47" y="15.5"
+                textAnchor="middle"
+                fill="white"
+                fontFamily="Syne,sans-serif"
+                fontSize="10"
+                fontWeight="800"
+              >
+                C
+              </text>
+            </svg>
+          </div>
+          <div className="wordmark">
+            Chi<em>chat</em>
+          </div>
+          <div className="tagline">Experience The Possibilities</div>
         </div>
-        <div className="wordmark">
-          Chi<em>chat</em>
-        </div>
-        <div className="tagline">Experience The Possibilities</div>
-      </div>
 
-      <div className="cta-wrap">
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-          <button className="cta" onClick={onGetStarted}>
-            Get Started
-          </button>
-          <div className="signin">
-            Already have an account?
-            <button type="button" onClick={onSignIn}>Sign in</button>
+        <div className="cta-wrap">
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+            <button className="cta" onClick={onGetStarted}>
+              Get Started
+            </button>
+            <div className="signin">
+              Already have an account?
+              <button type="button" onClick={onSignIn}>Sign in</button>
+            </div>
           </div>
         </div>
       </div>
