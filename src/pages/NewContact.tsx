@@ -1,10 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Camera, User } from "lucide-react";
-import {
-  addManualContact,
-  getDefaultContactAvatar,
-} from "@/lib/deviceContacts";
+import { addManualContact } from "@/lib/deviceContacts";
 import { saveDeviceContact } from "@/lib/saveDeviceContact";
 import { toast } from "@/hooks/use-toast";
 import { syncGoogleContacts, startGoogleContactsConnect } from "@/lib/googleContacts";
@@ -34,9 +31,8 @@ export default function NewContact() {
   const [busy, setBusy] = useState<"google" | "phone" | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Pre-fill default avatar + sensible default country (from prefilled number, then saved profile, then locale)
+  // Pre-fill avatar from the signed-in user's profile + sensible default country
   useEffect(() => {
-    setAvatar(getDefaultContactAvatar());
     (async () => {
       // 1. From URL prefill
       if (initialPhone.startsWith("+")) {
