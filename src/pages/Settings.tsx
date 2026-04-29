@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   ChevronRight,
@@ -8,8 +8,6 @@ import {
   Cloud,
   Contact2,
   RefreshCw,
-  Camera,
-  ImagePlus,
   Loader2,
 } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
@@ -41,20 +39,9 @@ import {
   hasNewChangesSinceBackup,
   type BackupRow,
 } from "@/lib/chatBackup";
-import {
-  getDefaultContactAvatar,
-  setDefaultContactAvatar,
-  clearContactsCache,
-} from "@/lib/deviceContacts";
+import { clearContactsCache } from "@/lib/deviceContacts";
 
-async function fileToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => resolve(String(r.result));
-    r.onerror = () => reject(r.error);
-    r.readAsDataURL(file);
-  });
-}
+function fileToDataUrl_unused() {}
 
 function bytesLabel(n: number) {
   if (n < 1024) return `${n} B`;
@@ -79,39 +66,9 @@ export default function Settings() {
   const [restoring, setRestoring] = useState(false);
   const [restoreOpen, setRestoreOpen] = useState(false);
 
-  const [defaultAvatar, setDefaultAvatarState] = useState<string | null>(null);
-  const avatarFileRef = useRef<HTMLInputElement>(null);
-
   useEffect(() => {
     document.title = "Settings — Chichat";
-    setDefaultAvatarState(getDefaultContactAvatar());
   }, []);
-
-  const onPickAvatar = () => avatarFileRef.current?.click();
-
-  const onAvatarFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    if (f.size > 2 * 1024 * 1024) {
-      toast({ title: "Image too large", description: "Pick under 2MB.", variant: "destructive" });
-      return;
-    }
-    try {
-      const url = await fileToDataUrl(f);
-      setDefaultContactAvatar(url);
-      setDefaultAvatarState(url);
-      toast({ title: "Default contact photo updated" });
-    } catch {
-      toast({ title: "Could not load image", variant: "destructive" });
-    } finally {
-      e.target.value = "";
-    }
-  };
-
-  const removeAvatar = () => {
-    setDefaultContactAvatar(null);
-    setDefaultAvatarState(null);
-  };
 
   useEffect(() => {
     if (!loading && !user) navigate("/login");
