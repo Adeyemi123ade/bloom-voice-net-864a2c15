@@ -21,6 +21,7 @@ import PhoneSettings from "./pages/PhoneSettings.tsx";
 import ForgotPassword from "./pages/ForgotPassword.tsx";
 import ResetPassword from "./pages/ResetPassword.tsx";
 import OutboundCall from "./pages/OutboundCall.tsx";
+import NewContact from "./pages/NewContact.tsx";
 import MessageNotifier from "./components/MessageNotifier.tsx";
 import IncomingCallScreen from "./components/IncomingCallScreen.tsx";
 
