@@ -46,24 +46,42 @@ const CSS = `
     rgba(7,9,12,0.97) 100%
   );
 }
-.chichat-splash .frame-svg {
-  position: absolute; inset: 0; z-index: 2;
-  pointer-events: none; width: 100%; height: 100%;
+.chichat-splash .frame-outer,
+.chichat-splash .frame-inner {
+  position: absolute; z-index: 2;
+  pointer-events: none;
+  border-radius: 52px;
 }
-.chichat-splash .line-outer {
-  stroke-dasharray: 2200; stroke-dashoffset: 2200;
-  animation: chichat-draw 2.8s cubic-bezier(0.4,0,0.2,1) 0.2s forwards;
+.chichat-splash .frame-outer {
+  top: max(env(safe-area-inset-top), 18px);
+  bottom: max(env(safe-area-inset-bottom), 18px);
+  left: max(env(safe-area-inset-left), 18px);
+  right: max(env(safe-area-inset-right), 18px);
+  border: 1.2px solid rgba(255,255,255,0.28);
+  opacity: 0;
+  animation: chichat-fadein 1.6s ease 0.2s forwards;
 }
-.chichat-splash .line-inner {
-  stroke-dasharray: 2000; stroke-dashoffset: 2000;
-  animation: chichat-draw 2.8s cubic-bezier(0.4,0,0.2,1) 0.5s forwards;
+.chichat-splash .frame-inner {
+  top: max(env(safe-area-inset-top), 30px);
+  bottom: max(env(safe-area-inset-bottom), 30px);
+  left: max(env(safe-area-inset-left), 30px);
+  right: max(env(safe-area-inset-right), 30px);
+  border-radius: 44px;
+  border: 0.9px solid rgba(255,255,255,0.14);
+  opacity: 0;
+  animation: chichat-fadein 1.6s ease 0.5s forwards;
 }
-@keyframes chichat-draw { to { stroke-dashoffset: 0; } }
+@keyframes chichat-fadein { to { opacity: 1; } }
 .chichat-splash .content {
-  position: absolute; inset: 0; z-index: 3;
+  position: absolute;
+  top: max(env(safe-area-inset-top), 28px);
+  bottom: max(env(safe-area-inset-bottom), 28px);
+  left: max(env(safe-area-inset-left), 28px);
+  right: max(env(safe-area-inset-right), 28px);
+  z-index: 3;
   display: flex; flex-direction: column;
   align-items: center; justify-content: space-between;
-  padding: max(32px, 6vh) 24px max(28px, 5vh);
+  padding: 24px 16px;
 }
 .chichat-splash .brand {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -177,31 +195,8 @@ export default function SplashScreen({ onGetStarted, onSignIn }: Props) {
 
       <div className="tint" />
 
-      <svg
-        className="frame-svg"
-        viewBox="0 0 390 844"
-        preserveAspectRatio="xMidYMid meet"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <rect
-          className="line-outer"
-          x="28" y="18"
-          width="334" height="764"
-          rx="52" ry="52"
-          fill="none"
-          stroke="rgba(255,255,255,0.28)"
-          strokeWidth="1.2"
-        />
-        <rect
-          className="line-inner"
-          x="40" y="30"
-          width="310" height="740"
-          rx="44" ry="44"
-          fill="none"
-          stroke="rgba(255,255,255,0.14)"
-          strokeWidth="0.9"
-        />
-      </svg>
+      <div className="frame-outer" />
+      <div className="frame-inner" />
 
       <div className="content">
         <div style={{ height: 0 }} />
