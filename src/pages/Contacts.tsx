@@ -631,48 +631,7 @@ export default function Contacts() {
           </Tabs>
         </div>
 
-        {/* Manual add dialog */}
-        <Dialog open={addOpen} onOpenChange={setAddOpen}>
-          <DialogContent className="max-w-[320px] bg-card border-border">
-            <DialogHeader>
-              <DialogTitle className="text-sm">Add a contact</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="add-name" className="text-xs text-muted-foreground">
-                  Name
-                </Label>
-                <Input
-                  id="add-name"
-                  autoFocus
-                  value={addName}
-                  onChange={(e) => setAddName(e.target.value)}
-                  placeholder="Jane Doe"
-                  className="h-9 text-xs bg-input border-border"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="add-phone" className="text-xs text-muted-foreground">
-                  Phone number
-                </Label>
-                <Input
-                  id="add-phone"
-                  type="tel"
-                  value={addPhone}
-                  onChange={(e) => setAddPhone(e.target.value)}
-                  placeholder="+234 801 234 5678"
-                  className="h-9 text-xs bg-input border-border"
-                />
-              </div>
-              <Button
-                onClick={handleAddManual}
-                className="w-full h-9 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-xs"
-              >
-                Add contact
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        {/* Manual add removed — contacts come from Google. */}
       </div>
       <Dialpad open={dialOpen} onOpenChange={setDialOpen} />
       <ContactActionSheet
