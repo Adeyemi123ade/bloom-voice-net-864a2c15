@@ -49,9 +49,11 @@ export default function NewContact() {
         if (user) {
           const { data } = await supabase
             .from("profiles")
-            .select("phone")
+            .select("phone, avatar_url")
             .eq("id", user.id)
             .maybeSingle();
+          const myAvatar = (data as { avatar_url?: string | null } | null)?.avatar_url;
+          if (myAvatar) setAvatar(myAvatar);
           const myPhone = (data as { phone?: string | null } | null)?.phone;
           if (myPhone) {
             const hit = findByDialPrefix(myPhone);
