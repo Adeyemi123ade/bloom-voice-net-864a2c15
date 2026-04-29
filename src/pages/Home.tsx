@@ -150,6 +150,30 @@ export default function Home() {
     import("@/lib/chatBackup").then((m) => m.maybeRunDailyBackup());
   }, [user]);
 
+  // Offer restore on first sign-in if a backup exists
+  useEffect(() => {
+    if (!user) return;
+    const askedKey = `chichat:restore-asked:${user.id}`;
+    if (localStorage.getItem(askedKey)) return;
+    (async () => {
+      const { getMyBackup, runRestore } = await import("@/lib/chatBackup");
+      const row = await getMyBackup();
+      if (!row || row.message_count === 0) return;
+      localStorage.setItem(askedKey, "1");
+      const ok = window.confirm(
+        `We found a backup from ${new Date(row.last_backup_at).toLocaleString()} ` +
+          `(${row.message_count} messages). Restore now?`,
+      );
+      if (!ok) return;
+      try {
+        const r = await runRestore();
+        toast({ title: "Restored", description: `${r.restored} messages restored.` });
+      } catch (e) {
+        toast({ title: "Restore failed", description: String(e), variant: "destructive" });
+      }
+    })();
+  }, [user]);
+
   // Mark online + heartbeat
   useEffect(() => {
     if (!user) return;
