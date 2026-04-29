@@ -75,9 +75,39 @@ export default function Settings() {
   const [backingUp, setBackingUp] = useState(false);
   const [restoring, setRestoring] = useState(false);
 
+  const [defaultAvatar, setDefaultAvatarState] = useState<string | null>(null);
+  const avatarFileRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     document.title = "Settings — Chichat";
+    setDefaultAvatarState(getDefaultContactAvatar());
   }, []);
+
+  const onPickAvatar = () => avatarFileRef.current?.click();
+
+  const onAvatarFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    if (f.size > 2 * 1024 * 1024) {
+      toast({ title: "Image too large", description: "Pick under 2MB.", variant: "destructive" });
+      return;
+    }
+    try {
+      const url = await fileToDataUrl(f);
+      setDefaultContactAvatar(url);
+      setDefaultAvatarState(url);
+      toast({ title: "Default contact photo updated" });
+    } catch {
+      toast({ title: "Could not load image", variant: "destructive" });
+    } finally {
+      e.target.value = "";
+    }
+  };
+
+  const removeAvatar = () => {
+    setDefaultContactAvatar(null);
+    setDefaultAvatarState(null);
+  };
 
   useEffect(() => {
     if (!loading && !user) navigate("/login");
