@@ -144,6 +144,12 @@ export default function Home() {
     if (!loading && !user) navigate("/login");
   }, [loading, user, navigate]);
 
+  // Daily auto-backup on app open (once per day, silent)
+  useEffect(() => {
+    if (!user) return;
+    import("@/lib/chatBackup").then((m) => m.maybeRunDailyBackup());
+  }, [user]);
+
   // Mark online + heartbeat
   useEffect(() => {
     if (!user) return;
