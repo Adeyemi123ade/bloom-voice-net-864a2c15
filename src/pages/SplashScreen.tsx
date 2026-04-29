@@ -60,10 +60,15 @@ const CSS = `
 }
 @keyframes chichat-draw { to { stroke-dashoffset: 0; } }
 .chichat-splash .content {
-  position: absolute; inset: 0; z-index: 3;
+  position: absolute;
+  top: max(env(safe-area-inset-top), 28px);
+  bottom: max(env(safe-area-inset-bottom), 28px);
+  left: max(env(safe-area-inset-left), 28px);
+  right: max(env(safe-area-inset-right), 28px);
+  z-index: 3;
   display: flex; flex-direction: column;
   align-items: center; justify-content: space-between;
-  padding: max(32px, 6vh) 24px max(28px, 5vh);
+  padding: 24px 16px;
 }
 .chichat-splash .brand {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
