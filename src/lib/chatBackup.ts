@@ -33,10 +33,21 @@ export async function runRestore(): Promise<{ restored: number; total: number }>
 export async function setAutoBackup(enabled: boolean): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
-  await supabase.from("chat_backups").upsert(
-    { user_id: user.id, auto_backup_enabled: enabled },
-    { onConflict: "user_id" },
-  );
+  // Update existing row; if none yet, kick off a backup first so a row exists.
+  const existing = await getMyBackup();
+  if (!existing) {
+    if (enabled) await runBackup();
+    // After backup row exists, set the flag
+    await supabase
+      .from("chat_backups")
+      .update({ auto_backup_enabled: enabled })
+      .eq("user_id", user.id);
+    return;
+  }
+  await supabase
+    .from("chat_backups")
+    .update({ auto_backup_enabled: enabled })
+    .eq("user_id", user.id);
 }
 
 /** Run once per calendar day on app open if auto-backup is enabled. */
