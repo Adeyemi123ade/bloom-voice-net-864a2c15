@@ -21,6 +21,7 @@ import PhoneSettings from "./pages/PhoneSettings.tsx";
 import ForgotPassword from "./pages/ForgotPassword.tsx";
 import ResetPassword from "./pages/ResetPassword.tsx";
 import OutboundCall from "./pages/OutboundCall.tsx";
+import NewContact from "./pages/NewContact.tsx";
 import MessageNotifier from "./components/MessageNotifier.tsx";
 import IncomingCallScreen from "./components/IncomingCallScreen.tsx";
 
@@ -46,6 +47,7 @@ const App = () => (
               <Route path="/call/:id" element={<CallScreen />} />
               <Route path="/calls" element={<Calls />} />
               <Route path="/contacts" element={<Contacts />} />
+              <Route path="/contacts/new" element={<NewContact />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/settings/phone" element={<PhoneSettings />} />
