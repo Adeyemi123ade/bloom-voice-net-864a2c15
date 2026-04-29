@@ -257,6 +257,49 @@ export default function Settings() {
             <ChevronRight className="w-4 h-4 text-muted-foreground" />
           </button>
 
+          {/* Default new-contact photo */}
+          <div className="mt-4 px-3 py-3 rounded-lg bg-secondary/40">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={onPickAvatar}
+                className="relative w-12 h-12 rounded-xl border-2 border-dashed border-primary/50 bg-primary/10 hover:bg-primary/15 flex items-center justify-center overflow-hidden"
+                aria-label="Choose default contact photo"
+              >
+                {defaultAvatar ? (
+                  <img src={defaultAvatar} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <ImagePlus className="w-5 h-5 text-primary" />
+                )}
+                <span className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
+                  <Camera className="w-2.5 h-2.5" />
+                </span>
+              </button>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold">Default contact photo</p>
+                <p className="text-[11px] text-muted-foreground truncate">
+                  Used as the avatar when adding a new contact.
+                </p>
+              </div>
+              {defaultAvatar && (
+                <button
+                  type="button"
+                  onClick={removeAvatar}
+                  className="text-[10px] text-muted-foreground hover:text-destructive px-2 h-7"
+                >
+                  Remove
+                </button>
+              )}
+              <input
+                ref={avatarFileRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={onAvatarFile}
+              />
+            </div>
+          </div>
+
           {/* Connected accounts — Google */}
           <div className="mt-4 px-3 py-3 rounded-lg bg-secondary/40">
             <div className="flex items-center gap-3 mb-2">
