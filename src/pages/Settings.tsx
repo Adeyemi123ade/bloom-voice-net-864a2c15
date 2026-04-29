@@ -1,15 +1,19 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   ChevronRight,
   Smartphone,
   Trash2,
   User as UserIcon,
+  Cloud,
+  Contact2,
+  RefreshCw,
 } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { Switch } from "@/components/ui/switch";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,12 +25,40 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  startGoogleContactsConnect,
+  completeGoogleContactsConnect,
+  syncGoogleContacts,
+} from "@/lib/googleContacts";
+import {
+  getMyBackup,
+  runBackup,
+  runRestore,
+  setAutoBackup,
+  type BackupRow,
+} from "@/lib/chatBackup";
+
+function bytesLabel(n: number) {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  if (n < 1024 * 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} MB`;
+  return `${(n / 1024 / 1024 / 1024).toFixed(2)} GB`;
+}
 
 export default function Settings() {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
+  const [params, setParams] = useSearchParams();
   const [confirmStage, setConfirmStage] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  const [googleEmail, setGoogleEmail] = useState<string | null>(null);
+  const [connecting, setConnecting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+
+  const [backup, setBackup] = useState<BackupRow | null>(null);
+  const [backingUp, setBackingUp] = useState(false);
+  const [restoring, setRestoring] = useState(false);
 
   useEffect(() => {
     document.title = "Settings — Chichat";
@@ -35,6 +67,95 @@ export default function Settings() {
   useEffect(() => {
     if (!loading && !user) navigate("/login");
   }, [loading, user, navigate]);
+
+  // Load Google connection + backup row
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const { data } = await supabase
+        .from("google_oauth_tokens")
+        .select("google_email")
+        .maybeSingle();
+      setGoogleEmail(data?.google_email ?? null);
+      setBackup(await getMyBackup());
+    })();
+  }, [user]);
+
+  // Handle Google OAuth redirect (?code=…)
+  useEffect(() => {
+    const code = params.get("code");
+    if (!code || !user) return;
+    (async () => {
+      try {
+        const r = await completeGoogleContactsConnect(code);
+        setGoogleEmail(r.email);
+        toast({ title: "Google connected", description: r.email ?? "Account linked." });
+        // Auto sync once after connecting
+        setSyncing(true);
+        const list = await syncGoogleContacts();
+        toast({ title: "Contacts synced", description: `${list.length} contacts loaded.` });
+      } catch (e) {
+        toast({ title: "Google connect failed", description: String(e), variant: "destructive" });
+      } finally {
+        setSyncing(false);
+        params.delete("code");
+        params.delete("scope");
+        params.delete("state");
+        setParams(params, { replace: true });
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  const connectGoogle = async () => {
+    setConnecting(true);
+    try { await startGoogleContactsConnect(); }
+    catch (e) {
+      setConnecting(false);
+      toast({ title: "Could not start Google sign-in", description: String(e), variant: "destructive" });
+    }
+  };
+
+  const syncNow = async () => {
+    setSyncing(true);
+    try {
+      const list = await syncGoogleContacts();
+      toast({ title: "Contacts synced", description: `${list.length} contacts loaded.` });
+    } catch (e) {
+      toast({ title: "Sync failed", description: String(e), variant: "destructive" });
+    } finally { setSyncing(false); }
+  };
+
+  const onBackup = async () => {
+    setBackingUp(true);
+    try {
+      const r = await runBackup();
+      toast({ title: "Backup complete", description: `${r.message_count} messages, ${r.media_count} media.` });
+      setBackup(await getMyBackup());
+    } catch (e) {
+      toast({ title: "Backup failed", description: String(e), variant: "destructive" });
+    } finally { setBackingUp(false); }
+  };
+
+  const onRestore = async () => {
+    if (!window.confirm("Restore chats from your latest backup?")) return;
+    setRestoring(true);
+    try {
+      const r = await runRestore();
+      toast({ title: "Restore complete", description: `${r.restored} of ${r.total} messages restored.` });
+    } catch (e) {
+      toast({ title: "Restore failed", description: String(e), variant: "destructive" });
+    } finally { setRestoring(false); }
+  };
+
+  const onToggleAuto = async (v: boolean) => {
+    try {
+      await setAutoBackup(v);
+      setBackup((b) => (b ? { ...b, auto_backup_enabled: v } : b));
+    } catch (e) {
+      toast({ title: "Could not update setting", description: String(e), variant: "destructive" });
+    }
+  };
 
   const deleteAccount = async () => {
     if (!user) return;
@@ -59,7 +180,6 @@ export default function Settings() {
         </div>
 
         <div className="flex-1 px-3 py-4 flex flex-col">
-          {/* Profile */}
           <button
             onClick={() => navigate("/profile")}
             className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-secondary text-left"
@@ -76,7 +196,6 @@ export default function Settings() {
             <ChevronRight className="w-4 h-4 text-muted-foreground" />
           </button>
 
-          {/* Phone settings */}
           <button
             onClick={() => navigate("/settings/phone")}
             className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-secondary text-left"
@@ -93,9 +212,85 @@ export default function Settings() {
             <ChevronRight className="w-4 h-4 text-muted-foreground" />
           </button>
 
+          {/* Connected accounts — Google */}
+          <div className="mt-4 px-3 py-3 rounded-lg bg-secondary/40">
+            <div className="flex items-center gap-3 mb-2">
+              <span className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center">
+                <Contact2 className="w-4 h-4 text-primary" />
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold">Google contacts</p>
+                <p className="text-[11px] text-muted-foreground truncate">
+                  {googleEmail ? `Connected as ${googleEmail}` : "Not connected"}
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              {googleEmail ? (
+                <button
+                  onClick={syncNow}
+                  disabled={syncing}
+                  className="flex-1 h-8 rounded-md bg-primary text-primary-foreground text-[11px] font-medium disabled:opacity-60 inline-flex items-center justify-center gap-1"
+                >
+                  <RefreshCw className={`w-3 h-3 ${syncing ? "animate-spin" : ""}`} />
+                  {syncing ? "Syncing…" : "Sync now"}
+                </button>
+              ) : (
+                <button
+                  onClick={connectGoogle}
+                  disabled={connecting}
+                  className="flex-1 h-8 rounded-md bg-primary text-primary-foreground text-[11px] font-medium disabled:opacity-60"
+                >
+                  {connecting ? "Opening Google…" : "Connect Google"}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Chat backup */}
+          <div className="mt-3 px-3 py-3 rounded-lg bg-secondary/40">
+            <div className="flex items-center gap-3 mb-2">
+              <span className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center">
+                <Cloud className="w-4 h-4 text-primary" />
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold">Chat backup</p>
+                <p className="text-[11px] text-muted-foreground truncate">
+                  {backup
+                    ? `Last: ${new Date(backup.last_backup_at).toLocaleString()} · ${backup.message_count} msgs · ${bytesLabel(backup.total_bytes)}`
+                    : "No backup yet"}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between py-1.5">
+              <span className="text-[11px] text-foreground">Auto-backup daily</span>
+              <Switch
+                checked={backup?.auto_backup_enabled ?? true}
+                onCheckedChange={onToggleAuto}
+              />
+            </div>
+
+            <div className="flex gap-2 mt-1">
+              <button
+                onClick={onBackup}
+                disabled={backingUp}
+                className="flex-1 h-8 rounded-md bg-primary text-primary-foreground text-[11px] font-medium disabled:opacity-60"
+              >
+                {backingUp ? "Backing up…" : "Back up now"}
+              </button>
+              <button
+                onClick={onRestore}
+                disabled={restoring || !backup}
+                className="flex-1 h-8 rounded-md border border-border bg-background text-[11px] font-medium disabled:opacity-50"
+              >
+                {restoring ? "Restoring…" : "Restore"}
+              </button>
+            </div>
+          </div>
+
           <div className="flex-1" />
 
-          {/* Delete account */}
           <div className="pt-6 pb-2">
             <AlertDialog onOpenChange={(o) => !o && setConfirmStage(false)}>
               <AlertDialogTrigger asChild>
@@ -112,7 +307,7 @@ export default function Settings() {
                   <AlertDialogDescription className="text-xs">
                     {confirmStage
                       ? "This permanently removes your profile and signs you out. This cannot be undone."
-                      : "Your profile and presence will be removed. You'll need to register again to come back."}
+                      : "Your profile and presence will be removed. You'll need to register again to come back. Tip: back up your chats first."}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
