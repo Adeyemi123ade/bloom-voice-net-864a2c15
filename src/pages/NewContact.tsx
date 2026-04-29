@@ -249,14 +249,20 @@ export default function NewContact() {
               <label className="text-[11px] font-semibold tracking-[0.15em] text-muted-foreground">
                 PHONE NUMBER
               </label>
-              <input
-                type="tel"
-                inputMode="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="+971 ..."
-                className="w-full h-12 px-4 rounded-xl bg-secondary/40 border border-border/40 text-sm placeholder:text-muted-foreground/70 focus:outline-none focus:border-primary/50"
-              />
+              <div className="flex gap-2">
+                <CountryPicker value={country?.code ?? null} onChange={setCountry} />
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  value={phoneLocal}
+                  onChange={(e) => setPhoneLocal(e.target.value)}
+                  placeholder="Phone number"
+                  className="flex-1 min-w-0 h-12 px-4 rounded-xl bg-secondary/40 border border-border/40 text-sm placeholder:text-muted-foreground/70 focus:outline-none focus:border-primary/50"
+                />
+              </div>
+              {e164 && (
+                <p className="text-[10px] text-muted-foreground pl-1">Will save as {e164}</p>
+              )}
             </div>
 
             <div className="space-y-3 pt-2">
