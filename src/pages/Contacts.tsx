@@ -118,7 +118,9 @@ export default function Contacts() {
     if (!loading && !user) navigate("/login");
   }, [loading, user, navigate]);
 
-  // Initial load: cached contacts + auto-sync from Google when connected.
+  // Initial load: cached contacts + auto-sync.
+  // On native (Android/iOS) we read directly from the device — Google OAuth is
+  // not needed and avoids the in-app-browser 403. On web, we fall back to Google.
   useEffect(() => {
     if (!user) return;
     (async () => {
@@ -138,7 +140,33 @@ export default function Contacts() {
       if (merged.length) await runMatch(merged);
       await loadInvited();
 
-      // Then check Google connection and silently refresh from People API.
+      if (isNativePlatform()) {
+        // Native: read device contacts directly. No OAuth, no external redirects.
+        setGoogleConnected(true); // Hide the "Connect Google" prompt on native.
+        setSyncing(true);
+        try {
+          const list = await loadNativeContacts();
+          saveCachedContacts(list);
+          const fresh = mergeContacts(list, loadManualContacts());
+          setContacts(fresh);
+          if (fresh.length) await runMatch(fresh);
+        } catch (err) {
+          const code = err instanceof Error ? err.message : "";
+          if (code === "PERMISSION_DENIED") {
+            toast({
+              title: "Contacts permission needed",
+              description: "Allow contacts access in your phone settings to see who's on Chichat.",
+              variant: "destructive",
+            });
+          }
+          // NOT_NATIVE shouldn't happen here; ignore other errors silently.
+        } finally {
+          setSyncing(false);
+        }
+        return;
+      }
+
+      // Web: use Google as the contacts source.
       try {
         const connected = await isGoogleConnected();
         setGoogleConnected(connected);
@@ -150,7 +178,7 @@ export default function Contacts() {
             setContacts(fresh);
             if (fresh.length) await runMatch(fresh);
           } catch {
-            // Silent — user can retry from Settings; surfacing errors here would clutter.
+            // Silent — user can retry from Settings.
           } finally {
             setSyncing(false);
           }
