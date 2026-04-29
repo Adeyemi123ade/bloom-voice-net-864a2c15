@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { Phone, Delete, Search, ArrowLeft } from "lucide-react";
+import { Phone, Delete, Search, UserPlus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -196,15 +196,20 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
       >
         <DialogTitle className="sr-only">Call</DialogTitle>
 
-        {/* Header — back arrow only, no title or add-contact action */}
-        <header className="px-4 pt-4 pb-2 flex items-center shrink-0">
+        {/* Header — Add Contact action; navigation handled by bottom nav. */}
+        <header className="px-4 pt-4 pb-2 flex items-center justify-end shrink-0">
           <button
             type="button"
-            aria-label="Back"
-            onClick={() => onOpenChange(false)}
-            className="w-10 h-10 rounded-full hover:bg-secondary flex items-center justify-center"
+            aria-label="Add contact"
+            onClick={() => {
+              const prefill = value ? toE164(value) : null;
+              onOpenChange(false);
+              navigate(prefill ? `/contacts/new?phone=${encodeURIComponent(prefill)}` : "/contacts/new");
+            }}
+            className="h-10 px-3 rounded-full hover:bg-secondary flex items-center gap-2 text-sm font-medium text-foreground"
           >
-            <ArrowLeft className="w-5 h-5 text-foreground" />
+            <UserPlus className="w-5 h-5" />
+            Add contact
           </button>
         </header>
 

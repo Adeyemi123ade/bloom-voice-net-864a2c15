@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  ArrowLeft,
   Edit3,
   Grid3x3,
   Loader2,
@@ -25,9 +24,12 @@ import { formatDisplay } from "@/lib/phone";
 import {
   DeviceContact,
   clearContactsCache,
+  isNativePlatform,
   loadCachedContacts,
   loadManualContacts,
+  loadNativeContacts,
   removeManualContact,
+  saveCachedContacts,
 } from "@/lib/deviceContacts";
 import {
   isGoogleConnected,
@@ -116,7 +118,9 @@ export default function Contacts() {
     if (!loading && !user) navigate("/login");
   }, [loading, user, navigate]);
 
-  // Initial load: cached contacts + auto-sync from Google when connected.
+  // Initial load: cached contacts + auto-sync.
+  // On native (Android/iOS) we read directly from the device — Google OAuth is
+  // not needed and avoids the in-app-browser 403. On web, we fall back to Google.
   useEffect(() => {
     if (!user) return;
     (async () => {
@@ -136,7 +140,33 @@ export default function Contacts() {
       if (merged.length) await runMatch(merged);
       await loadInvited();
 
-      // Then check Google connection and silently refresh from People API.
+      if (isNativePlatform()) {
+        // Native: read device contacts directly. No OAuth, no external redirects.
+        setGoogleConnected(true); // Hide the "Connect Google" prompt on native.
+        setSyncing(true);
+        try {
+          const list = await loadNativeContacts();
+          saveCachedContacts(list);
+          const fresh = mergeContacts(list, loadManualContacts());
+          setContacts(fresh);
+          if (fresh.length) await runMatch(fresh);
+        } catch (err) {
+          const code = err instanceof Error ? err.message : "";
+          if (code === "PERMISSION_DENIED") {
+            toast({
+              title: "Contacts permission needed",
+              description: "Allow contacts access in your phone settings to see who's on Chichat.",
+              variant: "destructive",
+            });
+          }
+          // NOT_NATIVE shouldn't happen here; ignore other errors silently.
+        } finally {
+          setSyncing(false);
+        }
+        return;
+      }
+
+      // Web: use Google as the contacts source.
       try {
         const connected = await isGoogleConnected();
         setGoogleConnected(connected);
@@ -148,7 +178,7 @@ export default function Contacts() {
             setContacts(fresh);
             if (fresh.length) await runMatch(fresh);
           } catch {
-            // Silent — user can retry from Settings; surfacing errors here would clutter.
+            // Silent — user can retry from Settings.
           } finally {
             setSyncing(false);
           }
@@ -219,15 +249,18 @@ export default function Contacts() {
     }
   };
 
-  /** Pull a fresh copy of contacts from the user's Google account. */
+  /** Pull a fresh copy of contacts — from device on native, Google on web. */
   const refreshFromGoogle = async () => {
     setSyncing(true);
     try {
-      const list = await syncGoogleContacts();
+      const list = isNativePlatform()
+        ? await loadNativeContacts()
+        : await syncGoogleContacts();
+      if (isNativePlatform()) saveCachedContacts(list);
       const merged = mergeContacts(list, loadManualContacts());
       setContacts(merged);
       await runMatch(merged);
-      toast({ title: `Loaded ${list.length} contacts from Google` });
+      toast({ title: `Loaded ${list.length} contacts` });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Could not load contacts";
       toast({ title: "Sync failed", description: msg, variant: "destructive" });
@@ -446,22 +479,15 @@ export default function Contacts() {
         >
           <Grid3x3 className="w-6 h-6" />
         </button>
-        {/* Header */}
-        <div className="px-3 pt-4 pb-3 border-b border-border flex items-center gap-2">
-          <button
-            aria-label="Back"
-            onClick={() => navigate(-1)}
-            className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
-          >
-            <ArrowLeft className="w-4 h-4 text-foreground" />
-          </button>
-          <h1 className="text-sm font-semibold text-foreground flex-1">Contacts</h1>
+        {/* Header — no back arrow; navigation is handled by bottom nav + system back. */}
+        <div className="px-4 pt-4 pb-3 border-b border-border flex items-center gap-2">
+          <h1 className="text-base font-semibold text-foreground flex-1">Contacts</h1>
           {googleConnected && (
             <button
               aria-label="Refresh contacts"
               onClick={refreshFromGoogle}
               disabled={syncing || matching}
-              className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary disabled:opacity-50"
+              className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-secondary disabled:opacity-50"
             >
               <Loader2
                 className={`w-4 h-4 text-foreground ${syncing ? "animate-spin" : "hidden"}`}
