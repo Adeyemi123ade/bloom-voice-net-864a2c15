@@ -97,11 +97,10 @@ export default function Contacts() {
   const [showPrivacy, setShowPrivacy] = useState(
     () => !localStorage.getItem(PRIVACY_DISMISSED_KEY),
   );
-  const [addOpen, setAddOpen] = useState(false);
-  const [addName, setAddName] = useState("");
-  const [addPhone, setAddPhone] = useState("");
   const [missingOwnPhone, setMissingOwnPhone] = useState(false);
   const [dialOpen, setDialOpen] = useState(false);
+  const [googleConnected, setGoogleConnected] = useState<boolean | null>(null);
+  const [connectingGoogle, setConnectingGoogle] = useState(false);
   const [actionSheet, setActionSheet] = useState<{
     title: string;
     subtitle?: string;
