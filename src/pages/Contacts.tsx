@@ -219,70 +219,33 @@ export default function Contacts() {
     }
   };
 
-  const handleSync = async () => {
+  /** Pull a fresh copy of contacts from the user's Google account. */
+  const refreshFromGoogle = async () => {
     setSyncing(true);
     try {
-      if (isNativePlatform()) {
-        const list = await loadNativeContacts();
-        if (!list.length) {
-          toast({ title: "No contacts found on device" });
-        }
-        const manual = loadManualContacts();
-        const merged = mergeContacts(list, manual);
-        saveCachedContacts(list);
-        setContacts(merged);
-        await runMatch(merged);
-        toast({ title: `Synced ${list.length} contacts` });
-      } else {
-        toast({
-          title: "Device sync runs in the mobile app",
-          description: "On the web you can add contacts manually below.",
-        });
-        setAddOpen(true);
-      }
+      const list = await syncGoogleContacts();
+      const merged = mergeContacts(list, loadManualContacts());
+      setContacts(merged);
+      await runMatch(merged);
+      toast({ title: `Loaded ${list.length} contacts from Google` });
     } catch (err) {
-      const code = err instanceof Error ? err.message : "";
-      if (code === "PERMISSION_DENIED") {
-        toast({
-          title: "Permission denied",
-          description: "Allow contacts access in your phone settings to sync.",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Sync failed",
-          description: code || "Try again.",
-          variant: "destructive",
-        });
-      }
+      const msg = err instanceof Error ? err.message : "Could not load contacts";
+      toast({ title: "Sync failed", description: msg, variant: "destructive" });
     } finally {
       setSyncing(false);
     }
   };
 
-  const handleRefresh = async () => {
-    clearContactsCache();
-    await handleSync();
-  };
-
-  const handleAddManual = () => {
-    const e164 = toE164(addPhone.trim());
-    if (!e164) {
-      toast({
-        title: "Invalid phone number",
-        description: "Use international format like +234 801 234 5678",
-        variant: "destructive",
-      });
-      return;
+  /** Kick off Google OAuth from this screen so the user never hits a dead end. */
+  const connectGoogle = async () => {
+    setConnectingGoogle(true);
+    try {
+      await startGoogleContactsConnect();
+    } catch (err) {
+      setConnectingGoogle(false);
+      const msg = err instanceof Error ? err.message : "Could not start Google sign-in";
+      toast({ title: "Google sign-in failed", description: msg, variant: "destructive" });
     }
-    const updated = addManualContact(addName.trim() || e164, e164);
-    const cached = loadCachedContacts() ?? [];
-    const merged = mergeContacts(cached, updated);
-    setContacts(merged);
-    setAddName("");
-    setAddPhone("");
-    setAddOpen(false);
-    runMatch(merged);
   };
 
   const handleRemoveManual = (e164: string) => {
