@@ -126,7 +126,7 @@ export default function AddNumberDialog({
               {mode === "create" && "Create new contact"}
               {mode === "existing" && "Add to existing contact"}
             </DialogTitle>
-            <DialogDescription className="text-[11px] truncate">
+            <DialogDescription className="text-xs truncate">
               {formatDisplay(phoneE164) || phoneE164}
             </DialogDescription>
           </div>
@@ -145,7 +145,7 @@ export default function AddNumberDialog({
                 <span className="block text-xs font-semibold">
                   Create new contact
                 </span>
-                <span className="block text-[10px] text-muted-foreground">
+                <span className="block text-2xs text-muted-foreground">
                   Save as a brand new contact
                 </span>
               </span>
@@ -162,7 +162,7 @@ export default function AddNumberDialog({
                 <span className="block text-xs font-semibold">
                   Add to existing contact
                 </span>
-                <span className="block text-[10px] text-muted-foreground">
+                <span className="block text-2xs text-muted-foreground">
                   {allContacts.length === 0
                     ? "No contacts yet"
                     : "Attach to someone you already know"}
@@ -175,7 +175,7 @@ export default function AddNumberDialog({
         {mode === "create" && (
           <div className="px-4 pb-4 space-y-3">
             <div className="space-y-1.5">
-              <Label htmlFor="add-contact-name" className="text-[11px]">
+              <Label htmlFor="add-contact-name" className="text-xs">
                 Name
               </Label>
               <Input
@@ -220,7 +220,7 @@ export default function AddNumberDialog({
             </div>
             <div className="max-h-64 overflow-y-auto -mx-1">
               {filtered.length === 0 ? (
-                <p className="text-[11px] text-muted-foreground text-center py-6">
+                <p className="text-xs text-muted-foreground text-center py-6">
                   No matching contacts
                 </p>
               ) : (
@@ -231,14 +231,14 @@ export default function AddNumberDialog({
                     disabled={busy}
                     className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-secondary text-left disabled:opacity-40"
                   >
-                    <span className="w-8 h-8 rounded-full bg-secondary text-foreground text-[11px] font-semibold flex items-center justify-center shrink-0">
+                    <span className="w-8 h-8 rounded-full bg-secondary text-foreground text-xs font-semibold flex items-center justify-center shrink-0">
                       {c.name.trim().charAt(0).toUpperCase() || "?"}
                     </span>
                     <span className="flex-1 min-w-0">
                       <span className="block text-xs font-medium truncate">
                         {c.name}
                       </span>
-                      <span className="block text-[10px] text-muted-foreground truncate">
+                      <span className="block text-2xs text-muted-foreground truncate">
                         {c.phones[0] ? formatDisplay(c.phones[0]) : ""}
                       </span>
                     </span>

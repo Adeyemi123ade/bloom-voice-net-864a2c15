@@ -52,12 +52,12 @@ export default function SaveContactDialog({
       <DialogContent className="max-w-[320px]">
         <DialogHeader>
           <DialogTitle className="text-sm">Save contact</DialogTitle>
-          <DialogDescription className="text-[11px]">
+          <DialogDescription className="text-xs">
             {formatDisplay(phoneE164) || phoneE164}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-2">
-          <Label htmlFor="contact-name" className="text-[11px]">Name</Label>
+          <Label htmlFor="contact-name" className="text-xs">Name</Label>
           <Input
             id="contact-name"
             value={name}

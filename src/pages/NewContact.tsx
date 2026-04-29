@@ -233,7 +233,7 @@ export default function NewContact() {
           {/* Form */}
           <div className="space-y-5">
             <div className="space-y-2">
-              <label className="text-[11px] font-semibold tracking-[0.15em] text-muted-foreground">
+              <label className="text-xs font-semibold tracking-[0.15em] text-muted-foreground">
                 FULL NAME
               </label>
               <input
@@ -246,7 +246,7 @@ export default function NewContact() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-[11px] font-semibold tracking-[0.15em] text-muted-foreground">
+              <label className="text-xs font-semibold tracking-[0.15em] text-muted-foreground">
                 PHONE NUMBER
               </label>
               <div className="flex gap-2">
@@ -261,12 +261,12 @@ export default function NewContact() {
                 />
               </div>
               {e164 && (
-                <p className="text-[10px] text-muted-foreground pl-1">Will save as {e164}</p>
+                <p className="text-2xs text-muted-foreground pl-1">Will save as {e164}</p>
               )}
             </div>
 
             <div className="space-y-3 pt-2">
-              <p className="text-[11px] font-semibold tracking-[0.15em] text-muted-foreground">
+              <p className="text-xs font-semibold tracking-[0.15em] text-muted-foreground">
                 SAVE TO
               </p>
 
@@ -290,7 +290,7 @@ export default function NewContact() {
 
               <div className="rounded-xl bg-secondary/30 border border-border/30 px-3 py-3 flex gap-2">
                 <span aria-hidden className="text-blue-400 mt-0.5">ℹ️</span>
-                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                <p className="text-xs text-muted-foreground leading-relaxed">
                   Contacts are saved directly to your phone — not stored inside the app.
                 </p>
               </div>

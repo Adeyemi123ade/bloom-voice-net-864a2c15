@@ -136,7 +136,7 @@ export default function PhoneSettings() {
             </span>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-semibold text-foreground">Theme</p>
-              <p className="text-[11px] text-muted-foreground">{themeLabel}</p>
+              <p className="text-xs text-muted-foreground">{themeLabel}</p>
             </div>
             <ChevronRight className="w-4 h-4 text-muted-foreground" />
           </button>
@@ -151,7 +151,7 @@ export default function PhoneSettings() {
             </span>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-semibold text-foreground">Ringtone</p>
-              <p className="text-[11px] text-muted-foreground truncate">
+              <p className="text-xs text-muted-foreground truncate">
                 {toneLabel} · plays on incoming calls
               </p>
             </div>
@@ -216,7 +216,7 @@ export default function PhoneSettings() {
             <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
               {/* From device */}
               <div>
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground px-1 mb-1">
+                <p className="text-2xs uppercase tracking-wider text-muted-foreground px-1 mb-1">
                   From my music
                 </p>
                 <div className="space-y-1">
@@ -250,7 +250,7 @@ export default function PhoneSettings() {
                       <p className="text-xs font-medium text-foreground">
                         {custom ? "Replace audio…" : "Pick audio from device…"}
                       </p>
-                      <p className="text-[10px] text-muted-foreground">
+                      <p className="text-2xs text-muted-foreground">
                         Any audio file under 3 MB
                       </p>
                     </div>
@@ -260,7 +260,7 @@ export default function PhoneSettings() {
 
               {(Object.keys(grouped) as Array<keyof typeof grouped>).map((cat) => (
                 <div key={cat}>
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground px-1 mb-1">
+                  <p className="text-2xs uppercase tracking-wider text-muted-foreground px-1 mb-1">
                     {cat}
                   </p>
                   <div className="space-y-1">
@@ -279,7 +279,7 @@ export default function PhoneSettings() {
                 </div>
               ))}
             </div>
-            <p className="text-[10px] text-muted-foreground px-1 pt-1">
+            <p className="text-2xs text-muted-foreground px-1 pt-1">
               Tap ▶ to preview, tap the name to select. ✓ marks the active ringtone.
             </p>
           </DialogContent>
@@ -331,7 +331,7 @@ function RingtoneRow({
         >
           {label}
         </p>
-        <p className="text-[10px] text-muted-foreground truncate">{description}</p>
+        <p className="text-2xs text-muted-foreground truncate">{description}</p>
       </button>
       {isSelected && (
         <span className="w-5 h-5 rounded-full bg-primary flex items-center justify-center shrink-0">

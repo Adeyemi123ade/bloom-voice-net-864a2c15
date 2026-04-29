@@ -181,7 +181,7 @@ export function AttachmentBubble({
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-[12px] font-medium truncate">{meta.name}</p>
-          <p className={`text-[10px] ${mine ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
+          <p className={`text-2xs ${mine ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
             {style.label}
             {meta.size ? ` · ${fmtSize(meta.size)}` : ""}
           </p>

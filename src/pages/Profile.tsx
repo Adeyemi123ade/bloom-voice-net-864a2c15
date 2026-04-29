@@ -167,7 +167,7 @@ export default function Profile() {
           </div>
 
           <div className="w-full mt-5 space-y-1.5">
-            <Label htmlFor="name" className="text-[11px] text-muted-foreground">Display name</Label>
+            <Label htmlFor="name" className="text-xs text-muted-foreground">Display name</Label>
             <Input
               id="name"
               value={displayName}
@@ -178,7 +178,7 @@ export default function Profile() {
           </div>
 
           <div className="w-full mt-3 space-y-1.5">
-            <Label htmlFor="about" className="text-[11px] text-muted-foreground">About</Label>
+            <Label htmlFor="about" className="text-xs text-muted-foreground">About</Label>
             <Textarea
               id="about"
               value={about}
@@ -189,7 +189,7 @@ export default function Profile() {
           </div>
 
           <div className="w-full mt-3 space-y-1.5">
-            <Label htmlFor="phone" className="text-[11px] text-muted-foreground">
+            <Label htmlFor="phone" className="text-xs text-muted-foreground">
               Phone number
             </Label>
             <div className="flex items-center gap-2">
@@ -211,14 +211,14 @@ export default function Profile() {
                 <button
                   type="button"
                   onClick={() => setPhone("")}
-                  className="text-[10px] text-muted-foreground hover:text-foreground px-2 h-9"
+                  className="text-2xs text-muted-foreground hover:text-foreground px-2 h-9"
                   aria-label="Clear phone"
                 >
                   Clear
                 </button>
               )}
             </div>
-            <p className="text-[10px] text-muted-foreground">
+            <p className="text-2xs text-muted-foreground">
               Required so friends can find you when they sync their contacts.
               {phone && toE164(phone) && (
                 <span className="block text-foreground/70 mt-0.5">
@@ -229,7 +229,7 @@ export default function Profile() {
           </div>
 
           <div className="w-full mt-3 space-y-1.5">
-            <Label className="text-[11px] text-muted-foreground">Email</Label>
+            <Label className="text-xs text-muted-foreground">Email</Label>
             <Input value={user?.email ?? ""} disabled className="h-9 text-xs bg-input border-border" />
           </div>
 

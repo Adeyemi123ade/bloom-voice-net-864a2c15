@@ -297,7 +297,7 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
           </div>
 
           {/* Live formatted preview */}
-          <div className="h-4 mb-2 text-[10px] text-muted-foreground text-center truncate">
+          <div className="h-4 mb-2 text-2xs text-muted-foreground text-center truncate">
             {e164Preview && formatDisplay(e164Preview) !== value
               ? formatDisplay(e164Preview)
               : "\u00A0"}

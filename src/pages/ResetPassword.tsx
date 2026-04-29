@@ -76,7 +76,7 @@ export default function ResetPassword() {
           <h1 className="text-[18px] font-bold text-foreground leading-tight">
             Set a new password
           </h1>
-          <p className="text-[11px] text-muted-foreground mt-1">
+          <p className="text-xs text-muted-foreground mt-1">
             {ready
               ? "Choose a strong password you haven't used before."
               : "Open this page from the reset link in your email."}
@@ -86,7 +86,7 @@ export default function ResetPassword() {
         <form onSubmit={handleSubmit} className="mt-3 flex-1 flex flex-col">
           <div className="space-y-2.5">
             <div>
-              <Label htmlFor="password" className="text-[10px] text-muted-foreground">
+              <Label htmlFor="password" className="text-2xs text-muted-foreground">
                 New password
               </Label>
               <div className="relative mt-1">
@@ -111,12 +111,12 @@ export default function ResetPassword() {
                 </button>
               </div>
               {errors.password && (
-                <p className="text-[10px] text-destructive mt-1">{errors.password}</p>
+                <p className="text-2xs text-destructive mt-1">{errors.password}</p>
               )}
             </div>
 
             <div>
-              <Label htmlFor="confirm" className="text-[10px] text-muted-foreground">
+              <Label htmlFor="confirm" className="text-2xs text-muted-foreground">
                 Confirm password
               </Label>
               <Input
@@ -131,7 +131,7 @@ export default function ResetPassword() {
                 aria-invalid={!!errors.confirm}
               />
               {errors.confirm && (
-                <p className="text-[10px] text-destructive mt-1">{errors.confirm}</p>
+                <p className="text-2xs text-destructive mt-1">{errors.confirm}</p>
               )}
             </div>
           </div>
