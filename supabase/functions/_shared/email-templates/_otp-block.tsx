@@ -29,10 +29,10 @@ export const OtpCodeBlock = ({ token }: { token: string }) => {
               <Text
                 style={{
                   fontFamily: '-apple-system, BlinkMacSystemFont, "SF Mono", Menlo, monospace',
-                  fontSize: '38px',
+                  fontSize: t.length > 6 ? '32px' : '38px',
                   fontWeight: 'bold' as const,
                   color: '#ffffff',
-                  letterSpacing: '6px',
+                  letterSpacing: t.length > 6 ? '4px' : '6px',
                   margin: 0,
                   lineHeight: '1.1',
                 }}
