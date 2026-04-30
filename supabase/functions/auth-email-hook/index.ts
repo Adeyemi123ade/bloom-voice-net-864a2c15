@@ -231,10 +231,13 @@ async function handleWebhook(req: Request): Promise<Response> {
   )
 
   let firstName = ''
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  const candidateId = payload.data.user_id || payload.user?.id || ''
   try {
-    const { data: userResp } = await supabaseLookup.auth.admin.getUserById(
-      payload.data.user_id || payload.user?.id || ''
-    )
+    if (!UUID_RE.test(candidateId)) {
+      throw new Error('No valid user id on payload; will look up by email')
+    }
+    const { data: userResp } = await supabaseLookup.auth.admin.getUserById(candidateId)
     const meta = userResp?.user?.user_metadata as Record<string, any> | undefined
     const fullName: string | undefined =
       meta?.full_name || meta?.name || meta?.display_name
