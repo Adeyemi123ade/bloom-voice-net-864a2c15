@@ -28,6 +28,7 @@ type Message = {
   sender_id: string;
   content: string;
   created_at: string;
+  delivered_at: string | null;
   read_at: string | null;
   edited_at: string | null;
   deleted_for_everyone: boolean;
