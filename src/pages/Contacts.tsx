@@ -496,20 +496,8 @@ export default function Contacts() {
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          {missingOwnPhone && (
-            <div className="mx-3 mt-3 p-3 rounded-lg bg-accent/10 border border-accent/30">
-              <p className="text-xs text-foreground">
-                Add your phone number on your profile so friends can find you when
-                they sync their contacts.
-              </p>
-              <Button
-                onClick={() => navigate("/profile")}
-                className="mt-2 h-8 px-3 text-xs bg-accent hover:bg-accent/90 text-accent-foreground"
-              >
-                Add phone number
-              </Button>
-            </div>
-          )}
+          {/* Share invite link — anyone you send this to can join. */}
+          <ShareInviteCard />
 
           {/* Google connection prompt — only when not yet linked. Always offers a way back. */}
           {googleConnected === false && (
