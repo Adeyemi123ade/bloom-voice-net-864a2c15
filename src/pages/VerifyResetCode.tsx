@@ -11,6 +11,8 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
+const OTP_LENGTH = 8;
+
 /**
  * Verify the password-reset OTP. On success Supabase establishes a recovery
  * session and we route the user to /reset-password to choose a new password.
