@@ -36,6 +36,13 @@ Deno.serve(async (req) => {
       .eq("user_id", user.id)
       .maybeSingle();
     if (!row) return json({ error: "Not connected" }, 400);
+    if (!hasContactsScope(row.scope)) {
+      await admin.from("google_oauth_tokens").delete().eq("user_id", user.id);
+      return json({
+        error: "Google contacts permission is missing. Please reconnect Google Contacts.",
+        reconnectRequired: true,
+      });
+    }
 
     let accessToken = row.access_token;
     if (new Date(row.expires_at).getTime() < Date.now() + 60000 && row.refresh_token) {
@@ -74,7 +81,7 @@ Deno.serve(async (req) => {
           return json({
             error: "Google contacts permission is missing. Please reconnect Google Contacts.",
             reconnectRequired: true,
-          }, 400);
+          });
         }
         return json({ error: data }, 400);
       }
