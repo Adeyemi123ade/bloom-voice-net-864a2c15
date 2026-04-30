@@ -386,6 +386,7 @@ export default function Settings() {
             </AlertDialog>
           </div>
         </div>
+      </div>
     </MobileFrame>
   );
 }
