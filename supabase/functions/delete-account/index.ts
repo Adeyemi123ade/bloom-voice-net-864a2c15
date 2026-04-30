@@ -20,7 +20,7 @@ Deno.serve(async (req) => {
     }
     const token = authHeader.slice("Bearer ".length);
 
-    // Validate JWT via getClaims (works with the new signing-keys system).
+    // Validate JWT (works with the new signing-keys system).
     const userClient = createClient(SUPABASE_URL, ANON_KEY);
     const { data: claimsRes, error: claimsErr } = await userClient.auth.getClaims(token);
     if (claimsErr || !claimsRes?.claims?.sub) {
@@ -31,17 +31,24 @@ Deno.serve(async (req) => {
     }
     const userId = claimsRes.claims.sub as string;
 
-    // Service-role client for full cleanup.
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
 
-    // Best-effort wipe of user-owned rows.
-    await admin.from("chat_backups").delete().eq("user_id", userId);
-    await admin.from("device_push_tokens").delete().eq("user_id", userId);
-    await admin.from("google_oauth_tokens").delete().eq("user_id", userId);
-    await admin.from("invites").delete().eq("inviter_id", userId);
-    await admin.from("typing_indicators").delete().eq("user_id", userId);
-    await admin.from("call_stats").delete().eq("caller_id", userId);
-    await admin.from("profiles").delete().eq("id", userId);
+    // Best-effort wipe of every row that belongs to or references this user.
+    // We swallow individual errors so one missing table can't block deletion.
+    const safe = async (p: Promise<unknown>) => { try { await p; } catch { /* ignore */ } };
+
+    await safe(admin.from("chat_backups").delete().eq("user_id", userId));
+    await safe(admin.from("device_push_tokens").delete().eq("user_id", userId));
+    await safe(admin.from("google_oauth_tokens").delete().eq("user_id", userId));
+    await safe(admin.from("invites").delete().eq("inviter_id", userId));
+    await safe(admin.from("typing_indicators").delete().eq("user_id", userId));
+    await safe(admin.from("call_stats").delete().eq("caller_id", userId));
+    await safe(admin.from("call_stats").delete().eq("callee_id", userId));
+    await safe(admin.from("messages").delete().eq("sender_id", userId));
+    await safe(admin.from("conversation_participants").delete().eq("user_id", userId));
+    await safe(admin.from("calls").delete().eq("caller_id", userId));
+    await safe(admin.from("calls").delete().eq("callee_id", userId));
+    await safe(admin.from("profiles").delete().eq("id", userId));
 
     // Finally remove the auth user so the email/phone is freed for re-signup.
     const { error: delErr } = await admin.auth.admin.deleteUser(userId);
