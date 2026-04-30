@@ -10,18 +10,19 @@ import {
   Preview,
   Text,
 } from 'npm:@react-email/components@0.0.22'
-import { getOtpCode, OtpCodeBlock } from './_otp-block.tsx'
-import { BrandHeader, FeatureStrip, SignOff } from './_brand.tsx'
+import { getEmailOtpCode, OtpCodeBlock } from './_otp-block.tsx'
+import { BrandHeader, BrandHero, FeatureStrip, SignOff } from './_brand.tsx'
 
 interface MagicLinkEmailProps {
   siteName: string
   confirmationUrl: string
   token: string
+  displayCode?: string
   firstName?: string
 }
 
-export const MagicLinkEmail = ({ token, firstName }: MagicLinkEmailProps) => {
-  const code = getOtpCode(token)
+export const MagicLinkEmail = ({ token, displayCode, firstName }: MagicLinkEmailProps) => {
+  const code = getEmailOtpCode(token, displayCode)
 
   return (
   <Html lang="en" dir="ltr">
@@ -30,6 +31,7 @@ export const MagicLinkEmail = ({ token, firstName }: MagicLinkEmailProps) => {
     <Body style={main}>
       <Container style={container}>
         <BrandHeader />
+        <BrandHero />
 
         <Heading style={h1}>
           {firstName ? `Welcome back, ${firstName}!` : 'Welcome back!'} <span style={{ color: '#F5C518' }}>👋</span>
@@ -39,7 +41,7 @@ export const MagicLinkEmail = ({ token, firstName }: MagicLinkEmailProps) => {
           Use the verification code below to sign in to ChiChat. Just enter it in the app — no link to click.
         </Text>
 
-        <OtpCodeBlock token={token} />
+        <OtpCodeBlock token={token} displayCode={displayCode} />
 
         <Text style={footer}>
           If you didn&rsquo;t ask to sign in, you can safely ignore this email.
