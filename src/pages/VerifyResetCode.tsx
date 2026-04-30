@@ -71,7 +71,7 @@ export default function VerifyResetCode() {
 
   const handleChange = (value: string) => {
     setCode(value);
-    if (value.length === 6 && !autoSubmitted.current) {
+    if (value.length === OTP_LENGTH && !autoSubmitted.current) {
       autoSubmitted.current = true;
       verify(value);
     }
