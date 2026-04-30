@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-  Send, Check, CheckCheck, Phone, Video, Mic, Square, Trash2, Pencil, X,
+  Send, Check, CheckCheck, Mic, Square, Trash2, Pencil, X,
   Play, Pause, Paperclip, Copy, Reply, Forward, PhoneIncoming, PhoneOutgoing, PhoneMissed,
 } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
@@ -28,6 +28,7 @@ type Message = {
   sender_id: string;
   content: string;
   created_at: string;
+  delivered_at: string | null;
   read_at: string | null;
   edited_at: string | null;
   deleted_for_everyone: boolean;
@@ -421,6 +422,16 @@ export default function ChatRoom() {
 
   useEffect(() => {
     if (!user || !conversationId) return;
+    // Mark incoming messages as delivered as soon as we receive them on this device.
+    const undelivered = messages.filter((m) => m.sender_id !== user.id && !m.delivered_at);
+    if (undelivered.length > 0) {
+      supabase
+        .from("messages")
+        .update({ delivered_at: new Date().toISOString() })
+        .in("id", undelivered.map((m) => m.id))
+        .then(() => {});
+    }
+    // Mark them read while the chat is open.
     const unread = messages.filter((m) => m.sender_id !== user.id && !m.read_at);
     if (unread.length === 0) return;
     supabase
@@ -920,20 +931,6 @@ export default function ChatRoom() {
                 ) : null}
               </div>
             </div>
-            <button
-              aria-label="Voice call"
-              onClick={() => startCall("voice")}
-              className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
-            >
-              <Phone className="w-4 h-4 text-foreground" />
-            </button>
-            <button
-              aria-label="Video call"
-              onClick={() => startCall("video")}
-              className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
-            >
-              <Video className="w-4 h-4 text-foreground" />
-            </button>
           </div>
         )}
 
@@ -1049,9 +1046,11 @@ export default function ChatRoom() {
                       </span>
                       {mine && !isDeleted && (
                         m.read_at ? (
-                          <CheckCheck className="w-3 h-3 text-primary-foreground/90" />
+                          <CheckCheck className="w-3 h-3 text-sky-400" />
+                        ) : m.delivered_at ? (
+                          <CheckCheck className={`w-3 h-3 ${mine ? "text-primary-foreground/70" : "text-muted-foreground"}`} />
                         ) : (
-                          <Check className="w-3 h-3 text-primary-foreground/70" />
+                          <Check className={`w-3 h-3 ${mine ? "text-primary-foreground/70" : "text-muted-foreground"}`} />
                         )
                       )}
                     </div>

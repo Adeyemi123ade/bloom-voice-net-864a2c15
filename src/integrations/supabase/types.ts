@@ -247,6 +247,7 @@ export type Database = {
           conversation_id: string
           created_at: string
           deleted_for_everyone: boolean
+          delivered_at: string | null
           edited_at: string | null
           id: string
           read_at: string | null
@@ -257,6 +258,7 @@ export type Database = {
           conversation_id: string
           created_at?: string
           deleted_for_everyone?: boolean
+          delivered_at?: string | null
           edited_at?: string | null
           id?: string
           read_at?: string | null
@@ -267,6 +269,7 @@ export type Database = {
           conversation_id?: string
           created_at?: string
           deleted_for_everyone?: boolean
+          delivered_at?: string | null
           edited_at?: string | null
           id?: string
           read_at?: string | null
