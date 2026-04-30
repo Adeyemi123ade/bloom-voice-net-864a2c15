@@ -356,10 +356,19 @@ export default function Contacts() {
     setInvitedPhones((prev) => new Set(prev).add(c.phone));
   };
 
-  /** "Invite" button → native OS share sheet. Records invite if shared. */
+  /** "Invite" button → native OS share sheet. Records invite if shared.
+   *  If the browser blocks/lacks share + popup, fall back to the /invite page. */
   const inviteContact = async (c: InviteContact) => {
-    const sent = await shareChichatInvite(inviteMessage(c.name));
-    if (sent) await recordInvite(c);
+    try {
+      const sent = await shareChichatInvite(inviteMessage(c.name));
+      if (sent) {
+        await recordInvite(c);
+        return;
+      }
+    } catch {
+      /* fall through */
+    }
+    navigate("/invite");
   };
 
   const openActiveActions = (c: ActiveContact) => {
