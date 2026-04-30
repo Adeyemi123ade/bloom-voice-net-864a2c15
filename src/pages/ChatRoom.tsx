@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-  Send, Check, CheckCheck, Phone, Video, Mic, Square, Trash2, Pencil, X,
+  Send, Check, CheckCheck, Mic, Square, Trash2, Pencil, X,
   Play, Pause, Paperclip, Copy, Reply, Forward, PhoneIncoming, PhoneOutgoing, PhoneMissed,
 } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
