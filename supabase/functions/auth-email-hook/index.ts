@@ -261,20 +261,28 @@ async function handleWebhook(req: Request): Promise<Response> {
   // Email-based fallback (covers cases where user_id is missing/invalid)
   if (!firstName && payload.data.email) {
     try {
-      const { data: profileByEmail } = await supabaseLookup
-        .from('profiles')
-        .select('display_name')
-        .eq('id', (
-          await supabaseLookup
-            .schema('auth' as any)
-            .from('users' as any)
-            .select('id')
-            .eq('email', payload.data.email)
-            .maybeSingle()
-        ).data?.id ?? '00000000-0000-0000-0000-000000000000')
-        .maybeSingle()
-      if (profileByEmail?.display_name) {
-        firstName = String(profileByEmail.display_name).trim().split(/\s+/)[0] || ''
+      // Use admin listUsers with email filter
+      const { data: list } = await supabaseLookup.auth.admin.listUsers({
+        page: 1,
+        perPage: 1,
+      } as any)
+      const match = list?.users?.find(
+        (u: any) => (u.email || '').toLowerCase() === payload.data.email.toLowerCase()
+      )
+      const meta = match?.user_metadata as Record<string, any> | undefined
+      const fullName: string | undefined =
+        meta?.full_name || meta?.name || meta?.display_name
+      if (fullName) {
+        firstName = fullName.trim().split(/\s+/)[0] || ''
+      } else if (match?.id) {
+        const { data: profile } = await supabaseLookup
+          .from('profiles')
+          .select('display_name')
+          .eq('id', match.id)
+          .maybeSingle()
+        if (profile?.display_name) {
+          firstName = String(profile.display_name).trim().split(/\s+/)[0] || ''
+        }
       }
     } catch (_e) {
       // Silent — name is optional
