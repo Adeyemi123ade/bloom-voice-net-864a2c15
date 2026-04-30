@@ -4,7 +4,6 @@ import {
   ChevronDown,
   ChevronRight,
   Cloud,
-  LogOut,
   Smartphone,
   Trash2,
   User as UserIcon,
@@ -39,7 +38,6 @@ export default function Settings() {
   const [confirmStage, setConfirmStage] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [backup, setBackup] = useState<BackupRow | null>(null);
-  const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
     document.title = "Settings — Chichat";
@@ -64,16 +62,6 @@ export default function Settings() {
     (async () => setBackup(await getMyBackup()))();
   }, [user]);
 
-  const signOut = async () => {
-    setSigningOut(true);
-    try {
-      await supabase.auth.signOut({ scope: "global" });
-      window.location.replace("/login");
-    } catch (e) {
-      toast({ title: "Could not sign out", description: friendly(e), variant: "destructive" });
-      setSigningOut(false);
-    }
-  };
 
   const deleteAccount = async () => {
     if (!user) return;
@@ -171,7 +159,7 @@ export default function Settings() {
               <div className="flex-1 min-w-0">
                 <p className="text-base font-semibold text-foreground">Account</p>
                 <p className="text-sm text-muted-foreground truncate">
-                  Profile, sign out · {user?.email ?? "this device"}
+                  Profile · {user?.email ?? "this device"}
                 </p>
               </div>
               <ChevronDown className="w-5 h-5 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
@@ -191,14 +179,6 @@ export default function Settings() {
                 <ChevronRight className="w-4 h-4 text-muted-foreground" />
               </button>
 
-              <button
-                onClick={signOut}
-                disabled={signingOut}
-                className="w-full h-11 rounded-md border border-border bg-background text-sm font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-60"
-              >
-                <LogOut className="w-4 h-4" />
-                {signingOut ? "Signing out…" : "Sign out"}
-              </button>
             </CollapsibleContent>
           </Collapsible>
 
