@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { z } from "zod";
-import { ArrowLeft, Eye, EyeOff, MailCheck } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -68,10 +68,8 @@ export default function Register() {
   const [submitting, setSubmitting] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
-  // After successful signup we render a "check your email" screen so the user
-  // knows to verify before signing in.
-  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
-  const [resending, setResending] = useState(false);
+  // After successful signup we navigate to /verify-email so the user
+  // can enter the 6-digit code we email them. No link-based flow.
 
   const handleGoogle = async () => {
     setGoogleLoading(true);
@@ -125,7 +123,7 @@ export default function Register() {
       password: parsed.data.password,
       options: {
         data: { full_name: parsed.data.name, phone: e164 },
-        emailRedirectTo: `${window.location.origin}/welcome`,
+        // No emailRedirectTo — Supabase sends a 6-digit OTP code, not a link.
       },
     });
     if (error) {
@@ -150,69 +148,9 @@ export default function Register() {
       }
     }
     setSubmitting(false);
-    setPendingEmail(parsed.data.email);
+    // Route to the OTP entry screen.
+    navigate("/verify-email", { state: { email: parsed.data.email }, replace: true });
   };
-
-  const resendConfirmation = async () => {
-    if (!pendingEmail) return;
-    setResending(true);
-    const { error } = await supabase.auth.resend({
-      type: "signup",
-      email: pendingEmail,
-      options: { emailRedirectTo: `${window.location.origin}/welcome` },
-    });
-    setResending(false);
-    if (error) {
-      toast({ title: "Couldn't resend", description: error.message, variant: "destructive" });
-      return;
-    }
-    toast({ title: "Verification email sent again" });
-  };
-
-  // ---------- Post-signup confirmation screen ----------
-  if (pendingEmail) {
-    return (
-      <MobileFrame>
-        <div className="h-full w-full overflow-y-auto flex justify-center bg-background">
-          <div className="w-full max-w-sm flex flex-col items-center text-center px-6 pt-16 pb-8">
-            <span className="w-16 h-16 rounded-full bg-primary/15 flex items-center justify-center mb-5">
-              <MailCheck className="w-8 h-8 text-primary" />
-            </span>
-            <h1 className="text-xl font-bold text-foreground">Confirm your email</h1>
-            <p className="text-base text-muted-foreground mt-2 leading-relaxed">
-              We've sent a verification link to{" "}
-              <span className="text-foreground font-semibold">{pendingEmail}</span>.
-              Open it on this device to activate your account.
-            </p>
-            <p className="text-sm text-muted-foreground mt-3">
-              The email may take a minute. Don't forget to check your spam folder.
-            </p>
-
-            <Button
-              onClick={() => navigate("/login")}
-              className="w-full h-11 mt-8 text-base bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg"
-            >
-              I've verified — Sign in
-            </Button>
-            <Button
-              onClick={resendConfirmation}
-              disabled={resending}
-              variant="outline"
-              className="w-full h-11 mt-2 text-base font-semibold rounded-lg"
-            >
-              {resending ? "Sending…" : "Resend verification email"}
-            </Button>
-            <button
-              onClick={() => setPendingEmail(null)}
-              className="mt-4 text-sm text-muted-foreground hover:text-foreground"
-            >
-              Used the wrong email? Go back
-            </button>
-          </div>
-        </div>
-      </MobileFrame>
-    );
-  }
 
   // ---------- Registration form ----------
   return (
