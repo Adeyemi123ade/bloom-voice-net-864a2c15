@@ -1041,6 +1041,7 @@ export default function ChatRoom() {
                     <AttachmentBubble
                       meta={fileMeta}
                       mine={mine}
+                      timestamp={m.created_at}
                       onDelete={() => {
                         setSelectedIds(new Set([m.id]));
                         setDeleteOpen(true);
