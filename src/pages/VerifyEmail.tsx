@@ -49,7 +49,7 @@ export default function VerifyEmail() {
   }, [secondsLeft]);
 
   const verify = async (codeValue: string) => {
-    if (!email || codeValue.length !== 6 || verifying) return;
+    if (!email || codeValue.length !== OTP_LENGTH || verifying) return;
     setVerifying(true);
     const { error } = await supabase.auth.verifyOtp({
       email,
