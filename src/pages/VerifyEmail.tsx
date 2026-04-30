@@ -124,28 +124,28 @@ export default function VerifyEmail() {
             Check your email
           </h1>
           <p className="text-base text-muted-foreground text-center mt-2 leading-relaxed max-w-xs">
-            We sent a 6-digit code to{" "}
+            We sent an {OTP_LENGTH}-digit code to{" "}
             <span className="text-foreground font-semibold">{email}</span>.
             Enter it below to finish setting up your account.
           </p>
 
-          <div className="mt-7">
+          <div className="mt-7 w-full flex justify-center">
             <InputOTP
-              maxLength={6}
+              maxLength={OTP_LENGTH}
               value={code}
               onChange={handleChange}
               autoFocus
               inputMode="numeric"
               pattern="^[0-9]+$"
               disabled={verifying}
-              containerClassName="gap-2"
+              containerClassName="gap-1.5"
             >
-              <InputOTPGroup className="gap-2">
-                {[0, 1, 2, 3, 4, 5].map((i) => (
+              <InputOTPGroup className="gap-1.5">
+                {Array.from({ length: OTP_LENGTH }, (_, i) => (
                   <InputOTPSlot
                     key={i}
                     index={i}
-                    className="h-12 w-11 text-lg font-bold border-r border-border first:border-l rounded-md bg-input"
+                    className="h-12 w-9 text-base font-bold border-r border-border first:border-l rounded-md bg-input"
                   />
                 ))}
               </InputOTPGroup>
