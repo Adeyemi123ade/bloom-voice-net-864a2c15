@@ -422,6 +422,16 @@ export default function ChatRoom() {
 
   useEffect(() => {
     if (!user || !conversationId) return;
+    // Mark incoming messages as delivered as soon as we receive them on this device.
+    const undelivered = messages.filter((m) => m.sender_id !== user.id && !m.delivered_at);
+    if (undelivered.length > 0) {
+      supabase
+        .from("messages")
+        .update({ delivered_at: new Date().toISOString() })
+        .in("id", undelivered.map((m) => m.id))
+        .then(() => {});
+    }
+    // Mark them read while the chat is open.
     const unread = messages.filter((m) => m.sender_id !== user.id && !m.read_at);
     if (unread.length === 0) return;
     supabase
