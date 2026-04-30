@@ -388,18 +388,18 @@ export default function Settings() {
               <AlertDialogTrigger asChild>
                 <button className="w-full h-12 rounded-lg bg-destructive/10 hover:bg-destructive/20 text-destructive text-sm font-semibold flex items-center justify-center gap-2">
                   <Trash2 className="w-4 h-4" />
-                  Delete account
+                  Uninstall app
                 </button>
               </AlertDialogTrigger>
               <AlertDialogContent className="max-w-[320px]">
                 <AlertDialogHeader>
                   <AlertDialogTitle className="text-base">
-                    {confirmStage ? "Are you absolutely sure?" : "Delete your account?"}
+                    {confirmStage ? "Are you absolutely sure?" : "Uninstall Chichat?"}
                   </AlertDialogTitle>
                   <AlertDialogDescription className="text-sm">
                     {confirmStage
-                      ? "This permanently removes your profile and signs you out. This cannot be undone."
-                      : "Your profile and presence will be removed. You'll need to register again to come back. Tip: back up your chats first."}
+                      ? "This permanently removes your account and every trace of the app from this device. You'll be a brand-new user if you ever come back."
+                      : "Uninstalling wipes your account, chats, contacts and presence — completely. The app will behave like a fresh install. Tip: back up your chats first."}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -410,7 +410,7 @@ export default function Settings() {
                       disabled={deleting}
                       className="bg-destructive hover:bg-destructive/90 text-destructive-foreground text-sm h-10"
                     >
-                      {deleting ? "Deleting…" : "Yes, delete"}
+                      {deleting ? "Uninstalling…" : "Yes, uninstall"}
                     </AlertDialogAction>
                   ) : (
                     <AlertDialogAction
