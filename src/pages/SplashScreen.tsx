@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import chichatLogo from "@/assets/chichat-logo.png";
 
 const IMAGES = [
   "/assets/splash/splash-1.jpg",
@@ -203,26 +204,7 @@ export default function SplashScreen({ onGetStarted, onSignIn }: Props) {
         <div style={{ height: 0 }} />
         <div className="brand">
           <div className="logo-icon">
-            <svg viewBox="0 0 58 58" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect x="3" y="3" width="45" height="40" rx="12" fill="#22C55E" />
-              <rect x="9" y="9" width="33" height="28" rx="8" fill="#07090C" />
-              <circle cx="18" cy="23" r="3.5" fill="#22C55E" />
-              <circle cx="29" cy="23" r="3.5" fill="#22C55E" />
-              <circle cx="40" cy="23" r="3.5" fill="#22C55E" />
-              <path d="M14 43 L8 54 L26 47" fill="#22C55E" />
-              <circle cx="47" cy="11" r="10" fill="#07090C" />
-              <circle cx="47" cy="11" r="8" fill="#16A34A" />
-              <text
-                x="47" y="15.5"
-                textAnchor="middle"
-                fill="white"
-                fontFamily="Syne,sans-serif"
-                fontSize="10"
-                fontWeight="800"
-              >
-                C
-              </text>
-            </svg>
+            <img src={chichatLogo} alt="ChiChat" />
           </div>
           <div className="wordmark">
             Chi<em>chat</em>
