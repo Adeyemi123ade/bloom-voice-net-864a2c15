@@ -1,10 +1,11 @@
 project_id = "tlyqomftfabnpczxefkp"
 
-[functions.twilio-token]
-verify_jwt = false
-
-[functions.twilio-voice-twiml]
-verify_jwt = false
-
-[functions.process-email-queue]
-verify_jwt = true
+[functions]
+  [functions.auth-email-hook]
+    verify_jwt = false
+  [functions.process-email-queue]
+    verify_jwt = true
+  [functions.twilio-token]
+    verify_jwt = false
+  [functions.twilio-voice-twiml]
+    verify_jwt = false
