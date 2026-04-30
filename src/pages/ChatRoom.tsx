@@ -279,35 +279,57 @@ function CallSystemBubble({
   );
 }
 
-// Swipe-to-reply wrapper (WhatsApp-style)
+// Swipe-to-reply + long-press wrapper (WhatsApp-style)
 function SwipeRow({
   mine,
   onReply,
   onTap,
+  onLongPress,
   children,
 }: {
   mine: boolean;
   onReply: () => void;
   onTap: (e: React.MouseEvent) => void;
+  onLongPress?: () => void;
   children: React.ReactNode;
 }) {
   const [dx, setDx] = useState(0);
   const startX = useRef<number | null>(null);
   const startY = useRef<number | null>(null);
   const triggered = useRef(false);
+  const longPressTimer = useRef<number | null>(null);
+  const longPressFired = useRef(false);
   const THRESHOLD = 60;
+
+  const fireLongPress = () => {
+    longPressFired.current = true;
+    try { (navigator as any).vibrate?.(20); } catch { /* ignore */ }
+    onLongPress?.();
+  };
+  const startLongPress = () => {
+    longPressFired.current = false;
+    if (longPressTimer.current) window.clearTimeout(longPressTimer.current);
+    longPressTimer.current = window.setTimeout(fireLongPress, 450);
+  };
+  const cancelLongPress = () => {
+    if (longPressTimer.current) {
+      window.clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
 
   const onTouchStart = (e: React.TouchEvent) => {
     startX.current = e.touches[0].clientX;
     startY.current = e.touches[0].clientY;
     triggered.current = false;
+    startLongPress();
   };
   const onTouchMove = (e: React.TouchEvent) => {
     if (startX.current == null || startY.current == null) return;
     const dxRaw = e.touches[0].clientX - startX.current;
     const dyRaw = e.touches[0].clientY - startY.current;
-    if (Math.abs(dyRaw) > Math.abs(dxRaw)) return; // vertical scroll
-    // Only allow rightward swipe
+    if (Math.abs(dxRaw) > 6 || Math.abs(dyRaw) > 6) cancelLongPress();
+    if (Math.abs(dyRaw) > Math.abs(dxRaw)) return;
     if (dxRaw <= 0) {
       setDx(0);
       return;
@@ -316,23 +338,31 @@ function SwipeRow({
     setDx(clamped);
     if (clamped >= THRESHOLD && !triggered.current) {
       triggered.current = true;
-      try {
-        (navigator as any).vibrate?.(15);
-      } catch {}
+      try { (navigator as any).vibrate?.(15); } catch { /* ignore */ }
     }
   };
   const onTouchEnd = () => {
+    cancelLongPress();
     if (triggered.current) onReply();
     setDx(0);
     startX.current = null;
     startY.current = null;
   };
 
+  const handleClick = (e: React.MouseEvent) => {
+    if (longPressFired.current) {
+      // Suppress click that would otherwise toggle selection right after long-press.
+      longPressFired.current = false;
+      e.stopPropagation();
+      return;
+    }
+    onTap(e);
+  };
+
   const progress = Math.min(dx / THRESHOLD, 1);
 
   return (
-    <div className={`relative flex ${mine ? "justify-end" : "justify-start"}`} onClick={onTap}>
-      {/* Reply icon revealed under the bubble on swipe */}
+    <div className={`relative flex ${mine ? "justify-end" : "justify-start"}`} onClick={handleClick}>
       <div
         className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center pointer-events-none"
         style={{ opacity: progress, transform: `translateY(-50%) scale(${0.6 + progress * 0.4})` }}
@@ -343,6 +373,13 @@ function SwipeRow({
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
+        onMouseDown={startLongPress}
+        onMouseUp={cancelLongPress}
+        onMouseLeave={cancelLongPress}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          if (!longPressFired.current) fireLongPress();
+        }}
         style={{
           transform: `translateX(${dx}px)`,
           transition: dx === 0 ? "transform 180ms ease-out" : "none",
@@ -354,6 +391,7 @@ function SwipeRow({
     </div>
   );
 }
+
 
 export default function ChatRoom() {
   const { id: conversationId } = useParams();
