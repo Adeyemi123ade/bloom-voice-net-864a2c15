@@ -189,12 +189,12 @@ export default function Settings() {
           .update({ display_name: null, avatar_url: null, phone: null, is_online: false })
           .eq("id", user.id);
         toast({
-          title: "Couldn't fully delete account",
-          description: "Please try again or contact support.",
+          title: "Couldn't fully uninstall",
+          description: "Please try again in a moment.",
           variant: "destructive",
         });
       } else {
-        toast({ title: "Account deleted", description: "Your account and data have been removed." });
+        toast({ title: "App uninstalled", description: "Your account and all data have been removed." });
       }
 
       // Always sign out and wipe every local trace so the app behaves like a
