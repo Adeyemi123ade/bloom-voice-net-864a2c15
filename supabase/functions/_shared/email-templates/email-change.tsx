@@ -11,7 +11,7 @@ import {
   Preview,
   Text,
 } from 'npm:@react-email/components@0.0.22'
-import { BrandHeader, FeatureStrip, SignOff } from './_brand.tsx'
+import { BrandHeader, BrandHero, FeatureStrip, SignOff } from './_brand.tsx'
 
 interface EmailChangeEmailProps {
   siteName: string
@@ -31,6 +31,7 @@ export const EmailChangeEmail = ({
     <Body style={main}>
       <Container style={container}>
         <BrandHeader />
+        <BrandHero />
 
         <Heading style={h1}>Confirm your new email</Heading>
 
