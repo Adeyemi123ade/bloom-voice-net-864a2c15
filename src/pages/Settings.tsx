@@ -4,7 +4,6 @@ import {
   ChevronDown,
   ChevronRight,
   Cloud,
-  LogOut,
   Smartphone,
   Trash2,
   User as UserIcon,
