@@ -159,7 +159,7 @@ export default function Settings() {
               <div className="flex-1 min-w-0">
                 <p className="text-base font-semibold text-foreground">Account</p>
                 <p className="text-sm text-muted-foreground truncate">
-                  Profile, sign out · {user?.email ?? "this device"}
+                  Profile · {user?.email ?? "this device"}
                 </p>
               </div>
               <ChevronDown className="w-5 h-5 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
