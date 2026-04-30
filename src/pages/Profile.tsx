@@ -178,6 +178,21 @@ export default function Profile() {
           </div>
 
           <div className="w-full mt-3 space-y-1.5">
+            <Label htmlFor="email" className="text-xs text-muted-foreground">Email address</Label>
+            <Input
+              id="email"
+              type="email"
+              value={user?.email ?? ""}
+              readOnly
+              disabled
+              className="h-9 text-xs bg-muted/40 border-border text-muted-foreground cursor-not-allowed"
+            />
+            <p className="text-2xs text-muted-foreground">
+              Email cannot be changed.
+            </p>
+          </div>
+
+          <div className="w-full mt-3 space-y-1.5">
             <Label htmlFor="about" className="text-xs text-muted-foreground">About</Label>
             <Textarea
               id="about"
