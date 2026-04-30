@@ -650,7 +650,7 @@ export default function Contacts() {
                     key={c.phone}
                     c={c}
                     isManual={!!isManual}
-                    onInvite={() => inviteContact(c)}
+                    onInvite={() => inviteViaWhatsApp(c)}
                     onRemove={() => handleRemoveManual(c.phone)}
                     onLongPress={() => openInviteActions(c)}
                   />
