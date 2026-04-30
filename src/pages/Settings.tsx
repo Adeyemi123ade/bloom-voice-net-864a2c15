@@ -55,14 +55,11 @@ export default function Settings() {
   const [confirmStage, setConfirmStage] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  const [googleEmail, setGoogleEmail] = useState<string | null>(null);
-  const [connecting, setConnecting] = useState(false);
-  const [syncing, setSyncing] = useState(false);
-
   const [backup, setBackup] = useState<BackupRow | null>(null);
   const [backingUp, setBackingUp] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [restoreOpen, setRestoreOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
     document.title = "Settings — Chichat";
@@ -72,84 +69,23 @@ export default function Settings() {
     if (!loading && !user) navigate("/login");
   }, [loading, user, navigate]);
 
-  // Load Google connection + backup row
+  // Load backup row
   useEffect(() => {
     if (!user) return;
     (async () => {
-      const { data } = await supabase
-        .from("google_oauth_tokens")
-        .select("google_email")
-        .maybeSingle();
-      setGoogleEmail(data?.google_email ?? null);
       setBackup(await getMyBackup());
     })();
   }, [user]);
 
-  // Handle Google OAuth redirect (?code=…)
-  const oauthHandledRef = useRef<string | null>(null);
-  useEffect(() => {
-    const code = params.get("code");
-    if (!code || !user) return;
-    if (oauthHandledRef.current === code) return;
-    oauthHandledRef.current = code;
-
-    // Strip OAuth params from the URL IMMEDIATELY so a remount/auth-refresh
-    // can't try to reuse the single-use authorization code.
-    params.delete("code");
-    params.delete("scope");
-    params.delete("state");
-    setParams(params, { replace: true });
-
-    (async () => {
-      try {
-        const r = await completeGoogleContactsConnect(code);
-        setGoogleEmail(r.email);
-        toast({ title: "Google connected", description: "Account linked." });
-        setSyncing(true);
-        const list = await syncGoogleContacts();
-        if (list.length === 0) {
-          toast({
-            title: "No contacts found in Google",
-            description: "This Google account has no saved contacts with phone numbers. Save some in Google Contacts, then sync again.",
-          });
-        } else {
-          toast({ title: "Contacts synced", description: `${list.length} contacts loaded.` });
-        }
-      } catch (e) {
-        if (e instanceof GoogleContactsReconnectRequired) setGoogleEmail(null);
-        toast({ title: "Google connect failed", description: friendly(e), variant: "destructive" });
-      } finally {
-        setSyncing(false);
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
-
-  const connectGoogle = async () => {
-    setConnecting(true);
-    try { await startGoogleContactsConnect(); }
-    catch (e) {
-      setConnecting(false);
-      toast({ title: "Could not start Google sign-in", description: friendly(e), variant: "destructive" });
-    }
-  };
-
-  const syncNow = async () => {
-    setSyncing(true);
+  const signOut = async () => {
+    setSigningOut(true);
     try {
-      const list = await syncGoogleContacts();
-      if (list.length === 0) {
-        toast({
-          title: "No contacts found in Google",
-          description: "This Google account has no saved contacts with phone numbers.",
-        });
-      } else {
-        toast({ title: "Contacts synced", description: `${list.length} contacts loaded.` });
-      }
+      await supabase.auth.signOut({ scope: "global" });
+      window.location.replace("/login");
     } catch (e) {
-      if (e instanceof GoogleContactsReconnectRequired) setGoogleEmail(null);
-      toast({ title: "Sync failed", description: friendly(e), variant: "destructive" });
-    } finally { setSyncing(false); }
+      toast({ title: "Could not sign out", description: friendly(e), variant: "destructive" });
+      setSigningOut(false);
+    }
   };
 
   const onBackup = async () => {
