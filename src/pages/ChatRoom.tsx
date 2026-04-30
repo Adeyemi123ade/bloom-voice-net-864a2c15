@@ -931,20 +931,6 @@ export default function ChatRoom() {
                 ) : null}
               </div>
             </div>
-            <button
-              aria-label="Voice call"
-              onClick={() => startCall("voice")}
-              className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
-            >
-              <Phone className="w-4 h-4 text-foreground" />
-            </button>
-            <button
-              aria-label="Video call"
-              onClick={() => startCall("video")}
-              className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
-            >
-              <Video className="w-4 h-4 text-foreground" />
-            </button>
           </div>
         )}
 
