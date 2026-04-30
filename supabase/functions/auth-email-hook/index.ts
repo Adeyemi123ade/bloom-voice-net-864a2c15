@@ -220,6 +220,7 @@ async function handleWebhook(req: Request): Promise<Response> {
   // payload.type is the hook event type ("auth")
   const emailType = payload.data.action_type
   console.log('Received auth event', { emailType, email: payload.data.email, run_id })
+  const recipientEmail = String(payload.data.email || '').trim().toLowerCase()
 
   const EmailTemplate = EMAIL_TEMPLATES[emailType]
   if (!EmailTemplate) {
@@ -308,11 +309,11 @@ async function handleWebhook(req: Request): Promise<Response> {
     await supabaseLookup
       .from('auth_otp_aliases')
       .delete()
-      .eq('email', payload.data.email)
+      .eq('email', recipientEmail)
       .eq('email_type', emailType)
 
     const { error: aliasError } = await supabaseLookup.from('auth_otp_aliases').insert({
-      email: payload.data.email,
+      email: recipientEmail,
       email_type: emailType,
       short_code: displayCode,
       full_token: rawToken,
@@ -332,7 +333,7 @@ async function handleWebhook(req: Request): Promise<Response> {
   const templateProps = {
     siteName: SITE_NAME,
     siteUrl: `https://${ROOT_DOMAIN}`,
-    recipient: payload.data.email,
+    recipient: recipientEmail,
     confirmationUrl: payload.data.url,
     token: payload.data.token,
     displayCode,
