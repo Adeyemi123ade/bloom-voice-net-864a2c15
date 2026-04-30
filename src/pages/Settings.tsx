@@ -51,7 +51,7 @@ function bytesLabel(n: number) {
 export default function Settings() {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
-  const [params, setParams] = useSearchParams();
+  
   const [confirmStage, setConfirmStage] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
