@@ -11,7 +11,7 @@ import {
   Preview,
   Text,
 } from 'npm:@react-email/components@0.0.22'
-import { BrandHeader, FeatureStrip, SignOff } from './_brand.tsx'
+import { BrandHeader, BrandHero, FeatureStrip, SignOff } from './_brand.tsx'
 
 interface InviteEmailProps {
   siteName: string
@@ -26,6 +26,7 @@ export const InviteEmail = ({ confirmationUrl }: InviteEmailProps) => (
     <Body style={main}>
       <Container style={container}>
         <BrandHeader />
+        <BrandHero />
 
         <Heading style={h1}>
           Someone wants to chat with you <span style={{ color: '#F5C518' }}>👋</span>
