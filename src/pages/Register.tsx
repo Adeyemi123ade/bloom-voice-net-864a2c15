@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { z } from "zod";
-import { ArrowLeft, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, MailCheck } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -11,8 +11,10 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import { toE164 } from "@/lib/phone";
+import CountryPicker from "@/components/CountryPicker";
+import { allCountries, type CountryEntry } from "@/lib/countries";
 
-const registerSchema = z.object({
+const baseSchema = z.object({
   name: z
     .string()
     .trim()
@@ -23,11 +25,6 @@ const registerSchema = z.object({
     .trim()
     .email({ message: "Enter a valid email address" })
     .max(255, { message: "Email must be less than 255 characters" }),
-  phone: z
-    .string()
-    .trim()
-    .min(6, { message: "Enter a valid phone number" })
-    .max(20, { message: "Phone number is too long" }),
   password: z
     .string()
     .min(8, { message: "Password must be at least 8 characters" })
@@ -36,7 +33,22 @@ const registerSchema = z.object({
     .regex(/[0-9]/, { message: "Include at least one number" }),
 });
 
-type FormErrors = Partial<Record<"name" | "email" | "phone" | "password", string>>;
+type FormErrors = Partial<
+  Record<"name" | "email" | "phone" | "password" | "confirmPassword" | "country", string>
+>;
+
+/** Pick a sensible default country from the browser locale, falling back to US. */
+function defaultCountry(): CountryEntry {
+  const list = allCountries();
+  try {
+    const region = new Intl.Locale(navigator.language).maximize().region;
+    const hit = region ? list.find((c) => c.code === region) : null;
+    if (hit) return hit;
+  } catch {
+    /* ignore */
+  }
+  return list.find((c) => c.code === "US") ?? list[0];
+}
 
 export default function Register() {
   const navigate = useNavigate();
@@ -44,15 +56,22 @@ export default function Register() {
   useEffect(() => {
     if (!authLoading && user) navigate("/home", { replace: true });
   }, [authLoading, user, navigate]);
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
+  const [country, setCountry] = useState<CountryEntry>(() => defaultCountry());
+  const [phoneLocal, setPhoneLocal] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
-  const [errors, setErrors] = useState<FormErrors & { confirmPassword?: string }>({});
+  const [errors, setErrors] = useState<FormErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+
+  // After successful signup we render a "check your email" screen so the user
+  // knows to verify before signing in.
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
+  const [resending, setResending] = useState(false);
 
   const handleGoogle = async () => {
     setGoogleLoading(true);
@@ -70,32 +89,42 @@ export default function Register() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const result = registerSchema.safeParse({ name, email, phone, password });
-    const fieldErrors: FormErrors & { confirmPassword?: string } = {};
-    if (!result.success) {
-      result.error.issues.forEach((issue) => {
+
+    const parsed = baseSchema.safeParse({ name, email, password });
+    const fieldErrors: FormErrors = {};
+    if (!parsed.success) {
+      parsed.error.issues.forEach((issue) => {
         const key = issue.path[0] as keyof FormErrors;
         if (!fieldErrors[key]) fieldErrors[key] = issue.message;
       });
     }
-    const e164 = result.success ? toE164(result.data.phone) : null;
-    if (result.success && !e164) {
-      fieldErrors.phone = "Enter a valid phone number with country code (e.g. +234...)";
+
+    // Compose the full international number from country + local digits.
+    const localDigits = phoneLocal.replace(/[^\d]/g, "");
+    if (!localDigits) {
+      fieldErrors.phone = "Enter your phone number";
     }
+    const composed = localDigits ? `+${country.dial}${localDigits}` : "";
+    const e164 = composed ? toE164(composed) : null;
+    if (composed && !e164) {
+      fieldErrors.phone = "That phone number doesn't look right";
+    }
+
     if (password !== confirmPassword) {
       fieldErrors.confirmPassword = "Passwords don't match";
     }
-    if (Object.keys(fieldErrors).length > 0) {
+    if (Object.keys(fieldErrors).length > 0 || !parsed.success || !e164) {
       setErrors(fieldErrors);
       return;
     }
     setErrors({});
     setSubmitting(true);
+
     const { data: signUpData, error } = await supabase.auth.signUp({
-      email: result.data!.email,
-      password: result.data!.password,
+      email: parsed.data.email,
+      password: parsed.data.password,
       options: {
-        data: { full_name: result.data!.name, phone: e164 },
+        data: { full_name: parsed.data.name, phone: e164 },
         emailRedirectTo: `${window.location.origin}/welcome`,
       },
     });
@@ -121,190 +150,259 @@ export default function Register() {
       }
     }
     setSubmitting(false);
-    toast({ title: "Account created", description: "Welcome to Chichat!" });
-    navigate("/welcome", { state: { name: result.data!.name, email: result.data!.email } });
+    setPendingEmail(parsed.data.email);
   };
 
+  const resendConfirmation = async () => {
+    if (!pendingEmail) return;
+    setResending(true);
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email: pendingEmail,
+      options: { emailRedirectTo: `${window.location.origin}/welcome` },
+    });
+    setResending(false);
+    if (error) {
+      toast({ title: "Couldn't resend", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Verification email sent again" });
+  };
+
+  // ---------- Post-signup confirmation screen ----------
+  if (pendingEmail) {
+    return (
+      <MobileFrame>
+        <div className="h-full w-full overflow-y-auto flex justify-center bg-background">
+          <div className="w-full max-w-sm flex flex-col items-center text-center px-6 pt-16 pb-8">
+            <span className="w-16 h-16 rounded-full bg-primary/15 flex items-center justify-center mb-5">
+              <MailCheck className="w-8 h-8 text-primary" />
+            </span>
+            <h1 className="text-xl font-bold text-foreground">Confirm your email</h1>
+            <p className="text-base text-muted-foreground mt-2 leading-relaxed">
+              We've sent a verification link to{" "}
+              <span className="text-foreground font-semibold">{pendingEmail}</span>.
+              Open it on this device to activate your account.
+            </p>
+            <p className="text-sm text-muted-foreground mt-3">
+              The email may take a minute. Don't forget to check your spam folder.
+            </p>
+
+            <Button
+              onClick={() => navigate("/login")}
+              className="w-full h-11 mt-8 text-base bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg"
+            >
+              I've verified — Sign in
+            </Button>
+            <Button
+              onClick={resendConfirmation}
+              disabled={resending}
+              variant="outline"
+              className="w-full h-11 mt-2 text-base font-semibold rounded-lg"
+            >
+              {resending ? "Sending…" : "Resend verification email"}
+            </Button>
+            <button
+              onClick={() => setPendingEmail(null)}
+              className="mt-4 text-sm text-muted-foreground hover:text-foreground"
+            >
+              Used the wrong email? Go back
+            </button>
+          </div>
+        </div>
+      </MobileFrame>
+    );
+  }
+
+  // ---------- Registration form ----------
   return (
     <MobileFrame>
       <div className="h-full w-full overflow-y-auto flex justify-center bg-background">
         <div className="w-full max-w-sm sm:max-w-md flex flex-col px-5 sm:px-6 pt-6 pb-6 min-h-full">
-        <button
-          onClick={() => navigate("/")}
-          aria-label="Back"
-          className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary transition-colors -ml-1"
-        >
-          <ArrowLeft className="w-4 h-4 text-foreground" />
-        </button>
+          <button
+            onClick={() => navigate("/")}
+            aria-label="Back"
+            className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-secondary transition-colors -ml-1"
+          >
+            <ArrowLeft className="w-5 h-5 text-foreground" />
+          </button>
 
-        <div className="mt-2">
-          <h1 className="text-[18px] font-bold text-foreground leading-tight">
-            Create your account
-          </h1>
-          <p className="text-xs text-muted-foreground mt-1">
-            Join Chichat and experience the possibilities.
-          </p>
-        </div>
+          <div className="mt-2">
+            <h1 className="text-xl font-bold text-foreground leading-tight">
+              Create your account
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Join Chichat and experience the possibilities.
+            </p>
+          </div>
 
-        <form onSubmit={handleSubmit} className="mt-3 flex-1 flex flex-col">
-          <div className="space-y-2.5">
-            <div>
-              <Label htmlFor="name" className="text-2xs text-muted-foreground">
-                Full name
-              </Label>
-              <Input
-                id="name"
-                type="text"
-                autoComplete="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Jane Doe"
-                maxLength={60}
-                className="mt-1 h-9 text-xs bg-input border-border text-foreground placeholder:text-muted-foreground"
-                aria-invalid={!!errors.name}
-              />
-              {errors.name && (
-                <p className="text-2xs text-destructive mt-1">{errors.name}</p>
-              )}
-            </div>
-
-            <div>
-              <Label htmlFor="email" className="text-2xs text-muted-foreground">
-                Email address
-              </Label>
-              <Input
-                id="email"
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                maxLength={255}
-                className="mt-1 h-9 text-xs bg-input border-border text-foreground placeholder:text-muted-foreground"
-                aria-invalid={!!errors.email}
-              />
-              {errors.email && (
-                <p className="text-2xs text-destructive mt-1">{errors.email}</p>
-              )}
-            </div>
-
-            <div>
-              <Label htmlFor="phone" className="text-2xs text-muted-foreground">
-                Phone number
-              </Label>
-              <Input
-                id="phone"
-                type="tel"
-                autoComplete="tel"
-                inputMode="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="+234 801 234 5678"
-                maxLength={20}
-                className="mt-1 h-9 text-xs bg-input border-border text-foreground placeholder:text-muted-foreground"
-                aria-invalid={!!errors.phone}
-              />
-              {errors.phone ? (
-                <p className="text-2xs text-destructive mt-1">{errors.phone}</p>
-              ) : (
-                <p className="text-[9px] text-muted-foreground mt-1">Include country code so friends can find you.</p>
-              )}
-            </div>
-
-            <div>
-              <Label htmlFor="password" className="text-2xs text-muted-foreground">
-                Password
-              </Label>
-              <div className="relative mt-1">
+          <form onSubmit={handleSubmit} className="mt-4 flex-1 flex flex-col">
+            <div className="space-y-3">
+              <div>
+                <Label htmlFor="name" className="text-sm text-muted-foreground">
+                  Full name
+                </Label>
                 <Input
-                  id="password"
+                  id="name"
+                  type="text"
+                  autoComplete="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Jane Doe"
+                  maxLength={60}
+                  className="mt-1 h-11 text-base bg-input border-border text-foreground placeholder:text-muted-foreground"
+                  aria-invalid={!!errors.name}
+                />
+                {errors.name && (
+                  <p className="text-sm text-destructive mt-1">{errors.name}</p>
+                )}
+              </div>
+
+              <div>
+                <Label htmlFor="email" className="text-sm text-muted-foreground">
+                  Email address
+                </Label>
+                <Input
+                  id="email"
+                  type="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  maxLength={255}
+                  className="mt-1 h-11 text-base bg-input border-border text-foreground placeholder:text-muted-foreground"
+                  aria-invalid={!!errors.email}
+                />
+                {errors.email && (
+                  <p className="text-sm text-destructive mt-1">{errors.email}</p>
+                )}
+              </div>
+
+              <div>
+                <Label htmlFor="phone" className="text-sm text-muted-foreground">
+                  Phone number
+                </Label>
+                <div className="mt-1 flex gap-2">
+                  <CountryPicker
+                    value={country.code}
+                    onChange={(c) => setCountry(c)}
+                  />
+                  <Input
+                    id="phone"
+                    type="tel"
+                    autoComplete="tel"
+                    inputMode="tel"
+                    value={phoneLocal}
+                    onChange={(e) => setPhoneLocal(e.target.value.replace(/[^\d\s-]/g, ""))}
+                    placeholder="801 234 5678"
+                    maxLength={20}
+                    className="flex-1 h-12 text-base bg-input border-border text-foreground placeholder:text-muted-foreground"
+                    aria-invalid={!!errors.phone}
+                  />
+                </div>
+                {errors.phone ? (
+                  <p className="text-sm text-destructive mt-1">{errors.phone}</p>
+                ) : (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Pick your country, then enter the rest of your number.
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <Label htmlFor="password" className="text-sm text-muted-foreground">
+                  Password
+                </Label>
+                <div className="relative mt-1">
+                  <Input
+                    id="password"
+                    type={showPwd ? "text" : "password"}
+                    autoComplete="new-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="At least 8 characters"
+                    maxLength={72}
+                    className="h-11 text-base bg-input border-border text-foreground placeholder:text-muted-foreground pr-10"
+                    aria-invalid={!!errors.password}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPwd((s) => !s)}
+                    aria-label={showPwd ? "Hide password" : "Show password"}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                {errors.password && (
+                  <p className="text-sm text-destructive mt-1">{errors.password}</p>
+                )}
+              </div>
+
+              <div>
+                <Label htmlFor="confirmPassword" className="text-sm text-muted-foreground">
+                  Confirm password
+                </Label>
+                <Input
+                  id="confirmPassword"
                   type={showPwd ? "text" : "password"}
                   autoComplete="new-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="At least 8 characters"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Re-enter password"
                   maxLength={72}
-                  className="h-9 text-xs bg-input border-border text-foreground placeholder:text-muted-foreground pr-10"
-                  aria-invalid={!!errors.password}
+                  className="mt-1 h-11 text-base bg-input border-border text-foreground placeholder:text-muted-foreground"
+                  aria-invalid={!!errors.confirmPassword}
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPwd((s) => !s)}
-                  aria-label={showPwd ? "Hide password" : "Show password"}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  {showPwd ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                </button>
+                {errors.confirmPassword && (
+                  <p className="text-sm text-destructive mt-1">{errors.confirmPassword}</p>
+                )}
               </div>
-              {errors.password && (
-                <p className="text-2xs text-destructive mt-1">{errors.password}</p>
-              )}
             </div>
 
-            <div>
-              <Label htmlFor="confirmPassword" className="text-2xs text-muted-foreground">
-                Confirm password
-              </Label>
-              <Input
-                id="confirmPassword"
-                type={showPwd ? "text" : "password"}
-                autoComplete="new-password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Re-enter password"
-                maxLength={72}
-                className="mt-1 h-9 text-xs bg-input border-border text-foreground placeholder:text-muted-foreground"
-                aria-invalid={!!errors.confirmPassword}
-              />
-              {errors.confirmPassword && (
-                <p className="text-2xs text-destructive mt-1">{errors.confirmPassword}</p>
-              )}
+            <div className="mt-auto pt-4">
+              <Button
+                type="submit"
+                disabled={submitting}
+                className="w-full h-11 text-base bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg"
+              >
+                {submitting ? "Creating account…" : "Continue"}
+              </Button>
+              <div className="flex items-center gap-2 my-3">
+                <div className="flex-1 h-px bg-border" />
+                <span className="text-xs text-muted-foreground uppercase tracking-wider">or</span>
+                <div className="flex-1 h-px bg-border" />
+              </div>
+              <Button
+                type="button"
+                onClick={handleGoogle}
+                disabled={googleLoading}
+                variant="outline"
+                className="w-full h-11 text-base font-semibold rounded-lg gap-2"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" aria-hidden="true">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.99.66-2.25 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z"/>
+                  <path fill="#FBBC05" d="M5.84 14.1A6.6 6.6 0 0 1 5.5 12c0-.73.13-1.44.34-2.1V7.07H2.18A11 11 0 0 0 1 12c0 1.78.43 3.46 1.18 4.93l3.66-2.83z"/>
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.83C6.71 7.31 9.14 5.38 12 5.38z"/>
+                </svg>
+                {googleLoading ? "Connecting…" : "Continue with Google"}
+              </Button>
+              <p className="text-sm text-muted-foreground text-center mt-3">
+                Already have an account?{" "}
+                <Link to="/login" className="text-accent font-semibold hover:underline">
+                  Sign in
+                </Link>
+              </p>
+              <p className="text-sm text-foreground text-center mt-2 font-semibold">
+                By continuing, you agree to our{" "}
+                <Link to="/terms" className="text-primary underline underline-offset-2">
+                  Terms &amp; Privacy Policy
+                </Link>
+                .
+              </p>
             </div>
-          </div>
-
-          <div className="mt-auto pt-3">
-            <Button
-              type="submit"
-              disabled={submitting}
-              className="w-full h-8 text-xs bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg"
-            >
-              {submitting ? "Sending code…" : "Continue"}
-            </Button>
-            <div className="flex items-center gap-2 my-2.5">
-              <div className="flex-1 h-px bg-border" />
-              <span className="text-[9px] text-muted-foreground uppercase tracking-wider">or</span>
-              <div className="flex-1 h-px bg-border" />
-            </div>
-            <Button
-              type="button"
-              onClick={handleGoogle}
-              disabled={googleLoading}
-              variant="outline"
-              className="w-full h-8 text-xs font-semibold rounded-lg gap-2"
-            >
-              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" aria-hidden="true">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.99.66-2.25 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z"/>
-                <path fill="#FBBC05" d="M5.84 14.1A6.6 6.6 0 0 1 5.5 12c0-.73.13-1.44.34-2.1V7.07H2.18A11 11 0 0 0 1 12c0 1.78.43 3.46 1.18 4.93l3.66-2.83z"/>
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.83C6.71 7.31 9.14 5.38 12 5.38z"/>
-              </svg>
-              {googleLoading ? "Connecting…" : "Continue with Google"}
-            </Button>
-            <p className="text-2xs text-muted-foreground text-center mt-2">
-              Already have an account?{" "}
-              <Link to="/login" className="text-accent font-semibold hover:underline">
-                Sign in
-              </Link>
-            </p>
-            <p className="text-xs text-foreground text-center mt-2 font-semibold">
-              By continuing, you agree to our{" "}
-              <Link to="/terms" className="text-primary underline underline-offset-2">
-                Terms &amp; Privacy Policy
-              </Link>
-              .
-            </p>
-          </div>
-        </form>
+          </form>
         </div>
       </div>
     </MobileFrame>
