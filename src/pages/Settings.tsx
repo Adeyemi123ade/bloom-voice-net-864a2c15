@@ -5,7 +5,6 @@ import {
   ChevronRight,
   Cloud,
   LogOut,
-  Loader2,
   Smartphone,
   Trash2,
   User as UserIcon,
@@ -14,7 +13,6 @@ import MobileFrame from "@/components/MobileFrame";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Switch } from "@/components/ui/switch";
 import {
   Collapsible,
   CollapsibleContent,
@@ -31,34 +29,16 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import {
-  getMyBackup,
-  runBackup,
-  runRestore,
-  setAutoBackup,
-  hasNewChangesSinceBackup,
-  type BackupRow,
-} from "@/lib/chatBackup";
+import { getMyBackup, type BackupRow } from "@/lib/chatBackup";
 import { clearContactsCache } from "@/lib/deviceContacts";
-
-function bytesLabel(n: number) {
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  if (n < 1024 * 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} MB`;
-  return `${(n / 1024 / 1024 / 1024).toFixed(2)} GB`;
-}
 
 export default function Settings() {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
-  
+
   const [confirmStage, setConfirmStage] = useState(false);
   const [deleting, setDeleting] = useState(false);
-
   const [backup, setBackup] = useState<BackupRow | null>(null);
-  const [backingUp, setBackingUp] = useState(false);
-  const [restoring, setRestoring] = useState(false);
-  const [restoreOpen, setRestoreOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
@@ -78,12 +58,10 @@ export default function Settings() {
     }
   }, [navigate]);
 
-  // Load backup row
+  // Load backup row (for the summary line on the Chat backup nav row)
   useEffect(() => {
     if (!user) return;
-    (async () => {
-      setBackup(await getMyBackup());
-    })();
+    (async () => setBackup(await getMyBackup()))();
   }, [user]);
 
   const signOut = async () => {
@@ -97,61 +75,14 @@ export default function Settings() {
     }
   };
 
-  const onBackup = async () => {
-    if (!user) return;
-    setBackingUp(true);
-    try {
-      // Fast client-side check for "up to date".
-      const current = backup ?? (await getMyBackup());
-      const hasChanges = await hasNewChangesSinceBackup(user.id, current?.last_backup_at ?? null);
-      if (current && !hasChanges) {
-        toast({ title: "Account is up to date" });
-        setBackingUp(false);
-        return;
-      }
-      const r = await runBackup();
-      const fresh = await getMyBackup();
-      setBackup(fresh);
-      toast({
-        title: "Account backed up successfully",
-        description: `${r.message_count} messages saved (${bytesLabel(fresh?.total_bytes ?? 0)}). A reboot is recommended.`,
-      });
-    } catch (e) {
-      toast({ title: "Backup failed", description: friendly(e), variant: "destructive" });
-    } finally { setBackingUp(false); }
-  };
-
-  const onConfirmRestore = async () => {
-    setRestoreOpen(false);
-    setRestoring(true);
-    try {
-      const r = await runRestore();
-      toast({ title: "Restore complete", description: `${r.restored} of ${r.total} messages restored.` });
-    } catch (e) {
-      toast({ title: "Restore failed", description: friendly(e), variant: "destructive" });
-    } finally { setRestoring(false); }
-  };
-
-  const onToggleAuto = async (v: boolean) => {
-    try {
-      await setAutoBackup(v);
-      setBackup((b) => (b ? { ...b, auto_backup_enabled: v } : b));
-    } catch (e) {
-      toast({ title: "Could not update setting", description: friendly(e), variant: "destructive" });
-    }
-  };
-
   const deleteAccount = async () => {
     if (!user) return;
     setDeleting(true);
     try {
-      // Fully wipe the account server-side so the user must re-register fresh.
       const { data, error: fnError } = await supabase.functions.invoke("delete-account", {});
       const serverOk = !fnError && (data as any)?.ok === true;
 
       if (!serverOk) {
-        // Fallback: at minimum strip identifying profile data so they can't
-        // be matched as a contact anymore.
         await supabase
           .from("profiles")
           .update({ display_name: null, avatar_url: null, phone: null, is_online: false })
@@ -165,14 +96,11 @@ export default function Settings() {
         toast({ title: "App uninstalled", description: "Your account and all data have been removed." });
       }
 
-      // Always sign out and wipe every local trace so the app behaves like a
-      // fresh install on next open.
       await supabase.auth.signOut({ scope: "global" }).catch(() => {});
       try {
         clearContactsCache();
         localStorage.clear();
         sessionStorage.clear();
-        // Also clear IndexedDB used by supabase-js for session persistence.
         if (typeof indexedDB !== "undefined" && indexedDB.databases) {
           const dbs = await indexedDB.databases();
           await Promise.all(
@@ -184,7 +112,6 @@ export default function Settings() {
         }
       } catch { /* ignore */ }
 
-      // Hard reload so no in-memory auth state survives.
       window.location.replace("/register");
     } finally {
       setDeleting(false);
@@ -199,24 +126,7 @@ export default function Settings() {
         </div>
 
         <div className="flex-1 px-4 py-4 flex flex-col gap-2">
-          {/* 1. Profile */}
-          <button
-            onClick={() => navigate("/profile")}
-            className="w-full flex items-center gap-3 px-3 py-3.5 rounded-lg hover:bg-secondary text-left"
-          >
-            <span className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center">
-              <UserIcon className="w-5 h-5 text-primary" />
-            </span>
-            <div className="flex-1 min-w-0">
-              <p className="text-base font-semibold text-foreground">Profile setting</p>
-              <p className="text-sm text-muted-foreground truncate">
-                Edit name, photo and about
-              </p>
-            </div>
-            <ChevronRight className="w-5 h-5 text-muted-foreground" />
-          </button>
-
-          {/* 2. Phone settings — Theme, Ringtone, Google account & contacts live in here. */}
+          {/* 1. Phone settings — Theme, Ringtone, Google account & contacts. */}
           <button
             onClick={() => navigate("/settings/phone")}
             className="w-full flex items-center gap-3 px-3 py-3.5 rounded-lg hover:bg-secondary text-left"
@@ -233,95 +143,26 @@ export default function Settings() {
             <ChevronRight className="w-5 h-5 text-muted-foreground" />
           </button>
 
-          {/* 3. Chat backup — collapsible. Back up & Restore only show when expanded. */}
-          <Collapsible className="rounded-lg bg-secondary/30">
-            <CollapsibleTrigger className="w-full flex items-center gap-3 px-3 py-3.5 text-left group">
-              <span className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center">
-                <Cloud className="w-5 h-5 text-primary" />
-              </span>
-              <div className="flex-1 min-w-0">
-                <p className="text-base font-semibold text-foreground">Chat backup</p>
-                <p className="text-sm text-muted-foreground truncate">
-                  {backup
-                    ? `Last: ${new Date(backup.last_backup_at).toLocaleDateString()} · ${backup.message_count} msgs`
-                    : "No backup yet"}
-                </p>
-              </div>
-              <ChevronDown className="w-5 h-5 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
-            </CollapsibleTrigger>
-            <CollapsibleContent className="px-3 pb-3 pt-1">
-              <div className="flex items-center justify-between py-2">
-                <span className="text-sm text-foreground">Auto-backup daily</span>
-                <Switch
-                  checked={backup?.auto_backup_enabled ?? true}
-                  onCheckedChange={onToggleAuto}
-                />
-              </div>
+          {/* 2. Chat backup — opens a dedicated page (no longer collapsible). */}
+          <button
+            onClick={() => navigate("/settings/backup")}
+            className="w-full flex items-center gap-3 px-3 py-3.5 rounded-lg hover:bg-secondary text-left"
+          >
+            <span className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center">
+              <Cloud className="w-5 h-5 text-primary" />
+            </span>
+            <div className="flex-1 min-w-0">
+              <p className="text-base font-semibold text-foreground">Chat backup</p>
+              <p className="text-sm text-muted-foreground truncate">
+                {backup
+                  ? `Last: ${new Date(backup.last_backup_at).toLocaleDateString()} · ${backup.message_count} msgs`
+                  : "No backup yet"}
+              </p>
+            </div>
+            <ChevronRight className="w-5 h-5 text-muted-foreground" />
+          </button>
 
-              {backup && (
-                <p className="text-xs text-muted-foreground pb-2">
-                  {bytesLabel(backup.total_bytes)} stored
-                </p>
-              )}
-
-              {backingUp && (
-                <div className="my-2 px-3 py-3 rounded-lg bg-primary/10 border border-primary/30">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Loader2 className="w-4 h-4 text-primary animate-spin" />
-                    <p className="text-sm font-semibold text-foreground">Backing up your chats…</p>
-                  </div>
-                  <div className="h-1.5 w-full rounded-full bg-secondary overflow-hidden">
-                    <div className="h-full w-1/3 bg-primary animate-[indeterminate_1.4s_ease-in-out_infinite]" />
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Please don't close the app until this finishes.
-                  </p>
-                </div>
-              )}
-
-              <div className="flex gap-2 mt-1">
-                <button
-                  onClick={onBackup}
-                  disabled={backingUp}
-                  className="flex-1 h-10 rounded-md bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-60"
-                >
-                  {backingUp ? "Backing up…" : "Back up now"}
-                </button>
-                <button
-                  onClick={() => setRestoreOpen(true)}
-                  disabled={restoring || !backup}
-                  className="flex-1 h-10 rounded-md border border-border bg-background text-sm font-semibold disabled:opacity-50"
-                >
-                  {restoring ? "Restoring…" : "Restore backup"}
-                </button>
-              </div>
-
-              <AlertDialog open={restoreOpen} onOpenChange={setRestoreOpen}>
-                <AlertDialogContent className="max-w-[320px]">
-                  <AlertDialogHeader>
-                    <AlertDialogTitle className="text-base">
-                      Restore chats from your latest backup?
-                    </AlertDialogTitle>
-                    <AlertDialogDescription className="text-sm">
-                      This will pull in your most recent saved chats. Existing messages
-                      on this device won't be removed.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel className="text-sm h-10">Cancel</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={onConfirmRestore}
-                      className="text-sm h-10"
-                    >
-                      OK
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </CollapsibleContent>
-          </Collapsible>
-
-          {/* 4. Account — collapsible. Holds sign-out. Delete is intentionally separated below. */}
+          {/* 3. Account — collapsible. Holds Profile setting + sign-out. */}
           <Collapsible className="rounded-lg bg-secondary/30">
             <CollapsibleTrigger className="w-full flex items-center gap-3 px-3 py-3.5 text-left group">
               <span className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center">
@@ -330,12 +171,26 @@ export default function Settings() {
               <div className="flex-1 min-w-0">
                 <p className="text-base font-semibold text-foreground">Account</p>
                 <p className="text-sm text-muted-foreground truncate">
-                  Signed in as {user?.email ?? "this device"}
+                  Profile, sign out · {user?.email ?? "this device"}
                 </p>
               </div>
               <ChevronDown className="w-5 h-5 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
             </CollapsibleTrigger>
-            <CollapsibleContent className="px-3 pb-3 pt-1">
+            <CollapsibleContent className="px-3 pb-3 pt-1 flex flex-col gap-2">
+              <button
+                onClick={() => navigate("/profile")}
+                className="w-full flex items-center gap-3 px-3 py-3 rounded-md bg-background border border-border text-left"
+              >
+                <UserIcon className="w-4 h-4 text-primary" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-foreground">Profile setting</p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    Edit name, photo and about
+                  </p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+              </button>
+
               <button
                 onClick={signOut}
                 disabled={signingOut}
@@ -349,15 +204,19 @@ export default function Settings() {
 
           <div className="flex-1" />
 
-          {/* Delete is kept far away from the four main options to avoid accidental taps. */}
-          <div className="pt-10 pb-2">
+          {/* Delete is intentionally separated and made larger / more prominent.
+              Represents removing the entire app + account from this device. */}
+          <div className="pt-10 pb-4">
             <AlertDialog onOpenChange={(o) => !o && setConfirmStage(false)}>
               <AlertDialogTrigger asChild>
-                <button className="w-full h-12 rounded-lg bg-destructive/10 hover:bg-destructive/20 text-destructive text-sm font-semibold flex items-center justify-center gap-2">
-                  <Trash2 className="w-4 h-4" />
+                <button className="w-full h-16 rounded-xl bg-destructive text-destructive-foreground text-lg font-bold flex items-center justify-center gap-3 shadow-lg shadow-destructive/30 hover:bg-destructive/90 active:scale-[0.99] transition">
+                  <Trash2 className="w-6 h-6" />
                   Uninstall app
                 </button>
               </AlertDialogTrigger>
+              <p className="text-xs text-muted-foreground text-center mt-2 px-4">
+                Removes your account and all data from this device. Back up your chats first.
+              </p>
               <AlertDialogContent className="max-w-[320px]">
                 <AlertDialogHeader>
                   <AlertDialogTitle className="text-base">
