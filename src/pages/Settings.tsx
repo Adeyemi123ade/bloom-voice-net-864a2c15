@@ -108,7 +108,14 @@ export default function Settings() {
         toast({ title: "Google connected", description: "Account linked." });
         setSyncing(true);
         const list = await syncGoogleContacts();
-        toast({ title: "Contacts synced", description: `${list.length} contacts loaded.` });
+        if (list.length === 0) {
+          toast({
+            title: "No contacts found in Google",
+            description: "This Google account has no saved contacts with phone numbers. Save some in Google Contacts, then sync again.",
+          });
+        } else {
+          toast({ title: "Contacts synced", description: `${list.length} contacts loaded.` });
+        }
       } catch (e) {
         if (e instanceof GoogleContactsReconnectRequired) setGoogleEmail(null);
         toast({ title: "Google connect failed", description: friendly(e), variant: "destructive" });
