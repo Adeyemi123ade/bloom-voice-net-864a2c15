@@ -1,6 +1,18 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Check, ChevronRight, Music, Palette, Play, Square, Upload, X } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import {
+  Check,
+  ChevronRight,
+  Contact2,
+  Loader2,
+  Music,
+  Palette,
+  Play,
+  RefreshCw,
+  Square,
+  Upload,
+  X,
+} from "lucide-react";
 import { useTheme } from "next-themes";
 import MobileFrame from "@/components/MobileFrame";
 import {
@@ -11,6 +23,14 @@ import {
 } from "@/components/ui/dialog";
 import { Monitor, Moon, Sun } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import {
+  startGoogleContactsConnect,
+  completeGoogleContactsConnect,
+  syncGoogleContacts,
+  GoogleContactsReconnectRequired,
+} from "@/lib/googleContacts";
 import {
   RINGTONES,
   RingtoneId,
