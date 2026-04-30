@@ -62,16 +62,6 @@ export default function Settings() {
     (async () => setBackup(await getMyBackup()))();
   }, [user]);
 
-  const signOut = async () => {
-    setSigningOut(true);
-    try {
-      await supabase.auth.signOut({ scope: "global" });
-      window.location.replace("/login");
-    } catch (e) {
-      toast({ title: "Could not sign out", description: friendly(e), variant: "destructive" });
-      setSigningOut(false);
-    }
-  };
 
   const deleteAccount = async () => {
     if (!user) return;
