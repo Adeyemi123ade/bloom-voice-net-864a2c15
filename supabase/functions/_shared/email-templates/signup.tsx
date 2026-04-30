@@ -10,7 +10,7 @@ import {
   Preview,
   Text,
 } from 'npm:@react-email/components@0.0.22'
-import { OtpCodeBlock } from './_otp-block.tsx'
+import { getOtpCode, OtpCodeBlock } from './_otp-block.tsx'
 import { BrandHeader, FeatureStrip, SignOff } from './_brand.tsx'
 
 interface SignupEmailProps {
@@ -22,10 +22,13 @@ interface SignupEmailProps {
   firstName?: string
 }
 
-export const SignupEmail = ({ recipient, token, firstName }: SignupEmailProps) => (
+export const SignupEmail = ({ recipient, token, firstName }: SignupEmailProps) => {
+  const code = getOtpCode(token)
+
+  return (
   <Html lang="en" dir="ltr">
     <Head />
-    <Preview>Your ChiChat verification code is {token}</Preview>
+    <Preview>Your ChiChat verification code is {code}</Preview>
     <Body style={main}>
       <Container style={container}>
         <BrandHeader />
@@ -54,7 +57,8 @@ export const SignupEmail = ({ recipient, token, firstName }: SignupEmailProps) =
       </Container>
     </Body>
   </Html>
-)
+  )
+}
 
 export default SignupEmail
 
