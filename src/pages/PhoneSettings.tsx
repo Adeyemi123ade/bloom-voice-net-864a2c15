@@ -501,3 +501,15 @@ function RingtoneRow({
     </div>
   );
 }
+
+/** Strip technical noise (URLs, UUIDs) from error messages before showing them. */
+function friendlyError(e: unknown): string {
+  const raw = e instanceof Error ? e.message : String(e ?? "");
+  return (
+    raw
+      .replace(/https?:\/\/\S+/gi, "")
+      .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, "")
+      .replace(/\s{2,}/g, " ")
+      .trim() || "Please try again."
+  );
+}
