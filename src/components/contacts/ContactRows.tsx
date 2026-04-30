@@ -1,73 +1,71 @@
-import { MessageCircle, Phone, X } from "lucide-react";
+import { MessageSquare, X } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useLongPress } from "@/hooks/useLongPress";
-import { formatDisplay } from "@/lib/phone";
 import { ActiveContact, InviteContact, initials } from "./contactsHelpers";
 
 export function EmptyState({ title, hint }: { title: string; hint: string }) {
   return (
     <div className="text-center py-10 px-4">
-      <p className="text-xs font-semibold text-foreground">{title}</p>
+      <p className="text-sm font-semibold text-foreground">{title}</p>
       <p className="text-xs text-muted-foreground mt-1">{hint}</p>
     </div>
   );
 }
 
+/** A row for a contact already on Chichat. Tap row OR icon → open chat. */
 export function ActiveRow({
   c,
-  onCall,
+  onChat,
   onLongPress,
 }: {
   c: ActiveContact;
-  onCall: () => void;
+  onChat: () => void;
   onLongPress: () => void;
 }) {
-  // Tap the row body → open action sheet (Call / Chat / …). Tap the Call
-  // button → call directly.
   const lp = useLongPress(onLongPress);
   return (
     <div
       {...lp}
-      onClick={onLongPress}
-      className="flex items-center gap-3 px-2 py-2.5 rounded-lg hover:bg-secondary select-none cursor-pointer"
+      onClick={onChat}
+      className="flex items-center gap-3 px-3 py-2.5 hover:bg-secondary/60 select-none cursor-pointer"
     >
-      <Avatar className="w-10 h-10">
+      <Avatar className="w-11 h-11">
         <AvatarImage src={c.avatar_url ?? undefined} />
-        <AvatarFallback className="bg-primary/20 text-foreground text-xs font-semibold">
+        <AvatarFallback className="bg-muted text-muted-foreground text-sm font-semibold">
           {initials(c.display_name)}
         </AvatarFallback>
       </Avatar>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
-          <p className="text-xs font-semibold text-foreground truncate">
+          <p className="text-sm font-semibold text-foreground truncate">
             {c.display_name}
           </p>
           {c.call_count >= 3 && (
-            <Badge variant="secondary" className="h-4 px-1.5 text-[9px] font-semibold">
-              Frequent · {c.call_count}
+            <Badge variant="secondary" className="h-4 px-1.5 text-[10px] font-semibold">
+              Frequent
             </Badge>
           )}
         </div>
-        <p className="text-2xs text-muted-foreground truncate">
-          {formatDisplay(c.phone)}
-        </p>
+        <p className="text-xs text-muted-foreground truncate">Hello there!</p>
       </div>
       <Button
         onClick={(e) => {
           e.stopPropagation();
-          onCall();
+          onChat();
         }}
-        aria-label={`Call ${c.display_name}`}
-        className="h-9 w-9 p-0 bg-primary hover:bg-primary/90 text-primary-foreground rounded-full"
+        aria-label={`Message ${c.display_name}`}
+        variant="ghost"
+        className="h-10 w-10 p-0 text-primary hover:text-primary hover:bg-primary/10 rounded-full"
       >
-        <Phone className="w-4 h-4" />
+        <MessageSquare className="w-5 h-5" />
       </Button>
     </div>
   );
 }
 
+/** A row for a contact NOT on Chichat. Tap "Invite" → native share sheet. */
 export function InviteRow({
   c,
   isManual,
@@ -86,18 +84,15 @@ export function InviteRow({
     <div
       {...lp}
       onClick={onLongPress}
-      className="flex items-center gap-3 px-2 py-2.5 rounded-lg hover:bg-secondary select-none cursor-pointer"
+      className="flex items-center gap-3 px-3 py-2.5 hover:bg-secondary/60 select-none cursor-pointer"
     >
-      <Avatar className="w-10 h-10">
-        <AvatarFallback className="bg-muted text-muted-foreground text-xs font-semibold">
+      <Avatar className="w-11 h-11">
+        <AvatarFallback className="bg-muted text-muted-foreground text-sm font-semibold">
           {initials(c.name)}
         </AvatarFallback>
       </Avatar>
       <div className="flex-1 min-w-0">
-        <p className="text-xs font-semibold text-foreground truncate">{c.name}</p>
-        <p className="text-2xs text-muted-foreground truncate">
-          {formatDisplay(c.phone)}
-        </p>
+        <p className="text-sm font-semibold text-foreground truncate">{c.name}</p>
       </div>
       {isManual && (
         <button
@@ -106,26 +101,24 @@ export function InviteRow({
             e.stopPropagation();
             onRemove();
           }}
-          className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-background"
+          className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-background mr-1"
         >
-          <X className="w-3.5 h-3.5 text-muted-foreground" />
+          <X className="w-4 h-4 text-muted-foreground" />
         </button>
       )}
-      <Button
+      <button
         onClick={(e) => {
           e.stopPropagation();
           onInvite();
         }}
-        variant={c.invited ? "outline" : "default"}
         className={
           c.invited
-            ? "h-9 px-3 rounded-lg text-xs border-border"
-            : "h-9 px-3 bg-[#25D366] hover:bg-[#1ebe5a] text-white rounded-lg text-xs"
+            ? "text-sm font-semibold text-muted-foreground px-2"
+            : "text-sm font-bold text-primary hover:text-primary/80 px-2"
         }
       >
-        <MessageCircle className="w-3.5 h-3.5" />
-        {c.invited ? "Sent" : "WhatsApp"}
-      </Button>
+        {c.invited ? "Sent" : "Invite"}
+      </button>
     </div>
   );
 }
