@@ -375,12 +375,6 @@ export default function Contacts() {
           icon: Edit3,
           onClick: () => setEditTarget({ phone: c.phone }),
         },
-        {
-          label: "Remove from my contacts",
-          icon: Trash2,
-          destructive: true,
-          onClick: () => handleRemoveManual(c.phone),
-        },
       ],
     });
   };
@@ -404,12 +398,6 @@ export default function Contacts() {
           label: "Edit name",
           icon: Edit3,
           onClick: () => setEditTarget({ phone: c.phone }),
-        },
-        {
-          label: "Remove from my contacts",
-          icon: Trash2,
-          destructive: true,
-          onClick: () => handleRemoveManual(c.phone),
         },
       ],
     });
