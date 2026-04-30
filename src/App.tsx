@@ -17,6 +17,7 @@ import Contacts from "./pages/Contacts.tsx";
 import Profile from "./pages/Profile.tsx";
 import Settings from "./pages/Settings.tsx";
 import PhoneSettings from "./pages/PhoneSettings.tsx";
+import ChatBackup from "./pages/ChatBackup.tsx";
 import ForgotPassword from "./pages/ForgotPassword.tsx";
 import ResetPassword from "./pages/ResetPassword.tsx";
 import OutboundCall from "./pages/OutboundCall.tsx";
@@ -49,6 +50,7 @@ const App = () => (
               <Route path="/profile" element={<Profile />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/settings/phone" element={<PhoneSettings />} />
+              <Route path="/settings/backup" element={<ChatBackup />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/dial/:number" element={<OutboundCall />} />
