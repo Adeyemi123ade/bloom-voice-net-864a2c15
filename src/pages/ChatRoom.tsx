@@ -1001,7 +1001,7 @@ export default function ChatRoom() {
                   className={`max-w-[92%] select-none transition-shadow ${
                     bareAttachment
                       ? `rounded-2xl ${isSelected ? "ring-2 ring-accent" : ""}`
-                      : `px-3 py-2 rounded-2xl ${
+                      : `px-4 py-2.5 rounded-2xl ${
                           mine
                             ? "bg-primary text-primary-foreground rounded-br-sm"
                             : "bg-secondary text-foreground rounded-bl-sm"
