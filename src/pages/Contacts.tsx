@@ -633,7 +633,7 @@ export default function Contacts() {
 
         {/* Manual add removed — contacts come from Google. */}
       </div>
-      <Dialpad open={dialOpen} onOpenChange={setDialOpen} />
+      
       <ContactActionSheet
         open={!!actionSheet}
         onOpenChange={(o) => !o && setActionSheet(null)}
