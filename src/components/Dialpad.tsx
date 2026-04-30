@@ -341,18 +341,6 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
           </button>
         </div>
 
-          {/* Big green Call button */}
-          <div className="pt-3 flex items-center justify-center">
-            <button
-              onClick={callTyped}
-              disabled={!value}
-              aria-label="Call"
-              className="w-16 h-14 rounded-2xl bg-primary hover:bg-primary/90 active:bg-primary/95 text-primary-foreground flex items-center justify-center shadow-lg disabled:opacity-40 transition-colors"
-            >
-              <Phone className="w-6 h-6" />
-            </button>
-          </div>
-        </div>
         {/* Bottom nav inside dialer — closes overlay on tap, then routes. */}
         <BottomNav active="calls" onBeforeNavigate={() => onOpenChange(false)} />
       </DialogContent>
