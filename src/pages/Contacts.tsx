@@ -705,11 +705,14 @@ function ActiveRow({
   onCall: () => void;
   onLongPress: () => void;
 }) {
+  // Tap the row body → open action sheet (Call / Chat / …). Tap the Call
+  // button → call directly.
   const lp = useLongPress(onLongPress);
   return (
     <div
       {...lp}
-      className="flex items-center gap-3 px-2 py-2.5 rounded-lg hover:bg-secondary select-none"
+      onClick={onLongPress}
+      className="flex items-center gap-3 px-2 py-2.5 rounded-lg hover:bg-secondary select-none cursor-pointer"
     >
       <Avatar className="w-10 h-10">
         <AvatarImage src={c.avatar_url ?? undefined} />
@@ -733,12 +736,14 @@ function ActiveRow({
         </p>
       </div>
       <Button
-        onClick={onCall}
+        onClick={(e) => {
+          e.stopPropagation();
+          onCall();
+        }}
         aria-label={`Call ${c.display_name}`}
-        className="h-9 px-3 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-xs"
+        className="h-9 w-9 p-0 bg-primary hover:bg-primary/90 text-primary-foreground rounded-full"
       >
-        <Phone className="w-3.5 h-3.5" />
-        Call
+        <Phone className="w-4 h-4" />
       </Button>
     </div>
   );
@@ -761,7 +766,8 @@ function InviteRow({
   return (
     <div
       {...lp}
-      className="flex items-center gap-3 px-2 py-2.5 rounded-lg hover:bg-secondary select-none"
+      onClick={onLongPress}
+      className="flex items-center gap-3 px-2 py-2.5 rounded-lg hover:bg-secondary select-none cursor-pointer"
     >
       <Avatar className="w-10 h-10">
         <AvatarFallback className="bg-muted text-muted-foreground text-xs font-semibold">
@@ -777,24 +783,105 @@ function InviteRow({
       {isManual && (
         <button
           aria-label="Remove"
-          onClick={onRemove}
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
           className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-background"
         >
           <X className="w-3.5 h-3.5 text-muted-foreground" />
         </button>
       )}
       <Button
-        onClick={onInvite}
+        onClick={(e) => {
+          e.stopPropagation();
+          onInvite();
+        }}
         variant={c.invited ? "outline" : "default"}
         className={
           c.invited
             ? "h-9 px-3 rounded-lg text-xs border-border"
-            : "h-9 px-3 bg-accent hover:bg-accent/90 text-accent-foreground rounded-lg text-xs"
+            : "h-9 px-3 bg-[#25D366] hover:bg-[#1ebe5a] text-white rounded-lg text-xs"
         }
       >
-        <Send className="w-3.5 h-3.5" />
-        {c.invited ? "Re-invite" : "Invite"}
+        <MessageCircle className="w-3.5 h-3.5" />
+        {c.invited ? "Sent" : "WhatsApp"}
       </Button>
+    </div>
+  );
+}
+
+function ShareInviteCard() {
+  const link = APP_INVITE_LINK;
+  const text = `Join me on Chichat — high-quality calls and messages: ${link}`;
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(link);
+      toast({ title: "Link copied", description: "Paste it anywhere." });
+    } catch {
+      toast({ title: "Couldn't copy", variant: "destructive" });
+    }
+  };
+
+  const share = async () => {
+    const nav = navigator as Navigator & {
+      share?: (data: { title?: string; text?: string; url?: string }) => Promise<void>;
+    };
+    if (nav.share) {
+      try {
+        await nav.share({ title: "Chichat", text, url: link });
+        return;
+      } catch {
+        /* user cancelled — fall through */
+      }
+    }
+    // Fallback: open WhatsApp web share.
+    window.open(
+      `https://wa.me/?text=${encodeURIComponent(text)}`,
+      "_blank",
+      "noopener",
+    );
+  };
+
+  const whatsapp = () => {
+    window.open(
+      `https://wa.me/?text=${encodeURIComponent(text)}`,
+      "_blank",
+      "noopener",
+    );
+  };
+
+  return (
+    <div className="mx-3 mt-3 p-3 rounded-lg bg-primary/10 border border-primary/30">
+      <div className="flex items-center gap-2">
+        <Share2 className="w-4 h-4 text-primary" />
+        <p className="text-xs font-semibold text-foreground">Invite anyone with a link</p>
+      </div>
+      <p className="text-2xs text-muted-foreground mt-1 truncate">{link}</p>
+      <div className="mt-2 grid grid-cols-3 gap-2">
+        <button
+          onClick={copy}
+          className="h-9 rounded-md bg-secondary hover:bg-secondary/80 text-foreground text-2xs font-semibold inline-flex items-center justify-center gap-1"
+        >
+          <Copy className="w-3.5 h-3.5" />
+          Copy
+        </button>
+        <button
+          onClick={whatsapp}
+          className="h-9 rounded-md bg-[#25D366] hover:bg-[#1ebe5a] text-white text-2xs font-semibold inline-flex items-center justify-center gap-1"
+        >
+          <MessageCircle className="w-3.5 h-3.5" />
+          WhatsApp
+        </button>
+        <button
+          onClick={share}
+          className="h-9 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground text-2xs font-semibold inline-flex items-center justify-center gap-1"
+        >
+          <Share2 className="w-3.5 h-3.5" />
+          Share
+        </button>
+      </div>
     </div>
   );
 }
