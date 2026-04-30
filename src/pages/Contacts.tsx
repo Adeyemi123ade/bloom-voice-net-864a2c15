@@ -395,13 +395,23 @@ export default function Contacts() {
     }
   };
 
-  const inviteContact = async (c: InviteContact) => {
+  const chatActive = async (c: ActiveContact) => {
     if (!user) return;
-    const body = encodeURIComponent(inviteMessage(c.name));
-    // Open the device's native SMS composer — zero cost, fully user-initiated.
-    const url = `sms:${c.phone}?body=${body}`;
-    window.location.href = url;
-    // Record the invite (idempotent thanks to unique index)
+    try {
+      const { data, error } = await supabase.rpc("start_direct_conversation", {
+        _other_user: c.user_id,
+      });
+      if (error) throw error;
+      navigate(`/chat/${data as string}`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Could not open chat";
+      toast({ title: "Chat failed", description: msg, variant: "destructive" });
+    }
+  };
+
+  /** Record an invite (idempotent) and mark the row as invited. */
+  const recordInvite = async (c: InviteContact) => {
+    if (!user) return;
     await supabase.from("invites").insert({
       inviter_id: user.id,
       phone: c.phone,
@@ -410,12 +420,27 @@ export default function Contacts() {
     setInvitedPhones((prev) => new Set(prev).add(c.phone));
   };
 
+  const inviteViaWhatsApp = async (c: InviteContact) => {
+    const text = encodeURIComponent(inviteMessage(c.name));
+    // wa.me wants digits only, no leading '+'.
+    const digits = c.phone.replace(/[^\d]/g, "");
+    window.open(`https://wa.me/${digits}?text=${text}`, "_blank", "noopener");
+    await recordInvite(c);
+  };
+
+  const inviteViaSms = async (c: InviteContact) => {
+    const body = encodeURIComponent(inviteMessage(c.name));
+    window.location.href = `sms:${c.phone}?body=${body}`;
+    await recordInvite(c);
+  };
+
   const openActiveActions = (c: ActiveContact) => {
     setActionSheet({
       title: c.display_name,
       subtitle: formatDisplay(c.phone),
       actions: [
         { label: "Call (in-app)", icon: Phone, onClick: () => callActive(c) },
+        { label: "Open chat", icon: MessageSquare, onClick: () => chatActive(c) },
         {
           label: "Edit name",
           icon: Edit3,
@@ -437,14 +462,19 @@ export default function Contacts() {
       subtitle: formatDisplay(c.phone),
       actions: [
         {
+          label: "Invite via WhatsApp",
+          icon: MessageCircle,
+          onClick: () => inviteViaWhatsApp(c),
+        },
+        {
+          label: "Invite via SMS",
+          icon: MessageSquare,
+          onClick: () => inviteViaSms(c),
+        },
+        {
           label: "Call this number",
           icon: Phone,
           onClick: () => navigate(`/dial/${encodeURIComponent(c.phone)}`),
-        },
-        {
-          label: c.invited ? "Re-invite to ChiChat" : "Invite to ChiChat",
-          icon: Send,
-          onClick: () => inviteContact(c),
         },
         {
           label: "Edit name",
