@@ -1,4 +1,9 @@
 // Fetches contacts from Google People API for the authenticated user.
+// Pulls from THREE sources so users who don't manually save to Google Contacts
+// still get useful results:
+//   1. people/me/connections      → saved Google Contacts
+//   2. otherContacts              → people you've emailed (auto-collected)
+//   3. people:listDirectoryPeople → workspace directory (if any)
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 
 const corsHeaders = {
@@ -9,6 +14,8 @@ const corsHeaders = {
 
 const CONTACTS_SCOPE = "https://www.googleapis.com/auth/contacts";
 const CONTACTS_READONLY_SCOPE = "https://www.googleapis.com/auth/contacts.readonly";
+
+type Contact = { name: string; phones: string[] };
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -44,7 +51,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    let accessToken = row.access_token;
+    let accessToken = row.access_token as string;
     if (new Date(row.expires_at).getTime() < Date.now() + 60000 && row.refresh_token) {
       const r = await fetch("https://oauth2.googleapis.com/token", {
         method: "POST",
@@ -66,38 +73,139 @@ Deno.serve(async (req) => {
       }
     }
 
-    const contacts: { name: string; phones: string[] }[] = [];
-    let pageToken: string | undefined;
-    do {
-      const url = new URL("https://people.googleapis.com/v1/people/me/connections");
-      url.searchParams.set("personFields", "names,phoneNumbers");
-      url.searchParams.set("pageSize", "500");
-      if (pageToken) url.searchParams.set("pageToken", pageToken);
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
-      const data = await res.json();
-      if (!res.ok) {
-        if (isInsufficientScope(data)) {
-          await admin.from("google_oauth_tokens").delete().eq("user_id", user.id);
-          return json({
-            error: "Google contacts permission is missing. Please reconnect Google Contacts.",
-            reconnectRequired: true,
-          });
-        }
-        return json({ error: data }, 400);
-      }
-      for (const p of data.connections ?? []) {
-        const name = p.names?.[0]?.displayName ?? "";
-        const phones = (p.phoneNumbers ?? []).map((n: { value: string }) => n.value).filter(Boolean);
-        if (name && phones.length) contacts.push({ name, phones });
-      }
-      pageToken = data.nextPageToken;
-    } while (pageToken);
+    const map = new Map<string, Contact>();
+    const sources = {
+      saved: 0,
+      other: 0,
+      directory: 0,
+    };
 
-    return json({ contacts });
+    // 1. Saved Google Contacts
+    {
+      const { contacts: list, scopeError } = await fetchConnections(accessToken);
+      if (scopeError) {
+        await admin.from("google_oauth_tokens").delete().eq("user_id", user.id);
+        return json({
+          error: "Google contacts permission is missing. Please reconnect Google Contacts.",
+          reconnectRequired: true,
+        });
+      }
+      for (const c of list) {
+        sources.saved++;
+        mergeContact(map, c);
+      }
+    }
+
+    // 2. "Other contacts" — auto-collected from Gmail interactions.
+    //    These often don't have phone numbers, but when they do they're useful.
+    {
+      const list = await fetchOtherContacts(accessToken);
+      for (const c of list) {
+        sources.other++;
+        mergeContact(map, c);
+      }
+    }
+
+    // 3. Workspace directory (only returns data when the user is on Google Workspace)
+    {
+      const list = await fetchDirectoryPeople(accessToken);
+      for (const c of list) {
+        sources.directory++;
+        mergeContact(map, c);
+      }
+    }
+
+    const contacts = [...map.values()];
+    return json({ contacts, sources, totalReturned: contacts.length });
   } catch (e) {
     return json({ error: String(e) }, 500);
   }
 });
+
+async function fetchConnections(
+  accessToken: string,
+): Promise<{ contacts: Contact[]; scopeError?: boolean }> {
+  const out: Contact[] = [];
+  let pageToken: string | undefined;
+  do {
+    const url = new URL("https://people.googleapis.com/v1/people/me/connections");
+    url.searchParams.set("personFields", "names,phoneNumbers,emailAddresses");
+    url.searchParams.set("pageSize", "500");
+    if (pageToken) url.searchParams.set("pageToken", pageToken);
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+    const data = await res.json();
+    if (!res.ok) {
+      if (isInsufficientScope(data)) return { contacts: [], scopeError: true };
+      // Don't fail the whole sync for non-scope issues — just stop paging.
+      break;
+    }
+    for (const p of data.connections ?? []) {
+      const c = personToContact(p);
+      if (c) out.push(c);
+    }
+    pageToken = data.nextPageToken;
+  } while (pageToken);
+  return { contacts: out };
+}
+
+async function fetchOtherContacts(accessToken: string): Promise<Contact[]> {
+  const out: Contact[] = [];
+  let pageToken: string | undefined;
+  do {
+    const url = new URL("https://people.googleapis.com/v1/otherContacts");
+    url.searchParams.set("readMask", "names,phoneNumbers,emailAddresses");
+    url.searchParams.set("pageSize", "1000");
+    if (pageToken) url.searchParams.set("pageToken", pageToken);
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+    const data = await res.json();
+    if (!res.ok) break;
+    for (const p of data.otherContacts ?? []) {
+      const c = personToContact(p);
+      if (c) out.push(c);
+    }
+    pageToken = data.nextPageToken;
+  } while (pageToken);
+  return out;
+}
+
+async function fetchDirectoryPeople(accessToken: string): Promise<Contact[]> {
+  const out: Contact[] = [];
+  let pageToken: string | undefined;
+  do {
+    const url = new URL("https://people.googleapis.com/v1/people:listDirectoryPeople");
+    url.searchParams.set("readMask", "names,phoneNumbers,emailAddresses");
+    url.searchParams.set("sources", "DIRECTORY_SOURCE_TYPE_DOMAIN_CONTACT");
+    url.searchParams.append("sources", "DIRECTORY_SOURCE_TYPE_DOMAIN_PROFILE");
+    url.searchParams.set("pageSize", "1000");
+    if (pageToken) url.searchParams.set("pageToken", pageToken);
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+    const data = await res.json();
+    if (!res.ok) break; // directory is workspace-only — silently ignore
+    for (const p of data.people ?? []) {
+      const c = personToContact(p);
+      if (c) out.push(c);
+    }
+    pageToken = data.nextPageToken;
+  } while (pageToken);
+  return out;
+}
+
+function personToContact(p: any): Contact | null {
+  const name: string =
+    p.names?.[0]?.displayName ??
+    p.emailAddresses?.[0]?.value ??
+    "";
+  const phones: string[] = (p.phoneNumbers ?? [])
+    .map((n: { value?: string }) => (n?.value ?? "").trim())
+    .filter(Boolean);
+  if (!name || phones.length === 0) return null;
+  return { name, phones };
+}
+
+function mergeContact(map: Map<string, Contact>, c: Contact) {
+  const key = c.phones[0];
+  if (!map.has(key)) map.set(key, c);
+}
 
 function json(b: unknown, status = 200) {
   return new Response(JSON.stringify(b), {
@@ -110,8 +218,7 @@ function isInsufficientScope(data: any) {
   if (data?.error?.status === "PERMISSION_DENIED") return true;
   const details = data?.error?.details ?? [];
   return details.some((d: any) =>
-    d?.reason === "ACCESS_TOKEN_SCOPE_INSUFFICIENT" ||
-    d?.metadata?.service === "people.googleapis.com"
+    d?.reason === "ACCESS_TOKEN_SCOPE_INSUFFICIENT"
   );
 }
 
