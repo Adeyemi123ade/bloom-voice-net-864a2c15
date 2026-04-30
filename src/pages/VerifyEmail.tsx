@@ -74,7 +74,7 @@ export default function VerifyEmail() {
   // Auto-submit as soon as the user types/pastes 6 digits.
   const handleChange = (value: string) => {
     setCode(value);
-    if (value.length === 6 && !autoSubmitted.current) {
+    if (value.length === OTP_LENGTH && !autoSubmitted.current) {
       autoSubmitted.current = true;
       verify(value);
     }
