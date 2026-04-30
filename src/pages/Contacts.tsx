@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  Copy,
   Edit3,
-  Grid3x3,
   Loader2,
+  MessageCircle,
+  MessageSquare,
   Phone,
   Search,
   Send,
+  Share2,
   Trash2,
   Users,
   X,
