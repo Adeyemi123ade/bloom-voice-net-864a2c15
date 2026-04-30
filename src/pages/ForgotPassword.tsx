@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { z } from "zod";
+import { ArrowLeft } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -17,7 +18,6 @@ export default function ForgotPassword() {
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | undefined>();
   const [submitting, setSubmitting] = useState(false);
-  const [sent, setSent] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,34 +28,40 @@ export default function ForgotPassword() {
     }
     setError(undefined);
     setSubmitting(true);
-    const { error: err } = await supabase.auth.resetPasswordForEmail(result.data.email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
+    // No redirectTo — Supabase will send a 6-digit OTP code, not a magic link.
+    const { error: err } = await supabase.auth.resetPasswordForEmail(result.data.email);
     setSubmitting(false);
     if (err) {
-      toast({ title: "Couldn't send reset email", description: err.message, variant: "destructive" });
+      toast({ title: "Couldn't send code", description: err.message, variant: "destructive" });
       return;
     }
-    setSent(true);
-    toast({ title: "Reset link sent", description: `Check ${result.data.email} for instructions.` });
+    toast({ title: "Code sent", description: `Check ${result.data.email} for your 6-digit code.` });
+    navigate("/verify-reset-code", { state: { email: result.data.email } });
   };
 
   return (
     <MobileFrame>
-      <div className="h-full w-full flex flex-col px-4 pt-5 pb-4 overflow-y-auto">
+      <div className="h-full w-full flex flex-col px-5 pt-5 pb-5 overflow-y-auto">
+        <button
+          onClick={() => navigate("/login")}
+          aria-label="Back"
+          className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-secondary transition-colors -ml-1"
+        >
+          <ArrowLeft className="w-5 h-5 text-foreground" />
+        </button>
 
         <div className="mt-2">
-          <h1 className="text-[18px] font-bold text-foreground leading-tight">
+          <h1 className="text-xl font-bold text-foreground leading-tight">
             Forgot your password?
           </h1>
-          <p className="text-xs text-muted-foreground mt-1">
-            Enter your email and we'll send you a reset link.
+          <p className="text-base text-muted-foreground mt-1">
+            Enter your email and we'll send you a 6-digit code to reset it.
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-3 flex-1 flex flex-col">
+        <form onSubmit={handleSubmit} className="mt-5 flex-1 flex flex-col">
           <div>
-            <Label htmlFor="email" className="text-2xs text-muted-foreground">
+            <Label htmlFor="email" className="text-sm text-muted-foreground">
               Email address
             </Label>
             <Input
@@ -66,26 +72,22 @@ export default function ForgotPassword() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
               maxLength={255}
-              className="mt-1 h-9 text-xs bg-input border-border text-foreground placeholder:text-muted-foreground"
+              autoFocus
+              className="mt-1 h-11 text-base bg-input border-border text-foreground placeholder:text-muted-foreground"
               aria-invalid={!!error}
             />
-            {error && <p className="text-2xs text-destructive mt-1">{error}</p>}
-            {sent && (
-              <p className="text-2xs text-accent mt-2">
-                If an account exists for {email}, a reset link is on its way.
-              </p>
-            )}
+            {error && <p className="text-sm text-destructive mt-1">{error}</p>}
           </div>
 
-          <div className="mt-auto pt-3">
+          <div className="mt-auto pt-4">
             <Button
               type="submit"
               disabled={submitting}
-              className="w-full h-8 text-xs bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg"
+              className="w-full h-11 text-base bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg"
             >
-              {submitting ? "Sending…" : "Send reset link"}
+              {submitting ? "Sending…" : "Send code"}
             </Button>
-            <p className="text-2xs text-muted-foreground text-center mt-2">
+            <p className="text-sm text-muted-foreground text-center mt-3">
               Remembered it?{" "}
               <Link to="/login" className="text-accent font-semibold hover:underline">
                 Sign in
