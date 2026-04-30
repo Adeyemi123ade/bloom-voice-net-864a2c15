@@ -38,7 +38,6 @@ export default function Settings() {
   const [confirmStage, setConfirmStage] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [backup, setBackup] = useState<BackupRow | null>(null);
-  const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
     document.title = "Settings — Chichat";
