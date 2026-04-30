@@ -1004,23 +1004,22 @@ export default function ChatRoom() {
 
             if (isCall) {
               return (
-                <div
+                <CallRow
                   key={m.id}
-                  className={`flex ${mine ? "justify-end" : "justify-start"}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleSelect(m.id);
+                  mine={mine}
+                  isSelected={isSelected}
+                  onTap={() => {
+                    if (selectionCount > 0) toggleSelect(m.id);
                   }}
+                  onLongPress={() => toggleSelect(m.id)}
                 >
-                  <div className={isSelected ? "ring-2 ring-primary rounded-2xl" : ""}>
-                    <CallSystemBubble
-                      m={m}
-                      mine={mine}
-                      otherName={other?.display_name}
-                      onCallBack={(t) => setCallSheet(t)}
-                    />
-                  </div>
-                </div>
+                  <CallSystemBubble
+                    m={m}
+                    mine={mine}
+                    otherName={other?.display_name}
+                    onCallBack={(t) => setCallSheet(t)}
+                  />
+                </CallRow>
               );
             }
 
@@ -1044,8 +1043,11 @@ export default function ChatRoom() {
                 onReply={() => replyMsg(m)}
                 onTap={(e) => {
                   e.stopPropagation();
-                  toggleSelect(m.id);
+                  // In selection mode, tap toggles. Otherwise tap does nothing
+                  // (selection requires long-press to avoid accidental opens).
+                  if (selectionCount > 0) toggleSelect(m.id);
                 }}
+                onLongPress={() => toggleSelect(m.id)}
               >
                 <div
                   className={`max-w-[92%] select-none transition-shadow ${
