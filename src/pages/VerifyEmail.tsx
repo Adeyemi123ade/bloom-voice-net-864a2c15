@@ -11,7 +11,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
-const OTP_LENGTH = 8;
+const OTP_LENGTH = 6;
 
 /**
  * Verify email with a 6-digit OTP after signup.
