@@ -1,7 +1,6 @@
 /// <reference types="npm:@types/react@18.3.1" />
 
 import * as React from 'npm:react@18.3.1'
-
 import {
   Body,
   Button,
@@ -12,6 +11,7 @@ import {
   Preview,
   Text,
 } from 'npm:@react-email/components@0.0.22'
+import { BrandHeader, FeatureStrip, SignOff } from './_brand.tsx'
 
 interface InviteEmailProps {
   siteName: string
@@ -22,20 +22,41 @@ interface InviteEmailProps {
 export const InviteEmail = ({ confirmationUrl }: InviteEmailProps) => (
   <Html lang="en" dir="ltr">
     <Head />
-    <Preview>You've been invited to ChiChat</Preview>
+    <Preview>You&rsquo;ve been invited to ChiChat — come say hi 👋</Preview>
     <Body style={main}>
       <Container style={container}>
-        <Heading style={brand}>ChiChat</Heading>
-        <Heading style={h1}>You've been invited</Heading>
+        <BrandHeader />
+
+        <Heading style={h1}>
+          Someone wants to chat with you <span style={{ color: '#F5C518' }}>👋</span>
+        </Heading>
+
         <Text style={text}>
-          Someone wants to chat with you on ChiChat — where conversations don't end and people never feel far away.
+          Welcome to ChiChat — where conversations don&rsquo;t end and people never feel far away.
+          A friend just sent you an invite. Tap the button below to accept and start chatting.
         </Text>
-        <Button style={button} href={confirmationUrl}>
-          Accept invitation
-        </Button>
+
+        <table role="presentation" cellPadding={0} cellSpacing={0} border={0} align="center" style={{ margin: '8px auto 18px' }}>
+          <tbody>
+            <tr>
+              <td align="center" style={{ backgroundColor: '#0B8F6C', borderRadius: '12px' }}>
+                <Button style={button} href={confirmationUrl}>
+                  Accept invitation
+                </Button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
         <Text style={footer}>
-          If you weren't expecting this invitation, you can safely ignore this email.
+          If you weren&rsquo;t expecting this invitation, you can safely ignore this email.
         </Text>
+
+        <FeatureStrip />
+        <SignOff message="Conversations are better when shared. Let's get you in." />
+
+        <div style={hr} />
+        <Text style={tinyFooter}>© ChiChat · Experience the possibilities</Text>
       </Container>
     </Body>
   </Html>
@@ -44,9 +65,10 @@ export const InviteEmail = ({ confirmationUrl }: InviteEmailProps) => (
 export default InviteEmail
 
 const main = { backgroundColor: '#ffffff', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif' }
-const container = { padding: '24px 28px', maxWidth: '560px' }
-const brand = { fontSize: '14px', fontWeight: 'bold' as const, color: '#0B8F6C', margin: '0 0 24px', letterSpacing: '0.5px' }
-const h1 = { fontSize: '22px', fontWeight: 'bold' as const, color: '#121212', margin: '0 0 16px' }
-const text = { fontSize: '15px', color: '#3a3a3a', lineHeight: '1.6', margin: '0 0 18px' }
-const button = { backgroundColor: '#0B8F6C', color: '#ffffff', fontSize: '15px', fontWeight: 'bold' as const, borderRadius: '8px', padding: '12px 22px', textDecoration: 'none', display: 'inline-block', margin: '8px 0 24px' }
-const footer = { fontSize: '12px', color: '#8A8A8A', margin: '28px 0 0', lineHeight: '1.5' }
+const container = { padding: '32px 28px', maxWidth: '600px', margin: '0 auto' }
+const h1 = { fontSize: '28px', fontWeight: 'bold' as const, color: '#121212', margin: '0 0 16px', lineHeight: '1.25' }
+const text = { fontSize: '16px', color: '#3a3a3a', lineHeight: '1.65', margin: '0 0 18px' }
+const button = { backgroundColor: '#0B8F6C', color: '#ffffff', fontSize: '16px', fontWeight: 'bold' as const, borderRadius: '12px', padding: '14px 28px', textDecoration: 'none', display: 'inline-block' }
+const footer = { fontSize: '13px', color: '#8A8A8A', margin: '20px 0 0', lineHeight: '1.55', textAlign: 'center' as const }
+const hr = { borderTop: '1px solid #ECECEC', margin: '28px 0 14px' }
+const tinyFooter = { fontSize: '11px', color: '#B0B0B0', textAlign: 'center' as const, margin: 0 }
