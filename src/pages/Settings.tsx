@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   ChevronRight,
@@ -86,9 +86,20 @@ export default function Settings() {
   }, [user]);
 
   // Handle Google OAuth redirect (?code=…)
+  const oauthHandledRef = useRef<string | null>(null);
   useEffect(() => {
     const code = params.get("code");
     if (!code || !user) return;
+    if (oauthHandledRef.current === code) return;
+    oauthHandledRef.current = code;
+
+    // Strip OAuth params from the URL IMMEDIATELY so a remount/auth-refresh
+    // can't try to reuse the single-use authorization code.
+    params.delete("code");
+    params.delete("scope");
+    params.delete("state");
+    setParams(params, { replace: true });
+
     (async () => {
       try {
         const r = await completeGoogleContactsConnect(code);
@@ -101,10 +112,6 @@ export default function Settings() {
         toast({ title: "Google connect failed", description: friendly(e), variant: "destructive" });
       } finally {
         setSyncing(false);
-        params.delete("code");
-        params.delete("scope");
-        params.delete("state");
-        setParams(params, { replace: true });
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
