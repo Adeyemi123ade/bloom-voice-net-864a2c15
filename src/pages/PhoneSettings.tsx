@@ -274,6 +274,48 @@ export default function PhoneSettings() {
             </div>
             <ChevronRight className="w-4 h-4 text-muted-foreground" />
           </button>
+
+          {/* Google contacts — collapsible. Connect when not linked, sync when linked. */}
+          <button
+            onClick={() => setGoogleOpen((v) => !v)}
+            className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-secondary text-left"
+          >
+            <span className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center">
+              <Contact2 className="w-4 h-4 text-primary" />
+            </span>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-foreground">Google contact</p>
+              <p className="text-xs text-muted-foreground truncate">
+                {googleEmail ? `Connected · ${googleEmail}` : "Not connected"}
+              </p>
+            </div>
+            <ChevronRight
+              className={`w-4 h-4 text-muted-foreground transition-transform ${googleOpen ? "rotate-90" : ""}`}
+            />
+          </button>
+          {googleOpen && (
+            <div className="px-3 pb-3 -mt-1">
+              {googleEmail ? (
+                <button
+                  onClick={syncGoogleNow}
+                  disabled={syncing}
+                  className="w-full h-10 rounded-md bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-60 inline-flex items-center justify-center gap-1.5"
+                >
+                  <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} />
+                  {syncing ? "Syncing…" : "Sync now"}
+                </button>
+              ) : (
+                <button
+                  onClick={connectGoogle}
+                  disabled={connecting}
+                  className="w-full h-10 rounded-md bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-60 inline-flex items-center justify-center gap-1.5"
+                >
+                  {connecting && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {connecting ? "Opening Google…" : "Connect account"}
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Theme dialog */}
