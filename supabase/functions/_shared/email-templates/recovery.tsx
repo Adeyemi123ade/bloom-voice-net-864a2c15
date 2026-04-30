@@ -10,7 +10,7 @@ import {
   Preview,
   Text,
 } from 'npm:@react-email/components@0.0.22'
-import { OtpCodeBlock } from './_otp-block.tsx'
+import { getOtpCode, OtpCodeBlock } from './_otp-block.tsx'
 import { BrandHeader, FeatureStrip, SignOff } from './_brand.tsx'
 
 interface RecoveryEmailProps {
@@ -20,10 +20,13 @@ interface RecoveryEmailProps {
   firstName?: string
 }
 
-export const RecoveryEmail = ({ token, firstName }: RecoveryEmailProps) => (
+export const RecoveryEmail = ({ token, firstName }: RecoveryEmailProps) => {
+  const code = getOtpCode(token)
+
+  return (
   <Html lang="en" dir="ltr">
     <Head />
-    <Preview>Your ChiChat password reset code is {token}</Preview>
+    <Preview>Your ChiChat password reset code is {code}</Preview>
     <Body style={main}>
       <Container style={container}>
         <BrandHeader />
@@ -51,7 +54,8 @@ export const RecoveryEmail = ({ token, firstName }: RecoveryEmailProps) => (
       </Container>
     </Body>
   </Html>
-)
+  )
+}
 
 export default RecoveryEmail
 
