@@ -191,14 +191,6 @@ export default function Settings() {
                 <ChevronRight className="w-4 h-4 text-muted-foreground" />
               </button>
 
-              <button
-                onClick={signOut}
-                disabled={signingOut}
-                className="w-full h-11 rounded-md border border-border bg-background text-sm font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-60"
-              >
-                <LogOut className="w-4 h-4" />
-                {signingOut ? "Signing out…" : "Sign out"}
-              </button>
             </CollapsibleContent>
           </Collapsible>
 
