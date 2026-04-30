@@ -200,9 +200,12 @@ function personToContact(p: any): Contact | null {
     p.names?.[0]?.displayName ??
     p.emailAddresses?.[0]?.value ??
     "";
-  const phones: string[] = (p.phoneNumbers ?? [])
-    .map((n: { value?: string }) => (n?.value ?? "").trim())
-    .filter(Boolean);
+  const phones: string[] = Array.from(new Set((p.phoneNumbers ?? [])
+    .flatMap((n: { canonicalForm?: string; value?: string }) => [
+      (n?.canonicalForm ?? "").trim(),
+      (n?.value ?? "").trim(),
+    ])
+    .filter(Boolean)));
   if (!name || phones.length === 0) return null;
   return { name, phones };
 }
