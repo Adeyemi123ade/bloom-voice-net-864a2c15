@@ -10,7 +10,7 @@ import {
   Preview,
   Text,
 } from 'npm:@react-email/components@0.0.22'
-import { OtpCodeBlock } from './_otp-block.tsx'
+import { getOtpCode, OtpCodeBlock } from './_otp-block.tsx'
 import { BrandHeader, FeatureStrip, SignOff } from './_brand.tsx'
 
 interface ReauthenticationEmailProps {
@@ -18,10 +18,13 @@ interface ReauthenticationEmailProps {
   firstName?: string
 }
 
-export const ReauthenticationEmail = ({ token, firstName }: ReauthenticationEmailProps) => (
+export const ReauthenticationEmail = ({ token, firstName }: ReauthenticationEmailProps) => {
+  const code = getOtpCode(token)
+
+  return (
   <Html lang="en" dir="ltr">
     <Head />
-    <Preview>Your ChiChat verification code is {token}</Preview>
+    <Preview>Your ChiChat verification code is {code}</Preview>
     <Body style={main}>
       <Container style={container}>
         <BrandHeader />
@@ -49,7 +52,8 @@ export const ReauthenticationEmail = ({ token, firstName }: ReauthenticationEmai
       </Container>
     </Body>
   </Html>
-)
+  )
+}
 
 export default ReauthenticationEmail
 

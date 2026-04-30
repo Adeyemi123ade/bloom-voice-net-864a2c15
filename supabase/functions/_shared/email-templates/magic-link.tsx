@@ -10,7 +10,7 @@ import {
   Preview,
   Text,
 } from 'npm:@react-email/components@0.0.22'
-import { OtpCodeBlock } from './_otp-block.tsx'
+import { getOtpCode, OtpCodeBlock } from './_otp-block.tsx'
 import { BrandHeader, FeatureStrip, SignOff } from './_brand.tsx'
 
 interface MagicLinkEmailProps {
@@ -20,10 +20,13 @@ interface MagicLinkEmailProps {
   firstName?: string
 }
 
-export const MagicLinkEmail = ({ token, firstName }: MagicLinkEmailProps) => (
+export const MagicLinkEmail = ({ token, firstName }: MagicLinkEmailProps) => {
+  const code = getOtpCode(token)
+
+  return (
   <Html lang="en" dir="ltr">
     <Head />
-    <Preview>Your ChiChat sign-in code is {token}</Preview>
+    <Preview>Your ChiChat sign-in code is {code}</Preview>
     <Body style={main}>
       <Container style={container}>
         <BrandHeader />
@@ -51,7 +54,8 @@ export const MagicLinkEmail = ({ token, firstName }: MagicLinkEmailProps) => (
       </Container>
     </Body>
   </Html>
-)
+  )
+}
 
 export default MagicLinkEmail
 
