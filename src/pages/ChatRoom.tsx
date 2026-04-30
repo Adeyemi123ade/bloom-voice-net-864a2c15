@@ -1060,9 +1060,11 @@ export default function ChatRoom() {
                       </span>
                       {mine && !isDeleted && (
                         m.read_at ? (
-                          <CheckCheck className="w-3 h-3 text-primary-foreground/90" />
+                          <CheckCheck className="w-3 h-3 text-sky-400" />
+                        ) : m.delivered_at ? (
+                          <CheckCheck className={`w-3 h-3 ${mine ? "text-primary-foreground/70" : "text-muted-foreground"}`} />
                         ) : (
-                          <Check className="w-3 h-3 text-primary-foreground/70" />
+                          <Check className={`w-3 h-3 ${mine ? "text-primary-foreground/70" : "text-muted-foreground"}`} />
                         )
                       )}
                     </div>
