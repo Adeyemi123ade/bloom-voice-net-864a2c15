@@ -20,9 +20,7 @@ export default function Welcome() {
         <div className="w-20 h-20 rounded-full bg-primary/15 flex items-center justify-center mb-6">
           <CheckCircle2 className="w-12 h-12 text-accent" strokeWidth={2.2} />
         </div>
-        <h1 className="text-[24px] font-bold text-foreground">
-          You're all set{firstName ? `, ${firstName}` : ""}!
-        </h1>
+        <h1 className="text-[24px] font-bold text-foreground">Congratulations{firstName ? `, ${firstName}` : ""}!</h1>
         <p className="text-sm text-muted-foreground mt-3 max-w-[280px]">
           Your Chichat account is verified. Get ready to experience the possibilities.
         </p>
