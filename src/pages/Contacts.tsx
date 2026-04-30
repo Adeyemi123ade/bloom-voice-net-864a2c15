@@ -475,13 +475,6 @@ export default function Contacts() {
   return (
     <MobileFrame bottomNav="contacts">
       <div className="h-full w-full flex flex-col bg-background relative">
-        <button
-          aria-label="Open dialer"
-          onClick={() => setDialOpen(true)}
-          className="absolute bottom-4 right-4 z-20 w-14 h-14 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg flex items-center justify-center"
-        >
-          <Grid3x3 className="w-6 h-6" />
-        </button>
         {/* Header — no back arrow; navigation is handled by bottom nav + system back. */}
         <div className="px-4 pt-4 pb-3 border-b border-border flex items-center gap-2">
           <h1 className="text-base font-semibold text-foreground flex-1">Contacts</h1>
