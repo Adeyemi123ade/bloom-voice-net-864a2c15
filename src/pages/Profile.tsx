@@ -220,17 +220,7 @@ export default function Profile() {
             </div>
             <p className="text-2xs text-muted-foreground">
               Required so friends can find you when they sync their contacts.
-              {phone && toE164(phone) && (
-                <span className="block text-foreground/70 mt-0.5">
-                  Saved as {formatDisplay(toE164(phone)!)}
-                </span>
-              )}
             </p>
-          </div>
-
-          <div className="w-full mt-3 space-y-1.5">
-            <Label className="text-xs text-muted-foreground">Email</Label>
-            <Input value={user?.email ?? ""} disabled className="h-9 text-xs bg-input border-border" />
           </div>
 
           <Button
