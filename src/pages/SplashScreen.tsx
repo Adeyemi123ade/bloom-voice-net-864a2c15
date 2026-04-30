@@ -92,10 +92,11 @@ const CSS = `
   margin-bottom: 14px;
   animation: chichat-rise 0.8s cubic-bezier(0.22,1,0.36,1) 1.2s both;
 }
-.chichat-splash .logo-icon svg {
-  width: clamp(40px, 8vh, 64px);
-  height: clamp(40px, 8vh, 64px);
-  filter: drop-shadow(0 4px 18px rgba(34,197,94,0.65));
+.chichat-splash .logo-icon img {
+  width: clamp(64px, 13vh, 104px);
+  height: clamp(64px, 13vh, 104px);
+  object-fit: contain;
+  filter: drop-shadow(0 6px 22px rgba(34,197,94,0.55));
 }
 .chichat-splash .wordmark {
   font-family: 'DM Sans', sans-serif;
