@@ -230,6 +230,11 @@ export function AttachmentBubble({
       {meta.caption && (
         <p className="text-[13px] whitespace-pre-wrap break-words">{meta.caption}</p>
       )}
+      {timeText && (
+        <span className={`text-[10px] self-end ${mine ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
+          {timeText}
+        </span>
+      )}
     </div>
   );
 }
