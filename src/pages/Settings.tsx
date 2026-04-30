@@ -69,6 +69,15 @@ export default function Settings() {
     if (!loading && !user) navigate("/login");
   }, [loading, user, navigate]);
 
+  // Google OAuth redirects back here with ?code=…; the actual completion lives
+  // inside Phone settings now, so forward the user there preserving the code.
+  useEffect(() => {
+    const search = window.location.search;
+    if (search.includes("code=") && search.includes("scope=")) {
+      navigate(`/settings/phone${search}`, { replace: true });
+    }
+  }, [navigate]);
+
   // Load backup row
   useEffect(() => {
     if (!user) return;
