@@ -8,6 +8,13 @@ import { toE164 } from "@/lib/phone";
 
 const PENDING_KEY = "chichat:google_oauth:pending";
 
+export class GoogleContactsReconnectRequired extends Error {
+  constructor() {
+    super("Reconnect Google Contacts and allow contact access.");
+    this.name = "GoogleContactsReconnectRequired";
+  }
+}
+
 interface PendingState {
   redirect_uri: string;
 }
@@ -56,14 +63,17 @@ export async function completeGoogleContactsConnect(code: string): Promise<{ ema
     "google-oauth-callback",
     { body: { action: "exchange", code, redirect_uri } },
   );
-  if (error || !data?.ok) throw error ?? new Error("Token exchange failed");
+  if (error) throw await normalizeGoogleContactsError(error);
+  if (data?.reconnectRequired) throw new GoogleContactsReconnectRequired();
+  if (!data?.ok) throw new Error("Token exchange failed");
   return { email: data.email ?? null };
 }
 
 /** Pull contacts from Google People API and merge into local cache. */
 export async function syncGoogleContacts(): Promise<DeviceContact[]> {
   const { data, error } = await supabase.functions.invoke("google-contacts-sync", {});
-  if (error) throw error;
+  if (error) throw await normalizeGoogleContactsError(error);
+  if (data?.reconnectRequired) throw new GoogleContactsReconnectRequired();
   const incoming: DeviceContact[] = ((data?.contacts ?? []) as { name: string; phones: string[] }[])
     .map((c) => ({
       name: c.name,
@@ -90,4 +100,32 @@ export async function isGoogleConnected(): Promise<boolean> {
     .select("user_id")
     .maybeSingle();
   return !!data;
+}
+
+async function normalizeGoogleContactsError(error: unknown): Promise<Error> {
+  const context = (error as { context?: Response })?.context;
+  if (context) {
+    try {
+      const body = await context.clone().json();
+      const message = extractErrorMessage(body);
+      if (body?.reconnectRequired || /scope|permission|contacts access/i.test(message)) {
+        return new GoogleContactsReconnectRequired();
+      }
+      return new Error(message || "Could not sync Google Contacts.");
+    } catch { /* fall through */ }
+  }
+
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  if (/insufficient authentication scopes|ACCESS_TOKEN_SCOPE_INSUFFICIENT|permission/i.test(message)) {
+    return new GoogleContactsReconnectRequired();
+  }
+  return error instanceof Error ? error : new Error(message || "Could not sync Google Contacts.");
+}
+
+function extractErrorMessage(body: any): string {
+  const direct = body?.error;
+  if (typeof direct === "string") return direct;
+  if (typeof direct?.message === "string") return direct.message;
+  if (typeof direct?.error?.message === "string") return direct.error.message;
+  return "";
 }
