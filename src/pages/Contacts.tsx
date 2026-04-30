@@ -125,14 +125,6 @@ export default function Contacts() {
   useEffect(() => {
     if (!user) return;
     (async () => {
-      // Warn if the user hasn't set their own phone yet
-      const { data: me } = await supabase
-        .from("profiles")
-        .select("phone")
-        .eq("id", user.id)
-        .maybeSingle();
-      setMissingOwnPhone(!(me as { phone?: string | null } | null)?.phone);
-
       // Show whatever is cached immediately
       const cached = loadCachedContacts() ?? [];
       const manual = loadManualContacts();
