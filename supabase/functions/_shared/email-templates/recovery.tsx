@@ -36,7 +36,7 @@ export const RecoveryEmail = ({ token, firstName }: RecoveryEmailProps) => (
 
         <Text style={text}>
           {firstName ? `${firstName}, we ` : 'We '}
-          received a request to reset your ChiChat password. Enter this 6-digit code in the app to choose a new password.
+          received a request to reset your ChiChat password. Enter this verification code in the app to choose a new password.
         </Text>
 
         <OtpCodeBlock token={token} />
