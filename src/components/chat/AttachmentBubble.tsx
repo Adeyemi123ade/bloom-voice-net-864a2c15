@@ -92,19 +92,31 @@ function docStyle(mime: string, name: string): DocStyle {
   return { Icon: FileIcon, bg: "bg-zinc-600", label: ext.toUpperCase() || "FILE" };
 }
 
+function formatTimestamp(iso?: string): string {
+  if (!iso) return "";
+  try {
+    return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return "";
+  }
+}
+
 export function AttachmentBubble({
   meta,
   mine,
+  timestamp,
   onDelete,
 }: {
   meta: FileMeta;
   mine: boolean;
+  timestamp?: string;
   onDelete?: () => void;
 }) {
   const [imgOpen, setImgOpen] = useState(false);
   const isImage = meta.mime.startsWith("image/") && meta.mime !== "image/svg+xml";
   const isVideo = meta.mime.startsWith("video/");
   const isAudio = meta.mime.startsWith("audio/");
+  const timeText = formatTimestamp(timestamp);
 
   if (isImage) {
     return (
@@ -123,8 +135,13 @@ export function AttachmentBubble({
             className="w-[180px] h-[180px] object-cover block"
           />
           {meta.size > 0 && (
-            <span className="absolute bottom-1.5 right-1.5 text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-black/55 text-white">
+            <span className="absolute top-1.5 right-1.5 text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-black/55 text-white">
               {fmtSize(meta.size)}
+            </span>
+          )}
+          {timeText && (
+            <span className="absolute bottom-1.5 right-1.5 text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-black/55 text-white">
+              {timeText}
             </span>
           )}
         </button>
@@ -158,6 +175,11 @@ export function AttachmentBubble({
               {fmtSize(meta.size)}
             </span>
           )}
+          {timeText && (
+            <span className="absolute bottom-1.5 right-1.5 text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-black/55 text-white pointer-events-none">
+              {timeText}
+            </span>
+          )}
         </div>
         {meta.caption && (
           <p className="text-[13px] whitespace-pre-wrap break-words mt-1">{meta.caption}</p>
@@ -172,6 +194,11 @@ export function AttachmentBubble({
         <audio src={meta.url} controls className="w-full h-9" />
         {meta.caption && (
           <p className="text-[13px] whitespace-pre-wrap break-words">{meta.caption}</p>
+        )}
+        {timeText && (
+          <span className={`text-[10px] self-end ${mine ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
+            {timeText}
+          </span>
         )}
       </div>
     );
@@ -202,6 +229,11 @@ export function AttachmentBubble({
       </a>
       {meta.caption && (
         <p className="text-[13px] whitespace-pre-wrap break-words">{meta.caption}</p>
+      )}
+      {timeText && (
+        <span className={`text-[10px] self-end ${mine ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
+          {timeText}
+        </span>
       )}
     </div>
   );

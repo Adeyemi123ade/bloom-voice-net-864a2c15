@@ -310,88 +310,57 @@ export default function Home() {
         {/* Header */}
         <div className="px-4 pt-5 pb-3 flex items-center justify-between">
           <h1 className="text-[20px] font-bold text-foreground">Chats</h1>
-          <div className="flex items-center gap-1.5">
-            <Dialog open={openNew} onOpenChange={(o) => { setOpenNew(o); if (o) { setPeopleQuery(""); loadPeople(); } }}>
-              <DialogTrigger asChild>
-                <button
-                  aria-label="New chat"
-                  className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
-                >
-                  <MessageSquarePlus className="w-4 h-4 text-foreground" />
-                </button>
-              </DialogTrigger>
-              <DialogContent className="max-w-[320px] bg-card border-border">
-                <DialogHeader>
-                  <DialogTitle className="text-sm">Start a new chat</DialogTitle>
-                </DialogHeader>
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                  <Input
-                    autoFocus
-                    value={peopleQuery}
-                    onChange={(e) => setPeopleQuery(e.target.value)}
-                    placeholder="Search contacts"
-                    className="h-8 pl-8 text-xs bg-input border-border"
-                  />
-                </div>
-                <div className="max-h-[300px] overflow-y-auto -mx-2 mt-1">
-                  {filteredPeople.length === 0 && (
-                    <p className="text-xs text-muted-foreground px-2 py-3 text-center">
-                      {people.length === 0 ? "No other users yet." : "No contacts match."}
-                    </p>
-                  )}
-                  {filteredPeople.map((p) => (
-                    <button
-                      key={p.id}
-                      onClick={() => startChat(p.id)}
-                      className="w-full flex items-center gap-2.5 px-2 py-2 rounded-md hover:bg-secondary text-left"
-                    >
-                      <div className="relative">
-                        <Avatar className="w-8 h-8">
-                          <AvatarImage src={p.avatar_url ?? undefined} />
-                          <AvatarFallback className="bg-primary/20 text-foreground text-xs font-semibold">
-                            {initials(p.display_name)}
-                          </AvatarFallback>
-                        </Avatar>
-                        {isReallyOnline(p) && (
-                          <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-accent border border-card" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-foreground truncate">
-                          {p.display_name ?? "Unknown"}
-                        </p>
-                        {isReallyOnline(p) && (
-                          <p className="text-2xs text-muted-foreground">online</p>
-                        )}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </DialogContent>
-            </Dialog>
-            <button
-              aria-label="Contacts"
-              onClick={() => setDialpadOpen(true)}
-              className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
-            >
-              <Users className="w-4 h-4 text-foreground" />
-            </button>
-            <button
-              aria-label="Dialpad"
-              onClick={() => setDialpadOpen(true)}
-              className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
-            >
-              <Phone className="w-4 h-4 text-foreground" />
-            </button>
-            <button
-              aria-label="Settings"
-              onClick={() => navigate("/settings")}
-              className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
-            >
-              <SettingsIcon className="w-4 h-4 text-foreground" />
-            </button>
-          </div>
+          <Dialog open={openNew} onOpenChange={(o) => { setOpenNew(o); if (o) { setPeopleQuery(""); loadPeople(); } }}>
+            <DialogContent className="max-w-[320px] bg-card border-border">
+              <DialogHeader>
+                <DialogTitle className="text-sm">Start a new chat</DialogTitle>
+              </DialogHeader>
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                <Input
+                  autoFocus
+                  value={peopleQuery}
+                  onChange={(e) => setPeopleQuery(e.target.value)}
+                  placeholder="Search contacts"
+                  className="h-8 pl-8 text-xs bg-input border-border"
+                />
+              </div>
+              <div className="max-h-[300px] overflow-y-auto -mx-2 mt-1">
+                {filteredPeople.length === 0 && (
+                  <p className="text-xs text-muted-foreground px-2 py-3 text-center">
+                    {people.length === 0 ? "No other users yet." : "No contacts match."}
+                  </p>
+                )}
+                {filteredPeople.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => startChat(p.id)}
+                    className="w-full flex items-center gap-2.5 px-2 py-2 rounded-md hover:bg-secondary text-left"
+                  >
+                    <div className="relative">
+                      <Avatar className="w-8 h-8">
+                        <AvatarImage src={p.avatar_url ?? undefined} />
+                        <AvatarFallback className="bg-primary/20 text-foreground text-xs font-semibold">
+                          {initials(p.display_name)}
+                        </AvatarFallback>
+                      </Avatar>
+                      {isReallyOnline(p) && (
+                        <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-accent border border-card" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-foreground truncate">
+                        {p.display_name ?? "Unknown"}
+                      </p>
+                      {isReallyOnline(p) && (
+                        <p className="text-2xs text-muted-foreground">online</p>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
 
         {/* Search */}

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import {
   Send, Check, CheckCheck, Mic, Square, Trash2, Pencil, X,
   Play, Pause, Paperclip, Copy, Reply, Forward, PhoneIncoming, PhoneOutgoing, PhoneMissed,
+  Phone, Video,
 } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
 import { Input } from "@/components/ui/input";
@@ -931,6 +932,20 @@ export default function ChatRoom() {
                 ) : null}
               </div>
             </div>
+            <button
+              aria-label="Voice call"
+              onClick={(e) => { e.stopPropagation(); startCall("voice"); }}
+              className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-secondary"
+            >
+              <Phone className="w-5 h-5 text-foreground" />
+            </button>
+            <button
+              aria-label="Video call"
+              onClick={(e) => { e.stopPropagation(); startCall("video"); }}
+              className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-secondary"
+            >
+              <Video className="w-5 h-5 text-foreground" />
+            </button>
           </div>
         )}
 
@@ -1026,6 +1041,7 @@ export default function ChatRoom() {
                     <AttachmentBubble
                       meta={fileMeta}
                       mine={mine}
+                      timestamp={m.created_at}
                       onDelete={() => {
                         setSelectedIds(new Set([m.id]));
                         setDeleteOpen(true);
