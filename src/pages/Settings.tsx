@@ -93,7 +93,7 @@ export default function Settings() {
       try {
         const r = await completeGoogleContactsConnect(code);
         setGoogleEmail(r.email);
-        toast({ title: "Google connected", description: r.email ?? "Account linked." });
+        toast({ title: "Google connected", description: "Account linked." });
         setSyncing(true);
         const list = await syncGoogleContacts();
         toast({ title: "Contacts synced", description: `${list.length} contacts loaded.` });
