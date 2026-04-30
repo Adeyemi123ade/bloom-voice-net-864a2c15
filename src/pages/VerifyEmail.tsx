@@ -182,7 +182,7 @@ export default function VerifyEmail() {
 
           <Button
             onClick={() => verify(code)}
-            disabled={verifying || code.length !== 6}
+            disabled={verifying || code.length !== OTP_LENGTH}
             className="w-full max-w-xs h-11 mt-8 text-base bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg"
           >
             {verifying ? "Verifying…" : "Verify"}
