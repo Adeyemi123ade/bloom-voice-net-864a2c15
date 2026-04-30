@@ -7,7 +7,6 @@ import {
   MessageSquare,
   Phone,
   Search,
-  Trash2,
   UserPlus,
   Users,
 } from "lucide-react";
@@ -357,10 +356,19 @@ export default function Contacts() {
     setInvitedPhones((prev) => new Set(prev).add(c.phone));
   };
 
-  /** "Invite" button → native OS share sheet. Records invite if shared. */
+  /** "Invite" button → native OS share sheet. Records invite if shared.
+   *  If the browser blocks/lacks share + popup, fall back to the /invite page. */
   const inviteContact = async (c: InviteContact) => {
-    const sent = await shareChichatInvite(inviteMessage(c.name));
-    if (sent) await recordInvite(c);
+    try {
+      const sent = await shareChichatInvite(inviteMessage(c.name));
+      if (sent) {
+        await recordInvite(c);
+        return;
+      }
+    } catch {
+      /* fall through */
+    }
+    navigate("/invite");
   };
 
   const openActiveActions = (c: ActiveContact) => {
@@ -374,12 +382,6 @@ export default function Contacts() {
           label: "Edit name",
           icon: Edit3,
           onClick: () => setEditTarget({ phone: c.phone }),
-        },
-        {
-          label: "Remove from my contacts",
-          icon: Trash2,
-          destructive: true,
-          onClick: () => handleRemoveManual(c.phone),
         },
       ],
     });
@@ -404,12 +406,6 @@ export default function Contacts() {
           label: "Edit name",
           icon: Edit3,
           onClick: () => setEditTarget({ phone: c.phone }),
-        },
-        {
-          label: "Remove from my contacts",
-          icon: Trash2,
-          destructive: true,
-          onClick: () => handleRemoveManual(c.phone),
         },
       ],
     });
@@ -542,7 +538,7 @@ export default function Contacts() {
               </div>
               <SectionList
                 items={filteredInvite}
-                getKey={(c) => c.phone}
+                getKey={(c) => `${c.phone}|${c.name}`}
                 getSectionLabel={(c) => sectionLetter(c.name)}
                 renderItem={(c) => {
                   const isManual = loadManualContacts().some(

@@ -83,7 +83,7 @@ export function InviteRow({
   return (
     <div
       {...lp}
-      onClick={onLongPress}
+      onClick={onInvite}
       className="flex items-center gap-3 px-3 py-2.5 hover:bg-secondary/60 select-none cursor-pointer"
     >
       <Avatar className="w-11 h-11">
