@@ -7,10 +7,9 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const SCOPES = [
-  "https://www.googleapis.com/auth/contacts",
-  "https://www.googleapis.com/auth/userinfo.email",
-];
+const CONTACTS_SCOPE = "https://www.googleapis.com/auth/contacts";
+const CONTACTS_READONLY_SCOPE = "https://www.googleapis.com/auth/contacts.readonly";
+const SCOPES = [CONTACTS_SCOPE, "https://www.googleapis.com/auth/userinfo.email"];
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -74,6 +73,14 @@ Deno.serve(async (req) => {
         email = ui.email ?? null;
       } catch { /* ignore */ }
 
+      const grantedScope = String(tokens.scope ?? "");
+      if (grantedScope && !hasContactsScope(grantedScope)) {
+        return json({
+          error: "Google contacts permission was not granted. Please reconnect and allow Contacts access.",
+          reconnectRequired: true,
+        }, 400);
+      }
+
       const expiresAt = new Date(Date.now() + (tokens.expires_in ?? 3600) * 1000).toISOString();
 
       const admin = createClient(
@@ -105,4 +112,9 @@ function json(b: unknown, status = 200) {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+}
+
+function hasContactsScope(scope: string) {
+  const granted = new Set(scope.split(/\s+/).filter(Boolean));
+  return granted.has(CONTACTS_SCOPE) || granted.has(CONTACTS_READONLY_SCOPE);
 }

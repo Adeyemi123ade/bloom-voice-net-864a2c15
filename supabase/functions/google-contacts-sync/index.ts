@@ -7,6 +7,9 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+const CONTACTS_SCOPE = "https://www.googleapis.com/auth/contacts";
+const CONTACTS_READONLY_SCOPE = "https://www.googleapis.com/auth/contacts.readonly";
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -33,6 +36,13 @@ Deno.serve(async (req) => {
       .eq("user_id", user.id)
       .maybeSingle();
     if (!row) return json({ error: "Not connected" }, 400);
+    if (!hasContactsScope(row.scope)) {
+      await admin.from("google_oauth_tokens").delete().eq("user_id", user.id);
+      return json({
+        error: "Google contacts permission is missing. Please reconnect Google Contacts.",
+        reconnectRequired: true,
+      });
+    }
 
     let accessToken = row.access_token;
     if (new Date(row.expires_at).getTime() < Date.now() + 60000 && row.refresh_token) {
@@ -65,7 +75,16 @@ Deno.serve(async (req) => {
       if (pageToken) url.searchParams.set("pageToken", pageToken);
       const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
       const data = await res.json();
-      if (!res.ok) return json({ error: data }, 400);
+      if (!res.ok) {
+        if (isInsufficientScope(data)) {
+          await admin.from("google_oauth_tokens").delete().eq("user_id", user.id);
+          return json({
+            error: "Google contacts permission is missing. Please reconnect Google Contacts.",
+            reconnectRequired: true,
+          });
+        }
+        return json({ error: data }, 400);
+      }
       for (const p of data.connections ?? []) {
         const name = p.names?.[0]?.displayName ?? "";
         const phones = (p.phoneNumbers ?? []).map((n: { value: string }) => n.value).filter(Boolean);
@@ -85,4 +104,18 @@ function json(b: unknown, status = 200) {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+}
+
+function isInsufficientScope(data: any) {
+  if (data?.error?.status === "PERMISSION_DENIED") return true;
+  const details = data?.error?.details ?? [];
+  return details.some((d: any) =>
+    d?.reason === "ACCESS_TOKEN_SCOPE_INSUFFICIENT" ||
+    d?.metadata?.service === "people.googleapis.com"
+  );
+}
+
+function hasContactsScope(scope: string | null | undefined) {
+  const granted = new Set(String(scope ?? "").split(/\s+/).filter(Boolean));
+  return granted.has(CONTACTS_SCOPE) || granted.has(CONTACTS_READONLY_SCOPE);
 }

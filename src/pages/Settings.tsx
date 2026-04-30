@@ -30,6 +30,7 @@ import {
   startGoogleContactsConnect,
   completeGoogleContactsConnect,
   syncGoogleContacts,
+  GoogleContactsReconnectRequired,
 } from "@/lib/googleContacts";
 import {
   getMyBackup,
@@ -109,6 +110,7 @@ export default function Settings() {
         const list = await syncGoogleContacts();
         toast({ title: "Contacts synced", description: `${list.length} contacts loaded.` });
       } catch (e) {
+        if (e instanceof GoogleContactsReconnectRequired) setGoogleEmail(null);
         toast({ title: "Google connect failed", description: friendly(e), variant: "destructive" });
       } finally {
         setSyncing(false);
@@ -132,6 +134,7 @@ export default function Settings() {
       const list = await syncGoogleContacts();
       toast({ title: "Contacts synced", description: `${list.length} contacts loaded.` });
     } catch (e) {
+      if (e instanceof GoogleContactsReconnectRequired) setGoogleEmail(null);
       toast({ title: "Sync failed", description: friendly(e), variant: "destructive" });
     } finally { setSyncing(false); }
   };
