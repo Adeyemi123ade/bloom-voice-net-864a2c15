@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Copy, Share2, X, Mail, MessageSquare, Link as LinkIcon } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import chichatLogo from "@/assets/chichat-logo.png";
 import { APP_INVITE_LINK } from "./contactsHelpers";
 import { isNativePlatform } from "@/lib/deviceContacts";
 
@@ -268,8 +269,12 @@ export function ShareInviteCard() {
     <>
       <div className="mx-4 rounded-2xl bg-card border border-border shadow-sm overflow-hidden">
         <div className="bg-gradient-to-br from-primary to-primary/70 p-6 text-center">
-          <div className="mx-auto w-16 h-16 rounded-2xl bg-white/15 backdrop-blur flex items-center justify-center">
-            <span className="text-3xl font-extrabold text-primary-foreground">C</span>
+          <div className="mx-auto w-16 h-16 flex items-center justify-center">
+            <img
+              src={chichatLogo}
+              alt="ChiChat"
+              className="h-16 w-16 object-contain drop-shadow-md"
+            />
           </div>
           <p className="mt-3 text-base font-bold text-primary-foreground">
             Join me on Chichat
