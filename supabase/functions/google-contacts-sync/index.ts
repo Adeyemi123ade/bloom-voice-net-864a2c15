@@ -84,19 +84,33 @@ Deno.serve(async (req) => {
       other: 0,
       directory: 0,
     };
+    const debug = {
+      savedRaw: 0,
+      otherRaw: 0,
+      directoryRaw: 0,
+      savedWithPhones: 0,
+      otherWithPhones: 0,
+      directoryWithPhones: 0,
+      savedError: null as string | null,
+      otherError: null as string | null,
+      directoryError: null as string | null,
+    };
 
     // 1. Saved Google Contacts
     {
-      const { contacts: list, scopeError } = await fetchConnections(accessToken);
-      if (scopeError) {
+      const result = await fetchConnections(accessToken);
+      if (result.scopeError) {
         await admin.from("google_oauth_tokens").delete().eq("user_id", user.id);
         return json({
           error: "Google contacts permission is missing. Please reconnect Google Contacts.",
           reconnectRequired: true,
         });
       }
-      for (const c of list) {
+      debug.savedRaw = result.rawCount;
+      debug.savedError = result.errorMessage;
+      for (const c of result.contacts) {
         sources.saved++;
+        debug.savedWithPhones++;
         mergeContact(map, c);
       }
     }
@@ -104,24 +118,31 @@ Deno.serve(async (req) => {
     // 2. "Other contacts" — auto-collected from Gmail interactions.
     //    These often don't have phone numbers, but when they do they're useful.
     {
-      const list = await fetchOtherContacts(accessToken);
-      for (const c of list) {
+      const result = await fetchOtherContacts(accessToken);
+      debug.otherRaw = result.rawCount;
+      debug.otherError = result.errorMessage;
+      for (const c of result.contacts) {
         sources.other++;
+        debug.otherWithPhones++;
         mergeContact(map, c);
       }
     }
 
     // 3. Workspace directory (only returns data when the user is on Google Workspace)
     {
-      const list = await fetchDirectoryPeople(accessToken);
-      for (const c of list) {
+      const result = await fetchDirectoryPeople(accessToken);
+      debug.directoryRaw = result.rawCount;
+      debug.directoryError = result.errorMessage;
+      for (const c of result.contacts) {
         sources.directory++;
+        debug.directoryWithPhones++;
         mergeContact(map, c);
       }
     }
 
     const contacts = [...map.values()];
-    return json({ contacts, sources, totalReturned: contacts.length });
+    console.log("google-contacts-sync", JSON.stringify({ userId: user.id, totalReturned: contacts.length, sources, debug }));
+    return json({ contacts, sources, debug, totalReturned: contacts.length });
   } catch (e) {
     return json({ error: String(e) }, 500);
   }
@@ -129,32 +150,41 @@ Deno.serve(async (req) => {
 
 async function fetchConnections(
   accessToken: string,
-): Promise<{ contacts: Contact[]; scopeError?: boolean }> {
+): Promise<{ contacts: Contact[]; rawCount: number; errorMessage: string | null; scopeError?: boolean }> {
   const out: Contact[] = [];
+  let rawCount = 0;
+  let errorMessage: string | null = null;
   let pageToken: string | undefined;
   do {
     const url = new URL("https://people.googleapis.com/v1/people/me/connections");
     url.searchParams.set("personFields", "names,phoneNumbers,emailAddresses");
-    url.searchParams.set("pageSize", "500");
+    url.searchParams.set("pageSize", "1000");
     if (pageToken) url.searchParams.set("pageToken", pageToken);
     const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
     const data = await res.json();
     if (!res.ok) {
-      if (isInsufficientScope(data)) return { contacts: [], scopeError: true };
+      errorMessage = errorSummary(data);
+      if (isInsufficientScope(data)) return { contacts: [], rawCount, errorMessage, scopeError: true };
       // Don't fail the whole sync for non-scope issues — just stop paging.
       break;
     }
-    for (const p of data.connections ?? []) {
+    const people = data.connections ?? [];
+    rawCount += people.length;
+    for (const p of people) {
       const c = personToContact(p);
       if (c) out.push(c);
     }
     pageToken = data.nextPageToken;
   } while (pageToken);
-  return { contacts: out };
+  return { contacts: out, rawCount, errorMessage };
 }
 
-async function fetchOtherContacts(accessToken: string): Promise<Contact[]> {
+async function fetchOtherContacts(
+  accessToken: string,
+): Promise<{ contacts: Contact[]; rawCount: number; errorMessage: string | null }> {
   const out: Contact[] = [];
+  let rawCount = 0;
+  let errorMessage: string | null = null;
   let pageToken: string | undefined;
   do {
     const url = new URL("https://people.googleapis.com/v1/otherContacts");
@@ -163,18 +193,27 @@ async function fetchOtherContacts(accessToken: string): Promise<Contact[]> {
     if (pageToken) url.searchParams.set("pageToken", pageToken);
     const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
     const data = await res.json();
-    if (!res.ok) break;
-    for (const p of data.otherContacts ?? []) {
+    if (!res.ok) {
+      errorMessage = errorSummary(data);
+      break;
+    }
+    const people = data.otherContacts ?? [];
+    rawCount += people.length;
+    for (const p of people) {
       const c = personToContact(p);
       if (c) out.push(c);
     }
     pageToken = data.nextPageToken;
   } while (pageToken);
-  return out;
+  return { contacts: out, rawCount, errorMessage };
 }
 
-async function fetchDirectoryPeople(accessToken: string): Promise<Contact[]> {
+async function fetchDirectoryPeople(
+  accessToken: string,
+): Promise<{ contacts: Contact[]; rawCount: number; errorMessage: string | null }> {
   const out: Contact[] = [];
+  let rawCount = 0;
+  let errorMessage: string | null = null;
   let pageToken: string | undefined;
   do {
     const url = new URL("https://people.googleapis.com/v1/people:listDirectoryPeople");
@@ -185,14 +224,19 @@ async function fetchDirectoryPeople(accessToken: string): Promise<Contact[]> {
     if (pageToken) url.searchParams.set("pageToken", pageToken);
     const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
     const data = await res.json();
-    if (!res.ok) break; // directory is workspace-only — silently ignore
-    for (const p of data.people ?? []) {
+    if (!res.ok) {
+      errorMessage = errorSummary(data);
+      break; // directory is workspace-only — silently ignore
+    }
+    const people = data.people ?? [];
+    rawCount += people.length;
+    for (const p of people) {
       const c = personToContact(p);
       if (c) out.push(c);
     }
     pageToken = data.nextPageToken;
   } while (pageToken);
-  return out;
+  return { contacts: out, rawCount, errorMessage };
 }
 
 function personToContact(p: any): Contact | null {
@@ -223,11 +267,14 @@ function json(b: unknown, status = 200) {
 }
 
 function isInsufficientScope(data: any) {
-  if (data?.error?.status === "PERMISSION_DENIED") return true;
   const details = data?.error?.details ?? [];
   return details.some((d: any) =>
     d?.reason === "ACCESS_TOKEN_SCOPE_INSUFFICIENT"
   );
+}
+
+function errorSummary(data: any): string | null {
+  return data?.error?.message ?? data?.error?.status ?? null;
 }
 
 function hasContactsScope(scope: string | null | undefined) {
