@@ -1,6 +1,7 @@
 import { Copy, MessageCircle, Share2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { APP_INVITE_LINK } from "./contactsHelpers";
+import { isNativePlatform } from "@/lib/deviceContacts";
 
 const SHARE_TEXT = `Hi! I'm inviting you to use Chichat — high-quality voice & video calls and messaging. Download here: ${APP_INVITE_LINK}`;
 
@@ -18,22 +19,14 @@ export function ShareInviteCard() {
 
   /** Native OS share sheet — lets the user pick WhatsApp, SMS, Gmail, etc. */
   const share = async () => {
-    const nav = navigator as Navigator & {
-      share?: (data: { title?: string; text?: string; url?: string }) => Promise<void>;
-    };
-    if (nav.share) {
-      try {
-        await nav.share({ title: "Chichat", text: SHARE_TEXT, url: link });
-        return;
-      } catch {
-        /* user cancelled — fall through to WhatsApp fallback */
-      }
+    const shared = await openShareChooser(SHARE_TEXT, link);
+    if (!shared) {
+      await copy();
+      toast({
+        title: "Invite copied",
+        description: "Your phone could not open the app chooser, so the invite is ready to paste.",
+      });
     }
-    window.open(
-      `https://wa.me/?text=${encodeURIComponent(SHARE_TEXT)}`,
-      "_blank",
-      "noopener",
-    );
   };
 
   return (
@@ -84,24 +77,38 @@ export function ShareInviteCard() {
 /** Programmatic invite trigger — used by the Contacts list "Invite" button. */
 export async function shareChichatInvite(personalNote?: string) {
   const text = personalNote ? `${personalNote}\n\n${SHARE_TEXT}` : SHARE_TEXT;
+  return openShareChooser(text, APP_INVITE_LINK);
+}
+
+async function openShareChooser(text: string, url: string) {
+  if (isNativePlatform()) {
+    try {
+      const { Share } = await import("@capacitor/share");
+      await Share.share({
+        title: "Chichat",
+        text,
+        url,
+        dialogTitle: "Send invite with",
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   const nav = navigator as Navigator & {
     share?: (data: { title?: string; text?: string; url?: string }) => Promise<void>;
   };
   if (nav.share) {
     try {
-      await nav.share({ title: "Chichat", text, url: APP_INVITE_LINK });
+      await nav.share({ title: "Chichat", text, url });
       return true;
     } catch {
       /* user cancelled */
       return false;
     }
   }
-  window.open(
-    `https://wa.me/?text=${encodeURIComponent(text)}`,
-    "_blank",
-    "noopener",
-  );
-  return true;
+  return false;
 }
 
 export { MessageCircle };
