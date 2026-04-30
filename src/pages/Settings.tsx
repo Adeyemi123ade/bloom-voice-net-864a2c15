@@ -177,27 +177,47 @@ export default function Settings() {
     if (!user) return;
     setDeleting(true);
     try {
-      // Try to fully wipe the account server-side so a reinstall behaves as a
-      // brand-new user (no "Deleted user" appearing in friends' contact lists).
-      // The edge function deletes profile, backups, tokens, then auth.user.
-      try {
-        await supabase.functions.invoke("delete-account", {});
-      } catch {
-        // Fallback: at minimum remove identifying profile data.
+      // Fully wipe the account server-side so the user must re-register fresh.
+      const { data, error: fnError } = await supabase.functions.invoke("delete-account", {});
+      const serverOk = !fnError && (data as any)?.ok === true;
+
+      if (!serverOk) {
+        // Fallback: at minimum strip identifying profile data so they can't
+        // be matched as a contact anymore.
         await supabase
           .from("profiles")
           .update({ display_name: null, avatar_url: null, phone: null, is_online: false })
           .eq("id", user.id);
+        toast({
+          title: "Couldn't fully delete account",
+          description: "Please try again or contact support.",
+          variant: "destructive",
+        });
+      } else {
+        toast({ title: "Account deleted", description: "Your account and data have been removed." });
       }
-      await supabase.auth.signOut();
-      // Wipe every local trace so reinstall feels fresh.
+
+      // Always sign out and wipe every local trace so the app behaves like a
+      // fresh install on next open.
+      await supabase.auth.signOut({ scope: "global" }).catch(() => {});
       try {
         clearContactsCache();
         localStorage.clear();
         sessionStorage.clear();
+        // Also clear IndexedDB used by supabase-js for session persistence.
+        if (typeof indexedDB !== "undefined" && indexedDB.databases) {
+          const dbs = await indexedDB.databases();
+          await Promise.all(
+            dbs.map((d) => d.name ? new Promise<void>((res) => {
+              const req = indexedDB.deleteDatabase(d.name!);
+              req.onsuccess = req.onerror = req.onblocked = () => res();
+            }) : Promise.resolve())
+          );
+        }
       } catch { /* ignore */ }
-      toast({ title: "Account removed", description: "You have been signed out." });
-      navigate("/register", { replace: true });
+
+      // Hard reload so no in-memory auth state survives.
+      window.location.replace("/register");
     } finally {
       setDeleting(false);
     }
