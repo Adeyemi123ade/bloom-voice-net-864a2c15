@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Copy, Share2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { APP_INVITE_LINK } from "./contactsHelpers";
@@ -8,7 +7,6 @@ const SHARE_TEXT = `Hi! I'm inviting you to use Chichat — high-quality voice &
 
 export function ShareInviteCard() {
   const link = APP_INVITE_LINK;
-  const [chooserOpen, setChooserOpen] = useState(false);
 
   const copy = async () => {
     try {
@@ -19,7 +17,7 @@ export function ShareInviteCard() {
     }
   };
 
-  /** Try native OS chooser first; if unavailable, open our in-app chooser. */
+  /** Use only the native OS/browser share chooser; never direct-link to a single app. */
   const share = async () => {
     const shared = await openNativeShare(SHARE_TEXT, link);
     if (!shared) await copy();
@@ -67,8 +65,6 @@ export function ShareInviteCard() {
           </p>
         </div>
       </div>
-
-      {chooserOpen ? null : null}
     </>
   );
 }
@@ -105,11 +101,3 @@ async function openNativeShare(text: string, url: string) {
   }
   return false;
 }
-
-type Target = {
-  id: string;
-  label: string;
-  bg: string;
-  icon: React.ReactNode;
-  href: (text: string, url: string) => string;
-};
