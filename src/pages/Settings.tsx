@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
+  ChevronDown,
   ChevronRight,
+  Cloud,
+  LogOut,
+  Loader2,
   Smartphone,
   Trash2,
   User as UserIcon,
-  Cloud,
-  Contact2,
-  RefreshCw,
-  Loader2,
 } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
 import { useAuth } from "@/hooks/useAuth";
