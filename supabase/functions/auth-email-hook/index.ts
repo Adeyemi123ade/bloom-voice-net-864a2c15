@@ -220,6 +220,42 @@ async function handleWebhook(req: Request): Promise<Response> {
     )
   }
 
+  // Look up the recipient's display name so emails can greet them by name.
+  const supabaseLookup = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  )
+
+  let firstName = ''
+  try {
+    const { data: userResp } = await supabaseLookup.auth.admin.getUserById(
+      payload.data.user_id || payload.user?.id || ''
+    )
+    const meta = userResp?.user?.user_metadata as Record<string, any> | undefined
+    const fullName: string | undefined =
+      meta?.full_name || meta?.name || meta?.display_name
+
+    if (fullName && typeof fullName === 'string') {
+      firstName = fullName.trim().split(/\s+/)[0] || ''
+    } else if (userResp?.user?.id) {
+      const { data: profile } = await supabaseLookup
+        .from('profiles')
+        .select('display_name')
+        .eq('id', userResp.user.id)
+        .maybeSingle()
+      if (profile?.display_name) {
+        firstName = String(profile.display_name).trim().split(/\s+/)[0] || ''
+      }
+    }
+  } catch (err) {
+    console.warn('Could not resolve recipient name', { err })
+  }
+
+  // Capitalize first letter just in case
+  if (firstName) {
+    firstName = firstName.charAt(0).toUpperCase() + firstName.slice(1)
+  }
+
   // Build template props from payload.data (HookData structure)
   const templateProps = {
     siteName: SITE_NAME,
@@ -229,6 +265,7 @@ async function handleWebhook(req: Request): Promise<Response> {
     token: payload.data.token,
     email: payload.data.email,
     newEmail: payload.data.new_email,
+    firstName,
   }
 
   // Render React Email to HTML and plain text
