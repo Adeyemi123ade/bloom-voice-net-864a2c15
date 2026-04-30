@@ -42,7 +42,12 @@ Deno.serve(async (req) => {
       .select("*")
       .eq("user_id", user.id)
       .maybeSingle();
-    if (!row) return json({ error: "Not connected" }, 400);
+    if (!row) {
+      return json({
+        error: "Google Contacts isn't connected yet. Tap Connect Google to link your account.",
+        reconnectRequired: true,
+      });
+    }
     if (!hasContactsScope(row.scope)) {
       await admin.from("google_oauth_tokens").delete().eq("user_id", user.id);
       return json({
