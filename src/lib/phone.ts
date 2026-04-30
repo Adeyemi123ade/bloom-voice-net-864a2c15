@@ -35,6 +35,15 @@ function guessCountryFromLocale(): string | undefined {
   }
 }
 
+export function countryFromE164(raw: string | null | undefined): CountryCode | undefined {
+  if (!raw) return undefined;
+  try {
+    return parsePhoneNumberFromString(raw)?.country;
+  } catch {
+    return undefined;
+  }
+}
+
 /** Best-effort display formatting; falls back to the original string. */
 export function formatDisplay(e164: string): string {
   try {

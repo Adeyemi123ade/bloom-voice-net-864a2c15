@@ -4,7 +4,7 @@ import {
   saveCachedContacts,
   type DeviceContact,
 } from "@/lib/deviceContacts";
-import { toE164 } from "@/lib/phone";
+import { countryFromE164, toE164 } from "@/lib/phone";
 
 const PENDING_KEY = "chichat:google_oauth:pending";
 
@@ -74,10 +74,13 @@ export async function syncGoogleContacts(): Promise<DeviceContact[]> {
   const { data, error } = await supabase.functions.invoke("google-contacts-sync", {});
   if (error) throw await normalizeGoogleContactsError(error);
   if (data?.reconnectRequired) throw new GoogleContactsReconnectRequired();
+  const defaultCountry = await getMyDefaultCountry();
   const incoming: DeviceContact[] = ((data?.contacts ?? []) as { name: string; phones: string[] }[])
     .map((c) => ({
       name: c.name,
-      phones: c.phones.map((p) => toE164(p)).filter((p): p is string => !!p),
+      phones: Array.from(new Set(
+        c.phones.map((p) => normalizeImportedPhone(p, defaultCountry)).filter((p): p is string => !!p),
+      )),
     }))
     .filter((c) => c.phones.length);
 
@@ -91,6 +94,26 @@ export async function syncGoogleContacts(): Promise<DeviceContact[]> {
   const merged = [...map.values()];
   saveCachedContacts(merged);
   return merged;
+}
+
+async function getMyDefaultCountry() {
+  const { data } = await supabase
+    .from("profiles")
+    .select("phone")
+    .maybeSingle();
+  return countryFromE164((data as { phone?: string | null } | null)?.phone);
+}
+
+function normalizeImportedPhone(raw: string, defaultCountry?: ReturnType<typeof countryFromE164>) {
+  const e164 = toE164(raw, defaultCountry);
+  if (e164) return e164;
+
+  // Do not drop Google contacts just because a number is saved in a local
+  // format that cannot be confidently normalized. Keep a dialable/displayable
+  // fallback so large address books don't appear as “0 contacts”.
+  const fallback = raw.replace(/[^\d+]/g, "");
+  const digits = fallback.replace(/\D/g, "");
+  return digits.length >= 5 ? fallback : null;
 }
 
 /** Returns true if the current user has linked their Google account. */
