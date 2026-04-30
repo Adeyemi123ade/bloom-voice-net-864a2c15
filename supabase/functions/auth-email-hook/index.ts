@@ -255,7 +255,30 @@ async function handleWebhook(req: Request): Promise<Response> {
       }
     }
   } catch (err) {
-    console.warn('Could not resolve recipient name', { err })
+    console.warn('Could not resolve recipient name via id; trying email', { err: String(err) })
+  }
+
+  // Email-based fallback (covers cases where user_id is missing/invalid)
+  if (!firstName && payload.data.email) {
+    try {
+      const { data: profileByEmail } = await supabaseLookup
+        .from('profiles')
+        .select('display_name')
+        .eq('id', (
+          await supabaseLookup
+            .schema('auth' as any)
+            .from('users' as any)
+            .select('id')
+            .eq('email', payload.data.email)
+            .maybeSingle()
+        ).data?.id ?? '00000000-0000-0000-0000-000000000000')
+        .maybeSingle()
+      if (profileByEmail?.display_name) {
+        firstName = String(profileByEmail.display_name).trim().split(/\s+/)[0] || ''
+      }
+    } catch (_e) {
+      // Silent — name is optional
+    }
   }
 
   // Capitalize first letter just in case
