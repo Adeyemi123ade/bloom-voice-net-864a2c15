@@ -279,6 +279,60 @@ function CallSystemBubble({
   );
 }
 
+// Long-press wrapper for call bubbles (no swipe-to-reply).
+function CallRow({
+  mine,
+  isSelected,
+  onTap,
+  onLongPress,
+  children,
+}: {
+  mine: boolean;
+  isSelected: boolean;
+  onTap: () => void;
+  onLongPress: () => void;
+  children: React.ReactNode;
+}) {
+  const timer = useRef<number | null>(null);
+  const fired = useRef(false);
+  const start = () => {
+    fired.current = false;
+    if (timer.current) window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => {
+      fired.current = true;
+      try { (navigator as any).vibrate?.(20); } catch { /* ignore */ }
+      onLongPress();
+    }, 450);
+  };
+  const cancel = () => {
+    if (timer.current) {
+      window.clearTimeout(timer.current);
+      timer.current = null;
+    }
+  };
+  return (
+    <div
+      className={`flex ${mine ? "justify-end" : "justify-start"}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        if (fired.current) { fired.current = false; return; }
+        onTap();
+      }}
+      onTouchStart={start}
+      onTouchEnd={cancel}
+      onTouchMove={cancel}
+      onMouseDown={start}
+      onMouseUp={cancel}
+      onMouseLeave={cancel}
+      onContextMenu={(e) => { e.preventDefault(); if (!fired.current) { fired.current = true; onLongPress(); } }}
+    >
+      <div className={isSelected ? "ring-2 ring-primary rounded-2xl" : ""}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 // Swipe-to-reply + long-press wrapper (WhatsApp-style)
 function SwipeRow({
   mine,
