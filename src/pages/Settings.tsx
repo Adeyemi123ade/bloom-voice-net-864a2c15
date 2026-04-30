@@ -1,20 +1,25 @@
-import { useEffect, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
+  ChevronDown,
   ChevronRight,
+  Cloud,
+  LogOut,
+  Loader2,
   Smartphone,
   Trash2,
   User as UserIcon,
-  Cloud,
-  Contact2,
-  RefreshCw,
-  Loader2,
 } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,12 +31,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import {
-  startGoogleContactsConnect,
-  completeGoogleContactsConnect,
-  syncGoogleContacts,
-  GoogleContactsReconnectRequired,
-} from "@/lib/googleContacts";
 import {
   getMyBackup,
   runBackup,
@@ -52,18 +51,15 @@ function bytesLabel(n: number) {
 export default function Settings() {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
-  const [params, setParams] = useSearchParams();
+  
   const [confirmStage, setConfirmStage] = useState(false);
   const [deleting, setDeleting] = useState(false);
-
-  const [googleEmail, setGoogleEmail] = useState<string | null>(null);
-  const [connecting, setConnecting] = useState(false);
-  const [syncing, setSyncing] = useState(false);
 
   const [backup, setBackup] = useState<BackupRow | null>(null);
   const [backingUp, setBackingUp] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [restoreOpen, setRestoreOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
     document.title = "Settings — Chichat";
@@ -73,84 +69,32 @@ export default function Settings() {
     if (!loading && !user) navigate("/login");
   }, [loading, user, navigate]);
 
-  // Load Google connection + backup row
+  // Google OAuth redirects back here with ?code=…; the actual completion lives
+  // inside Phone settings now, so forward the user there preserving the code.
+  useEffect(() => {
+    const search = window.location.search;
+    if (search.includes("code=") && search.includes("scope=")) {
+      navigate(`/settings/phone${search}`, { replace: true });
+    }
+  }, [navigate]);
+
+  // Load backup row
   useEffect(() => {
     if (!user) return;
     (async () => {
-      const { data } = await supabase
-        .from("google_oauth_tokens")
-        .select("google_email")
-        .maybeSingle();
-      setGoogleEmail(data?.google_email ?? null);
       setBackup(await getMyBackup());
     })();
   }, [user]);
 
-  // Handle Google OAuth redirect (?code=…)
-  const oauthHandledRef = useRef<string | null>(null);
-  useEffect(() => {
-    const code = params.get("code");
-    if (!code || !user) return;
-    if (oauthHandledRef.current === code) return;
-    oauthHandledRef.current = code;
-
-    // Strip OAuth params from the URL IMMEDIATELY so a remount/auth-refresh
-    // can't try to reuse the single-use authorization code.
-    params.delete("code");
-    params.delete("scope");
-    params.delete("state");
-    setParams(params, { replace: true });
-
-    (async () => {
-      try {
-        const r = await completeGoogleContactsConnect(code);
-        setGoogleEmail(r.email);
-        toast({ title: "Google connected", description: "Account linked." });
-        setSyncing(true);
-        const list = await syncGoogleContacts();
-        if (list.length === 0) {
-          toast({
-            title: "No contacts found in Google",
-            description: "This Google account has no saved contacts with phone numbers. Save some in Google Contacts, then sync again.",
-          });
-        } else {
-          toast({ title: "Contacts synced", description: `${list.length} contacts loaded.` });
-        }
-      } catch (e) {
-        if (e instanceof GoogleContactsReconnectRequired) setGoogleEmail(null);
-        toast({ title: "Google connect failed", description: friendly(e), variant: "destructive" });
-      } finally {
-        setSyncing(false);
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
-
-  const connectGoogle = async () => {
-    setConnecting(true);
-    try { await startGoogleContactsConnect(); }
-    catch (e) {
-      setConnecting(false);
-      toast({ title: "Could not start Google sign-in", description: friendly(e), variant: "destructive" });
-    }
-  };
-
-  const syncNow = async () => {
-    setSyncing(true);
+  const signOut = async () => {
+    setSigningOut(true);
     try {
-      const list = await syncGoogleContacts();
-      if (list.length === 0) {
-        toast({
-          title: "No contacts found in Google",
-          description: "This Google account has no saved contacts with phone numbers.",
-        });
-      } else {
-        toast({ title: "Contacts synced", description: `${list.length} contacts loaded.` });
-      }
+      await supabase.auth.signOut({ scope: "global" });
+      window.location.replace("/login");
     } catch (e) {
-      if (e instanceof GoogleContactsReconnectRequired) setGoogleEmail(null);
-      toast({ title: "Sync failed", description: friendly(e), variant: "destructive" });
-    } finally { setSyncing(false); }
+      toast({ title: "Could not sign out", description: friendly(e), variant: "destructive" });
+      setSigningOut(false);
+    }
   };
 
   const onBackup = async () => {
@@ -254,7 +198,8 @@ export default function Settings() {
           <h1 className="text-lg font-bold text-foreground">Settings</h1>
         </div>
 
-        <div className="flex-1 px-4 py-4 flex flex-col gap-3">
+        <div className="flex-1 px-4 py-4 flex flex-col gap-2">
+          {/* 1. Profile */}
           <button
             onClick={() => navigate("/profile")}
             className="w-full flex items-center gap-3 px-3 py-3.5 rounded-lg hover:bg-secondary text-left"
@@ -271,6 +216,7 @@ export default function Settings() {
             <ChevronRight className="w-5 h-5 text-muted-foreground" />
           </button>
 
+          {/* 2. Phone settings — Theme, Ringtone, Google account & contacts live in here. */}
           <button
             onClick={() => navigate("/settings/phone")}
             className="w-full flex items-center gap-3 px-3 py-3.5 rounded-lg hover:bg-secondary text-left"
@@ -281,133 +227,130 @@ export default function Settings() {
             <div className="flex-1 min-w-0">
               <p className="text-base font-semibold text-foreground">Phone settings</p>
               <p className="text-sm text-muted-foreground truncate">
-                Theme and ringtone
+                Theme, ringtone, Google account
               </p>
             </div>
             <ChevronRight className="w-5 h-5 text-muted-foreground" />
           </button>
 
-          {/* Default contact photo removed — user's profile photo is the single source of truth. */}
-
-          {/* Connected accounts — Google */}
-          <div className="px-3 py-3 rounded-lg bg-secondary/40">
-            <div className="flex items-center gap-3 mb-2">
-              <span className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center">
-                <Contact2 className="w-5 h-5 text-primary" />
-              </span>
-              <div className="flex-1 min-w-0">
-                <p className="text-base font-semibold">Google contacts</p>
-                <p className="text-sm text-muted-foreground truncate">
-                  {googleEmail ? "Connected" : "Not connected"}
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              {googleEmail ? (
-                <button
-                  onClick={syncNow}
-                  disabled={syncing}
-                  className="flex-1 h-10 rounded-md bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-60 inline-flex items-center justify-center gap-1.5"
-                >
-                  <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} />
-                  {syncing ? "Syncing…" : "Sync now"}
-                </button>
-              ) : (
-                <button
-                  onClick={connectGoogle}
-                  disabled={connecting}
-                  className="flex-1 h-10 rounded-md bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-60"
-                >
-                  {connecting ? "Opening Google…" : "Connect Google"}
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Chat backup */}
-          <div className="px-3 py-3 rounded-lg bg-secondary/40">
-            <div className="flex items-center gap-3 mb-2">
+          {/* 3. Chat backup — collapsible. Back up & Restore only show when expanded. */}
+          <Collapsible className="rounded-lg bg-secondary/30">
+            <CollapsibleTrigger className="w-full flex items-center gap-3 px-3 py-3.5 text-left group">
               <span className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center">
                 <Cloud className="w-5 h-5 text-primary" />
               </span>
               <div className="flex-1 min-w-0">
-                <p className="text-base font-semibold">Chat backup</p>
+                <p className="text-base font-semibold text-foreground">Chat backup</p>
                 <p className="text-sm text-muted-foreground truncate">
                   {backup
-                    ? `Last: ${new Date(backup.last_backup_at).toLocaleString()} · ${backup.message_count} msgs · ${bytesLabel(backup.total_bytes)}`
+                    ? `Last: ${new Date(backup.last_backup_at).toLocaleDateString()} · ${backup.message_count} msgs`
                     : "No backup yet"}
                 </p>
               </div>
-            </div>
+              <ChevronDown className="w-5 h-5 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+            </CollapsibleTrigger>
+            <CollapsibleContent className="px-3 pb-3 pt-1">
+              <div className="flex items-center justify-between py-2">
+                <span className="text-sm text-foreground">Auto-backup daily</span>
+                <Switch
+                  checked={backup?.auto_backup_enabled ?? true}
+                  onCheckedChange={onToggleAuto}
+                />
+              </div>
 
-            <div className="flex items-center justify-between py-2">
-              <span className="text-sm text-foreground">Auto-backup daily</span>
-              <Switch
-                checked={backup?.auto_backup_enabled ?? true}
-                onCheckedChange={onToggleAuto}
-              />
-            </div>
+              {backup && (
+                <p className="text-xs text-muted-foreground pb-2">
+                  {bytesLabel(backup.total_bytes)} stored
+                </p>
+              )}
 
-            {backingUp && (
-              <div className="mt-2 mb-2 px-3 py-3 rounded-lg bg-primary/10 border border-primary/30">
-                <div className="flex items-center gap-2 mb-2">
-                  <Loader2 className="w-4 h-4 text-primary animate-spin" />
-                  <p className="text-sm font-semibold text-foreground">Backing up your chats…</p>
+              {backingUp && (
+                <div className="my-2 px-3 py-3 rounded-lg bg-primary/10 border border-primary/30">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Loader2 className="w-4 h-4 text-primary animate-spin" />
+                    <p className="text-sm font-semibold text-foreground">Backing up your chats…</p>
+                  </div>
+                  <div className="h-1.5 w-full rounded-full bg-secondary overflow-hidden">
+                    <div className="h-full w-1/3 bg-primary animate-[indeterminate_1.4s_ease-in-out_infinite]" />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Please don't close the app until this finishes.
+                  </p>
                 </div>
-                <div className="h-1.5 w-full rounded-full bg-secondary overflow-hidden">
-                  <div className="h-full w-1/3 bg-primary animate-[indeterminate_1.4s_ease-in-out_infinite]" />
-                </div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Please don't close the app until this finishes.
+              )}
+
+              <div className="flex gap-2 mt-1">
+                <button
+                  onClick={onBackup}
+                  disabled={backingUp}
+                  className="flex-1 h-10 rounded-md bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-60"
+                >
+                  {backingUp ? "Backing up…" : "Back up now"}
+                </button>
+                <button
+                  onClick={() => setRestoreOpen(true)}
+                  disabled={restoring || !backup}
+                  className="flex-1 h-10 rounded-md border border-border bg-background text-sm font-semibold disabled:opacity-50"
+                >
+                  {restoring ? "Restoring…" : "Restore backup"}
+                </button>
+              </div>
+
+              <AlertDialog open={restoreOpen} onOpenChange={setRestoreOpen}>
+                <AlertDialogContent className="max-w-[320px]">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="text-base">
+                      Restore chats from your latest backup?
+                    </AlertDialogTitle>
+                    <AlertDialogDescription className="text-sm">
+                      This will pull in your most recent saved chats. Existing messages
+                      on this device won't be removed.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel className="text-sm h-10">Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={onConfirmRestore}
+                      className="text-sm h-10"
+                    >
+                      OK
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </CollapsibleContent>
+          </Collapsible>
+
+          {/* 4. Account — collapsible. Holds sign-out. Delete is intentionally separated below. */}
+          <Collapsible className="rounded-lg bg-secondary/30">
+            <CollapsibleTrigger className="w-full flex items-center gap-3 px-3 py-3.5 text-left group">
+              <span className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center">
+                <UserIcon className="w-5 h-5 text-primary" />
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-base font-semibold text-foreground">Account</p>
+                <p className="text-sm text-muted-foreground truncate">
+                  Signed in as {user?.email ?? "this device"}
                 </p>
               </div>
-            )}
-
-            <div className="flex gap-2 mt-1">
+              <ChevronDown className="w-5 h-5 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+            </CollapsibleTrigger>
+            <CollapsibleContent className="px-3 pb-3 pt-1">
               <button
-                onClick={onBackup}
-                disabled={backingUp}
-                className="flex-1 h-10 rounded-md bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-60"
+                onClick={signOut}
+                disabled={signingOut}
+                className="w-full h-11 rounded-md border border-border bg-background text-sm font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-60"
               >
-                {backingUp ? "Backing up…" : "Back up now"}
+                <LogOut className="w-4 h-4" />
+                {signingOut ? "Signing out…" : "Sign out"}
               </button>
-              <button
-                onClick={() => setRestoreOpen(true)}
-                disabled={restoring || !backup}
-                className="flex-1 h-10 rounded-md border border-border bg-background text-sm font-semibold disabled:opacity-50"
-              >
-                {restoring ? "Restoring…" : "Restore"}
-              </button>
-            </div>
-
-            {/* Clean restore confirmation — no embedded URL chrome. */}
-            <AlertDialog open={restoreOpen} onOpenChange={setRestoreOpen}>
-              <AlertDialogContent className="max-w-[320px]">
-                <AlertDialogHeader>
-                  <AlertDialogTitle className="text-base">
-                    Restore chats from your latest backup?
-                  </AlertDialogTitle>
-                  <AlertDialogDescription className="text-sm">
-                    This will pull in your most recent saved chats. Existing messages
-                    on this device won't be removed.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel className="text-sm h-10">Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={onConfirmRestore}
-                    className="text-sm h-10"
-                  >
-                    OK
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
+            </CollapsibleContent>
+          </Collapsible>
 
           <div className="flex-1" />
 
-          <div className="pt-6 pb-2">
+          {/* Delete is kept far away from the four main options to avoid accidental taps. */}
+          <div className="pt-10 pb-2">
             <AlertDialog onOpenChange={(o) => !o && setConfirmStage(false)}>
               <AlertDialogTrigger asChild>
                 <button className="w-full h-12 rounded-lg bg-destructive/10 hover:bg-destructive/20 text-destructive text-sm font-semibold flex items-center justify-center gap-2">

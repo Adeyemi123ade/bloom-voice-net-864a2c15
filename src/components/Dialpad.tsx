@@ -227,8 +227,8 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
           </div>
         </div>
 
-        {/* Contact list */}
-        <div className="px-5 pb-3 flex-1 min-h-0 overflow-y-auto space-y-2">
+        {/* Contact list — guaranteed room for at least 3 rows above the keypad. */}
+        <div className="px-5 pb-3 flex-1 min-h-[228px] overflow-y-auto space-y-2">
           {filteredContacts.length === 0 ? (
             <p className="text-xs text-muted-foreground/70 italic py-6 text-center">
               {search ? "No matching contact" : "Your contacts will appear here"}
@@ -239,10 +239,10 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
               return (
                 <div
                   key={`${c.name}-${c.phones[0]}`}
-                  className="flex items-center gap-3 p-2.5 rounded-2xl bg-secondary/30"
+                  className="flex items-center gap-3 p-2 rounded-2xl bg-secondary/50"
                 >
                   <span
-                    className={`w-12 h-12 rounded-2xl border flex items-center justify-center shrink-0 text-lg font-bold overflow-hidden ${tint.bg} ${tint.border} ${tint.text}`}
+                    className={`w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 text-base font-bold overflow-hidden ${tint.bg} ${tint.border} ${tint.text}`}
                   >
                     {c.avatar ? (
                       <img src={c.avatar} alt="" className="w-full h-full object-cover" />
@@ -259,9 +259,9 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
                   <button
                     onClick={() => placeCall(c.phones[0])}
                     aria-label={`Call ${c.name}`}
-                    className="w-12 h-12 rounded-2xl bg-primary/15 hover:bg-primary/25 text-primary flex items-center justify-center shrink-0 transition-colors"
+                    className="w-10 h-10 rounded-xl bg-primary/20 hover:bg-primary/30 text-primary flex items-center justify-center shrink-0 transition-colors"
                   >
-                    <Phone className="w-5 h-5" />
+                    <Phone className="w-4 h-4" />
                   </button>
                 </div>
               );
@@ -269,10 +269,10 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
           )}
         </div>
 
-        {/* Keypad panel */}
-        <div className="mx-3 mb-3 rounded-3xl bg-secondary/20 border border-border/30 p-4 shrink-0">
+        {/* Compact keypad panel — sits low so it's easy to reach with the thumb. */}
+        <div className="mx-2 mb-2 rounded-2xl bg-secondary/30 border border-border/40 p-3 shrink-0">
           {/* Number display */}
-          <div className="relative mb-3">
+          <div className="relative mb-2">
             <input
               ref={inputRef}
               type="tel"
@@ -284,27 +284,27 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
                 setValue(cleaned);
               }}
               placeholder="Enter number"
-              className="w-full h-10 text-2xl font-light tracking-wide text-center bg-transparent border-0 focus:outline-none placeholder:text-muted-foreground/60"
+              className="w-full h-9 text-xl font-light tracking-wide text-center bg-transparent border-0 focus:outline-none placeholder:text-muted-foreground/60"
             />
             <button
               aria-label="Backspace"
               onClick={backspace}
               disabled={!value}
-              className="absolute right-1 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full hover:bg-secondary flex items-center justify-center disabled:opacity-30"
+              className="absolute right-1 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full hover:bg-secondary flex items-center justify-center disabled:opacity-30"
             >
               <Delete className="w-4 h-4 text-muted-foreground" />
             </button>
           </div>
 
           {/* Live formatted preview */}
-          <div className="h-4 mb-2 text-2xs text-muted-foreground text-center truncate">
+          <div className="h-3 mb-1.5 text-[10px] text-muted-foreground text-center truncate">
             {e164Preview && formatDisplay(e164Preview) !== value
               ? formatDisplay(e164Preview)
               : "\u00A0"}
           </div>
 
-          {/* Keypad grid */}
-          <div className="grid grid-cols-3 gap-2.5">
+          {/* Keypad grid — high-contrast keys readable in both light and dark. */}
+          <div className="grid grid-cols-3 gap-1.5">
             {KEYS.map((k) => (
               <button
                 key={k.d}
@@ -315,13 +315,13 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
                     longZero();
                   }
                 }}
-                className="h-14 rounded-2xl bg-secondary/50 hover:bg-secondary active:bg-primary/20 border border-border/30 flex flex-col items-center justify-center transition-colors"
+                className="h-11 rounded-xl bg-primary/10 hover:bg-primary/20 active:bg-primary/30 border border-primary/30 flex flex-col items-center justify-center transition-colors"
               >
-                <span className="text-2xl font-light text-foreground leading-none">
+                <span className="text-lg font-semibold text-foreground leading-none">
                   {k.d}
                 </span>
                 {k.sub && (
-                  <span className="text-[9px] text-muted-foreground tracking-[0.2em] leading-none mt-0.5">
+                  <span className="text-[8px] text-muted-foreground tracking-[0.2em] leading-none mt-0.5">
                     {k.sub}
                   </span>
                 )}
@@ -329,18 +329,18 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
             ))}
           </div>
 
-          {/* Big green Call button */}
-          <div className="pt-3 flex items-center justify-center">
-            <button
-              onClick={callTyped}
-              disabled={!value}
-              aria-label="Call"
-              className="w-16 h-14 rounded-2xl bg-primary hover:bg-primary/90 active:bg-primary/95 text-primary-foreground flex items-center justify-center shadow-lg disabled:opacity-40 transition-colors"
-            >
-              <Phone className="w-6 h-6" />
-            </button>
-          </div>
+          {/* Full-width Call button — easy thumb target at the bottom. */}
+          <button
+            onClick={callTyped}
+            disabled={!value}
+            aria-label="Call"
+            className="mt-2 w-full h-12 rounded-xl bg-primary hover:bg-primary/90 active:bg-primary/95 text-primary-foreground flex items-center justify-center gap-2 shadow-md disabled:opacity-40 transition-colors"
+          >
+            <Phone className="w-5 h-5" />
+            <span className="text-sm font-semibold">Call</span>
+          </button>
         </div>
+
         {/* Bottom nav inside dialer — closes overlay on tap, then routes. */}
         <BottomNav active="calls" onBeforeNavigate={() => onOpenChange(false)} />
       </DialogContent>

@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  Copy,
   Edit3,
-  Grid3x3,
   Loader2,
+  MessageCircle,
+  MessageSquare,
   Phone,
   Search,
   Send,
+  Share2,
   Trash2,
   Users,
   X,
@@ -36,7 +39,6 @@ import {
   startGoogleContactsConnect,
   syncGoogleContacts,
 } from "@/lib/googleContacts";
-import Dialpad from "@/components/Dialpad";
 import ContactActionSheet, { ContactAction } from "@/components/ContactActionSheet";
 import SaveContactDialog from "@/components/SaveContactDialog";
 import { useLongPress } from "@/hooks/useLongPress";
@@ -99,8 +101,6 @@ export default function Contacts() {
   const [showPrivacy, setShowPrivacy] = useState(
     () => !localStorage.getItem(PRIVACY_DISMISSED_KEY),
   );
-  const [missingOwnPhone, setMissingOwnPhone] = useState(false);
-  const [dialOpen, setDialOpen] = useState(false);
   const [googleConnected, setGoogleConnected] = useState<boolean | null>(null);
   const [connectingGoogle, setConnectingGoogle] = useState(false);
   const [actionSheet, setActionSheet] = useState<{
@@ -124,14 +124,6 @@ export default function Contacts() {
   useEffect(() => {
     if (!user) return;
     (async () => {
-      // Warn if the user hasn't set their own phone yet
-      const { data: me } = await supabase
-        .from("profiles")
-        .select("phone")
-        .eq("id", user.id)
-        .maybeSingle();
-      setMissingOwnPhone(!(me as { phone?: string | null } | null)?.phone);
-
       // Show whatever is cached immediately
       const cached = loadCachedContacts() ?? [];
       const manual = loadManualContacts();
@@ -403,13 +395,23 @@ export default function Contacts() {
     }
   };
 
-  const inviteContact = async (c: InviteContact) => {
+  const chatActive = async (c: ActiveContact) => {
     if (!user) return;
-    const body = encodeURIComponent(inviteMessage(c.name));
-    // Open the device's native SMS composer — zero cost, fully user-initiated.
-    const url = `sms:${c.phone}?body=${body}`;
-    window.location.href = url;
-    // Record the invite (idempotent thanks to unique index)
+    try {
+      const { data, error } = await supabase.rpc("start_direct_conversation", {
+        _other_user: c.user_id,
+      });
+      if (error) throw error;
+      navigate(`/chat/${data as string}`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Could not open chat";
+      toast({ title: "Chat failed", description: msg, variant: "destructive" });
+    }
+  };
+
+  /** Record an invite (idempotent) and mark the row as invited. */
+  const recordInvite = async (c: InviteContact) => {
+    if (!user) return;
     await supabase.from("invites").insert({
       inviter_id: user.id,
       phone: c.phone,
@@ -418,12 +420,27 @@ export default function Contacts() {
     setInvitedPhones((prev) => new Set(prev).add(c.phone));
   };
 
+  const inviteViaWhatsApp = async (c: InviteContact) => {
+    const text = encodeURIComponent(inviteMessage(c.name));
+    // wa.me wants digits only, no leading '+'.
+    const digits = c.phone.replace(/[^\d]/g, "");
+    window.open(`https://wa.me/${digits}?text=${text}`, "_blank", "noopener");
+    await recordInvite(c);
+  };
+
+  const inviteViaSms = async (c: InviteContact) => {
+    const body = encodeURIComponent(inviteMessage(c.name));
+    window.location.href = `sms:${c.phone}?body=${body}`;
+    await recordInvite(c);
+  };
+
   const openActiveActions = (c: ActiveContact) => {
     setActionSheet({
       title: c.display_name,
       subtitle: formatDisplay(c.phone),
       actions: [
         { label: "Call (in-app)", icon: Phone, onClick: () => callActive(c) },
+        { label: "Open chat", icon: MessageSquare, onClick: () => chatActive(c) },
         {
           label: "Edit name",
           icon: Edit3,
@@ -445,14 +462,19 @@ export default function Contacts() {
       subtitle: formatDisplay(c.phone),
       actions: [
         {
+          label: "Invite via WhatsApp",
+          icon: MessageCircle,
+          onClick: () => inviteViaWhatsApp(c),
+        },
+        {
+          label: "Invite via SMS",
+          icon: MessageSquare,
+          onClick: () => inviteViaSms(c),
+        },
+        {
           label: "Call this number",
           icon: Phone,
           onClick: () => navigate(`/dial/${encodeURIComponent(c.phone)}`),
-        },
-        {
-          label: c.invited ? "Re-invite to ChiChat" : "Invite to ChiChat",
-          icon: Send,
-          onClick: () => inviteContact(c),
         },
         {
           label: "Edit name",
@@ -472,13 +494,6 @@ export default function Contacts() {
   return (
     <MobileFrame bottomNav="contacts">
       <div className="h-full w-full flex flex-col bg-background relative">
-        <button
-          aria-label="Open dialer"
-          onClick={() => setDialOpen(true)}
-          className="absolute bottom-4 right-4 z-20 w-14 h-14 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg flex items-center justify-center"
-        >
-          <Grid3x3 className="w-6 h-6" />
-        </button>
         {/* Header — no back arrow; navigation is handled by bottom nav + system back. */}
         <div className="px-4 pt-4 pb-3 border-b border-border flex items-center gap-2">
           <h1 className="text-base font-semibold text-foreground flex-1">Contacts</h1>
@@ -500,20 +515,8 @@ export default function Contacts() {
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          {missingOwnPhone && (
-            <div className="mx-3 mt-3 p-3 rounded-lg bg-accent/10 border border-accent/30">
-              <p className="text-xs text-foreground">
-                Add your phone number on your profile so friends can find you when
-                they sync their contacts.
-              </p>
-              <Button
-                onClick={() => navigate("/profile")}
-                className="mt-2 h-8 px-3 text-xs bg-accent hover:bg-accent/90 text-accent-foreground"
-              >
-                Add phone number
-              </Button>
-            </div>
-          )}
+          {/* Share invite link — anyone you send this to can join. */}
+          <ShareInviteCard />
 
           {/* Google connection prompt — only when not yet linked. Always offers a way back. */}
           {googleConnected === false && (
@@ -647,7 +650,7 @@ export default function Contacts() {
                     key={c.phone}
                     c={c}
                     isManual={!!isManual}
-                    onInvite={() => inviteContact(c)}
+                    onInvite={() => inviteViaWhatsApp(c)}
                     onRemove={() => handleRemoveManual(c.phone)}
                     onLongPress={() => openInviteActions(c)}
                   />
@@ -659,7 +662,7 @@ export default function Contacts() {
 
         {/* Manual add removed — contacts come from Google. */}
       </div>
-      <Dialpad open={dialOpen} onOpenChange={setDialOpen} />
+      
       <ContactActionSheet
         open={!!actionSheet}
         onOpenChange={(o) => !o && setActionSheet(null)}
@@ -702,11 +705,14 @@ function ActiveRow({
   onCall: () => void;
   onLongPress: () => void;
 }) {
+  // Tap the row body → open action sheet (Call / Chat / …). Tap the Call
+  // button → call directly.
   const lp = useLongPress(onLongPress);
   return (
     <div
       {...lp}
-      className="flex items-center gap-3 px-2 py-2.5 rounded-lg hover:bg-secondary select-none"
+      onClick={onLongPress}
+      className="flex items-center gap-3 px-2 py-2.5 rounded-lg hover:bg-secondary select-none cursor-pointer"
     >
       <Avatar className="w-10 h-10">
         <AvatarImage src={c.avatar_url ?? undefined} />
@@ -730,12 +736,14 @@ function ActiveRow({
         </p>
       </div>
       <Button
-        onClick={onCall}
+        onClick={(e) => {
+          e.stopPropagation();
+          onCall();
+        }}
         aria-label={`Call ${c.display_name}`}
-        className="h-9 px-3 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-xs"
+        className="h-9 w-9 p-0 bg-primary hover:bg-primary/90 text-primary-foreground rounded-full"
       >
-        <Phone className="w-3.5 h-3.5" />
-        Call
+        <Phone className="w-4 h-4" />
       </Button>
     </div>
   );
@@ -758,7 +766,8 @@ function InviteRow({
   return (
     <div
       {...lp}
-      className="flex items-center gap-3 px-2 py-2.5 rounded-lg hover:bg-secondary select-none"
+      onClick={onLongPress}
+      className="flex items-center gap-3 px-2 py-2.5 rounded-lg hover:bg-secondary select-none cursor-pointer"
     >
       <Avatar className="w-10 h-10">
         <AvatarFallback className="bg-muted text-muted-foreground text-xs font-semibold">
@@ -774,24 +783,105 @@ function InviteRow({
       {isManual && (
         <button
           aria-label="Remove"
-          onClick={onRemove}
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
           className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-background"
         >
           <X className="w-3.5 h-3.5 text-muted-foreground" />
         </button>
       )}
       <Button
-        onClick={onInvite}
+        onClick={(e) => {
+          e.stopPropagation();
+          onInvite();
+        }}
         variant={c.invited ? "outline" : "default"}
         className={
           c.invited
             ? "h-9 px-3 rounded-lg text-xs border-border"
-            : "h-9 px-3 bg-accent hover:bg-accent/90 text-accent-foreground rounded-lg text-xs"
+            : "h-9 px-3 bg-[#25D366] hover:bg-[#1ebe5a] text-white rounded-lg text-xs"
         }
       >
-        <Send className="w-3.5 h-3.5" />
-        {c.invited ? "Re-invite" : "Invite"}
+        <MessageCircle className="w-3.5 h-3.5" />
+        {c.invited ? "Sent" : "WhatsApp"}
       </Button>
+    </div>
+  );
+}
+
+function ShareInviteCard() {
+  const link = APP_INVITE_LINK;
+  const text = `Join me on Chichat — high-quality calls and messages: ${link}`;
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(link);
+      toast({ title: "Link copied", description: "Paste it anywhere." });
+    } catch {
+      toast({ title: "Couldn't copy", variant: "destructive" });
+    }
+  };
+
+  const share = async () => {
+    const nav = navigator as Navigator & {
+      share?: (data: { title?: string; text?: string; url?: string }) => Promise<void>;
+    };
+    if (nav.share) {
+      try {
+        await nav.share({ title: "Chichat", text, url: link });
+        return;
+      } catch {
+        /* user cancelled — fall through */
+      }
+    }
+    // Fallback: open WhatsApp web share.
+    window.open(
+      `https://wa.me/?text=${encodeURIComponent(text)}`,
+      "_blank",
+      "noopener",
+    );
+  };
+
+  const whatsapp = () => {
+    window.open(
+      `https://wa.me/?text=${encodeURIComponent(text)}`,
+      "_blank",
+      "noopener",
+    );
+  };
+
+  return (
+    <div className="mx-3 mt-3 p-3 rounded-lg bg-primary/10 border border-primary/30">
+      <div className="flex items-center gap-2">
+        <Share2 className="w-4 h-4 text-primary" />
+        <p className="text-xs font-semibold text-foreground">Invite anyone with a link</p>
+      </div>
+      <p className="text-2xs text-muted-foreground mt-1 truncate">{link}</p>
+      <div className="mt-2 grid grid-cols-3 gap-2">
+        <button
+          onClick={copy}
+          className="h-9 rounded-md bg-secondary hover:bg-secondary/80 text-foreground text-2xs font-semibold inline-flex items-center justify-center gap-1"
+        >
+          <Copy className="w-3.5 h-3.5" />
+          Copy
+        </button>
+        <button
+          onClick={whatsapp}
+          className="h-9 rounded-md bg-[#25D366] hover:bg-[#1ebe5a] text-white text-2xs font-semibold inline-flex items-center justify-center gap-1"
+        >
+          <MessageCircle className="w-3.5 h-3.5" />
+          WhatsApp
+        </button>
+        <button
+          onClick={share}
+          className="h-9 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground text-2xs font-semibold inline-flex items-center justify-center gap-1"
+        >
+          <Share2 className="w-3.5 h-3.5" />
+          Share
+        </button>
+      </div>
     </div>
   );
 }

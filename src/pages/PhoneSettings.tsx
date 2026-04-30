@@ -1,6 +1,18 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Check, ChevronRight, Music, Palette, Play, Square, Upload, X } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import {
+  Check,
+  ChevronRight,
+  Contact2,
+  Loader2,
+  Music,
+  Palette,
+  Play,
+  RefreshCw,
+  Square,
+  Upload,
+  X,
+} from "lucide-react";
 import { useTheme } from "next-themes";
 import MobileFrame from "@/components/MobileFrame";
 import {
@@ -11,6 +23,14 @@ import {
 } from "@/components/ui/dialog";
 import { Monitor, Moon, Sun } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import {
+  startGoogleContactsConnect,
+  completeGoogleContactsConnect,
+  syncGoogleContacts,
+  GoogleContactsReconnectRequired,
+} from "@/lib/googleContacts";
 import {
   RINGTONES,
   RingtoneId,
@@ -26,6 +46,7 @@ const MAX_CUSTOM_BYTES = 3 * 1024 * 1024; // 3MB cap (localStorage friendly)
 
 export default function PhoneSettings() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { theme, setTheme } = useTheme();
   const [themeOpen, setThemeOpen] = useState(false);
   const [toneOpen, setToneOpen] = useState(false);
@@ -34,6 +55,13 @@ export default function PhoneSettings() {
   const [previewing, setPreviewing] = useState<string | null>(null);
   const stopRef = useRef<(() => void) | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
+
+  // Google contacts integration (moved here from Settings).
+  const [googleEmail, setGoogleEmail] = useState<string | null>(null);
+  const [googleOpen, setGoogleOpen] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [params, setParams] = useSearchParams();
 
   useEffect(() => {
     document.title = "Phone settings — Chichat";
@@ -46,6 +74,95 @@ export default function PhoneSettings() {
   useEffect(() => {
     return () => stopPreview();
   }, []);
+
+  // Load Google connection status
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const { data } = await supabase
+        .from("google_oauth_tokens")
+        .select("google_email")
+        .maybeSingle();
+      setGoogleEmail(data?.google_email ?? null);
+    })();
+  }, [user]);
+
+  // Complete OAuth if redirected back here with ?code=…
+  const oauthHandledRef = useRef<string | null>(null);
+  useEffect(() => {
+    const code = params.get("code");
+    if (!code || !user) return;
+    if (oauthHandledRef.current === code) return;
+    oauthHandledRef.current = code;
+    params.delete("code");
+    params.delete("scope");
+    params.delete("state");
+    setParams(params, { replace: true });
+    (async () => {
+      try {
+        const r = await completeGoogleContactsConnect(code);
+        setGoogleEmail(r.email);
+        setGoogleOpen(true);
+        toast({ title: "Google connected", description: "Account linked." });
+        setSyncing(true);
+        const list = await syncGoogleContacts();
+        toast({
+          title: list.length === 0 ? "No contacts found in Google" : "Contacts synced",
+          description:
+            list.length === 0
+              ? "This Google account has no saved contacts with phone numbers."
+              : `${list.length} contacts loaded.`,
+        });
+      } catch (e) {
+        if (e instanceof GoogleContactsReconnectRequired) setGoogleEmail(null);
+        toast({
+          title: "Google connect failed",
+          description: friendlyError(e),
+          variant: "destructive",
+        });
+      } finally {
+        setSyncing(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  const connectGoogle = async () => {
+    setConnecting(true);
+    try {
+      await startGoogleContactsConnect();
+    } catch (e) {
+      setConnecting(false);
+      toast({
+        title: "Could not start Google sign-in",
+        description: friendlyError(e),
+        variant: "destructive",
+      });
+    }
+  };
+
+  const syncGoogleNow = async () => {
+    setSyncing(true);
+    try {
+      const list = await syncGoogleContacts();
+      toast({
+        title: list.length === 0 ? "No contacts found in Google" : "Contacts synced",
+        description:
+          list.length === 0
+            ? "This Google account has no saved contacts with phone numbers."
+            : `${list.length} contacts loaded.`,
+      });
+    } catch (e) {
+      if (e instanceof GoogleContactsReconnectRequired) setGoogleEmail(null);
+      toast({
+        title: "Sync failed",
+        description: friendlyError(e),
+        variant: "destructive",
+      });
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const stopPreview = () => {
     stopRef.current?.();
@@ -157,6 +274,48 @@ export default function PhoneSettings() {
             </div>
             <ChevronRight className="w-4 h-4 text-muted-foreground" />
           </button>
+
+          {/* Google contacts — collapsible. Connect when not linked, sync when linked. */}
+          <button
+            onClick={() => setGoogleOpen((v) => !v)}
+            className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-secondary text-left"
+          >
+            <span className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center">
+              <Contact2 className="w-4 h-4 text-primary" />
+            </span>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-foreground">Google contact</p>
+              <p className="text-xs text-muted-foreground truncate">
+                {googleEmail ? `Connected · ${googleEmail}` : "Not connected"}
+              </p>
+            </div>
+            <ChevronRight
+              className={`w-4 h-4 text-muted-foreground transition-transform ${googleOpen ? "rotate-90" : ""}`}
+            />
+          </button>
+          {googleOpen && (
+            <div className="px-3 pb-3 -mt-1">
+              {googleEmail ? (
+                <button
+                  onClick={syncGoogleNow}
+                  disabled={syncing}
+                  className="w-full h-10 rounded-md bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-60 inline-flex items-center justify-center gap-1.5"
+                >
+                  <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} />
+                  {syncing ? "Syncing…" : "Sync now"}
+                </button>
+              ) : (
+                <button
+                  onClick={connectGoogle}
+                  disabled={connecting}
+                  className="w-full h-10 rounded-md bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-60 inline-flex items-center justify-center gap-1.5"
+                >
+                  {connecting && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {connecting ? "Opening Google…" : "Connect account"}
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Theme dialog */}
@@ -340,5 +499,17 @@ function RingtoneRow({
       )}
       {trailing}
     </div>
+  );
+}
+
+/** Strip technical noise (URLs, UUIDs) from error messages before showing them. */
+function friendlyError(e: unknown): string {
+  const raw = e instanceof Error ? e.message : String(e ?? "");
+  return (
+    raw
+      .replace(/https?:\/\/\S+/gi, "")
+      .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, "")
+      .replace(/\s{2,}/g, " ")
+      .trim() || "Please try again."
   );
 }
