@@ -79,7 +79,7 @@ export async function syncGoogleContacts(): Promise<DeviceContact[]> {
     .map((c) => ({
       name: c.name,
       phones: Array.from(new Set(
-        c.phones.map((p) => toE164(p, defaultCountry)).filter((p): p is string => !!p),
+        c.phones.map((p) => normalizeImportedPhone(p, defaultCountry)).filter((p): p is string => !!p),
       )),
     }))
     .filter((c) => c.phones.length);
@@ -102,6 +102,18 @@ async function getMyDefaultCountry() {
     .select("phone")
     .maybeSingle();
   return countryFromE164((data as { phone?: string | null } | null)?.phone);
+}
+
+function normalizeImportedPhone(raw: string, defaultCountry?: ReturnType<typeof countryFromE164>) {
+  const e164 = toE164(raw, defaultCountry);
+  if (e164) return e164;
+
+  // Do not drop Google contacts just because a number is saved in a local
+  // format that cannot be confidently normalized. Keep a dialable/displayable
+  // fallback so large address books don't appear as “0 contacts”.
+  const fallback = raw.replace(/[^\d+]/g, "");
+  const digits = fallback.replace(/\D/g, "");
+  return digits.length >= 5 ? fallback : null;
 }
 
 /** Returns true if the current user has linked their Google account. */
