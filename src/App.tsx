@@ -20,6 +20,8 @@ import PhoneSettings from "./pages/PhoneSettings.tsx";
 import ChatBackup from "./pages/ChatBackup.tsx";
 import ForgotPassword from "./pages/ForgotPassword.tsx";
 import ResetPassword from "./pages/ResetPassword.tsx";
+import VerifyEmail from "./pages/VerifyEmail.tsx";
+import VerifyResetCode from "./pages/VerifyResetCode.tsx";
 import OutboundCall from "./pages/OutboundCall.tsx";
 import NewContact from "./pages/NewContact.tsx";
 import MessageNotifier from "./components/MessageNotifier.tsx";
@@ -52,7 +54,9 @@ const App = () => (
               <Route path="/settings/phone" element={<PhoneSettings />} />
               <Route path="/settings/backup" element={<ChatBackup />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/verify-reset-code" element={<VerifyResetCode />} />
               <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/verify-email" element={<VerifyEmail />} />
               <Route path="/dial/:number" element={<OutboundCall />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />

@@ -24,6 +24,11 @@ const schema = z
     message: "Passwords don't match",
   });
 
+/**
+ * Set a new password. Reached after the user verifies the OTP code on
+ * /verify-reset-code, which establishes a recovery session. If somehow the
+ * user lands here without a session, we route them back to /forgot-password.
+ */
 export default function ResetPassword() {
   const navigate = useNavigate();
   const [password, setPassword] = useState("");
@@ -32,17 +37,27 @@ export default function ResetPassword() {
   const [errors, setErrors] = useState<{ password?: string; confirm?: string }>({});
   const [submitting, setSubmitting] = useState(false);
   const [ready, setReady] = useState(false);
+  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    // Supabase auto-establishes a recovery session from the URL hash.
-    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") setReady(true);
-    });
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) setReady(true);
-    });
-    return () => sub.subscription.unsubscribe();
+    document.title = "Set new password — ChiChat";
   }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (!mounted) return;
+      if (data.session) {
+        setReady(true);
+      } else {
+        navigate("/forgot-password", { replace: true });
+      }
+      setChecking(false);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,25 +83,24 @@ export default function ResetPassword() {
     navigate("/home");
   };
 
+  if (checking || !ready) return null;
+
   return (
     <MobileFrame>
-      <div className="h-full w-full flex flex-col px-4 pt-5 pb-4 overflow-y-auto">
-
+      <div className="h-full w-full flex flex-col px-5 pt-5 pb-5 overflow-y-auto">
         <div className="mt-2">
-          <h1 className="text-[18px] font-bold text-foreground leading-tight">
+          <h1 className="text-xl font-bold text-foreground leading-tight">
             Set a new password
           </h1>
-          <p className="text-xs text-muted-foreground mt-1">
-            {ready
-              ? "Choose a strong password you haven't used before."
-              : "Open this page from the reset link in your email."}
+          <p className="text-base text-muted-foreground mt-1">
+            Choose a strong password you haven't used before.
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-3 flex-1 flex flex-col">
-          <div className="space-y-2.5">
+        <form onSubmit={handleSubmit} className="mt-5 flex-1 flex flex-col">
+          <div className="space-y-3">
             <div>
-              <Label htmlFor="password" className="text-2xs text-muted-foreground">
+              <Label htmlFor="password" className="text-sm text-muted-foreground">
                 New password
               </Label>
               <div className="relative mt-1">
@@ -98,25 +112,26 @@ export default function ResetPassword() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="At least 8 characters"
                   maxLength={72}
-                  className="h-9 text-xs bg-input border-border text-foreground placeholder:text-muted-foreground pr-10"
+                  autoFocus
+                  className="h-11 text-base bg-input border-border text-foreground placeholder:text-muted-foreground pr-10"
                   aria-invalid={!!errors.password}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPwd((s) => !s)}
                   aria-label={showPwd ? "Hide password" : "Show password"}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
-                  {showPwd ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
               {errors.password && (
-                <p className="text-2xs text-destructive mt-1">{errors.password}</p>
+                <p className="text-sm text-destructive mt-1">{errors.password}</p>
               )}
             </div>
 
             <div>
-              <Label htmlFor="confirm" className="text-2xs text-muted-foreground">
+              <Label htmlFor="confirm" className="text-sm text-muted-foreground">
                 Confirm password
               </Label>
               <Input
@@ -127,20 +142,20 @@ export default function ResetPassword() {
                 onChange={(e) => setConfirm(e.target.value)}
                 placeholder="Re-enter password"
                 maxLength={72}
-                className="mt-1 h-9 text-xs bg-input border-border text-foreground placeholder:text-muted-foreground"
+                className="mt-1 h-11 text-base bg-input border-border text-foreground placeholder:text-muted-foreground"
                 aria-invalid={!!errors.confirm}
               />
               {errors.confirm && (
-                <p className="text-2xs text-destructive mt-1">{errors.confirm}</p>
+                <p className="text-sm text-destructive mt-1">{errors.confirm}</p>
               )}
             </div>
           </div>
 
-          <div className="mt-auto pt-3">
+          <div className="mt-auto pt-4">
             <Button
               type="submit"
-              disabled={submitting || !ready}
-              className="w-full h-8 text-xs bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg"
+              disabled={submitting}
+              className="w-full h-11 text-base bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg"
             >
               {submitting ? "Updating…" : "Update password"}
             </Button>
