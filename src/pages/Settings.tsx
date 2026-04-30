@@ -32,12 +32,6 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
-  startGoogleContactsConnect,
-  completeGoogleContactsConnect,
-  syncGoogleContacts,
-  GoogleContactsReconnectRequired,
-} from "@/lib/googleContacts";
-import {
   getMyBackup,
   runBackup,
   runRestore,
