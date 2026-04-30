@@ -386,7 +386,6 @@ export default function Settings() {
             </AlertDialog>
           </div>
         </div>
-
             <div className="flex items-center justify-between py-2">
               <span className="text-sm text-foreground">Auto-backup daily</span>
               <Switch
