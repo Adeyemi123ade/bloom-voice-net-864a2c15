@@ -375,6 +375,7 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          backup_email: string | null
           created_at: string
           display_name: string | null
           id: string
@@ -386,6 +387,7 @@ export type Database = {
         }
         Insert: {
           avatar_url?: string | null
+          backup_email?: string | null
           created_at?: string
           display_name?: string | null
           id: string
@@ -397,6 +399,7 @@ export type Database = {
         }
         Update: {
           avatar_url?: string | null
+          backup_email?: string | null
           created_at?: string
           display_name?: string | null
           id?: string
@@ -462,6 +465,10 @@ export type Database = {
       enqueue_email: {
         Args: { payload: Json; queue_name: string }
         Returns: number
+      }
+      find_user_by_backup_email: {
+        Args: { _backup_email: string }
+        Returns: string
       }
       is_conversation_participant: {
         Args: { _conversation_id: string; _user_id: string }
