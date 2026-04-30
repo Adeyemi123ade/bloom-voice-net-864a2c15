@@ -8,8 +8,10 @@ import { Section, Text } from 'npm:@react-email/components@0.0.22'
  * Renders the code with a green pill background, centered, mobile-safe.
  */
 export const OtpCodeBlock = ({ token }: { token: string }) => {
-  // Format as "482 913" for legibility
-  const display = token && token.length === 6 ? `${token.slice(0, 3)} ${token.slice(3)}` : token
+  // Format with a single space in the middle for legibility (works for 6 or 8 digits)
+  const t = token || ''
+  const mid = Math.floor(t.length / 2)
+  const display = t.length >= 4 ? `${t.slice(0, mid)} ${t.slice(mid)}` : t
 
   return (
     <Section style={{ textAlign: 'center', margin: '8px 0 18px' }}>
@@ -27,10 +29,10 @@ export const OtpCodeBlock = ({ token }: { token: string }) => {
               <Text
                 style={{
                   fontFamily: '-apple-system, BlinkMacSystemFont, "SF Mono", Menlo, monospace',
-                  fontSize: '38px',
+                  fontSize: t.length > 6 ? '32px' : '38px',
                   fontWeight: 'bold' as const,
                   color: '#ffffff',
-                  letterSpacing: '6px',
+                  letterSpacing: t.length > 6 ? '4px' : '6px',
                   margin: 0,
                   lineHeight: '1.1',
                 }}

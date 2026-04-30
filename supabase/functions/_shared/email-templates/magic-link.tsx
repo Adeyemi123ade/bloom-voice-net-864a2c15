@@ -36,7 +36,7 @@ export const MagicLinkEmail = ({ token, firstName }: MagicLinkEmailProps) => (
 
         <Text style={text}>
           {firstName ? `${firstName}, use ` : 'Use '}
-          the 6-digit code below to sign in to ChiChat. Just enter it in the app — no link to click.
+          the verification code below to sign in to ChiChat. Just enter it in the app — no link to click.
         </Text>
 
         <OtpCodeBlock token={token} />

@@ -39,7 +39,7 @@ export const SignupEmail = ({ recipient, token, firstName }: SignupEmailProps) =
         <Text style={text}>
           {firstName ? `Welcome to ChiChat, ${firstName} — ` : 'Welcome to ChiChat — '}
           where conversations don't end and people never feel far away.
-          To finish setting up your account ({recipient}), please enter this 6-digit code in the app:
+          To finish setting up your account ({recipient}), please enter this verification code in the app:
         </Text>
 
         <OtpCodeBlock token={token} />
