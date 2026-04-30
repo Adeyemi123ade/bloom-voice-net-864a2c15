@@ -10,8 +10,8 @@ import {
   Preview,
   Text,
 } from 'npm:@react-email/components@0.0.22'
-import { getOtpCode, OtpCodeBlock } from './_otp-block.tsx'
-import { BrandHeader, FeatureStrip, SignOff } from './_brand.tsx'
+import { getEmailOtpCode, OtpCodeBlock } from './_otp-block.tsx'
+import { BrandHeader, BrandHero, FeatureStrip, SignOff } from './_brand.tsx'
 
 interface SignupEmailProps {
   siteName: string
@@ -19,11 +19,12 @@ interface SignupEmailProps {
   recipient: string
   confirmationUrl: string
   token: string
+  displayCode?: string
   firstName?: string
 }
 
-export const SignupEmail = ({ recipient, token, firstName }: SignupEmailProps) => {
-  const code = getOtpCode(token)
+export const SignupEmail = ({ recipient, token, displayCode, firstName }: SignupEmailProps) => {
+  const code = getEmailOtpCode(token, displayCode)
 
   return (
   <Html lang="en" dir="ltr">
@@ -32,6 +33,7 @@ export const SignupEmail = ({ recipient, token, firstName }: SignupEmailProps) =
     <Body style={main}>
       <Container style={container}>
         <BrandHeader />
+        <BrandHero />
 
         <Heading style={h1}>
           {firstName ? `Hello, ${firstName}!` : 'Hello there!'} <span style={{ color: '#F5C518' }}>👋</span>
@@ -42,7 +44,7 @@ export const SignupEmail = ({ recipient, token, firstName }: SignupEmailProps) =
           To finish setting up your account ({recipient}), please enter this verification code in the app:
         </Text>
 
-        <OtpCodeBlock token={token} />
+        <OtpCodeBlock token={token} displayCode={displayCode} />
 
         <Text style={footer}>
           If you didn&rsquo;t sign up for ChiChat, you can safely ignore this email — no account will be created.

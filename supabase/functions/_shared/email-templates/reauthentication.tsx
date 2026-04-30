@@ -10,16 +10,17 @@ import {
   Preview,
   Text,
 } from 'npm:@react-email/components@0.0.22'
-import { getOtpCode, OtpCodeBlock } from './_otp-block.tsx'
-import { BrandHeader, FeatureStrip, SignOff } from './_brand.tsx'
+import { getEmailOtpCode, OtpCodeBlock } from './_otp-block.tsx'
+import { BrandHeader, BrandHero, FeatureStrip, SignOff } from './_brand.tsx'
 
 interface ReauthenticationEmailProps {
   token: string
+  displayCode?: string
   firstName?: string
 }
 
-export const ReauthenticationEmail = ({ token, firstName }: ReauthenticationEmailProps) => {
-  const code = getOtpCode(token)
+export const ReauthenticationEmail = ({ token, displayCode, firstName }: ReauthenticationEmailProps) => {
+  const code = getEmailOtpCode(token, displayCode)
 
   return (
   <Html lang="en" dir="ltr">
@@ -28,6 +29,7 @@ export const ReauthenticationEmail = ({ token, firstName }: ReauthenticationEmai
     <Body style={main}>
       <Container style={container}>
         <BrandHeader />
+        <BrandHero />
 
         <Heading style={h1}>
           {firstName ? `Hi ${firstName}, just confirming it's you` : "Just confirming it's you"} 🔐
@@ -37,7 +39,7 @@ export const ReauthenticationEmail = ({ token, firstName }: ReauthenticationEmai
           Enter this verification code in ChiChat to confirm it&rsquo;s really you. Quick check, then back to your conversations.
         </Text>
 
-        <OtpCodeBlock token={token} />
+        <OtpCodeBlock token={token} displayCode={displayCode} />
 
         <Text style={footer}>
           If you didn&rsquo;t request this, you can safely ignore this email.

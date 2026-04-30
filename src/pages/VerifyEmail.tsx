@@ -51,10 +51,8 @@ export default function VerifyEmail() {
   const verify = async (codeValue: string) => {
     if (!email || codeValue.length !== OTP_LENGTH || verifying) return;
     setVerifying(true);
-    const { error } = await supabase.auth.verifyOtp({
-      email,
-      token: codeValue,
-      type: "signup",
+    const { data, error } = await supabase.functions.invoke("verify-otp-code", {
+      body: { email, code: codeValue, type: "signup" },
     });
     setVerifying(false);
     if (error) {
@@ -66,6 +64,12 @@ export default function VerifyEmail() {
         variant: "destructive",
       });
       return;
+    }
+    if (data?.session?.access_token && data?.session?.refresh_token) {
+      await supabase.auth.setSession({
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+      });
     }
     toast({ title: "Email verified — welcome to ChiChat!" });
     navigate("/welcome", { replace: true });

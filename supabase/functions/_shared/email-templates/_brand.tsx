@@ -10,7 +10,7 @@ const LOGO_URL =
  * Branded ChiChat email header — round logo + wordmark + tagline.
  */
 export const BrandHeader = () => (
-  <Section style={{ marginBottom: '28px' }}>
+  <Section style={{ marginBottom: '22px' }}>
     <table role="presentation" cellPadding={0} cellSpacing={0} border={0} style={{ width: '100%' }}>
       <tbody>
         <tr>
@@ -45,6 +45,75 @@ export const BrandHeader = () => (
     </table>
   </Section>
 )
+
+export const BrandHero = () => (
+  <Section style={{ margin: '0 0 26px', textAlign: 'center' }}>
+    <table role="presentation" cellPadding={0} cellSpacing={0} border={0} style={heroShell}>
+      <tbody>
+        <tr>
+          <td align="center" style={phoneFrame}>
+            <table role="presentation" cellPadding={0} cellSpacing={0} border={0} style={phoneScreen}>
+              <tbody>
+                <tr>
+                  <td align="center" style={{ padding: '22px 12px 18px' }}>
+                    <img
+                      src={LOGO_URL}
+                      alt="ChiChat"
+                      width="84"
+                      height="84"
+                      style={{ display: 'block', objectFit: 'contain', margin: '0 auto 12px' }}
+                    />
+                    <Text style={phoneTitle}>ChiChat</Text>
+                    <Text style={phoneTagline}>Experience the possibilities</Text>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </Section>
+)
+
+const heroShell: React.CSSProperties = {
+  width: '100%',
+  backgroundColor: '#0B8F6C',
+  borderRadius: '24px',
+  padding: '26px 0',
+  margin: '0 auto',
+}
+
+const phoneFrame: React.CSSProperties = {
+  width: '178px',
+  maxWidth: '178px',
+  backgroundColor: '#121212',
+  borderRadius: '34px',
+  padding: '10px',
+  boxShadow: '0 18px 40px rgba(18,18,18,0.28)',
+}
+
+const phoneScreen: React.CSSProperties = {
+  width: '100%',
+  backgroundColor: '#ffffff',
+  borderRadius: '26px',
+  border: '1px solid #E6F4EE',
+}
+
+const phoneTitle: React.CSSProperties = {
+  margin: 0,
+  fontSize: '24px',
+  fontWeight: 'bold',
+  color: '#0B8F6C',
+  lineHeight: '1.15',
+}
+
+const phoneTagline: React.CSSProperties = {
+  margin: '5px 0 0',
+  fontSize: '11px',
+  color: '#8A8A8A',
+  lineHeight: '1.4',
+}
 
 /**
  * Three-up value-prop strip shown near the bottom of branded emails.

@@ -10,18 +10,19 @@ import {
   Preview,
   Text,
 } from 'npm:@react-email/components@0.0.22'
-import { getOtpCode, OtpCodeBlock } from './_otp-block.tsx'
-import { BrandHeader, FeatureStrip, SignOff } from './_brand.tsx'
+import { getEmailOtpCode, OtpCodeBlock } from './_otp-block.tsx'
+import { BrandHeader, BrandHero, FeatureStrip, SignOff } from './_brand.tsx'
 
 interface RecoveryEmailProps {
   siteName: string
   confirmationUrl: string
   token: string
+  displayCode?: string
   firstName?: string
 }
 
-export const RecoveryEmail = ({ token, firstName }: RecoveryEmailProps) => {
-  const code = getOtpCode(token)
+export const RecoveryEmail = ({ token, displayCode, firstName }: RecoveryEmailProps) => {
+  const code = getEmailOtpCode(token, displayCode)
 
   return (
   <Html lang="en" dir="ltr">
@@ -30,6 +31,7 @@ export const RecoveryEmail = ({ token, firstName }: RecoveryEmailProps) => {
     <Body style={main}>
       <Container style={container}>
         <BrandHeader />
+        <BrandHero />
 
         <Heading style={h1}>
           {firstName ? `Hi ${firstName}, let's get you back in` : "Let's get you back in"} 🔐
@@ -39,7 +41,7 @@ export const RecoveryEmail = ({ token, firstName }: RecoveryEmailProps) => {
           We received a request to reset your ChiChat password. Enter this verification code in the app to choose a new password and pick up right where you left off.
         </Text>
 
-        <OtpCodeBlock token={token} />
+        <OtpCodeBlock token={token} displayCode={displayCode} />
 
         <Text style={footer}>
           If you didn&rsquo;t request this, you can safely ignore this email — your password won&rsquo;t change.

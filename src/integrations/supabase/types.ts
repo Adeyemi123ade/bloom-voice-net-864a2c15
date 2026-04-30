@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      auth_otp_aliases: {
+        Row: {
+          created_at: string
+          email: string
+          email_type: string
+          expires_at: string
+          full_token: string
+          id: string
+          short_code: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          email_type: string
+          expires_at: string
+          full_token: string
+          id?: string
+          short_code: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          email_type?: string
+          expires_at?: string
+          full_token?: string
+          id?: string
+          short_code?: string
+        }
+        Relationships: []
+      }
       call_stats: {
         Row: {
           call_count: number
@@ -458,6 +488,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cleanup_expired_auth_otp_aliases: { Args: never; Returns: number }
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean

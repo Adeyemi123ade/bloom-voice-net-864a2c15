@@ -86,6 +86,12 @@ const SAMPLE_DATA: Record<string, object> = {
   },
 }
 
+const OTP_EMAIL_TYPES = new Set(['signup', 'recovery', 'magiclink', 'reauthentication'])
+
+function sixDigitCode() {
+  return String(crypto.getRandomValues(new Uint32Array(1))[0] % 1000000).padStart(6, '0')
+}
+
 // Preview endpoint handler - returns rendered HTML without sending email
 async function handlePreview(req: Request): Promise<Response> {
   const previewCorsHeaders = {
@@ -214,6 +220,7 @@ async function handleWebhook(req: Request): Promise<Response> {
   // payload.type is the hook event type ("auth")
   const emailType = payload.data.action_type
   console.log('Received auth event', { emailType, email: payload.data.email, run_id })
+  const recipientEmail = String(payload.data.email || '').trim().toLowerCase()
 
   const EmailTemplate = EMAIL_TEMPLATES[emailType]
   if (!EmailTemplate) {
@@ -294,13 +301,42 @@ async function handleWebhook(req: Request): Promise<Response> {
     firstName = firstName.charAt(0).toUpperCase() + firstName.slice(1)
   }
 
+  let displayCode = ''
+  const rawToken = String(payload.data.token || '').replace(/\D/g, '')
+  if (OTP_EMAIL_TYPES.has(emailType) && rawToken) {
+    displayCode = rawToken.length === 6 ? rawToken : sixDigitCode()
+    await supabaseLookup.rpc('cleanup_expired_auth_otp_aliases')
+    await supabaseLookup
+      .from('auth_otp_aliases')
+      .delete()
+      .eq('email', recipientEmail)
+      .eq('email_type', emailType)
+
+    const { error: aliasError } = await supabaseLookup.from('auth_otp_aliases').insert({
+      email: recipientEmail,
+      email_type: emailType,
+      short_code: displayCode,
+      full_token: rawToken,
+      expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+    })
+
+    if (aliasError) {
+      console.error('Failed to prepare verification code', { error: aliasError, run_id, emailType })
+      return new Response(JSON.stringify({ error: 'Failed to prepare verification code' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+  }
+
   // Build template props from payload.data (HookData structure)
   const templateProps = {
     siteName: SITE_NAME,
     siteUrl: `https://${ROOT_DOMAIN}`,
-    recipient: payload.data.email,
+    recipient: recipientEmail,
     confirmationUrl: payload.data.url,
     token: payload.data.token,
+    displayCode,
     email: payload.data.email,
     newEmail: payload.data.new_email,
     firstName,
