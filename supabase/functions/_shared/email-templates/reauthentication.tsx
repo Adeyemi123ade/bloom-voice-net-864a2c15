@@ -14,9 +14,10 @@ import { OtpCodeBlock } from './_otp-block.tsx'
 
 interface ReauthenticationEmailProps {
   token: string
+  firstName?: string
 }
 
-export const ReauthenticationEmail = ({ token }: ReauthenticationEmailProps) => (
+export const ReauthenticationEmail = ({ token, firstName }: ReauthenticationEmailProps) => (
   <Html lang="en" dir="ltr">
     <Head />
     <Preview>Your ChiChat verification code is {token}</Preview>
@@ -27,10 +28,13 @@ export const ReauthenticationEmail = ({ token }: ReauthenticationEmailProps) => 
           <span style={tagline}>Experience the possibilities</span>
         </div>
 
-        <Heading style={h1}>Your verification code 🔐</Heading>
+        <Heading style={h1}>
+          {firstName ? `Hi ${firstName}, confirm it's you 🔐` : 'Your verification code 🔐'}
+        </Heading>
 
         <Text style={text}>
-          Enter this 6-digit code in ChiChat to confirm it's really you.
+          {firstName ? `${firstName}, enter ` : 'Enter '}
+          this 6-digit code in ChiChat to confirm it's really you.
         </Text>
 
         <OtpCodeBlock token={token} />
