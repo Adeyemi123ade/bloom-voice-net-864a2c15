@@ -136,13 +136,13 @@ export default function Profile() {
 
         <div className="flex-1 px-6 py-5 flex flex-col items-center">
           <p className="text-xs text-muted-foreground mb-3">
-            Hello {displayName || user?.email?.split("@")[0] || "friend"} 👋
+            Hello {displayName || "friend"} 👋
           </p>
           <div className="relative">
             <Avatar className="w-20 h-20">
               <AvatarImage src={avatarUrl ?? undefined} />
               <AvatarFallback className="bg-primary/20 text-foreground text-lg font-semibold">
-                {initials(displayName || user?.email)}
+                {initials(displayName)}
               </AvatarFallback>
             </Avatar>
             <button
