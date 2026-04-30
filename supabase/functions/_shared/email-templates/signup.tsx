@@ -18,9 +18,10 @@ interface SignupEmailProps {
   recipient: string
   confirmationUrl: string
   token: string
+  firstName?: string
 }
 
-export const SignupEmail = ({ recipient, token }: SignupEmailProps) => (
+export const SignupEmail = ({ recipient, token, firstName }: SignupEmailProps) => (
   <Html lang="en" dir="ltr">
     <Head />
     <Preview>Your ChiChat verification code is {token}</Preview>
@@ -31,10 +32,13 @@ export const SignupEmail = ({ recipient, token }: SignupEmailProps) => (
           <span style={tagline}>Experience the possibilities</span>
         </div>
 
-        <Heading style={h1}>Hello, your verification code is here! 👋</Heading>
+        <Heading style={h1}>
+          {firstName ? `Hello, ${firstName}! 👋` : 'Hello there! 👋'}
+        </Heading>
 
         <Text style={text}>
-          Welcome to ChiChat — where conversations don't end and people never feel far away.
+          {firstName ? `Welcome to ChiChat, ${firstName} — ` : 'Welcome to ChiChat — '}
+          where conversations don't end and people never feel far away.
           To finish setting up your account ({recipient}), please enter this 6-digit code in the app:
         </Text>
 

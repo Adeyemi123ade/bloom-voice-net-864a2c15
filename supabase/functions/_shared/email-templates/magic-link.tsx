@@ -16,9 +16,10 @@ interface MagicLinkEmailProps {
   siteName: string
   confirmationUrl: string
   token: string
+  firstName?: string
 }
 
-export const MagicLinkEmail = ({ token }: MagicLinkEmailProps) => (
+export const MagicLinkEmail = ({ token, firstName }: MagicLinkEmailProps) => (
   <Html lang="en" dir="ltr">
     <Head />
     <Preview>Your ChiChat sign-in code is {token}</Preview>
@@ -29,10 +30,13 @@ export const MagicLinkEmail = ({ token }: MagicLinkEmailProps) => (
           <span style={tagline}>Experience the possibilities</span>
         </div>
 
-        <Heading style={h1}>Your sign-in code 👋</Heading>
+        <Heading style={h1}>
+          {firstName ? `Welcome back, ${firstName}! 👋` : 'Your sign-in code 👋'}
+        </Heading>
 
         <Text style={text}>
-          Use the 6-digit code below to sign in to ChiChat. Just enter it in the app — no link to click.
+          {firstName ? `${firstName}, use ` : 'Use '}
+          the 6-digit code below to sign in to ChiChat. Just enter it in the app — no link to click.
         </Text>
 
         <OtpCodeBlock token={token} />

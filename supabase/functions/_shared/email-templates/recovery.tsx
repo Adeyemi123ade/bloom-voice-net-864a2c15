@@ -16,9 +16,10 @@ interface RecoveryEmailProps {
   siteName: string
   confirmationUrl: string
   token: string
+  firstName?: string
 }
 
-export const RecoveryEmail = ({ token }: RecoveryEmailProps) => (
+export const RecoveryEmail = ({ token, firstName }: RecoveryEmailProps) => (
   <Html lang="en" dir="ltr">
     <Head />
     <Preview>Your ChiChat password reset code is {token}</Preview>
@@ -29,10 +30,13 @@ export const RecoveryEmail = ({ token }: RecoveryEmailProps) => (
           <span style={tagline}>Experience the possibilities</span>
         </div>
 
-        <Heading style={h1}>Reset your password 🔐</Heading>
+        <Heading style={h1}>
+          {firstName ? `Hi ${firstName}, reset your password 🔐` : 'Reset your password 🔐'}
+        </Heading>
 
         <Text style={text}>
-          We received a request to reset your ChiChat password. Enter this 6-digit code in the app to choose a new password.
+          {firstName ? `${firstName}, we ` : 'We '}
+          received a request to reset your ChiChat password. Enter this 6-digit code in the app to choose a new password.
         </Text>
 
         <OtpCodeBlock token={token} />
