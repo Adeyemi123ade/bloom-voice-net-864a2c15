@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Copy,
   Edit3,
   Loader2,
   MessageCircle,
@@ -9,7 +8,6 @@ import {
   Phone,
   Search,
   Send,
-  Share2,
   Trash2,
   Users,
   X,
@@ -17,8 +15,6 @@ import {
 import MobileFrame from "@/components/MobileFrame";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -26,7 +22,6 @@ import { toast } from "@/hooks/use-toast";
 import { formatDisplay } from "@/lib/phone";
 import {
   DeviceContact,
-  clearContactsCache,
   isNativePlatform,
   loadCachedContacts,
   loadManualContacts,
@@ -41,49 +36,18 @@ import {
 } from "@/lib/googleContacts";
 import ContactActionSheet, { ContactAction } from "@/components/ContactActionSheet";
 import SaveContactDialog from "@/components/SaveContactDialog";
-import { useLongPress } from "@/hooks/useLongPress";
 import { requestIgnoreBatteryOptimizations } from "@/lib/nativeCalls";
-
-interface MatchedUser {
-  phone: string;
-  user_id: string;
-  display_name: string | null;
-  avatar_url: string | null;
-}
-
-interface ActiveContact {
-  user_id: string;
-  display_name: string;
-  avatar_url: string | null;
-  phone: string;
-  call_count: number;
-  last_called_at: string | null;
-}
-
-interface InviteContact {
-  name: string;
-  phone: string;
-  invited: boolean;
-}
-
-const APP_INVITE_LINK = "https://bloom-voice-net.lovable.app";
-const BATCH_SIZE = 200;
-const PRIVACY_DISMISSED_KEY = "chichat:contacts:privacy-dismissed";
-
-function initials(name?: string | null) {
-  if (!name) return "?";
-  return name
-    .split(/\s+/)
-    .map((p) => p[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-}
-
-function inviteMessage(name: string) {
-  return `Hey ${name}, I've been using Chichat for high-quality calls and messages. Join me here so we can call for free: ${APP_INVITE_LINK} Download now!`;
-}
+import {
+  ActiveContact,
+  BATCH_SIZE,
+  InviteContact,
+  MatchedUser,
+  PRIVACY_DISMISSED_KEY,
+  inviteMessage,
+  mergeContacts,
+} from "@/components/contacts/contactsHelpers";
+import { ActiveRow, EmptyState, InviteRow } from "@/components/contacts/ContactRows";
+import { ShareInviteCard } from "@/components/contacts/ShareInviteCard";
 
 export default function Contacts() {
   const navigate = useNavigate();
