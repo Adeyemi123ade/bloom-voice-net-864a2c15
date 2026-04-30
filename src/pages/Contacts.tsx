@@ -39,7 +39,6 @@ import {
   startGoogleContactsConnect,
   syncGoogleContacts,
 } from "@/lib/googleContacts";
-import Dialpad from "@/components/Dialpad";
 import ContactActionSheet, { ContactAction } from "@/components/ContactActionSheet";
 import SaveContactDialog from "@/components/SaveContactDialog";
 import { useLongPress } from "@/hooks/useLongPress";
