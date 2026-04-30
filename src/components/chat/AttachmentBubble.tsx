@@ -114,7 +114,7 @@ export function AttachmentBubble({
             e.stopPropagation();
             setImgOpen(true);
           }}
-          className="block rounded-2xl overflow-hidden"
+          className="block rounded-2xl overflow-hidden relative"
         >
           <img
             src={meta.url}
@@ -122,6 +122,11 @@ export function AttachmentBubble({
             loading="lazy"
             className="w-[180px] h-[180px] object-cover block"
           />
+          {meta.size > 0 && (
+            <span className="absolute bottom-1.5 right-1.5 text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-black/55 text-white">
+              {fmtSize(meta.size)}
+            </span>
+          )}
         </button>
         {meta.caption && (
           <p className="text-[13px] whitespace-pre-wrap break-words mt-1">{meta.caption}</p>
@@ -141,12 +146,19 @@ export function AttachmentBubble({
   if (isVideo) {
     return (
       <>
-        <video
-          src={meta.url}
-          controls
-          playsInline
-          className="w-[200px] max-h-[260px] rounded-2xl bg-black block"
-        />
+        <div className="relative w-[200px]">
+          <video
+            src={meta.url}
+            controls
+            playsInline
+            className="w-full max-h-[260px] rounded-2xl bg-black block"
+          />
+          {meta.size > 0 && (
+            <span className="absolute top-1.5 right-1.5 text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-black/55 text-white pointer-events-none">
+              {fmtSize(meta.size)}
+            </span>
+          )}
+        </div>
         {meta.caption && (
           <p className="text-[13px] whitespace-pre-wrap break-words mt-1">{meta.caption}</p>
         )}
