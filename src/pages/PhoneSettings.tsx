@@ -46,6 +46,7 @@ const MAX_CUSTOM_BYTES = 3 * 1024 * 1024; // 3MB cap (localStorage friendly)
 
 export default function PhoneSettings() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { theme, setTheme } = useTheme();
   const [themeOpen, setThemeOpen] = useState(false);
   const [toneOpen, setToneOpen] = useState(false);
@@ -54,6 +55,13 @@ export default function PhoneSettings() {
   const [previewing, setPreviewing] = useState<string | null>(null);
   const stopRef = useRef<(() => void) | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
+
+  // Google contacts integration (moved here from Settings).
+  const [googleEmail, setGoogleEmail] = useState<string | null>(null);
+  const [googleOpen, setGoogleOpen] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [params, setParams] = useSearchParams();
 
   useEffect(() => {
     document.title = "Phone settings — Chichat";
@@ -66,6 +74,95 @@ export default function PhoneSettings() {
   useEffect(() => {
     return () => stopPreview();
   }, []);
+
+  // Load Google connection status
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const { data } = await supabase
+        .from("google_oauth_tokens")
+        .select("google_email")
+        .maybeSingle();
+      setGoogleEmail(data?.google_email ?? null);
+    })();
+  }, [user]);
+
+  // Complete OAuth if redirected back here with ?code=…
+  const oauthHandledRef = useRef<string | null>(null);
+  useEffect(() => {
+    const code = params.get("code");
+    if (!code || !user) return;
+    if (oauthHandledRef.current === code) return;
+    oauthHandledRef.current = code;
+    params.delete("code");
+    params.delete("scope");
+    params.delete("state");
+    setParams(params, { replace: true });
+    (async () => {
+      try {
+        const r = await completeGoogleContactsConnect(code);
+        setGoogleEmail(r.email);
+        setGoogleOpen(true);
+        toast({ title: "Google connected", description: "Account linked." });
+        setSyncing(true);
+        const list = await syncGoogleContacts();
+        toast({
+          title: list.length === 0 ? "No contacts found in Google" : "Contacts synced",
+          description:
+            list.length === 0
+              ? "This Google account has no saved contacts with phone numbers."
+              : `${list.length} contacts loaded.`,
+        });
+      } catch (e) {
+        if (e instanceof GoogleContactsReconnectRequired) setGoogleEmail(null);
+        toast({
+          title: "Google connect failed",
+          description: friendlyError(e),
+          variant: "destructive",
+        });
+      } finally {
+        setSyncing(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  const connectGoogle = async () => {
+    setConnecting(true);
+    try {
+      await startGoogleContactsConnect();
+    } catch (e) {
+      setConnecting(false);
+      toast({
+        title: "Could not start Google sign-in",
+        description: friendlyError(e),
+        variant: "destructive",
+      });
+    }
+  };
+
+  const syncGoogleNow = async () => {
+    setSyncing(true);
+    try {
+      const list = await syncGoogleContacts();
+      toast({
+        title: list.length === 0 ? "No contacts found in Google" : "Contacts synced",
+        description:
+          list.length === 0
+            ? "This Google account has no saved contacts with phone numbers."
+            : `${list.length} contacts loaded.`,
+      });
+    } catch (e) {
+      if (e instanceof GoogleContactsReconnectRequired) setGoogleEmail(null);
+      toast({
+        title: "Sync failed",
+        description: friendlyError(e),
+        variant: "destructive",
+      });
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const stopPreview = () => {
     stopRef.current?.();
