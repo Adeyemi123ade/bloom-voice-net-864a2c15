@@ -93,7 +93,7 @@ export default function Settings() {
       try {
         const r = await completeGoogleContactsConnect(code);
         setGoogleEmail(r.email);
-        toast({ title: "Google connected", description: r.email ?? "Account linked." });
+        toast({ title: "Google connected", description: "Account linked." });
         setSyncing(true);
         const list = await syncGoogleContacts();
         toast({ title: "Contacts synced", description: `${list.length} contacts loaded.` });
@@ -274,7 +274,7 @@ export default function Settings() {
               <div className="flex-1 min-w-0">
                 <p className="text-base font-semibold">Google contacts</p>
                 <p className="text-sm text-muted-foreground truncate">
-                  {googleEmail ? `Connected as ${googleEmail}` : "Not connected"}
+                  {googleEmail ? "Connected" : "Not connected"}
                 </p>
               </div>
             </div>
