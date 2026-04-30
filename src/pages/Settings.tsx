@@ -274,7 +274,7 @@ export default function Settings() {
               <div className="flex-1 min-w-0">
                 <p className="text-base font-semibold">Google contacts</p>
                 <p className="text-sm text-muted-foreground truncate">
-                  {googleEmail ? `Connected as ${googleEmail}` : "Not connected"}
+                  {googleEmail ? "Connected" : "Not connected"}
                 </p>
               </div>
             </div>
