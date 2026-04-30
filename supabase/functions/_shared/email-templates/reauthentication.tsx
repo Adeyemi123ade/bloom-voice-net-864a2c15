@@ -31,8 +31,7 @@ export const ReauthenticationEmail = ({ token, firstName }: ReauthenticationEmai
         </Heading>
 
         <Text style={text}>
-          {firstName ? `${firstName}, enter ` : 'Enter '}
-          this verification code in ChiChat to confirm it&rsquo;s really you. Quick check, then back to your conversations.
+          Enter this verification code in ChiChat to confirm it&rsquo;s really you. Quick check, then back to your conversations.
         </Text>
 
         <OtpCodeBlock token={token} />
