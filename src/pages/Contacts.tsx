@@ -538,7 +538,7 @@ export default function Contacts() {
               </div>
               <SectionList
                 items={filteredInvite}
-                getKey={(c) => c.phone}
+                getKey={(c) => `${c.phone}|${c.name}`}
                 getSectionLabel={(c) => sectionLetter(c.name)}
                 renderItem={(c) => {
                   const isManual = loadManualContacts().some(
