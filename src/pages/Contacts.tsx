@@ -2,20 +2,18 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Edit3,
+  Heart,
   Loader2,
-  MessageCircle,
   MessageSquare,
   Phone,
   Search,
-  Send,
   Trash2,
+  UserPlus,
   Users,
-  X,
 } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -36,18 +34,17 @@ import {
 } from "@/lib/googleContacts";
 import ContactActionSheet, { ContactAction } from "@/components/ContactActionSheet";
 import SaveContactDialog from "@/components/SaveContactDialog";
-import { requestIgnoreBatteryOptimizations } from "@/lib/nativeCalls";
 import {
   ActiveContact,
   BATCH_SIZE,
   InviteContact,
   MatchedUser,
-  PRIVACY_DISMISSED_KEY,
   inviteMessage,
   mergeContacts,
 } from "@/components/contacts/contactsHelpers";
 import { ActiveRow, EmptyState, InviteRow } from "@/components/contacts/ContactRows";
-import { ShareInviteCard } from "@/components/contacts/ShareInviteCard";
+import { SectionList, sectionLetter } from "@/components/contacts/ContactSectionList";
+import { shareChichatInvite } from "@/components/contacts/ShareInviteCard";
 
 export default function Contacts() {
   const navigate = useNavigate();
@@ -62,9 +59,6 @@ export default function Contacts() {
   const [syncing, setSyncing] = useState(false);
   const [matching, setMatching] = useState(false);
   const [query, setQuery] = useState("");
-  const [showPrivacy, setShowPrivacy] = useState(
-    () => !localStorage.getItem(PRIVACY_DISMISSED_KEY),
-  );
   const [googleConnected, setGoogleConnected] = useState<boolean | null>(null);
   const [connectingGoogle, setConnectingGoogle] = useState(false);
   const [actionSheet, setActionSheet] = useState<{
@@ -82,13 +76,9 @@ export default function Contacts() {
     if (!loading && !user) navigate("/login");
   }, [loading, user, navigate]);
 
-  // Initial load: cached contacts + auto-sync.
-  // On native (Android/iOS) we read directly from the device — Google OAuth is
-  // not needed and avoids the in-app-browser 403. On web, we fall back to Google.
   useEffect(() => {
     if (!user) return;
     (async () => {
-      // Show whatever is cached immediately
       const cached = loadCachedContacts() ?? [];
       const manual = loadManualContacts();
       const merged = mergeContacts(cached, manual);
@@ -97,8 +87,7 @@ export default function Contacts() {
       await loadInvited();
 
       if (isNativePlatform()) {
-        // Native: read device contacts directly. No OAuth, no external redirects.
-        setGoogleConnected(true); // Hide the "Connect Google" prompt on native.
+        setGoogleConnected(true);
         setSyncing(true);
         try {
           const list = await loadNativeContacts();
@@ -115,14 +104,12 @@ export default function Contacts() {
               variant: "destructive",
             });
           }
-          // NOT_NATIVE shouldn't happen here; ignore other errors silently.
         } finally {
           setSyncing(false);
         }
         return;
       }
 
-      // Web: use Google as the contacts source.
       try {
         const connected = await isGoogleConnected();
         setGoogleConnected(connected);
@@ -134,7 +121,7 @@ export default function Contacts() {
             setContacts(fresh);
             if (fresh.length) await runMatch(fresh);
           } catch {
-            // Silent — user can retry from Settings.
+            /* user can retry from Settings */
           } finally {
             setSyncing(false);
           }
@@ -175,7 +162,6 @@ export default function Contacts() {
       }
       setMatched(matches);
 
-      // Pull call_stats for matched users only
       const calleeIds = Array.from(matches.values()).map((m) => m.user_id);
       if (calleeIds.length) {
         const { data: statRows } = await supabase
@@ -205,8 +191,7 @@ export default function Contacts() {
     }
   };
 
-  /** Pull a fresh copy of contacts — from device on native, Google on web. */
-  const refreshFromGoogle = async () => {
+  const refreshContacts = async () => {
     setSyncing(true);
     try {
       const list = isNativePlatform()
@@ -225,7 +210,6 @@ export default function Contacts() {
     }
   };
 
-  /** Kick off Google OAuth from this screen so the user never hits a dead end. */
   const connectGoogle = async () => {
     setConnectingGoogle(true);
     try {
@@ -245,12 +229,7 @@ export default function Contacts() {
     runMatch(merged);
   };
 
-  const dismissPrivacy = () => {
-    localStorage.setItem(PRIVACY_DISMISSED_KEY, "1");
-    setShowPrivacy(false);
-  };
-
-  // Build active + invite lists
+  // Build active + invite lists, alphabetised.
   const { active, invite } = useMemo(() => {
     const activeList: ActiveContact[] = [];
     const inviteList: InviteContact[] = [];
@@ -280,12 +259,7 @@ export default function Contacts() {
       }
     }
 
-    activeList.sort((a, b) => {
-      if (b.call_count !== a.call_count) return b.call_count - a.call_count;
-      const at = a.last_called_at ? Date.parse(a.last_called_at) : 0;
-      const bt = b.last_called_at ? Date.parse(b.last_called_at) : 0;
-      return bt - at;
-    });
+    activeList.sort((a, b) => a.display_name.localeCompare(b.display_name));
     inviteList.sort((a, b) => a.name.localeCompare(b.name));
 
     return { active: activeList, invite: inviteList };
@@ -311,10 +285,6 @@ export default function Contacts() {
 
   const callActive = async (c: ActiveContact) => {
     if (!user) return;
-    if (!localStorage.getItem("chichat:battery-prompt-shown")) {
-      void requestIgnoreBatteryOptimizations();
-      localStorage.setItem("chichat:battery-prompt-shown", "1");
-    }
     try {
       const conversationId = await supabase
         .rpc("start_direct_conversation", { _other_user: c.user_id })
@@ -352,13 +322,17 @@ export default function Contacts() {
           roomName,
         },
       }).catch((e) => console.warn("[call-push] failed", e));
-      navigate(`/call/${conversationId}?type=voice&callId=${callRow.id}&room=${encodeURIComponent(roomName)}&role=caller`, { replace: true });
+      navigate(
+        `/call/${conversationId}?type=voice&callId=${callRow.id}&room=${encodeURIComponent(roomName)}&role=caller`,
+        { replace: true },
+      );
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Could not start call";
       toast({ title: "Call failed", description: msg, variant: "destructive" });
     }
   };
 
+  /** Open chat room — used by the message icon next to each active contact. */
   const chatActive = async (c: ActiveContact) => {
     if (!user) return;
     try {
@@ -373,7 +347,6 @@ export default function Contacts() {
     }
   };
 
-  /** Record an invite (idempotent) and mark the row as invited. */
   const recordInvite = async (c: InviteContact) => {
     if (!user) return;
     await supabase.from("invites").insert({
@@ -384,18 +357,10 @@ export default function Contacts() {
     setInvitedPhones((prev) => new Set(prev).add(c.phone));
   };
 
-  const inviteViaWhatsApp = async (c: InviteContact) => {
-    const text = encodeURIComponent(inviteMessage(c.name));
-    // wa.me wants digits only, no leading '+'.
-    const digits = c.phone.replace(/[^\d]/g, "");
-    window.open(`https://wa.me/${digits}?text=${text}`, "_blank", "noopener");
-    await recordInvite(c);
-  };
-
-  const inviteViaSms = async (c: InviteContact) => {
-    const body = encodeURIComponent(inviteMessage(c.name));
-    window.location.href = `sms:${c.phone}?body=${body}`;
-    await recordInvite(c);
+  /** "Invite" button → native OS share sheet. Records invite if shared. */
+  const inviteContact = async (c: InviteContact) => {
+    const sent = await shareChichatInvite(inviteMessage(c.name));
+    if (sent) await recordInvite(c);
   };
 
   const openActiveActions = (c: ActiveContact) => {
@@ -403,8 +368,8 @@ export default function Contacts() {
       title: c.display_name,
       subtitle: formatDisplay(c.phone),
       actions: [
-        { label: "Call (in-app)", icon: Phone, onClick: () => callActive(c) },
         { label: "Open chat", icon: MessageSquare, onClick: () => chatActive(c) },
+        { label: "Voice call", icon: Phone, onClick: () => callActive(c) },
         {
           label: "Edit name",
           icon: Edit3,
@@ -426,14 +391,9 @@ export default function Contacts() {
       subtitle: formatDisplay(c.phone),
       actions: [
         {
-          label: "Invite via WhatsApp",
-          icon: MessageCircle,
-          onClick: () => inviteViaWhatsApp(c),
-        },
-        {
-          label: "Invite via SMS",
-          icon: MessageSquare,
-          onClick: () => inviteViaSms(c),
+          label: "Send invite",
+          icon: UserPlus,
+          onClick: () => inviteContact(c),
         },
         {
           label: "Call this number",
@@ -455,178 +415,168 @@ export default function Contacts() {
     });
   };
 
+  const totalContacts = contacts.length;
+  const isLoading = syncing || matching;
+
   return (
     <MobileFrame bottomNav="contacts">
       <div className="h-full w-full flex flex-col bg-background relative">
-        {/* Header — no back arrow; navigation is handled by bottom nav + system back. */}
+        {/* Header */}
         <div className="px-4 pt-4 pb-3 border-b border-border flex items-center gap-2">
-          <h1 className="text-base font-semibold text-foreground flex-1">Contacts</h1>
+          <h1 className="text-lg font-semibold text-foreground flex-1">Contacts</h1>
           {googleConnected && (
             <button
               aria-label="Refresh contacts"
-              onClick={refreshFromGoogle}
-              disabled={syncing || matching}
+              onClick={refreshContacts}
+              disabled={isLoading}
               className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-secondary disabled:opacity-50"
             >
               <Loader2
-                className={`w-4 h-4 text-foreground ${syncing ? "animate-spin" : "hidden"}`}
+                className={`w-4 h-4 text-foreground ${isLoading ? "animate-spin" : "opacity-60"}`}
               />
-              {!syncing && (
-                <Send className="w-4 h-4 text-foreground rotate-45 opacity-0" />
-              )}
             </button>
           )}
         </div>
 
-        <div className="flex-1 overflow-y-auto">
-          {/* Share invite link — anyone you send this to can join. */}
-          <ShareInviteCard />
-
-          {/* Google connection prompt — only when not yet linked. Always offers a way back. */}
-          {googleConnected === false && (
-            <div className="px-3 pt-3 space-y-2">
-              <div className="p-3 rounded-lg bg-secondary border border-border">
-                <p className="text-sm font-semibold text-foreground">
-                  Connect your Google account
-                </p>
-                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                  We'll show your Google contacts here so you can call friends already on
-                  Chichat or invite the rest with one tap.
-                </p>
-                <Button
-                  onClick={connectGoogle}
-                  disabled={connectingGoogle}
-                  className="mt-3 w-full h-10 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-xs font-semibold"
-                >
-                  {connectingGoogle ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : null}
-                  {connectingGoogle ? "Opening Google…" : "Connect Google"}
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {syncing && (
-            <p className="px-3 pt-3 text-xs text-muted-foreground text-center">
-              Loading contacts from Google…
-            </p>
-          )}
-
-          {showPrivacy && googleConnected && (
-            <div className="px-3 pt-3">
-              <div className="relative p-3 rounded-lg bg-secondary border border-border">
-                <button
-                  aria-label="Dismiss"
-                  onClick={dismissPrivacy}
-                  className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full flex items-center justify-center hover:bg-background/60"
-                >
-                  <X className="w-3 h-3 text-muted-foreground" />
-                </button>
-                <p className="text-xs text-muted-foreground leading-relaxed pr-5">
-                  We use your Google contacts only to find friends already on Chichat
-                  and let you invite the rest. We never share your contact list.
-                </p>
-              </div>
-            </div>
-          )}
+        <div className="flex-1 overflow-y-auto pb-6">
           {/* Search */}
-          <div className="px-3 pt-3">
+          <div className="px-4 pt-3 pb-2">
             <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search contacts"
-                className="h-8 pl-8 text-xs bg-input border-border"
+                placeholder="Search names or numbers"
+                className="h-10 pl-9 text-sm bg-secondary/40 border-border"
               />
             </div>
           </div>
 
-          {/* Tabs */}
-          <Tabs defaultValue="active" className="px-3 pt-3 pb-4">
-            <TabsList className="grid grid-cols-2 w-full h-9 bg-secondary">
-              <TabsTrigger value="active" className="text-xs">
-                <Users className="w-3.5 h-3.5 mr-1" />
-                Active ({active.length})
-              </TabsTrigger>
-              <TabsTrigger value="invite" className="text-xs">
-                <Send className="w-3.5 h-3.5 mr-1" />
-                Invite ({invite.length})
-              </TabsTrigger>
-            </TabsList>
+          {/* Top action card: New Group Call / New Contact / Invite a friend */}
+          <div className="mx-4 mt-2 rounded-2xl bg-secondary/40 border border-border overflow-hidden">
+            <ActionRow
+              icon={Users}
+              label="New Group Call"
+              onClick={() =>
+                toast({
+                  title: "Group calls coming soon",
+                  description: "Stay tuned — we're putting the finishing touches on this.",
+                })
+              }
+            />
+            <Divider />
+            <ActionRow
+              icon={UserPlus}
+              label="New Contact"
+              onClick={() => navigate("/contacts/new")}
+            />
+            <Divider />
+            <ActionRow
+              icon={Heart}
+              label="Invite a friend"
+              onClick={() => navigate("/invite")}
+            />
+          </div>
 
-            {/* Active tab */}
-            <TabsContent value="active" className="mt-3 space-y-1">
-              {matching && (
-                <p className="text-xs text-muted-foreground text-center py-3">
-                  Checking who's on Chichat…
-                </p>
-              )}
-              {!matching && filteredActive.length === 0 && (
-                <EmptyState
-                  title={
-                    contacts.length === 0
-                      ? "Sync to find friends"
-                      : query
-                        ? "No matches"
-                        : "No active contacts yet"
-                  }
-                  hint={
-                    contacts.length === 0
-                      ? "Tap Sync above to see which of your contacts are on Chichat."
-                      : "Invite friends from the next tab to grow your circle."
-                  }
-                />
-              )}
-              {filteredActive.map((c) => (
-                <ActiveRow
-                  key={c.user_id}
-                  c={c}
-                  onCall={() => callActive(c)}
-                  onLongPress={() => openActiveActions(c)}
-                />
-              ))}
-            </TabsContent>
+          {/* Google connection prompt — only when not yet linked. */}
+          {googleConnected === false && (
+            <div className="mx-4 mt-3 p-3 rounded-xl bg-secondary border border-border">
+              <p className="text-sm font-semibold text-foreground">
+                Connect your Google account
+              </p>
+              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                We'll show your Google contacts here so you can message friends already on
+                Chichat or invite the rest with one tap.
+              </p>
+              <Button
+                onClick={connectGoogle}
+                disabled={connectingGoogle}
+                className="mt-3 w-full h-10 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-sm font-semibold"
+              >
+                {connectingGoogle ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : null}
+                {connectingGoogle ? "Opening Google…" : "Connect Google"}
+              </Button>
+            </div>
+          )}
 
-            {/* Invite tab */}
-            <TabsContent value="invite" className="mt-3 space-y-1">
-              {!matching && filteredInvite.length === 0 && (
-                <EmptyState
-                  title={
-                    contacts.length === 0
-                      ? "No contacts loaded"
-                      : query
-                        ? "No matches"
-                        : "Everyone is already on Chichat 🎉"
-                  }
-                  hint={
-                    contacts.length === 0
-                      ? "Sync your device contacts or add one manually."
-                      : "Check back after syncing again."
-                  }
-                />
-              )}
-              {filteredInvite.map((c) => {
-                const isManual = c.phone && loadManualContacts().some((m) => m.phones[0] === c.phone);
-                return (
-                  <InviteRow
-                    key={c.phone}
+          {syncing && totalContacts === 0 && (
+            <p className="px-4 pt-4 text-xs text-muted-foreground text-center">
+              Loading contacts…
+            </p>
+          )}
+
+          {/* Active contacts (on Chichat) — endless alphabetical list */}
+          <div className="mt-4">
+            {filteredActive.length > 0 && (
+              <SectionList
+                items={filteredActive}
+                getKey={(c) => c.user_id}
+                getSectionLabel={(c) => sectionLetter(c.display_name)}
+                renderItem={(c) => (
+                  <ActiveRow
                     c={c}
-                    isManual={!!isManual}
-                    onInvite={() => inviteViaWhatsApp(c)}
-                    onRemove={() => handleRemoveManual(c.phone)}
-                    onLongPress={() => openInviteActions(c)}
+                    onChat={() => chatActive(c)}
+                    onLongPress={() => openActiveActions(c)}
                   />
-                );
-              })}
-            </TabsContent>
-          </Tabs>
-        </div>
+                )}
+              />
+            )}
+            {!matching && filteredActive.length === 0 && totalContacts > 0 && !query && (
+              <EmptyState
+                title="No contacts on Chichat yet"
+                hint="Invite friends below to start chatting and calling."
+              />
+            )}
+          </div>
 
-        {/* Manual add removed — contacts come from Google. */}
+          {/* Invite to ChiChat — non-app contacts */}
+          {filteredInvite.length > 0 && (
+            <div className="mt-6">
+              <div className="px-4 py-2 flex items-center justify-between">
+                <h2 className="text-sm font-bold text-foreground">Invite to Chichat</h2>
+                <span className="text-xs text-muted-foreground">
+                  {filteredInvite.length}
+                </span>
+              </div>
+              <SectionList
+                items={filteredInvite}
+                getKey={(c) => c.phone}
+                getSectionLabel={(c) => sectionLetter(c.name)}
+                renderItem={(c) => {
+                  const isManual = loadManualContacts().some(
+                    (m) => m.phones[0] === c.phone,
+                  );
+                  return (
+                    <InviteRow
+                      c={c}
+                      isManual={isManual}
+                      onInvite={() => inviteContact(c)}
+                      onRemove={() => handleRemoveManual(c.phone)}
+                      onLongPress={() => openInviteActions(c)}
+                    />
+                  );
+                }}
+              />
+            </div>
+          )}
+
+          {!isLoading && totalContacts === 0 && googleConnected && (
+            <EmptyState
+              title="No contacts found"
+              hint="Tap refresh above to load your contacts."
+            />
+          )}
+
+          {query &&
+            filteredActive.length === 0 &&
+            filteredInvite.length === 0 && (
+              <EmptyState title="No matches" hint="Try a different name or number." />
+            )}
+        </div>
       </div>
-      
+
       <ContactActionSheet
         open={!!actionSheet}
         onOpenChange={(o) => !o && setActionSheet(null)}
@@ -649,4 +599,33 @@ export default function Contacts() {
       )}
     </MobileFrame>
   );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Local UI bits used only by this page                                       */
+/* -------------------------------------------------------------------------- */
+
+function ActionRow({
+  icon: Icon,
+  label,
+  onClick,
+}: {
+  icon: typeof Users;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-secondary/60 text-left"
+    >
+      <Icon className="w-5 h-5 text-primary" />
+      <span className="flex-1 text-sm font-semibold text-foreground">{label}</span>
+      <span className="text-muted-foreground text-lg leading-none">›</span>
+    </button>
+  );
+}
+
+function Divider() {
+  return <div className="h-px bg-border mx-4" />;
 }
