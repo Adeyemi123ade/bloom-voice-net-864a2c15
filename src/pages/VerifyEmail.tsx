@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { ArrowLeft, MailCheck } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
+import BrandHero from "@/components/BrandHero";
 import { Button } from "@/components/ui/button";
 import {
   InputOTP,
@@ -119,18 +120,19 @@ export default function VerifyEmail() {
           </button>
         </div>
 
-        <div className="flex-1 flex flex-col px-6 pt-2 pb-6 items-center">
-          <span className="w-16 h-16 rounded-full bg-primary/15 flex items-center justify-center mb-5 mt-4">
-            <MailCheck className="w-8 h-8 text-primary" />
-          </span>
+        <div className="flex-1 flex flex-col px-4 pt-2 pb-6 items-center">
+          <BrandHero
+            className="mt-1 mb-5"
+            message={`Enter the 6-digit code we sent to ${email} to finish setting up your account.`}
+          />
 
           <h1 className="text-xl font-bold text-foreground text-center">
             Check your email
           </h1>
           <p className="text-base text-muted-foreground text-center mt-2 leading-relaxed max-w-xs">
-            We sent an {OTP_LENGTH}-digit code to{" "}
+            Code sent to{" "}
             <span className="text-foreground font-semibold">{email}</span>.
-            Enter it below to finish setting up your account.
+            It expires in 5 minutes.
           </p>
 
           <div className="mt-7 w-full flex justify-center">
