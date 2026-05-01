@@ -268,7 +268,10 @@ export function ShareInviteCard() {
   return (
     <>
       <div className="mx-4 rounded-2xl bg-card border border-border shadow-sm overflow-hidden">
-        <div className="bg-gradient-to-br from-primary to-primary/70 p-6 text-center">
+        <div
+          className="p-6 text-center"
+          style={{ backgroundColor: "#0B5D3B" }}
+        >
           <div className="mx-auto w-16 h-16 flex items-center justify-center">
             <img
               src={chichatLogo}
@@ -276,10 +279,16 @@ export function ShareInviteCard() {
               className="h-16 w-16 object-contain drop-shadow-md"
             />
           </div>
-          <p className="mt-3 text-base font-bold text-primary-foreground">
+          <p
+            className="mt-3 text-base font-bold"
+            style={{ color: "#FFFFFF" }}
+          >
             Join me on Chichat
           </p>
-          <p className="mt-1 text-xs text-primary-foreground/85">
+          <p
+            className="mt-1 text-xs"
+            style={{ color: "#FFFFFF" }}
+          >
             Free voice &amp; video calls, messaging, and more.
           </p>
         </div>
