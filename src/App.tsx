@@ -23,6 +23,7 @@ import ResetPassword from "./pages/ResetPassword.tsx";
 import VerifyEmail from "./pages/VerifyEmail.tsx";
 import VerifyResetCode from "./pages/VerifyResetCode.tsx";
 import VerifyDevice from "./pages/VerifyDevice.tsx";
+import GoogleReturn from "./pages/GoogleReturn.tsx";
 import OutboundCall from "./pages/OutboundCall.tsx";
 import NewContact from "./pages/NewContact.tsx";
 import InviteFriends from "./pages/InviteFriends.tsx";
@@ -47,6 +48,7 @@ const App = () => (
                 <Route path="/" element={<Index />} />
                 <Route path="/register" element={<Register />} />
                 <Route path="/login" element={<Login />} />
+                <Route path="/auth/google-return" element={<GoogleReturn />} />
                 <Route path="/welcome" element={<Welcome />} />
                 <Route path="/home" element={<Home />} />
                 <Route path="/chat/:id" element={<ChatRoom />} />

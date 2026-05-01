@@ -27,6 +27,7 @@ export default function DeviceGate({ children }: { children: ReactNode }) {
     if (loading || !user) return;
     // Pages that ARE the gate or are public auth pages — don't run.
     const exempt = [
+      "/auth/google-return",
       "/verify-device",
       "/verify-email",
       "/verify-reset-code",
