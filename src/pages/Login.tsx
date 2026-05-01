@@ -63,10 +63,19 @@ export default function Login() {
     }
     setErrors({});
     setSubmitting(true);
-    const { error } = await supabase.auth.signInWithPassword({
+    // Race the sign-in against a 10s timeout so the UI never hangs forever
+    // if the network or auth service stalls.
+    const timeoutPromise = new Promise<{ error: Error }>((resolve) =>
+      setTimeout(
+        () => resolve({ error: new Error("Sign in timed out. Please check your connection and try again.") }),
+        10000,
+      ),
+    );
+    const signInPromise = supabase.auth.signInWithPassword({
       email: result.data.email,
       password: result.data.password,
-    });
+    }).then((res) => ({ error: res.error as Error | null }));
+    const { error } = (await Promise.race([signInPromise, timeoutPromise])) as { error: Error | null };
     setSubmitting(false);
     if (error) {
       const raw = (error.message || "").toLowerCase();
