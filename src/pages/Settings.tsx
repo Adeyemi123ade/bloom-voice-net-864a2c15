@@ -4,6 +4,7 @@ import {
   ChevronDown,
   ChevronRight,
   Cloud,
+  LogOut,
   Smartphone,
   Trash2,
   User as UserIcon,
@@ -12,6 +13,7 @@ import MobileFrame from "@/components/MobileFrame";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { isWebApp } from "@/lib/platform";
 import {
   Collapsible,
   CollapsibleContent,
@@ -36,8 +38,9 @@ export default function Settings() {
   const { user, loading } = useAuth();
 
   const [confirmStage, setConfirmStage] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [working, setWorking] = useState(false);
   const [backup, setBackup] = useState<BackupRow | null>(null);
+  const onWeb = isWebApp();
 
   useEffect(() => {
     document.title = "Settings — Chichat";
@@ -63,29 +66,14 @@ export default function Settings() {
   }, [user]);
 
 
-  const deleteAccount = async () => {
+  // Mobile "Uninstall app": local-only wipe + global sign-out. No backend
+  // delete — accounts are never deleted, only the app is removed from this
+  // phone. If the user comes back they sign in with the same email.
+  const uninstallOnDevice = async () => {
     if (!user) return;
-    setDeleting(true);
+    setWorking(true);
     try {
-      // Server wipe MUST succeed — otherwise the email stays locked and the
-      // user can never re-register with it. Surface failures clearly.
-      const { data, error } = await supabase.functions.invoke("delete-account", {});
-      const serverFailed = !!error || (data && (data as { error?: string }).error);
-      if (serverFailed) {
-        setDeleting(false);
-        toast({
-          title: "We couldn't fully remove your account",
-          description:
-            "Something went wrong on our side. Please check your connection and try again — your account is still active.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Kill every session on every device for this account.
       try { await supabase.auth.signOut({ scope: "global" }); } catch { /* ignore */ }
-
-      // Wipe every trace from this device so re-opening the app is a fresh install.
       try {
         clearContactsCache();
         localStorage.clear();
@@ -100,11 +88,22 @@ export default function Settings() {
           );
         }
       } catch { /* ignore */ }
-
-      toast({ title: "Account uninstalled" });
-      window.location.replace("/register");
+      toast({ title: "App removed from this device" });
+      window.location.replace("/login");
     } finally {
-      setDeleting(false);
+      setWorking(false);
+    }
+  };
+
+  // Web "Sign out": just end the session on this browser.
+  const signOutWeb = async () => {
+    setWorking(true);
+    try {
+      try { await supabase.auth.signOut(); } catch { /* ignore */ }
+      toast({ title: "Signed out" });
+      window.location.replace("/login");
+    } finally {
+      setWorking(false);
     }
   };
 
@@ -186,54 +185,67 @@ export default function Settings() {
 
           <div className="flex-1" />
 
-          {/* Delete is intentionally separated and made larger / more prominent.
-              Represents removing the entire app + account from this device. */}
+          {/* Bottom action — Web shows "Sign out" (just ends the session on
+              this browser). Mobile keeps "Uninstall app" which wipes the app
+              from this device only. Accounts are never deleted; the email
+              stays usable for future sign-ins from any device. */}
           <div className="pt-10 pb-4">
-            <AlertDialog onOpenChange={(o) => !o && setConfirmStage(false)}>
-              <AlertDialogTrigger asChild>
-                <button className="w-full h-16 rounded-xl bg-destructive text-destructive-foreground text-lg font-bold flex items-center justify-center gap-3 shadow-lg shadow-destructive/30 hover:bg-destructive/90 active:scale-[0.99] transition">
-                  <Trash2 className="w-6 h-6" />
-                  Uninstall app
-                </button>
-              </AlertDialogTrigger>
-              <p className="text-xs text-muted-foreground text-center mt-2 px-4">
-                Removes your account and all data from this device. Back up your chats first.
-              </p>
-              <AlertDialogContent className="max-w-[320px]">
-                <AlertDialogHeader>
-                  <AlertDialogTitle className="text-base">
-                    {confirmStage ? "Are you absolutely sure?" : "Uninstall Chichat?"}
-                  </AlertDialogTitle>
-                  <AlertDialogDescription className="text-sm">
-                    {confirmStage
-                      ? "This permanently removes your account and every trace of the app from this device. You'll be a brand-new user if you ever come back."
-                      : "Uninstalling wipes your account, chats, contacts and presence — completely. The app will behave like a fresh install. Tip: back up your chats first."}
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel className="text-sm h-10">Cancel</AlertDialogCancel>
-                  {confirmStage ? (
-                    <AlertDialogAction
-                      onClick={deleteAccount}
-                      disabled={deleting}
-                      className="bg-destructive hover:bg-destructive/90 text-destructive-foreground text-sm h-10"
-                    >
-                      {deleting ? "Uninstalling…" : "Yes, uninstall"}
-                    </AlertDialogAction>
-                  ) : (
-                    <AlertDialogAction
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setConfirmStage(true);
-                      }}
-                      className="bg-destructive hover:bg-destructive/90 text-destructive-foreground text-sm h-10"
-                    >
-                      Continue
-                    </AlertDialogAction>
-                  )}
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            {onWeb ? (
+              <button
+                onClick={signOutWeb}
+                disabled={working}
+                className="w-full h-16 rounded-xl bg-secondary text-foreground text-lg font-bold flex items-center justify-center gap-3 border border-border hover:bg-secondary/80 active:scale-[0.99] transition disabled:opacity-60"
+              >
+                <LogOut className="w-6 h-6" />
+                {working ? "Signing out…" : "Sign out"}
+              </button>
+            ) : (
+              <AlertDialog onOpenChange={(o) => !o && setConfirmStage(false)}>
+                <AlertDialogTrigger asChild>
+                  <button className="w-full h-16 rounded-xl bg-destructive text-destructive-foreground text-lg font-bold flex items-center justify-center gap-3 shadow-lg shadow-destructive/30 hover:bg-destructive/90 active:scale-[0.99] transition">
+                    <Trash2 className="w-6 h-6" />
+                    Uninstall app
+                  </button>
+                </AlertDialogTrigger>
+                <p className="text-xs text-muted-foreground text-center mt-2 px-4">
+                  Removes the app and its data from this device. Your account stays — sign back in any time. Back up your chats first.
+                </p>
+                <AlertDialogContent className="max-w-[320px]">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="text-base">
+                      {confirmStage ? "Are you absolutely sure?" : "Uninstall Chichat?"}
+                    </AlertDialogTitle>
+                    <AlertDialogDescription className="text-sm">
+                      {confirmStage
+                        ? "This removes the app and all of its data from this device. Your account stays — you can sign back in with the same email any time."
+                        : "Uninstalling clears chats, contacts and presence from this device. Your account is not deleted — you can sign back in later. Tip: back up your chats first."}
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel className="text-sm h-10">Cancel</AlertDialogCancel>
+                    {confirmStage ? (
+                      <AlertDialogAction
+                        onClick={uninstallOnDevice}
+                        disabled={working}
+                        className="bg-destructive hover:bg-destructive/90 text-destructive-foreground text-sm h-10"
+                      >
+                        {working ? "Uninstalling…" : "Yes, uninstall"}
+                      </AlertDialogAction>
+                    ) : (
+                      <AlertDialogAction
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setConfirmStage(true);
+                        }}
+                        className="bg-destructive hover:bg-destructive/90 text-destructive-foreground text-sm h-10"
+                      >
+                        Continue
+                      </AlertDialogAction>
+                    )}
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
           </div>
         </div>
       </div>
