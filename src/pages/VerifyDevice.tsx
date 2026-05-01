@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { getDeviceId, getDeviceLabel } from "@/lib/deviceId";
+import { getAppPlatform } from "@/lib/platform";
 import { markDeviceVerified } from "@/lib/deviceVerified";
 import MobileFrame from "@/components/MobileFrame";
 import BrandHero from "@/components/BrandHero";
@@ -16,12 +17,14 @@ import { toast } from "@/hooks/use-toast";
 
 const OTP_LENGTH = 6;
 
+type DeviceReason = "new_device" | "device_takeover" | "web_mobile_active";
+
 export default function VerifyDevice() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, loading } = useAuth();
   const state = (location.state as {
-    reason?: "new_device" | "device_takeover";
+    reason?: DeviceReason;
     otherDisplayName?: string | null;
   } | null) ?? {};
 
