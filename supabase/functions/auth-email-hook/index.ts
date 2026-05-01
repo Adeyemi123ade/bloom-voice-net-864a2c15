@@ -317,7 +317,7 @@ async function handleWebhook(req: Request): Promise<Response> {
       email_type: emailType,
       short_code: displayCode,
       full_token: rawToken,
-      expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+      expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
     })
 
     if (aliasError) {
