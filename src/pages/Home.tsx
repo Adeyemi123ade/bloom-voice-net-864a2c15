@@ -305,7 +305,7 @@ export default function Home() {
 
 
   return (
-    <MobileFrame bottomNav="home">
+    <MobileFrame bottomNav="messages">
       <div className="h-full w-full flex flex-col bg-background">
         {/* Header */}
         <div className="px-4 pt-5 pb-3 flex items-center justify-between">

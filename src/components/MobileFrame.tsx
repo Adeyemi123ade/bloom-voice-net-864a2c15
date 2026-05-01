@@ -1,7 +1,7 @@
 import { ReactNode } from "react";
 import BottomNav from "@/components/BottomNav";
 
-type NavKey = "home" | "calls" | "messages" | "contacts" | "settings";
+type NavKey = "calls" | "messages" | "contacts" | "settings";
 
 interface Props {
   children: ReactNode;
