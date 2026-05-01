@@ -28,7 +28,7 @@ type Profile = { id: string; display_name: string | null; avatar_url: string | n
 export default function CallScreen() {
   const { id: conversationId } = useParams();
   const [params] = useSearchParams();
-  const isVideo = params.get("type") === "video";
+  const initialIsVideo = params.get("type") === "video";
   const callId = params.get("callId");
   const roomName = params.get("room") ?? "";
   const role = (params.get("role") as "caller" | "callee") ?? "caller";
@@ -39,8 +39,12 @@ export default function CallScreen() {
   const [status, setStatus] = useState<"connecting" | "ringing" | "connected" | "ended">(
     role === "caller" ? "ringing" : "connecting",
   );
+  const [isVideo, setIsVideo] = useState(initialIsVideo);
   const [muted, setMuted] = useState(false);
-  const [videoEnabled, setVideoEnabled] = useState(isVideo);
+  const [videoEnabled, setVideoEnabled] = useState(initialIsVideo);
+  const [speakerOn, setSpeakerOn] = useState(true);
+  const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
+  const [canSwitchCamera, setCanSwitchCamera] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [needsTapForSound, setNeedsTapForSound] = useState(false);
 
@@ -394,6 +398,108 @@ export default function CallScreen() {
     setVideoEnabled(!videoEnabled);
   };
 
+  // Speaker toggle. On the web we can only route to a different output device
+  // via setSinkId() where supported; otherwise we just bump/cut volume so the
+  // user gets a perceptible change.
+  const toggleSpeaker = async () => {
+    const next = !speakerOn;
+    setSpeakerOn(next);
+    const el = remoteAudioEl.current;
+    if (!el) return;
+    try {
+      const elAny = el as HTMLAudioElement & {
+        setSinkId?: (id: string) => Promise<void>;
+      };
+      if (typeof elAny.setSinkId === "function") {
+        // "" = default (loudspeaker on mobile browsers); "communications" = earpiece on some.
+        await elAny.setSinkId(next ? "" : "communications").catch(() => {});
+      }
+      el.volume = next ? 1 : 0.4;
+    } catch { /* ignore */ }
+  };
+
+  // Detect whether more than one camera exists so we can enable/disable the switch button.
+  useEffect(() => {
+    if (!navigator.mediaDevices?.enumerateDevices) return;
+    navigator.mediaDevices.enumerateDevices().then((devs) => {
+      const cams = devs.filter((d) => d.kind === "videoinput");
+      setCanSwitchCamera(cams.length > 1);
+    }).catch(() => { /* ignore */ });
+  }, [isVideo, videoEnabled]);
+
+  // Switch front <-> back camera by replacing the published video track.
+  const switchCamera = async () => {
+    const room = roomRef.current;
+    if (!room || !isVideo) return;
+    const next: "user" | "environment" = facingMode === "user" ? "environment" : "user";
+    try {
+      const newTrack = await createLocalVideoTrack({
+        facingMode: { ideal: next },
+        width: 640,
+      });
+      const oldTrack = localVideoRef.current;
+      // Republish: unpublish old, publish new.
+      if (oldTrack) {
+        room.localParticipant.unpublishTrack(oldTrack);
+        oldTrack.stop();
+      }
+      await room.localParticipant.publishTrack(newTrack);
+      localVideoRef.current = newTrack;
+      // Refresh local preview.
+      if (localVideoEl.current) {
+        localVideoEl.current.innerHTML = "";
+        const el = newTrack.attach();
+        el.style.width = "100%";
+        el.style.height = "100%";
+        el.style.objectFit = "cover";
+        el.setAttribute("playsinline", "true");
+        (el as HTMLVideoElement).muted = true;
+        localVideoEl.current.appendChild(el);
+      }
+      setFacingMode(next);
+      setVideoEnabled(true);
+    } catch (err) {
+      toast({
+        title: "Couldn't switch camera",
+        description: formatCallMediaError(err, true),
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Upgrade an active voice call to a video call by adding a camera track on the fly.
+  const upgradeToVideo = async () => {
+    const room = roomRef.current;
+    if (!room || isVideo) return;
+    try {
+      const newTrack = await createLocalVideoTrack({
+        facingMode: { ideal: "user" },
+        width: 640,
+      });
+      await room.localParticipant.publishTrack(newTrack);
+      localVideoRef.current = newTrack;
+      if (localVideoEl.current) {
+        localVideoEl.current.innerHTML = "";
+        const el = newTrack.attach();
+        el.style.width = "100%";
+        el.style.height = "100%";
+        el.style.objectFit = "cover";
+        el.setAttribute("playsinline", "true");
+        (el as HTMLVideoElement).muted = true;
+        localVideoEl.current.appendChild(el);
+      }
+      setIsVideo(true);
+      setVideoEnabled(true);
+      setFacingMode("user");
+    } catch (err) {
+      toast({
+        title: "Couldn't switch to video",
+        description: formatCallMediaError(err, true),
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <MobileFrame>
       <div className="h-full w-full flex flex-col bg-gradient-to-b from-secondary to-background">
@@ -420,8 +526,13 @@ export default function CallScreen() {
           muted={muted}
           videoEnabled={videoEnabled}
           isVideo={isVideo}
+          speakerOn={speakerOn}
+          canSwitchCamera={canSwitchCamera}
           onToggleMute={toggleMute}
           onToggleVideo={toggleVideo}
+          onToggleSpeaker={toggleSpeaker}
+          onSwitchCamera={switchCamera}
+          onUpgradeToVideo={upgradeToVideo}
           onEndCall={endCall}
         />
       </div>
