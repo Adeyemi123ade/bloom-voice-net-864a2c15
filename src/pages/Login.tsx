@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
+import { checkEmailExists } from "@/lib/checkEmail";
 
 const loginSchema = z.object({
   email: z.string().trim().email({ message: "Enter a valid email address" }).max(255),
@@ -87,8 +88,20 @@ export default function Login() {
       let description = "Check your email and password, or create a new account if you don't have one yet.";
 
       if (raw.includes("invalid") || raw.includes("credentials")) {
-        title = "Email or password doesn't match";
-        description = "Either this account doesn't exist (or was deleted), or the password is wrong. Check your details, reset your password, or create a new account.";
+        // Supabase returns the same generic message for "no such user" AND
+        // "wrong password". Ask our existence check so we can tell the user
+        // exactly what's wrong (especially after they delete their account).
+        const exists = await checkEmailExists(result.data.email);
+        if (exists === false) {
+          title = "No account found for this email";
+          description = "This email isn't registered (or the account was deleted). Create a new account to continue.";
+        } else if (exists === true) {
+          title = "Wrong password";
+          description = "The password doesn't match this email. Try again or reset your password.";
+        } else {
+          title = "Email or password doesn't match";
+          description = "Check your details, reset your password, or create a new account.";
+        }
       } else if (raw.includes("not confirmed") || raw.includes("confirm")) {
         title = "Email not verified yet";
         description = "Please check your inbox for the verification code we sent you.";
