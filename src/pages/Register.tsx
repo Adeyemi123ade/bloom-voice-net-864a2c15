@@ -265,10 +265,12 @@ export default function Register() {
               message="Welcome to ChiChat — where conversations don't end and people never feel far away."
             />
             <h1 className="text-xl font-bold text-foreground leading-tight">
-              Create your account
+              {googleVerified ? "Finish setting up" : "Create your account"}
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Join Chichat and experience the possibilities.
+              {googleVerified
+                ? "We got your name and email from Google. Add a phone number and password to finish."
+                : "Join Chichat and experience the possibilities."}
             </p>
           </div>
 
