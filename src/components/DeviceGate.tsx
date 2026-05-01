@@ -54,7 +54,8 @@ export default function DeviceGate({ children }: { children: ReactNode }) {
       setVerified(false);
       return;
     }
-    if (isDeviceVerifiedLocally(user.id)) {
+    const platform = getAppPlatform();
+    if (platform === "mobile" && isDeviceVerifiedLocally(user.id)) {
       setVerified(true);
       return;
     }
@@ -97,7 +98,7 @@ export default function DeviceGate({ children }: { children: ReactNode }) {
           body: {
             device_id: getDeviceId(),
             device_label: getDeviceLabel(),
-            platform: getAppPlatform(),
+            platform,
             dry_run: true,
           },
         });
