@@ -1,7 +1,9 @@
-// Tracks whether the signed-in user has cleared the device-verification gate
-// for the *current* session/device. Set in localStorage so a hard refresh
-// after a successful verification doesn't re-prompt.
+// Tracks whether the signed-in user has cleared the device-verification gate.
+// - Mobile: localStorage (survives app restarts; trusted-device pattern).
+// - Web: sessionStorage (cleared when the tab/browser closes; web requires
+//   OTP on EVERY new sign-in but not on page refresh during the same session).
 import { getDeviceId } from "./deviceId";
+import { getAppPlatform } from "./platform";
 
 const PREFIX = "chichat.device_verified.";
 
@@ -9,14 +11,22 @@ function key(userId: string) {
   return `${PREFIX}${userId}.${getDeviceId()}`;
 }
 
+function store(): Storage | null {
+  try {
+    return getAppPlatform() === "mobile" ? localStorage : sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
 export function markDeviceVerified(userId: string) {
-  try { localStorage.setItem(key(userId), "1"); } catch { /* ignore */ }
+  try { store()?.setItem(key(userId), "1"); } catch { /* ignore */ }
 }
 
 export function isDeviceVerifiedLocally(userId: string): boolean {
-  try { return localStorage.getItem(key(userId)) === "1"; } catch { return false; }
+  try { return store()?.getItem(key(userId)) === "1"; } catch { return false; }
 }
 
 export function clearDeviceVerified(userId: string) {
-  try { localStorage.removeItem(key(userId)); } catch { /* ignore */ }
+  try { store()?.removeItem(key(userId)); } catch { /* ignore */ }
 }

@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { getDeviceId, getDeviceLabel } from "@/lib/deviceId";
+import { getAppPlatform } from "@/lib/platform";
 import {
   isDeviceVerifiedLocally,
   markDeviceVerified,
@@ -63,7 +64,11 @@ export default function DeviceGate({ children }: { children: ReactNode }) {
 
         // Step 2: device gate.
         const { data, error } = await supabase.functions.invoke("request-device-otp", {
-          body: { device_id: getDeviceId(), device_label: getDeviceLabel() },
+          body: {
+            device_id: getDeviceId(),
+            device_label: getDeviceLabel(),
+            platform: getAppPlatform(),
+          },
         });
         if (cancelled) return;
         if (error || !data) {

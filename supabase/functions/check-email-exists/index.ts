@@ -61,7 +61,20 @@ Deno.serve(async (req) => {
       page += 1;
     }
 
-    return new Response(JSON.stringify({ exists }), {
+    // If no live account, check deletion log so the UI can say "this account
+    // was deleted" instead of a generic "no account found".
+    let deleted = false;
+    if (!exists) {
+      const { data: del } = await admin
+        .from("deleted_accounts")
+        .select("id")
+        .eq("email", normalized)
+        .limit(1)
+        .maybeSingle();
+      deleted = !!del;
+    }
+
+    return new Response(JSON.stringify({ exists, deleted }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (_e) {

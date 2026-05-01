@@ -28,9 +28,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (event === "SIGNED_OUT") {
         // Wipe per-user device-verified flags so next sign-in re-checks the gate.
         try {
-          const keys = Object.keys(localStorage);
-          for (const k of keys) {
-            if (k.startsWith("chichat.device_verified.")) localStorage.removeItem(k);
+          for (const storage of [localStorage, sessionStorage]) {
+            const keys = Object.keys(storage);
+            for (const k of keys) {
+              if (k.startsWith("chichat.device_verified.")) storage.removeItem(k);
+            }
           }
         } catch { /* ignore */ }
       }
