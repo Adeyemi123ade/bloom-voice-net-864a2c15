@@ -38,7 +38,11 @@ export default function Login() {
     });
     if (result.error) {
       setGoogleLoading(false);
-      toast({ title: "Google sign-in failed", description: result.error.message, variant: "destructive" });
+      toast({
+        title: "Google sign-in didn't work",
+        description: "We couldn't connect to your Google account. Please try again, or sign in with your email and password.",
+        variant: "destructive",
+      });
       return;
     }
     if (result.redirected) return;
