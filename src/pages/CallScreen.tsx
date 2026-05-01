@@ -28,7 +28,7 @@ type Profile = { id: string; display_name: string | null; avatar_url: string | n
 export default function CallScreen() {
   const { id: conversationId } = useParams();
   const [params] = useSearchParams();
-  const isVideo = params.get("type") === "video";
+  const initialIsVideo = params.get("type") === "video";
   const callId = params.get("callId");
   const roomName = params.get("room") ?? "";
   const role = (params.get("role") as "caller" | "callee") ?? "caller";
@@ -39,8 +39,12 @@ export default function CallScreen() {
   const [status, setStatus] = useState<"connecting" | "ringing" | "connected" | "ended">(
     role === "caller" ? "ringing" : "connecting",
   );
+  const [isVideo, setIsVideo] = useState(initialIsVideo);
   const [muted, setMuted] = useState(false);
-  const [videoEnabled, setVideoEnabled] = useState(isVideo);
+  const [videoEnabled, setVideoEnabled] = useState(initialIsVideo);
+  const [speakerOn, setSpeakerOn] = useState(true);
+  const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
+  const [canSwitchCamera, setCanSwitchCamera] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [needsTapForSound, setNeedsTapForSound] = useState(false);
 
