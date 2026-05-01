@@ -199,8 +199,8 @@ export default function VerifyDevice() {
     <MobileFrame>
       <div className="h-full w-full flex flex-col bg-background overflow-y-auto">
         <div className="flex-1 flex flex-col px-4 pt-6 pb-6 items-center">
-          <BrandHero className="mt-1 mb-5" message={blurb} />
-          <h1 className="text-xl font-bold text-foreground text-center">{headline}</h1>
+          <BrandHero className="mt-1 mb-5" message={otpBlurb} />
+          <h1 className="text-xl font-bold text-foreground text-center">Enter verification code</h1>
           <p className="text-base text-muted-foreground text-center mt-2 leading-relaxed max-w-xs">
             Code sent to <span className="text-foreground font-semibold">{user.email}</span>. It expires in 10 minutes.
           </p>
