@@ -270,8 +270,8 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
           )}
         </div>
 
-        {/* Compact keypad panel — shifted down ~2cm per request */}
-        <div className="mx-4 mb-4 mt-[265px] rounded-2xl bg-secondary/30 border border-border/40 p-3 shrink-0">
+        {/* Compact keypad panel — pinned just above the bottom nav with a small gap */}
+        <div className="mx-4 mb-3 mt-auto rounded-2xl bg-secondary/30 border border-border/40 p-3 shrink-0">
           {/* Number display */}
           <div className="relative mb-2">
             <input
