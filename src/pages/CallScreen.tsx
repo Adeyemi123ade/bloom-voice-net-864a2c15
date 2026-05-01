@@ -354,8 +354,16 @@ export default function CallScreen() {
       room.participants.forEach(handleParticipant);
       room.on("participantConnected", handleParticipant);
       room.on("participantDisconnected", () => {
-        toast({ title: "Other participant left" });
-        endCall();
+        // Twilio fires this on transient network blips during ICE/DTLS renegotiation.
+        // Wait briefly and only end the call if the remote really stayed gone.
+        window.setTimeout(() => {
+          if (endedRef.current) return;
+          if (!roomRef.current) return;
+          if (roomRef.current.participants.size === 0) {
+            toast({ title: "Other participant left" });
+            endCall();
+          }
+        }, 3500);
       });
       room.on("disconnected", cleanupAndExit);
 
