@@ -228,7 +228,7 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
         </div>
 
         {/* Contact list — capped height so keypad starts right below it (no big gap) */}
-        <div className="px-5 pb-2 flex-1 min-h-0 overflow-y-auto space-y-2">
+        <div className="px-5 pb-2 max-h-[28vh] overflow-y-auto space-y-2 shrink-0">
           {filteredContacts.length === 0 ? (
             <p className="text-xs text-muted-foreground/70 italic py-6 text-center">
               {search ? "No matching contact" : "Your contacts will appear here"}
