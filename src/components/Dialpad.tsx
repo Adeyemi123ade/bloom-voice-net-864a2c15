@@ -192,7 +192,7 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
-          className="max-w-[420px] w-full h-[100dvh] sm:h-[92vh] p-0 gap-0 bg-background top-0 left-1/2 -translate-x-1/2 translate-y-0 rounded-none sm:rounded-2xl border-0 shadow-2xl flex flex-col overflow-hidden pb-[104px] [&>button.absolute]:hidden"
+          className="max-w-[420px] w-full h-[100dvh] sm:h-[92vh] p-0 gap-0 bg-background top-0 left-1/2 -translate-x-1/2 translate-y-0 rounded-none sm:rounded-2xl border-0 shadow-2xl flex flex-col overflow-hidden pb-[76px] [&>button.absolute]:hidden"
         >
         <DialogTitle className="sr-only">Call</DialogTitle>
 
@@ -227,8 +227,8 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
           </div>
         </div>
 
-        {/* Contact list */}
-        <div className="px-5 pb-2 flex-1 min-h-0 overflow-y-auto space-y-2">
+        {/* Contact list — capped height so keypad starts right below it (no big gap) */}
+        <div className="px-5 pb-2 max-h-[28vh] overflow-y-auto space-y-2 shrink-0">
           {filteredContacts.length === 0 ? (
             <p className="text-xs text-muted-foreground/70 italic py-6 text-center">
               {search ? "No matching contact" : "Your contacts will appear here"}
@@ -336,7 +336,7 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
               onClick={callTyped}
               disabled={!value}
               aria-label="Call"
-              className="w-14 h-14 rounded-full flex items-center justify-center shadow-md disabled:opacity-40 transition-colors"
+              className="w-14 h-14 rounded-full flex items-center justify-center shadow-md disabled:cursor-not-allowed transition-colors"
               style={{ backgroundColor: "#0B5D3B", color: "#FFFFFF" }}
             >
               <Phone className="w-6 h-6" />
