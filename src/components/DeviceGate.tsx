@@ -148,10 +148,11 @@ export default function DeviceGate({ children }: { children: ReactNode }) {
   // No user — let the underlying route's own guards handle redirect; render nothing.
   if (!user) return <LoadingShell label="Signing you in…" />;
 
-  // Have a user but device not yet cleared — show a neutral loader so the
-  // protected screen NEVER appears before verification finishes.
-  if (!verified) return <LoadingShell label="Verifying this device…" />;
-
+  // Render the protected screen immediately. Device verification runs silently
+  // in the background; if it determines a real verification step is required,
+  // the effect above will navigate to /verify-device. We deliberately do NOT
+  // block the UI on a "Verifying this device…" loader — the user should never
+  // see the verification machinery during normal use.
   return <>{children}</>;
 }
 
