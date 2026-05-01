@@ -312,12 +312,18 @@ export default function ChatRoom() {
     setText("");
 
     if (editing) {
+      const editId = editing.id;
+      const editedAt = new Date().toISOString();
+      // Optimistic edit
+      setMessages((prev) =>
+        prev.map((m) => (m.id === editId ? { ...m, content, edited_at: editedAt } : m)),
+      );
+      setEditing(null);
       const { error } = await supabase
         .from("messages")
-        .update({ content, edited_at: new Date().toISOString() })
-        .eq("id", editing.id);
+        .update({ content, edited_at: editedAt })
+        .eq("id", editId);
       if (error) toast({ title: "Edit failed", description: error.message, variant: "destructive" });
-      setEditing(null);
       return;
     }
 
@@ -330,12 +336,29 @@ export default function ChatRoom() {
       setReplyTo(null);
     }
 
+    // Optimistic: add the message immediately so it appears with no perceived lag.
+    const tmpId = `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const optimistic: Message = {
+      id: tmpId,
+      conversation_id: conversationId,
+      sender_id: user.id,
+      content: finalContent,
+      created_at: new Date().toISOString(),
+      delivered_at: null,
+      read_at: null,
+      edited_at: null,
+      deleted_for_everyone: false,
+    };
+    setMessages((prev) => [...prev, optimistic]);
+
     const { error } = await supabase.from("messages").insert({
       conversation_id: conversationId,
       sender_id: user.id,
       content: finalContent,
     });
     if (error) {
+      // Roll back optimistic message on failure
+      setMessages((prev) => prev.filter((m) => m.id !== tmpId));
       toast({ title: "Failed to send", description: error.message, variant: "destructive" });
       return;
     }
