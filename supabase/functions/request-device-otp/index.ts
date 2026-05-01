@@ -54,6 +54,12 @@ Deno.serve(async (req) => {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    const recipientEmail = String(user.email ?? "").trim().toLowerCase();
+    if (!recipientEmail) {
+      return new Response(JSON.stringify({ error: "email_required" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const admin = createClient(url, serviceKey);
 
@@ -134,7 +140,7 @@ Deno.serve(async (req) => {
 
     const { error: insertErr } = await admin.from("device_login_challenges").insert({
       user_id: user.id,
-      email: user.email,
+      email: recipientEmail,
       device_id: deviceId,
       code_hash: codeHash,
       reason,
@@ -174,21 +180,39 @@ Deno.serve(async (req) => {
     const text = `${intro}\n\nYour code: ${code}\n\nIt expires in 10 minutes.`;
 
     const messageId = crypto.randomUUID();
+    let unsubscribeToken = crypto.randomUUID();
+    const { data: existingToken } = await admin
+      .from("email_unsubscribe_tokens")
+      .select("token")
+      .eq("email", recipientEmail)
+      .is("used_at", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (existingToken?.token) {
+      unsubscribeToken = existingToken.token;
+    } else {
+      await admin.from("email_unsubscribe_tokens").insert({
+        email: recipientEmail,
+        token: unsubscribeToken,
+      });
+    }
+
     await admin.from("email_send_log").insert({
       message_id: messageId,
       template_name: `device_${reason}`,
-      recipient_email: user.email,
+      recipient_email: recipientEmail,
       status: "pending",
     });
     await admin.rpc("enqueue_email", {
       queue_name: "auth_emails",
       payload: {
-        // No pre-existing run — let the Lovable Email API create one inline
-        // via idempotency_key (purpose: transactional). Passing a fabricated
-        // run_id causes "run_not_found" 404s.
+        // Runtime-triggered email: no fabricated run_id. The API requires an
+        // idempotency key and unsubscribe token for this path.
         message_id: messageId,
         idempotency_key: messageId,
-        to: user.email,
+        unsubscribe_token: unsubscribeToken,
+        to: recipientEmail,
         from: "ChiChat <noreply@notify.kajolacooperative.com>",
         sender_domain: "notify.kajolacooperative.com",
         subject,
