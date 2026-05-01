@@ -91,11 +91,11 @@ export default function Register() {
     const exists = await checkEmailExists(trimmed);
     setEmailChecking(false);
     if (exists === true) {
-      setErrors((prev) => ({ ...prev, email: "Email already exists — try signing in" }));
+      setErrors((prev) => ({ ...prev, email: "Email already in use — sign in instead" }));
     } else if (exists === false) {
       setErrors((prev) => {
         const next = { ...prev };
-        if (next.email === "Email already exists — try signing in") delete next.email;
+        if (next.email === "Email already in use — sign in instead") delete next.email;
         return next;
       });
     }
@@ -214,10 +214,10 @@ export default function Register() {
         msg.includes("user already") ||
         (error as { status?: number }).status === 422;
       if (duplicate) {
-        setErrors({ email: "Email already in use" });
+        setErrors({ email: "Email already in use — sign in instead" });
         toast({
           title: "Email already in use",
-          description: "Try signing in, or use a different email.",
+          description: "This is an existing account. Use Sign in to access it.",
           variant: "destructive",
         });
       } else {

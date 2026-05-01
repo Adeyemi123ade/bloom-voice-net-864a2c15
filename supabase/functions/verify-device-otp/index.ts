@@ -98,8 +98,10 @@ Deno.serve(async (req) => {
         .neq("user_id", user.id);
     }
 
-    // Web sign-in takes over from mobile: drop the user's mobile bindings AND
-    // sign out every other session for this user (including the mobile app).
+    // Web sign-in takes over from mobile only: drop the user's mobile bindings.
+    // Do NOT revoke all auth sessions here, because the admin API can't know
+    // which browser session is the current one in this function context; doing
+    // so can also destroy the browser session that just passed verification.
     let mobileSignedOut = false;
     if (plat === "web") {
       const { data: mobileRows } = await admin
@@ -113,15 +115,6 @@ Deno.serve(async (req) => {
           .eq("user_id", user.id)
           .eq("platform", "mobile");
         mobileSignedOut = true;
-      }
-      // Revoke ALL sessions for this user except the current one.
-      // signOut(userId, "others") signs out every session except the caller's.
-      try {
-        // @ts-ignore - second arg accepted by Supabase admin SDK >= 2.39
-        await admin.auth.admin.signOut(user.id, "others");
-      } catch {
-        // Fallback: sign out everything; the current web session can refresh.
-        try { await admin.auth.admin.signOut(user.id); } catch { /* ignore */ }
       }
     }
 
