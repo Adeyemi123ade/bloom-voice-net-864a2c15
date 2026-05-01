@@ -109,6 +109,16 @@ Deno.serve(async (req) => {
     }
 
 
+    // If this is just a probe ("is the device trusted? what would the prompt be?"),
+    // do NOT create a challenge or send an email. The client will call back
+    // without dry_run after the user explicitly confirms they want to continue.
+    if (dryRun) {
+      return new Response(
+        JSON.stringify({ reason, other_display_name: otherDisplayName }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     // Create the challenge.
     const code = sixDigit();
     const codeHash = await sha256(code);
