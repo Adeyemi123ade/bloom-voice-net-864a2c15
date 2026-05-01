@@ -259,7 +259,8 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
                   <button
                     onClick={() => placeCall(c.phones[0])}
                     aria-label={`Call ${c.name}`}
-                    className="w-10 h-10 rounded-xl bg-primary/20 hover:bg-primary/30 text-primary flex items-center justify-center shrink-0 transition-colors"
+                    className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors"
+                    style={{ backgroundColor: "#0B5D3B", color: "#FFFFFF" }}
                   >
                     <Phone className="w-4 h-4" />
                   </button>
