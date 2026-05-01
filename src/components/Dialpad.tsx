@@ -277,12 +277,21 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
             <input
               ref={inputRef}
               type="tel"
-              inputMode="tel"
+              // Suppress the native mobile keyboard — the on-screen dialpad
+              // is the ONLY input mechanism. Without inputMode="none" the
+              // OS keyboard pops up on focus and the dialpad jumps around.
+              inputMode="none"
               autoComplete="off"
               value={value}
               onChange={(e) => {
                 const cleaned = e.target.value.replace(/[^\d+*#]/g, "");
                 setValue(cleaned);
+              }}
+              onFocus={(e) => {
+                // Belt-and-braces: blur immediately so iOS/Android don't
+                // ever spawn a soft keyboard, while still allowing taps to
+                // place a caret via setSelectionRange below.
+                e.currentTarget.blur();
               }}
               placeholder="Enter number"
               className="w-full h-9 text-xl font-light tracking-wide text-center bg-transparent border-0 focus:outline-none placeholder:text-muted-foreground/60"
