@@ -191,9 +191,9 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="max-w-[420px] w-full h-[100dvh] sm:h-[92vh] p-0 gap-0 bg-background top-0 left-1/2 -translate-x-1/2 translate-y-0 rounded-none sm:rounded-2xl border-0 shadow-2xl flex flex-col overflow-hidden pb-[88px] [&>button.absolute]:hidden"
-      >
+        <DialogContent
+          className="max-w-[420px] w-full h-[100dvh] sm:h-[92vh] p-0 gap-0 bg-background top-0 left-1/2 -translate-x-1/2 translate-y-0 rounded-none sm:rounded-2xl border-0 shadow-2xl flex flex-col overflow-hidden pb-[104px] [&>button.absolute]:hidden"
+        >
         <DialogTitle className="sr-only">Call</DialogTitle>
 
         {/* Header — Add Contact action; navigation handled by bottom nav. */}
@@ -227,8 +227,8 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
           </div>
         </div>
 
-        {/* Contact list — guaranteed room for at least 3 rows above the keypad. */}
-        <div className="px-5 pb-3 flex-1 min-h-[228px] overflow-y-auto space-y-2">
+        {/* Contact list */}
+        <div className="px-5 pb-2 flex-1 min-h-0 overflow-y-auto space-y-2">
           {filteredContacts.length === 0 ? (
             <p className="text-xs text-muted-foreground/70 italic py-6 text-center">
               {search ? "No matching contact" : "Your contacts will appear here"}
@@ -270,8 +270,8 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
           )}
         </div>
 
-        {/* Compact keypad panel — sits low so it's easy to reach with the thumb. */}
-        <div className="mx-2 mb-2 rounded-2xl bg-secondary/30 border border-border/40 p-3 shrink-0">
+        {/* Compact keypad panel */}
+        <div className="mx-4 mb-4 rounded-2xl bg-secondary/30 border border-border/40 p-3 shrink-0">
           {/* Number display */}
           <div className="relative mb-2">
             <input
@@ -331,17 +331,17 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
             ))}
           </div>
 
-          {/* Full-width Call button — easy thumb target at the bottom. */}
-          <button
-            onClick={callTyped}
-            disabled={!value}
-            aria-label="Call"
-            className="mt-2 w-full h-12 rounded-xl flex items-center justify-center gap-2 shadow-md disabled:opacity-40 transition-colors"
-            style={{ backgroundColor: "#0B5D3B", color: "#FFFFFF" }}
-          >
-            <Phone className="w-5 h-5" />
-            <span className="text-sm font-semibold">Call</span>
-          </button>
+          <div className="mt-2 flex justify-center">
+            <button
+              onClick={callTyped}
+              disabled={!value}
+              aria-label="Call"
+              className="w-14 h-14 rounded-full flex items-center justify-center shadow-md disabled:opacity-40 transition-colors"
+              style={{ backgroundColor: "#0B5D3B", color: "#FFFFFF" }}
+            >
+              <Phone className="w-6 h-6" />
+            </button>
+          </div>
         </div>
 
         {/* Bottom nav inside dialer — closes overlay on tap, then routes. */}
