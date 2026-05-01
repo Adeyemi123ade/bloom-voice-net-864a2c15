@@ -89,7 +89,7 @@ export default function Settings() {
         }
       } catch { /* ignore */ }
       toast({ title: "App removed from this device" });
-      window.location.replace("/login");
+      window.location.replace("/");
     } finally {
       setWorking(false);
     }
