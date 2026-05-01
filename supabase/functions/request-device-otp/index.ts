@@ -32,9 +32,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { device_id, device_label, platform } = await req.json();
+    const { device_id, device_label, platform, dry_run } = await req.json();
     const deviceId = typeof device_id === "string" ? device_id.trim() : "";
     const plat: "mobile" | "web" = platform === "mobile" ? "mobile" : "web";
+    const dryRun = dry_run === true;
     if (!deviceId || deviceId.length > 128) {
       return new Response(JSON.stringify({ error: "invalid_device" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -107,6 +108,16 @@ Deno.serve(async (req) => {
       }
     }
 
+
+    // If this is just a probe ("is the device trusted? what would the prompt be?"),
+    // do NOT create a challenge or send an email. The client will call back
+    // without dry_run after the user explicitly confirms they want to continue.
+    if (dryRun) {
+      return new Response(
+        JSON.stringify({ reason, other_display_name: otherDisplayName }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
 
     // Create the challenge.
     const code = sixDigit();

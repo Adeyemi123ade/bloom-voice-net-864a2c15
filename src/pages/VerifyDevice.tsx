@@ -31,8 +31,10 @@ export default function VerifyDevice() {
   const reason: DeviceReason = state.reason ?? "new_device";
   const isTakeover = reason === "device_takeover";
   const isWebTakingOverMobile = reason === "web_mobile_active";
-  // Web-mobile takeover requires explicit confirmation BEFORE we show the OTP.
-  const [confirmedTakeover, setConfirmedTakeover] = useState(!isWebTakingOverMobile);
+  // For ALL reasons we now show a confirmation step BEFORE sending the OTP.
+  // The user must explicitly confirm they want to continue on this device.
+  const [confirmedTakeover, setConfirmedTakeover] = useState(false);
+  const [sendingInitial, setSendingInitial] = useState(false);
 
   const [code, setCode] = useState("");
   const [verifying, setVerifying] = useState(false);
@@ -41,7 +43,7 @@ export default function VerifyDevice() {
   const autoSubmitted = useRef(false);
 
   useEffect(() => {
-    if (!loading && !user) navigate("/login", { replace: true });
+    if (!loading && !user) navigate("/", { replace: true });
   }, [loading, user, navigate]);
 
   useEffect(() => {
@@ -49,6 +51,30 @@ export default function VerifyDevice() {
     const id = setInterval(() => setSecondsLeft((s) => s - 1), 1000);
     return () => clearInterval(id);
   }, [secondsLeft]);
+
+  // Send the OTP only after the user confirms they want to continue.
+  const confirmAndSendOtp = async () => {
+    if (sendingInitial) return;
+    setSendingInitial(true);
+    const { error } = await supabase.functions.invoke("request-device-otp", {
+      body: {
+        device_id: getDeviceId(),
+        device_label: getDeviceLabel(),
+        platform: getAppPlatform(),
+      },
+    });
+    setSendingInitial(false);
+    if (error) {
+      toast({
+        title: "Couldn't send verification code",
+        description: "Please check your connection and try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setConfirmedTakeover(true);
+    setSecondsLeft(45);
+  };
 
   const verify = async (codeValue: string) => {
     if (!user || verifying || codeValue.length !== OTP_LENGTH) return;
@@ -111,7 +137,7 @@ export default function VerifyDevice() {
 
   const cancelAndSignOut = async () => {
     await supabase.auth.signOut();
-    navigate("/login", { replace: true });
+    navigate("/", { replace: true });
   };
 
   if (!user) return null;
@@ -120,15 +146,26 @@ export default function VerifyDevice() {
     ? "Account already active on another device"
     : isWebTakingOverMobile
       ? "Account already active on another device"
-      : "Verify this device";
-  const blurb = isTakeover
-    ? `${state.otherDisplayName || "Another ChiChat account"} is currently signed in on this phone. Continuing will sign them out. Enter the 6-digit code we sent to your email to confirm.`
+      : "Sign in on this device?";
+  const confirmBlurb = isTakeover
+    ? `${state.otherDisplayName || "Another ChiChat account"} is currently signed in on this phone. If you continue, they'll be signed out and we'll send a 6-digit code to ${user.email} to confirm it's you.`
     : isWebTakingOverMobile
-      ? `Your ChiChat account is currently active on ${state.otherDisplayName || "your phone"}. To sign in here on the web, your phone will be signed out. We've sent a 6-digit code to ${user.email} to confirm it's you.`
-      : `For your security, enter the 6-digit code we sent to ${user.email} to confirm this is you on a new device.`;
+      ? `Your ChiChat account is currently active on ${state.otherDisplayName || "your phone"}. If you continue, your phone will be signed out and we'll send a 6-digit code to ${user.email} to confirm it's you.`
+      : `Your account is already active on another device. If you continue, we'll send a 6-digit code to ${user.email} to confirm this sign-in.`;
+  const confirmCta = isTakeover
+    ? "Continue and sign the other account out"
+    : isWebTakingOverMobile
+      ? "Continue and sign my phone out"
+      : "Continue and send code";
+  const otpBlurb = isTakeover
+    ? `Enter the 6-digit code we sent to ${user.email} to confirm.`
+    : isWebTakingOverMobile
+      ? `We've sent a 6-digit code to ${user.email}. Enter it to finish signing in here.`
+      : `Enter the 6-digit code we sent to ${user.email} to confirm this sign-in.`;
 
-  // Pre-OTP confirm screen for web takeover.
-  if (isWebTakingOverMobile && !confirmedTakeover) {
+  // Pre-OTP confirm screen — shown for ALL reasons. The OTP is NOT sent
+  // until the user explicitly confirms here.
+  if (!confirmedTakeover) {
     return (
       <MobileFrame>
         <div className="h-full w-full flex flex-col bg-background overflow-y-auto">
@@ -136,13 +173,14 @@ export default function VerifyDevice() {
             <BrandHero className="mt-1 mb-5" message="Account already active on another device" />
             <h1 className="text-xl font-bold text-foreground text-center">{headline}</h1>
             <p className="text-base text-muted-foreground text-center mt-3 leading-relaxed max-w-xs">
-              {blurb}
+              {confirmBlurb}
             </p>
             <Button
-              onClick={() => setConfirmedTakeover(true)}
+              onClick={confirmAndSendOtp}
+              disabled={sendingInitial}
               className="w-full max-w-xs h-11 mt-8 text-base bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg"
             >
-              Continue and sign my phone out
+              {sendingInitial ? "Sending code…" : confirmCta}
             </Button>
             <button
               type="button"
@@ -161,8 +199,8 @@ export default function VerifyDevice() {
     <MobileFrame>
       <div className="h-full w-full flex flex-col bg-background overflow-y-auto">
         <div className="flex-1 flex flex-col px-4 pt-6 pb-6 items-center">
-          <BrandHero className="mt-1 mb-5" message={blurb} />
-          <h1 className="text-xl font-bold text-foreground text-center">{headline}</h1>
+          <BrandHero className="mt-1 mb-5" message={otpBlurb} />
+          <h1 className="text-xl font-bold text-foreground text-center">Enter verification code</h1>
           <p className="text-base text-muted-foreground text-center mt-2 leading-relaxed max-w-xs">
             Code sent to <span className="text-foreground font-semibold">{user.email}</span>. It expires in 10 minutes.
           </p>
