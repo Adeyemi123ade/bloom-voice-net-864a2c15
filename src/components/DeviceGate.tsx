@@ -46,23 +46,35 @@ export default function DeviceGate({ children }: { children: ReactNode }) {
     (async () => {
       setChecking(true);
       try {
-        // Step 1: block brand-new Google sign-ups (must register first).
+        // Step 1: if this is a Google session, decide what to do.
+        //   - existing user with finished profile → straight through (skip
+        //     the device OTP entirely, Google already verified the email).
+        //   - new user who hasn't finished the form → bounce to /register
+        //     with details pre-filled. Keep the session alive.
         const { data: googleCheck } = await supabase.functions.invoke("check-google-signup");
         if (cancelled) return;
-        if (googleCheck && googleCheck.allowed === false) {
-          await supabase.auth.signOut();
-          toast({
-            title: "You don't have an account yet",
-            description: "Please register first. We've pre-filled the form with your Google details.",
-          });
-          navigate("/register", {
-            replace: true,
-            state: { prefill: { email: googleCheck.email, name: googleCheck.full_name } },
-          });
-          return;
+        if (googleCheck) {
+          if (googleCheck.allowed === false && googleCheck.pending_registration) {
+            navigate("/register", {
+              replace: true,
+              state: {
+                prefill: {
+                  email: googleCheck.email,
+                  name: googleCheck.full_name,
+                  googleVerified: true,
+                },
+              },
+            });
+            return;
+          }
+          if (googleCheck.allowed === true && googleCheck.is_google) {
+            // Trusted Google sign-in: no device OTP.
+            markDeviceVerified(user.id);
+            return;
+          }
         }
 
-        // Step 2: device gate.
+        // Step 2: device gate (email/password sign-ins).
         const { data, error } = await supabase.functions.invoke("request-device-otp", {
           body: {
             device_id: getDeviceId(),
