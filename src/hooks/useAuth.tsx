@@ -22,8 +22,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   useEffect(() => {
+    let resolved = false;
+
     // IMPORTANT: subscribe BEFORE calling getSession to avoid missing events.
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      resolved = true;
       setState({ session, user: session?.user ?? null, loading: false });
       if (event === "SIGNED_OUT") {
         // Wipe per-user device-verified flags so next sign-in re-checks the gate.
@@ -39,10 +42,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
+      resolved = true;
       setState({ session, user: session?.user ?? null, loading: false });
+    }).catch(() => {
+      resolved = true;
+      setState({ session: null, user: null, loading: false });
     });
 
-    return () => sub.subscription.unsubscribe();
+    // Hard safety net: if neither getSession nor onAuthStateChange resolves
+    // within 8s (network stalled, storage corrupt, etc.), fall back to a
+    // signed-out state so the UI never hangs on "Signing you in…".
+    const failsafe = window.setTimeout(() => {
+      if (!resolved) {
+        setState({ session: null, user: null, loading: false });
+      }
+    }, 8000);
+
+    return () => {
+      window.clearTimeout(failsafe);
+      sub.subscription.unsubscribe();
+    };
   }, []);
 
   return <AuthContext.Provider value={state}>{children}</AuthContext.Provider>;
