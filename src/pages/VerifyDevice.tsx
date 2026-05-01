@@ -31,8 +31,10 @@ export default function VerifyDevice() {
   const reason: DeviceReason = state.reason ?? "new_device";
   const isTakeover = reason === "device_takeover";
   const isWebTakingOverMobile = reason === "web_mobile_active";
-  // Web-mobile takeover requires explicit confirmation BEFORE we show the OTP.
-  const [confirmedTakeover, setConfirmedTakeover] = useState(!isWebTakingOverMobile);
+  // For ALL reasons we now show a confirmation step BEFORE sending the OTP.
+  // The user must explicitly confirm they want to continue on this device.
+  const [confirmedTakeover, setConfirmedTakeover] = useState(false);
+  const [sendingInitial, setSendingInitial] = useState(false);
 
   const [code, setCode] = useState("");
   const [verifying, setVerifying] = useState(false);
@@ -41,7 +43,7 @@ export default function VerifyDevice() {
   const autoSubmitted = useRef(false);
 
   useEffect(() => {
-    if (!loading && !user) navigate("/login", { replace: true });
+    if (!loading && !user) navigate("/", { replace: true });
   }, [loading, user, navigate]);
 
   useEffect(() => {
@@ -49,6 +51,30 @@ export default function VerifyDevice() {
     const id = setInterval(() => setSecondsLeft((s) => s - 1), 1000);
     return () => clearInterval(id);
   }, [secondsLeft]);
+
+  // Send the OTP only after the user confirms they want to continue.
+  const confirmAndSendOtp = async () => {
+    if (sendingInitial) return;
+    setSendingInitial(true);
+    const { error } = await supabase.functions.invoke("request-device-otp", {
+      body: {
+        device_id: getDeviceId(),
+        device_label: getDeviceLabel(),
+        platform: getAppPlatform(),
+      },
+    });
+    setSendingInitial(false);
+    if (error) {
+      toast({
+        title: "Couldn't send verification code",
+        description: "Please check your connection and try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setConfirmedTakeover(true);
+    setSecondsLeft(45);
+  };
 
   const verify = async (codeValue: string) => {
     if (!user || verifying || codeValue.length !== OTP_LENGTH) return;
