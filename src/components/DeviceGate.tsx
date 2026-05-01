@@ -156,11 +156,15 @@ export default function DeviceGate({ children }: { children: ReactNode }) {
 }
 
 function LoadingShell({ label }: { label: string }) {
+  // Intentionally minimal — no spinner. Spinners advertise latency and feel
+  // janky on a chat app's cold-start. A quietly pulsing label is enough
+  // signal that something is happening without making it feel slow.
   return (
     <MobileFrame>
-      <div className="h-full w-full flex flex-col items-center justify-center bg-background gap-4 px-6">
-        <div className="h-10 w-10 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
-        <p className="text-base text-muted-foreground">{label}</p>
+      <div className="h-full w-full flex flex-col items-center justify-center bg-background px-6">
+        <p className="text-base text-muted-foreground/70 animate-pulse">
+          {label}
+        </p>
       </div>
     </MobileFrame>
   );
