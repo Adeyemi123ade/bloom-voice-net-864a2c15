@@ -33,17 +33,25 @@ Deno.serve(async (req) => {
     }
 
     const url = Deno.env.get("SUPABASE_URL")!;
-    const userClient = createClient(url, Deno.env.get("SUPABASE_ANON_KEY")!, {
-      global: { headers: { Authorization: `Bearer ${jwt}` } },
-    });
-    const { data: { user }, error: userErr } = await userClient.auth.getUser();
-    if (userErr || !user) {
+    const anonClient = createClient(url, Deno.env.get("SUPABASE_ANON_KEY")!);
+    const { data: claimsData, error: claimsErr } = await anonClient.auth.getClaims(jwt);
+    if (claimsErr || !claimsData?.claims?.sub) {
       return new Response(JSON.stringify({ error: "unauthorized" }), {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    const userId = claimsData.claims.sub as string;
 
     const admin = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+
+    // Fetch full user (for identities + metadata) using admin client.
+    const { data: userRes, error: userErr } = await admin.auth.admin.getUserById(userId);
+    if (userErr || !userRes?.user) {
+      return new Response(JSON.stringify({ error: "unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const user = userRes.user;
 
     // Was this sign-in via Google?
     const identities = (user.identities || []) as Array<{ provider?: string }>;
