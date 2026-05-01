@@ -4,6 +4,7 @@ import {
   ChevronDown,
   ChevronRight,
   Cloud,
+  LogOut,
   Smartphone,
   Trash2,
   User as UserIcon,
@@ -12,6 +13,7 @@ import MobileFrame from "@/components/MobileFrame";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { isWebApp } from "@/lib/platform";
 import {
   Collapsible,
   CollapsibleContent,
@@ -36,8 +38,9 @@ export default function Settings() {
   const { user, loading } = useAuth();
 
   const [confirmStage, setConfirmStage] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [working, setWorking] = useState(false);
   const [backup, setBackup] = useState<BackupRow | null>(null);
+  const onWeb = isWebApp();
 
   useEffect(() => {
     document.title = "Settings — Chichat";
@@ -63,29 +66,14 @@ export default function Settings() {
   }, [user]);
 
 
-  const deleteAccount = async () => {
+  // Mobile "Uninstall app": local-only wipe + global sign-out. No backend
+  // delete — accounts are never deleted, only the app is removed from this
+  // phone. If the user comes back they sign in with the same email.
+  const uninstallOnDevice = async () => {
     if (!user) return;
-    setDeleting(true);
+    setWorking(true);
     try {
-      // Server wipe MUST succeed — otherwise the email stays locked and the
-      // user can never re-register with it. Surface failures clearly.
-      const { data, error } = await supabase.functions.invoke("delete-account", {});
-      const serverFailed = !!error || (data && (data as { error?: string }).error);
-      if (serverFailed) {
-        setDeleting(false);
-        toast({
-          title: "We couldn't fully remove your account",
-          description:
-            "Something went wrong on our side. Please check your connection and try again — your account is still active.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Kill every session on every device for this account.
       try { await supabase.auth.signOut({ scope: "global" }); } catch { /* ignore */ }
-
-      // Wipe every trace from this device so re-opening the app is a fresh install.
       try {
         clearContactsCache();
         localStorage.clear();
@@ -100,11 +88,22 @@ export default function Settings() {
           );
         }
       } catch { /* ignore */ }
-
-      toast({ title: "Account uninstalled" });
-      window.location.replace("/register");
+      toast({ title: "App removed from this device" });
+      window.location.replace("/login");
     } finally {
-      setDeleting(false);
+      setWorking(false);
+    }
+  };
+
+  // Web "Sign out": just end the session on this browser.
+  const signOutWeb = async () => {
+    setWorking(true);
+    try {
+      try { await supabase.auth.signOut(); } catch { /* ignore */ }
+      toast({ title: "Signed out" });
+      window.location.replace("/login");
+    } finally {
+      setWorking(false);
     }
   };
 
