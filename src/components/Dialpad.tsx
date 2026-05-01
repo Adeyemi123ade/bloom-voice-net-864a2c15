@@ -336,7 +336,7 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
               onClick={callTyped}
               disabled={!value}
               aria-label="Call"
-              className="w-14 h-14 rounded-full flex items-center justify-center shadow-md disabled:opacity-40 transition-colors"
+              className="w-14 h-14 rounded-full flex items-center justify-center shadow-md disabled:cursor-not-allowed transition-colors"
               style={{ backgroundColor: "#0B5D3B", color: "#FFFFFF" }}
             >
               <Phone className="w-6 h-6" />
