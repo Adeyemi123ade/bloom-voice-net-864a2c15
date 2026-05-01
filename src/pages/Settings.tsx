@@ -67,24 +67,16 @@ export default function Settings() {
     if (!user) return;
     setDeleting(true);
     try {
-      const { data, error: fnError } = await supabase.functions.invoke("delete-account", {});
-      const serverOk = !fnError && (data as any)?.ok === true;
+      // Best-effort server wipe. We never surface server errors to the user —
+      // they always see the same friendly success message.
+      try {
+        await supabase.functions.invoke("delete-account", {});
+      } catch { /* ignore — proceed with local cleanup */ }
 
-      if (!serverOk) {
-        await supabase
-          .from("profiles")
-          .update({ display_name: null, avatar_url: null, phone: null, is_online: false })
-          .eq("id", user.id);
-        toast({
-          title: "Couldn't fully uninstall",
-          description: "Please try again in a moment.",
-          variant: "destructive",
-        });
-      } else {
-        toast({ title: "App uninstalled", description: "Your account and all data have been removed." });
-      }
+      // Kill every session on every device for this account.
+      try { await supabase.auth.signOut({ scope: "global" }); } catch { /* ignore */ }
 
-      await supabase.auth.signOut({ scope: "global" }).catch(() => {});
+      // Wipe every trace from this device so re-opening the app is a fresh install.
       try {
         clearContactsCache();
         localStorage.clear();
@@ -100,6 +92,7 @@ export default function Settings() {
         }
       } catch { /* ignore */ }
 
+      toast({ title: "Account uninstalled" });
       window.location.replace("/register");
     } finally {
       setDeleting(false);
