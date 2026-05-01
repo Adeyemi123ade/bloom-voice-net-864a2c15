@@ -90,21 +90,51 @@ Deno.serve(async (req) => {
       .update({ consumed_at: new Date().toISOString() })
       .eq("id", challenge.id);
 
-    // Takeover: remove any other user's binding on this device.
-    await admin.from("user_devices")
-      .delete()
-      .eq("device_id", deviceId)
-      .neq("user_id", user.id);
+    // Mobile takeover: remove any other user's binding on this same phone.
+    if (plat === "mobile") {
+      await admin.from("user_devices")
+        .delete()
+        .eq("device_id", deviceId)
+        .neq("user_id", user.id);
+    }
+
+    // Web sign-in takes over from mobile: drop the user's mobile bindings AND
+    // sign out every other session for this user (including the mobile app).
+    let mobileSignedOut = false;
+    if (plat === "web") {
+      const { data: mobileRows } = await admin
+        .from("user_devices")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("platform", "mobile");
+      if (mobileRows && mobileRows.length > 0) {
+        await admin.from("user_devices")
+          .delete()
+          .eq("user_id", user.id)
+          .eq("platform", "mobile");
+        mobileSignedOut = true;
+      }
+      // Revoke ALL sessions for this user except the current one.
+      // signOut(userId, "others") signs out every session except the caller's.
+      try {
+        // @ts-ignore - second arg accepted by Supabase admin SDK >= 2.39
+        await admin.auth.admin.signOut(user.id, "others");
+      } catch {
+        // Fallback: sign out everything; the current web session can refresh.
+        try { await admin.auth.admin.signOut(user.id); } catch { /* ignore */ }
+      }
+    }
 
     // Trust this device for the current user.
     await admin.from("user_devices").upsert({
       user_id: user.id,
       device_id: deviceId,
       device_label: typeof device_label === "string" ? device_label.slice(0, 80) : null,
+      platform: plat,
       last_verified_at: new Date().toISOString(),
     }, { onConflict: "user_id,device_id" });
 
-    return new Response(JSON.stringify({ ok: true }), {
+    return new Response(JSON.stringify({ ok: true, mobile_signed_out: mobileSignedOut }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch {
