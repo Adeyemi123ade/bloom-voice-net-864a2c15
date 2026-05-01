@@ -46,6 +46,19 @@ export default function Login() {
       return;
     }
     if (result.redirected) return;
+    // Tokens received in-line — verify this Google user already has an account.
+    const { data: check } = await supabase.functions.invoke("check-google-signup");
+    if (check && check.allowed === false) {
+      setGoogleLoading(false);
+      toast({
+        title: "You don't have an account yet",
+        description: "Please register first. We've pre-filled the form with your Google details.",
+      });
+      navigate("/register", {
+        state: { prefill: { email: check.email, name: check.full_name } },
+      });
+      return;
+    }
     navigate("/home");
   };
 

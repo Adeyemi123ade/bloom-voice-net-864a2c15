@@ -11,3 +11,13 @@ project_id = "tlyqomftfabnpczxefkp"
     verify_jwt = false
   [functions.twilio-voice-twiml]
     verify_jwt = false
+  [functions.check-email-exists]
+    verify_jwt = false
+  [functions.check-user-exists]
+    verify_jwt = false
+  [functions.request-device-otp]
+    verify_jwt = false
+  [functions.verify-device-otp]
+    verify_jwt = false
+  [functions.check-google-signup]
+    verify_jwt = false

@@ -23,8 +23,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // IMPORTANT: subscribe BEFORE calling getSession to avoid missing events.
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       setState({ session, user: session?.user ?? null, loading: false });
+      if (event === "SIGNED_OUT") {
+        // Wipe per-user device-verified flags so next sign-in re-checks the gate.
+        try {
+          const keys = Object.keys(localStorage);
+          for (const k of keys) {
+            if (k.startsWith("chichat.device_verified.")) localStorage.removeItem(k);
+          }
+        } catch { /* ignore */ }
+      }
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {

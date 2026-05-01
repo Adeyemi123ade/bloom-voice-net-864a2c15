@@ -22,11 +22,13 @@ import ForgotPassword from "./pages/ForgotPassword.tsx";
 import ResetPassword from "./pages/ResetPassword.tsx";
 import VerifyEmail from "./pages/VerifyEmail.tsx";
 import VerifyResetCode from "./pages/VerifyResetCode.tsx";
+import VerifyDevice from "./pages/VerifyDevice.tsx";
 import OutboundCall from "./pages/OutboundCall.tsx";
 import NewContact from "./pages/NewContact.tsx";
 import InviteFriends from "./pages/InviteFriends.tsx";
 import MessageNotifier from "./components/MessageNotifier.tsx";
 import IncomingCallScreen from "./components/IncomingCallScreen.tsx";
+import DeviceGate from "./components/DeviceGate.tsx";
 
 const queryClient = new QueryClient();
 
@@ -38,31 +40,34 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
-            <MessageNotifier />
-            <IncomingCallScreen />
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/register" element={<Register />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/welcome" element={<Welcome />} />
-              <Route path="/home" element={<Home />} />
-              <Route path="/chat/:id" element={<ChatRoom />} />
-              <Route path="/call/:id" element={<CallScreen />} />
-              <Route path="/contacts" element={<Contacts />} />
-              <Route path="/contacts/new" element={<NewContact />} />
-              <Route path="/invite" element={<InviteFriends />} />
-              <Route path="/profile" element={<Profile />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/settings/phone" element={<PhoneSettings />} />
-              <Route path="/settings/backup" element={<ChatBackup />} />
-              <Route path="/forgot-password" element={<ForgotPassword />} />
-              <Route path="/verify-reset-code" element={<VerifyResetCode />} />
-              <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/verify-email" element={<VerifyEmail />} />
-              <Route path="/dial/:number" element={<OutboundCall />} />
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+            <DeviceGate>
+              <MessageNotifier />
+              <IncomingCallScreen />
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/register" element={<Register />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/welcome" element={<Welcome />} />
+                <Route path="/home" element={<Home />} />
+                <Route path="/chat/:id" element={<ChatRoom />} />
+                <Route path="/call/:id" element={<CallScreen />} />
+                <Route path="/contacts" element={<Contacts />} />
+                <Route path="/contacts/new" element={<NewContact />} />
+                <Route path="/invite" element={<InviteFriends />} />
+                <Route path="/profile" element={<Profile />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/settings/phone" element={<PhoneSettings />} />
+                <Route path="/settings/backup" element={<ChatBackup />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/verify-reset-code" element={<VerifyResetCode />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/verify-email" element={<VerifyEmail />} />
+                <Route path="/verify-device" element={<VerifyDevice />} />
+                <Route path="/dial/:number" element={<OutboundCall />} />
+                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </DeviceGate>
           </BrowserRouter>
         </TooltipProvider>
       </AuthProvider>
