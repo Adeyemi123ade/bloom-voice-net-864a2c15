@@ -11,7 +11,7 @@ import {
   Preview,
   Text,
 } from 'npm:@react-email/components@0.0.22'
-import { BrandHeader, BrandHero, FeatureStrip, SignOff } from './_brand.tsx'
+import { BrandHeader } from './_brand.tsx'
 
 interface InviteEmailProps {
   siteName: string
@@ -26,7 +26,6 @@ export const InviteEmail = ({ confirmationUrl }: InviteEmailProps) => (
     <Body style={main}>
       <Container style={container}>
         <BrandHeader />
-        <BrandHero />
 
         <Heading style={h1}>
           Someone wants to chat with you <span style={{ color: '#F5C518' }}>👋</span>
@@ -52,9 +51,6 @@ export const InviteEmail = ({ confirmationUrl }: InviteEmailProps) => (
         <Text style={footer}>
           If you weren&rsquo;t expecting this invitation, you can safely ignore this email.
         </Text>
-
-        <FeatureStrip />
-        <SignOff message="Conversations are better when shared. Let's get you in." />
 
         <div style={hr} />
         <Text style={tinyFooter}>© ChiChat · Experience the possibilities</Text>

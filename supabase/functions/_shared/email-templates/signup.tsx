@@ -11,7 +11,7 @@ import {
   Text,
 } from 'npm:@react-email/components@0.0.22'
 import { getEmailOtpCode, OtpCodeBlock } from './_otp-block.tsx'
-import { BrandHeader, BrandHero, FeatureStrip, SignOff } from './_brand.tsx'
+import { BrandHeader } from './_brand.tsx'
 
 interface SignupEmailProps {
   siteName: string
@@ -33,7 +33,6 @@ export const SignupEmail = ({ recipient, token, displayCode, firstName }: Signup
     <Body style={main}>
       <Container style={container}>
         <BrandHeader />
-        <BrandHero />
 
         <Heading style={h1}>
           {firstName ? `Hello, ${firstName}!` : 'Hello there!'} <span style={{ color: '#F5C518' }}>👋</span>
@@ -50,9 +49,6 @@ export const SignupEmail = ({ recipient, token, displayCode, firstName }: Signup
           If you didn&rsquo;t sign up for ChiChat, you can safely ignore this email — no account will be created.
           Never share this code with anyone.
         </Text>
-
-        <FeatureStrip />
-        <SignOff />
 
         <div style={hr} />
         <Text style={tinyFooter}>© ChiChat · Experience the possibilities</Text>

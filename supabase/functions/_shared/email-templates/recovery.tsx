@@ -11,7 +11,7 @@ import {
   Text,
 } from 'npm:@react-email/components@0.0.22'
 import { getEmailOtpCode, OtpCodeBlock } from './_otp-block.tsx'
-import { BrandHeader, BrandHero, FeatureStrip, SignOff } from './_brand.tsx'
+import { BrandHeader } from './_brand.tsx'
 
 interface RecoveryEmailProps {
   siteName: string
@@ -31,7 +31,6 @@ export const RecoveryEmail = ({ token, displayCode, firstName }: RecoveryEmailPr
     <Body style={main}>
       <Container style={container}>
         <BrandHeader />
-        <BrandHero />
 
         <Heading style={h1}>
           {firstName ? `Hi ${firstName}, let's get you back in` : "Let's get you back in"} 🔐
@@ -47,9 +46,6 @@ export const RecoveryEmail = ({ token, displayCode, firstName }: RecoveryEmailPr
           If you didn&rsquo;t request this, you can safely ignore this email — your password won&rsquo;t change.
           Never share this code with anyone, not even ChiChat support.
         </Text>
-
-        <FeatureStrip />
-        <SignOff message="We're glad you're here. Your conversations are waiting." />
 
         <div style={hr} />
         <Text style={tinyFooter}>© ChiChat · Experience the possibilities</Text>
