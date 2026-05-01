@@ -17,8 +17,8 @@ type Props = {
 const RemoteMedia = forwardRef<HTMLDivElement, Props>(
   ({ showVideo, localPreviewRef, remoteVideoRef, remoteAudioRef, swapped = false, onSwap }, _ref) => {
     // PiP dimensions (reduced ~130% from 288x384 → ~125x167)
-    const PIP_W = 125;
-    const PIP_H = 167;
+    const PIP_W = 150;
+    const PIP_H = 200;
     const MARGIN = 8;
 
     const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
