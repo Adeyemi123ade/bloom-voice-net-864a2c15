@@ -150,6 +150,7 @@ export default function OutboundCall() {
 
   const hangUp = () => {
     endLocally("ended");
+    navigate(-1);
   };
 
   const toggleMute = () => {
