@@ -14,6 +14,8 @@ import { lovable } from "@/integrations/lovable";
 import { toE164 } from "@/lib/phone";
 import CountryPicker from "@/components/CountryPicker";
 import { allCountries, type CountryEntry } from "@/lib/countries";
+import PasswordStrengthBar from "@/components/PasswordStrengthBar";
+import { checkEmailExists } from "@/lib/checkEmail";
 
 const baseSchema = z.object({
   name: z
@@ -68,6 +70,31 @@ export default function Register() {
   const [errors, setErrors] = useState<FormErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [emailChecking, setEmailChecking] = useState(false);
+
+  // On blur: if the email is well-formed, ask the backend whether it's already
+  // taken. We only set the inline error here — the form's own validation runs
+  // on submit.
+  const handleEmailBlur = async () => {
+    const trimmed = email.trim();
+    if (!trimmed) return;
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(trimmed)) {
+      setErrors((prev) => ({ ...prev, email: "Enter a valid email address" }));
+      return;
+    }
+    setEmailChecking(true);
+    const exists = await checkEmailExists(trimmed);
+    setEmailChecking(false);
+    if (exists === true) {
+      setErrors((prev) => ({ ...prev, email: "Email already exists — try signing in" }));
+    } else if (exists === false) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        if (next.email === "Email already exists — try signing in") delete next.email;
+        return next;
+      });
+    }
+  };
 
   // After successful signup we navigate to /verify-email so the user
   // can enter the 6-digit code we email them. No link-based flow.
@@ -225,12 +252,25 @@ export default function Register() {
                   type="email"
                   autoComplete="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (errors.email) {
+                      setErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.email;
+                        return next;
+                      });
+                    }
+                  }}
+                  onBlur={handleEmailBlur}
                   placeholder="you@example.com"
                   maxLength={255}
                   className="mt-1 h-11 text-base bg-input border-border text-foreground placeholder:text-muted-foreground"
                   aria-invalid={!!errors.email}
                 />
+                {emailChecking && !errors.email && (
+                  <p className="text-sm text-muted-foreground mt-1">Checking…</p>
+                )}
                 {errors.email && (
                   <p className="text-sm text-destructive mt-1">{errors.email}</p>
                 )}
@@ -292,6 +332,7 @@ export default function Register() {
                     {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
+                <PasswordStrengthBar password={password} />
                 {errors.password && (
                   <p className="text-sm text-destructive mt-1">{errors.password}</p>
                 )}

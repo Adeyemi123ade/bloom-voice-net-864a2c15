@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import PasswordStrengthBar from "@/components/PasswordStrengthBar";
 
 const schema = z
   .object({
@@ -125,6 +126,7 @@ export default function ResetPassword() {
                   {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+              <PasswordStrengthBar password={password} />
               {errors.password && (
                 <p className="text-sm text-destructive mt-1">{errors.password}</p>
               )}
