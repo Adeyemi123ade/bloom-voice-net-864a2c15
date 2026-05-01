@@ -32,8 +32,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { device_id, device_label } = await req.json();
+    const { device_id, device_label, platform } = await req.json();
     const deviceId = typeof device_id === "string" ? device_id.trim() : "";
+    const plat: "mobile" | "web" = platform === "mobile" ? "mobile" : "web";
     if (!deviceId || deviceId.length > 128) {
       return new Response(JSON.stringify({ error: "invalid_device" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -55,30 +56,57 @@ Deno.serve(async (req) => {
 
     const admin = createClient(url, serviceKey);
 
-    // Already trusted? Then no challenge needed.
-    const { data: trusted } = await admin
-      .from("user_devices")
-      .select("id")
-      .eq("user_id", user.id)
-      .eq("device_id", deviceId)
-      .maybeSingle();
-    if (trusted) {
-      // Touch last_verified_at so we know it's still active.
-      await admin.from("user_devices")
-        .update({ last_verified_at: new Date().toISOString() })
-        .eq("id", trusted.id);
-      return new Response(JSON.stringify({ reason: "trusted" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    // Mobile-only shortcut: a trusted device skips the OTP. Web ALWAYS verifies.
+    if (plat === "mobile") {
+      const { data: trusted } = await admin
+        .from("user_devices")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("device_id", deviceId)
+        .maybeSingle();
+      if (trusted) {
+        await admin.from("user_devices")
+          .update({ last_verified_at: new Date().toISOString() })
+          .eq("id", trusted.id);
+        return new Response(JSON.stringify({ reason: "trusted" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
-    // Is the device already bound to a DIFFERENT user?
-    const { data: otherRows } = await admin.rpc("device_is_bound_to_other", {
-      _device_id: deviceId,
-      _user_id: user.id,
-    });
-    const other = Array.isArray(otherRows) ? otherRows[0] : null;
-    const reason: "device_takeover" | "new_device" = other ? "device_takeover" : "new_device";
+    // Determine reason for the prompt the user will see.
+    // - web with an active mobile device for this same account ➜ "web_mobile_active"
+    //   (signing in on web will sign the mobile out)
+    // - mobile with another user already on this phone ➜ "device_takeover"
+    // - otherwise ➜ "new_device"
+    let reason: "new_device" | "device_takeover" | "web_mobile_active" = "new_device";
+    let otherDisplayName: string | null = null;
+
+    if (plat === "web") {
+      const { data: mobileBinding } = await admin
+        .from("user_devices")
+        .select("id, device_label")
+        .eq("user_id", user.id)
+        .eq("platform", "mobile")
+        .order("last_verified_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (mobileBinding) {
+        reason = "web_mobile_active";
+        otherDisplayName = mobileBinding.device_label || "your phone";
+      }
+    } else {
+      const { data: otherRows } = await admin.rpc("device_is_bound_to_other", {
+        _device_id: deviceId,
+        _user_id: user.id,
+      });
+      const other = Array.isArray(otherRows) ? otherRows[0] : null;
+      if (other) {
+        reason = "device_takeover";
+        otherDisplayName = other.other_display_name ?? null;
+      }
+    }
+
 
     // Create the challenge.
     const code = sixDigit();
