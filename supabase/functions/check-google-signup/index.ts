@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
     const identities = (user.identities || []) as Array<{ provider?: string }>;
     const isGoogle = identities.some((i) => i.provider === "google");
     if (!isGoogle) {
-      return new Response(JSON.stringify({ allowed: true }), {
+      return new Response(JSON.stringify({ allowed: true, is_google: false }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
     const hasPhone = !!profile?.phone;
 
     if (hasPhone) {
-      return new Response(JSON.stringify({ allowed: true }), {
+      return new Response(JSON.stringify({ allowed: true, is_google: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
