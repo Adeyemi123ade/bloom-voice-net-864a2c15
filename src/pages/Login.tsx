@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
-import { checkEmailExists } from "@/lib/checkEmail";
+import { checkEmailStatus } from "@/lib/checkEmail";
 
 const loginSchema = z.object({
   email: z.string().trim().email({ message: "Enter a valid email address" }).max(255),
