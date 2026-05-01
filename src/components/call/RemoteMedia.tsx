@@ -11,38 +11,39 @@ type Props = {
 };
 
 /**
- * Renders the remote video container (when video) and an always-present
- * <audio> element that twilio audio tracks attach to. Using a real <audio>
- * element (not a div) is what actually makes remote sound play in browsers.
+ * When showVideo is true, the big stage fills the ENTIRE screen edge-to-edge
+ * (full-bleed) so the call header and controls overlay on top of the video.
+ * The small PiP tile floats above the controls.
  *
- * Both the big stage and the small PiP tile are always mounted so Twilio's
- * attached <video> elements keep playing. We just flip which container is
- * full-size vs the floating thumbnail when the user taps to swap.
+ * Both video containers are always mounted so Twilio's attached <video>
+ * elements keep playing through swaps.
  */
 const RemoteMedia = forwardRef<HTMLDivElement, Props>(
   ({ showVideo, localPreviewRef, remoteVideoRef, remoteAudioRef, swapped = false, onSwap }, _ref) => {
     return (
       <>
         {showVideo ? (
-          <div className="mx-6 mt-2 flex-1 rounded-2xl bg-black/40 border border-border relative overflow-hidden">
-            {/* Big stage — remote by default, local when swapped */}
-            <div
-              ref={swapped ? localPreviewRef : remoteVideoRef}
-              className="absolute inset-0"
-            />
-            {/* Small PiP tile — tap to swap which feed is big */}
+          <>
+            {/* Full-bleed big stage — sits behind header & controls */}
+            <div className="fixed inset-0 z-0 bg-black">
+              <div
+                ref={swapped ? localPreviewRef : remoteVideoRef}
+                className="absolute inset-0"
+              />
+            </div>
+            {/* Floating PiP tile — above controls, tap to swap */}
             <button
               type="button"
               onClick={onSwap}
               aria-label="Swap video"
-              className="absolute bottom-2 right-2 w-20 h-28 rounded-lg bg-secondary border border-border overflow-hidden active:scale-95 transition-transform"
+              className="fixed bottom-36 right-4 z-30 w-24 h-32 rounded-xl bg-secondary border border-border overflow-hidden shadow-lg active:scale-95 transition-transform"
             >
               <div
                 ref={swapped ? remoteVideoRef : localPreviewRef}
                 className="absolute inset-0"
               />
             </button>
-          </div>
+          </>
         ) : (
           <div className="flex-1" />
         )}

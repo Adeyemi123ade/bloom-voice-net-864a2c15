@@ -501,13 +501,17 @@ export default function CallScreen() {
     }
   };
 
+  const videoFullscreen = isVideo && status === "connected";
+
   return (
     <MobileFrame>
-      <div className="h-full w-full flex flex-col bg-gradient-to-b from-secondary to-background">
-        <CallHeader isVideo={isVideo} other={other} status={status} seconds={seconds} role={role} />
-
+      <div
+        className={`h-full w-full flex flex-col ${
+          videoFullscreen ? "bg-black" : "bg-gradient-to-b from-secondary to-background"
+        }`}
+      >
         <RemoteMedia
-          showVideo={isVideo && status === "connected"}
+          showVideo={videoFullscreen}
           localPreviewRef={localVideoEl}
           remoteVideoRef={remoteVideoEl}
           remoteAudioRef={remoteAudioEl}
@@ -515,16 +519,35 @@ export default function CallScreen() {
           onSwap={() => setVideoSwapped((s) => !s)}
         />
 
+        <div
+          className={
+            videoFullscreen
+              ? "fixed top-0 inset-x-0 z-20 bg-gradient-to-b from-black/70 via-black/40 to-transparent text-white pointer-events-none"
+              : ""
+          }
+        >
+          <CallHeader isVideo={isVideo} other={other} status={status} seconds={seconds} role={role} />
+        </div>
+
         {needsTapForSound && status === "connected" && (
           <button
             onClick={tryPlayRemoteAudio}
-            className="mx-6 mb-2 px-4 py-2 rounded-full bg-primary text-primary-foreground text-xs font-medium flex items-center justify-center gap-2 animate-pulse"
+            className={`${
+              videoFullscreen ? "fixed bottom-44 left-1/2 -translate-x-1/2 z-30" : "mx-6 mb-2"
+            } px-4 py-2 rounded-full bg-primary text-primary-foreground text-xs font-medium flex items-center justify-center gap-2 animate-pulse`}
           >
             <Volume2 className="w-4 h-4" />
             Tap to enable sound
           </button>
         )}
 
+        <div
+          className={
+            videoFullscreen
+              ? "fixed bottom-0 inset-x-0 z-20 pb-2 bg-gradient-to-t from-black/70 via-black/30 to-transparent"
+              : ""
+          }
+        >
         <CallControls
           muted={muted}
           videoEnabled={videoEnabled}
@@ -538,6 +561,7 @@ export default function CallScreen() {
           onUpgradeToVideo={upgradeToVideo}
           onEndCall={endCall}
         />
+        </div>
       </div>
     </MobileFrame>
   );
