@@ -13,7 +13,6 @@ interface Tab {
 }
 
 const TABS: Tab[] = [
-  { key: "home", label: "Home", icon: HomeIcon, to: "/home" },
   { key: "calls", label: "Calls", icon: Phone },
   { key: "messages", label: "Messages", icon: MessageSquare, to: "/home" },
   { key: "contacts", label: "Contacts", icon: Users, to: "/contacts" },
