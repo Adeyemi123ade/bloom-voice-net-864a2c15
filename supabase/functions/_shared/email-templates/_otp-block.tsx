@@ -50,7 +50,7 @@ export const OtpCodeBlock = ({ token, displayCode }: { token: string; displayCod
         </tbody>
       </table>
       <Text style={{ fontSize: '13px', color: '#8A8A8A', margin: '14px 0 0' }}>
-        This code expires in <strong style={{ color: '#121212' }}>10 minutes</strong>.
+        This code expires in <strong style={{ color: '#121212' }}>5 minutes</strong>.
       </Text>
     </Section>
   )

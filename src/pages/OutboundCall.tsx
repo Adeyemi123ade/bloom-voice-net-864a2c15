@@ -176,10 +176,13 @@ export default function OutboundCall() {
 
   return (
     <MobileFrame>
-      <div className="h-full w-full flex flex-col bg-gradient-to-b from-primary/15 via-background to-background text-foreground">
+      <div className="h-full w-full flex flex-col bg-background text-foreground">
         <div className="flex-1 flex flex-col items-center justify-center px-6 text-center gap-4">
-          <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center">
-            <Phone className="w-10 h-10 text-primary" />
+          <div
+            className="w-24 h-24 rounded-full flex items-center justify-center"
+            style={{ backgroundColor: "#0B5D3B" }}
+          >
+            <Phone className="w-10 h-10" style={{ color: "#FFFFFF" }} />
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Calling</p>

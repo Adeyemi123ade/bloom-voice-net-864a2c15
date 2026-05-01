@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { z } from "zod";
 import { ArrowLeft, Eye, EyeOff } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
+import BrandHero from "@/components/BrandHero";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -128,11 +129,26 @@ export default function Register() {
     });
     if (error) {
       setSubmitting(false);
-      toast({
-        title: "Sign up failed",
-        description: error.message,
-        variant: "destructive",
-      });
+      const msg = (error.message || "").toLowerCase();
+      const duplicate =
+        msg.includes("already registered") ||
+        msg.includes("already exists") ||
+        msg.includes("user already") ||
+        (error as { status?: number }).status === 422;
+      if (duplicate) {
+        setErrors({ email: "Email already in use" });
+        toast({
+          title: "Email already in use",
+          description: "Try signing in, or use a different email.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Sign up failed",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
       return;
     }
     // Save phone to profile (handle_new_user trigger created the row)
@@ -166,6 +182,10 @@ export default function Register() {
           </button>
 
           <div className="mt-2">
+            <BrandHero
+              className="mb-3"
+              message="Welcome to ChiChat — where conversations don't end and people never feel far away."
+            />
             <h1 className="text-xl font-bold text-foreground leading-tight">
               Create your account
             </h1>
