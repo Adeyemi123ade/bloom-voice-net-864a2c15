@@ -56,7 +56,8 @@ function defaultCountry(): CountryEntry {
 export default function Register() {
   const navigate = useNavigate();
   const location = useLocation();
-  const prefill = (location.state as { prefill?: { email?: string; name?: string } } | null)?.prefill;
+  const prefill = (location.state as { prefill?: { email?: string; name?: string; googleVerified?: boolean } } | null)?.prefill;
+  const googleVerified = !!prefill?.googleVerified;
   const { user, loading: authLoading } = useAuth();
   useEffect(() => {
     if (!authLoading && user) navigate("/home", { replace: true });
