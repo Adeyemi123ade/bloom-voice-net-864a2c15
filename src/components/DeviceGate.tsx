@@ -49,87 +49,39 @@ export default function DeviceGate({ children }: { children: ReactNode }) {
     if (loading) return;
     if (isExempt) return;
     if (!user) {
-      // Not signed in but on a protected route — let downstream auth guards
-      // handle the redirect. The gate just stays out of the way.
       setVerified(false);
       return;
     }
-    const platform = getAppPlatform();
-    if (platform === "mobile" && isDeviceVerifiedLocally(user.id)) {
-      setVerified(true);
-      return;
-    }
+    // Dual-device verification temporarily disabled. Trust every signed-in
+    // session. We still run the Google-signup probe so brand-new Google users
+    // get routed to /register to finish their profile.
     if (checking) return;
 
     let cancelled = false;
     (async () => {
       setChecking(true);
-      setVerified(false);
       try {
-        // Step 1: Google session check.
         const { data: googleCheck, error: gErr } = await supabase.functions.invoke("check-google-signup");
         if (cancelled) return;
-        if (!gErr && googleCheck) {
-          if (googleCheck.allowed === false && googleCheck.pending_registration) {
-            navigate("/register", {
-              replace: true,
-              state: {
-                prefill: {
-                  email: googleCheck.email,
-                  name: googleCheck.full_name,
-                  googleVerified: true,
-                },
+        if (!gErr && googleCheck?.allowed === false && googleCheck?.pending_registration) {
+          navigate("/register", {
+            replace: true,
+            state: {
+              prefill: {
+                email: googleCheck.email,
+                name: googleCheck.full_name,
+                googleVerified: true,
               },
-            });
-            return;
-          }
-          if (googleCheck.allowed === true && googleCheck.is_google) {
-            markDeviceVerified(user.id);
-            setVerified(true);
-            return;
-          }
-        }
-
-        // Step 2: device gate (email/password sign-ins).
-        // IMPORTANT: dry_run probes the state WITHOUT sending an OTP. The
-        // verify screen will request the actual code only after the user
-        // explicitly confirms they want to continue on this device.
-        const { data, error } = await supabase.functions.invoke("request-device-otp", {
-          body: {
-            device_id: getDeviceId(),
-            device_label: getDeviceLabel(),
-            platform,
-            dry_run: true,
-          },
-        });
-        if (cancelled) return;
-        if (error || !data) {
-          // Hard fail: do NOT grant access. Sign the user out and bounce
-          // them back to the splash with a clear message.
-          await supabase.auth.signOut();
-          toast({
-            title: "Couldn't verify this device",
-            description: "We couldn't reach the verification service. Please check your connection and sign in again.",
-            variant: "destructive",
+            },
           });
-          navigate("/", { replace: true });
           return;
         }
-        if (data.reason === "trusted") {
-          markDeviceVerified(user.id);
-          setVerified(true);
-          return;
-        }
-        // Verification required — block access and route to the confirm/OTP screen.
-        // No OTP has been sent yet; the verify screen handles that after the
-        // user confirms they want to proceed.
-        navigate("/verify-device", {
-          replace: true,
-          state: {
-            reason: data.reason,
-            otherDisplayName: data.other_display_name ?? null,
-          },
-        });
+        markDeviceVerified(user.id);
+        setVerified(true);
+      } catch {
+        // Network hiccup on the Google probe — don't block the user.
+        markDeviceVerified(user.id);
+        setVerified(true);
       } finally {
         if (!cancelled) setChecking(false);
       }
