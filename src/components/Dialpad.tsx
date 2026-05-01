@@ -323,7 +323,7 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
                   {k.d}
                 </span>
                 {k.sub && (
-                  <span className="text-[8px] tracking-[0.2em] leading-none mt-0.5" style={{ color: "#FFFFFF", opacity: 0.85 }}>
+                  <span className="text-[8px] tracking-[0.2em] leading-none mt-0.5" style={{ color: "#FFFFFF" }}>
                     {k.sub}
                   </span>
                 )}
@@ -336,7 +336,8 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
             onClick={callTyped}
             disabled={!value}
             aria-label="Call"
-            className="mt-2 w-full h-12 rounded-xl bg-primary hover:bg-primary/90 active:bg-primary/95 text-primary-foreground flex items-center justify-center gap-2 shadow-md disabled:opacity-40 transition-colors"
+            className="mt-2 w-full h-12 rounded-xl flex items-center justify-center gap-2 shadow-md disabled:opacity-40 transition-colors"
+            style={{ backgroundColor: "#0B5D3B", color: "#FFFFFF" }}
           >
             <Phone className="w-5 h-5" />
             <span className="text-sm font-semibold">Call</span>
