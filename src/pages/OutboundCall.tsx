@@ -150,7 +150,7 @@ export default function OutboundCall() {
 
   const hangUp = () => {
     endLocally("ended");
-    navigate(-1);
+    navigate("/home", { replace: true });
   };
 
   const toggleMute = () => {
@@ -205,7 +205,7 @@ export default function OutboundCall() {
 
           {status === "ended" || status === "failed" ? (
             <button
-              onClick={() => navigate(-1)}
+              onClick={() => navigate("/home", { replace: true })}
               className="w-16 h-16 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground flex items-center justify-center"
               aria-label="Done"
             >
