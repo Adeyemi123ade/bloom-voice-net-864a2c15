@@ -78,11 +78,14 @@ export default function Login() {
         // Supabase returns the same generic message for "no such user" AND
         // "wrong password". Ask our existence check so we can tell the user
         // exactly what's wrong (especially after they delete their account).
-        const exists = await checkEmailExists(result.data.email);
-        if (exists === false) {
+        const status = await checkEmailStatus(result.data.email);
+        if (status?.exists === false && status.deleted) {
+          title = "This account was deleted";
+          description = "The account for this email has been deleted. Create a new account to continue.";
+        } else if (status?.exists === false) {
           title = "No account found for this email";
-          description = "This email isn't registered (or the account was deleted). Create a new account to continue.";
-        } else if (exists === true) {
+          description = "This email isn't registered. Create a new account to continue.";
+        } else if (status?.exists === true) {
           title = "Wrong password";
           description = "The password doesn't match this email. Try again or reset your password.";
         } else {
