@@ -316,13 +316,14 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
                     longZero();
                   }
                 }}
-                className="h-11 rounded-xl bg-primary/10 hover:bg-primary/20 active:bg-primary/30 border border-primary/30 flex flex-col items-center justify-center transition-colors"
+                className="h-11 rounded-xl flex flex-col items-center justify-center transition-colors"
+                style={{ backgroundColor: "#0B5D3B", color: "#FFFFFF" }}
               >
-                <span className="text-lg font-semibold text-foreground leading-none">
+                <span className="text-lg font-semibold leading-none" style={{ color: "#FFFFFF" }}>
                   {k.d}
                 </span>
                 {k.sub && (
-                  <span className="text-[8px] text-muted-foreground tracking-[0.2em] leading-none mt-0.5">
+                  <span className="text-[8px] tracking-[0.2em] leading-none mt-0.5" style={{ color: "#FFFFFF", opacity: 0.85 }}>
                     {k.sub}
                   </span>
                 )}
