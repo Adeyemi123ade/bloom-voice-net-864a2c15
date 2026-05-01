@@ -121,6 +121,15 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Remember this email was deleted so future sign-in attempts can show
+    // "this account was deleted" instead of a generic "no account found".
+    if (userEmail) {
+      await safe(
+        "deleted_accounts_log",
+        admin.from("deleted_accounts").insert({ email: userEmail }),
+      );
+    }
+
     return new Response(
       JSON.stringify({ ok: true, partial_failures: failures }),
       {
