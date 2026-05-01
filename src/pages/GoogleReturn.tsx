@@ -7,6 +7,7 @@ import { toast } from "@/hooks/use-toast";
 
 type GoogleSignupCheck = {
   allowed?: boolean;
+  pending_registration?: boolean;
   email?: string;
   full_name?: string;
 };
@@ -33,19 +34,28 @@ export default function GoogleReturn() {
         return;
       }
 
-      if (data?.allowed === false) {
-        await supabase.auth.signOut();
+      // Pending registration: keep the Google session alive and send the user
+      // to /register pre-filled. They finish phone + password and we call
+      // complete-google-registration on submit. No email OTP.
+      if (data?.allowed === false && data.pending_registration) {
         toast({
-          title: "Complete registration first",
-          description: "Your Google name and email were added. Fill the remaining details to continue.",
+          title: "Almost done",
+          description: "Add your phone and a password to finish creating your account.",
         });
         navigate("/register", {
           replace: true,
-          state: { prefill: { email: data.email ?? "", name: data.full_name ?? "" } },
+          state: {
+            prefill: {
+              email: data.email ?? "",
+              name: data.full_name ?? "",
+              googleVerified: true,
+            },
+          },
         });
         return;
       }
 
+      // Existing user — straight in.
       navigate("/home", { replace: true });
     })();
   }, [navigate]);

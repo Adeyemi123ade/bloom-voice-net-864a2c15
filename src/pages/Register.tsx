@@ -56,11 +56,14 @@ function defaultCountry(): CountryEntry {
 export default function Register() {
   const navigate = useNavigate();
   const location = useLocation();
-  const prefill = (location.state as { prefill?: { email?: string; name?: string } } | null)?.prefill;
+  const prefill = (location.state as { prefill?: { email?: string; name?: string; googleVerified?: boolean } } | null)?.prefill;
+  const googleVerified = !!prefill?.googleVerified;
   const { user, loading: authLoading } = useAuth();
   useEffect(() => {
-    if (!authLoading && user) navigate("/home", { replace: true });
-  }, [authLoading, user, navigate]);
+    // Don't redirect away when the user is mid-Google-completion: they're
+    // signed in but their profile isn't finished yet.
+    if (!authLoading && user && !googleVerified) navigate("/home", { replace: true });
+  }, [authLoading, user, navigate, googleVerified]);
 
   const [name, setName] = useState(prefill?.name ?? "");
   const [email, setEmail] = useState(prefill?.email ?? "");
@@ -156,6 +159,44 @@ export default function Register() {
     setErrors({});
     setSubmitting(true);
 
+    // Google-completion path: an existing Google session is live. Just
+    // finish the profile (phone + password + name). No email OTP.
+    if (googleVerified) {
+      const { data, error: fnErr } = await supabase.functions.invoke("complete-google-registration", {
+        body: {
+          name: parsed.data.name,
+          phone: e164,
+          password: parsed.data.password,
+        },
+      });
+      setSubmitting(false);
+      if (fnErr || (data && (data as { error?: string }).error)) {
+        const code = (data as { error?: string } | null)?.error;
+        if (code === "phone_taken") {
+          setErrors({ phone: "This phone number is already registered" });
+          return;
+        }
+        if (code === "invalid_phone") {
+          setErrors({ phone: "That phone number doesn't look right" });
+          return;
+        }
+        if (code === "invalid_password") {
+          setErrors({ password: "Password must be 8+ chars with a number and an uppercase letter" });
+          return;
+        }
+        toast({
+          title: "Couldn't finish your account",
+          description: "Please try again in a moment.",
+          variant: "destructive",
+        });
+        return;
+      }
+      toast({ title: "Welcome to ChiChat" });
+      navigate("/home", { replace: true });
+      return;
+    }
+
+    // Standard email/password sign-up.
     const { data: signUpData, error } = await supabase.auth.signUp({
       email: parsed.data.email,
       password: parsed.data.password,
@@ -224,10 +265,12 @@ export default function Register() {
               message="Welcome to ChiChat — where conversations don't end and people never feel far away."
             />
             <h1 className="text-xl font-bold text-foreground leading-tight">
-              Create your account
+              {googleVerified ? "Finish setting up" : "Create your account"}
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Join Chichat and experience the possibilities.
+              {googleVerified
+                ? "We got your name and email from Google. Add a phone number and password to finish."
+                : "Join Chichat and experience the possibilities."}
             </p>
           </div>
 
@@ -263,6 +306,7 @@ export default function Register() {
                   autoComplete="email"
                   value={email}
                   onChange={(e) => {
+                    if (googleVerified) return;
                     setEmail(e.target.value);
                     if (errors.email) {
                       setErrors((prev) => {
@@ -272,13 +316,19 @@ export default function Register() {
                       });
                     }
                   }}
-                  onBlur={handleEmailBlur}
+                  onBlur={googleVerified ? undefined : handleEmailBlur}
                   placeholder="you@example.com"
                   maxLength={255}
-                  className="mt-1 h-11 text-base bg-input border-border text-foreground placeholder:text-muted-foreground"
+                  readOnly={googleVerified}
+                  className={`mt-1 h-11 text-base bg-input border-border text-foreground placeholder:text-muted-foreground ${googleVerified ? "opacity-80" : ""}`}
                   aria-invalid={!!errors.email}
                 />
-                {emailChecking && !errors.email && (
+                {googleVerified && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Verified by Google. You can't change this here.
+                  </p>
+                )}
+                {!googleVerified && emailChecking && !errors.email && (
                   <p className="text-sm text-muted-foreground mt-1">Checking…</p>
                 )}
                 {errors.email && (
@@ -375,28 +425,32 @@ export default function Register() {
                 disabled={submitting}
                 className="w-full h-11 text-base bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg"
               >
-                {submitting ? "Creating account…" : "Continue"}
+                {submitting ? (googleVerified ? "Finishing…" : "Creating account…") : (googleVerified ? "Finish & continue" : "Continue")}
               </Button>
-              <div className="flex items-center gap-2 my-3">
-                <div className="flex-1 h-px bg-border" />
-                <span className="text-xs text-muted-foreground uppercase tracking-wider">or</span>
-                <div className="flex-1 h-px bg-border" />
-              </div>
-              <Button
-                type="button"
-                onClick={handleGoogle}
-                disabled={googleLoading}
-                variant="outline"
-                className="w-full h-11 text-base font-semibold rounded-lg gap-2"
-              >
-                <svg className="w-4 h-4" viewBox="0 0 24 24" aria-hidden="true">
-                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.99.66-2.25 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z"/>
-                  <path fill="#FBBC05" d="M5.84 14.1A6.6 6.6 0 0 1 5.5 12c0-.73.13-1.44.34-2.1V7.07H2.18A11 11 0 0 0 1 12c0 1.78.43 3.46 1.18 4.93l3.66-2.83z"/>
-                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.83C6.71 7.31 9.14 5.38 12 5.38z"/>
-                </svg>
-                {googleLoading ? "Connecting…" : "Continue with Google"}
-              </Button>
+              {!googleVerified && (
+                <>
+                  <div className="flex items-center gap-2 my-3">
+                    <div className="flex-1 h-px bg-border" />
+                    <span className="text-xs text-muted-foreground uppercase tracking-wider">or</span>
+                    <div className="flex-1 h-px bg-border" />
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={handleGoogle}
+                    disabled={googleLoading}
+                    variant="outline"
+                    className="w-full h-11 text-base font-semibold rounded-lg gap-2"
+                  >
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" aria-hidden="true">
+                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.99.66-2.25 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z"/>
+                      <path fill="#FBBC05" d="M5.84 14.1A6.6 6.6 0 0 1 5.5 12c0-.73.13-1.44.34-2.1V7.07H2.18A11 11 0 0 0 1 12c0 1.78.43 3.46 1.18 4.93l3.66-2.83z"/>
+                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.83C6.71 7.31 9.14 5.38 12 5.38z"/>
+                    </svg>
+                    {googleLoading ? "Connecting…" : "Continue with Google"}
+                  </Button>
+                </>
+              )}
               <p className="text-sm text-muted-foreground text-center mt-3">
                 Already have an account?{" "}
                 <Link to="/login" className="text-accent font-semibold hover:underline">

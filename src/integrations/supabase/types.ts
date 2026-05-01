@@ -391,6 +391,33 @@ export type Database = {
         }
         Relationships: []
       }
+      google_signin_attempts: {
+        Row: {
+          created_at: string
+          google_email: string
+          id: string
+          intended_email: string
+          ip_hash: string | null
+          matched: boolean
+        }
+        Insert: {
+          created_at?: string
+          google_email: string
+          id?: string
+          intended_email: string
+          ip_hash?: string | null
+          matched: boolean
+        }
+        Update: {
+          created_at?: string
+          google_email?: string
+          id?: string
+          intended_email?: string
+          ip_hash?: string | null
+          matched?: boolean
+        }
+        Relationships: []
+      }
       invites: {
         Row: {
           contact_name: string | null
