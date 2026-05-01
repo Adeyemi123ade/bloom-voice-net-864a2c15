@@ -10,7 +10,6 @@ import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
-import { checkEmailStatus } from "@/lib/checkEmail";
 
 const loginSchema = z.object({
   email: z.string().trim().email({ message: "Enter a valid email address" }).max(255),
@@ -71,28 +70,14 @@ export default function Login() {
     setSubmitting(false);
     if (error) {
       const raw = (error.message || "").toLowerCase();
-      let title = "We couldn't sign you in";
-      let description = "Check your email and password, or create a new account if you don't have one yet.";
+      let title = "Account not recognized";
+      let description = "We couldn't sign you in with those details. Check them and try again, or create a new account.";
 
       if (raw.includes("invalid") || raw.includes("credentials")) {
-        // Supabase returns the same generic message for "no such user" AND
-        // "wrong password". Ask our existence check so we can be specific:
-        //   - exists  → password is wrong (email is fine)
-        //   - deleted → only say "deleted" when we're CERTAIN (logged)
-        //   - unknown → soft "wrong email or password" (don't accuse them
-        //     of typing a non-existent email — they may have mistyped one
-        //     character, or signed up on a different environment).
-        const status = await checkEmailStatus(result.data.email);
-        if (status?.exists === true) {
-          title = "Wrong password";
-          description = "The password doesn't match this email. Try again or reset your password.";
-        } else if (status?.exists === false && status.deleted) {
-          title = "This account was deleted";
-          description = "The account for this email has been deleted. Create a new account to continue.";
-        } else {
-          title = "Wrong email or password";
-          description = "Please check your details and try again. If you don't have an account yet, create one.";
-        }
+        // Stay generic on purpose: don't reveal whether the email exists,
+        // and don't mention "deleted" — uninstall = fresh user, no history.
+        title = "Account not recognized";
+        description = "We couldn't sign you in with those details. Check them and try again, or create a new account.";
       } else if (raw.includes("not confirmed") || raw.includes("confirm")) {
         title = "Email not verified yet";
         description = "Please check your inbox for the verification code we sent you.";

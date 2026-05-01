@@ -117,9 +117,9 @@ export default function VerifyDevice() {
   if (!user) return null;
 
   const headline = isTakeover
-    ? "This phone is in use"
+    ? "Account already active on another device"
     : isWebTakingOverMobile
-      ? "Your account is open on your phone"
+      ? "Account already active on another device"
       : "Verify this device";
   const blurb = isTakeover
     ? `${state.otherDisplayName || "Another ChiChat account"} is currently signed in on this phone. Continuing will sign them out. Enter the 6-digit code we sent to your email to confirm.`
@@ -133,7 +133,7 @@ export default function VerifyDevice() {
       <MobileFrame>
         <div className="h-full w-full flex flex-col bg-background overflow-y-auto">
           <div className="flex-1 flex flex-col px-4 pt-6 pb-6 items-center">
-            <BrandHero className="mt-1 mb-5" message="Account already in use" />
+            <BrandHero className="mt-1 mb-5" message="Account already active on another device" />
             <h1 className="text-xl font-bold text-foreground text-center">{headline}</h1>
             <p className="text-base text-muted-foreground text-center mt-3 leading-relaxed max-w-xs">
               {blurb}
