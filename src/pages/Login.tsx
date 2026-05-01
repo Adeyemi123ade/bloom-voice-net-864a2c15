@@ -76,21 +76,22 @@ export default function Login() {
 
       if (raw.includes("invalid") || raw.includes("credentials")) {
         // Supabase returns the same generic message for "no such user" AND
-        // "wrong password". Ask our existence check so we can tell the user
-        // exactly what's wrong (especially after they delete their account).
+        // "wrong password". Ask our existence check so we can be specific:
+        //   - exists  → password is wrong (email is fine)
+        //   - deleted → only say "deleted" when we're CERTAIN (logged)
+        //   - unknown → soft "wrong email or password" (don't accuse them
+        //     of typing a non-existent email — they may have mistyped one
+        //     character, or signed up on a different environment).
         const status = await checkEmailStatus(result.data.email);
-        if (status?.exists === false && status.deleted) {
-          title = "This account was deleted";
-          description = "The account for this email has been deleted. Create a new account to continue.";
-        } else if (status?.exists === false) {
-          title = "No account found for this email";
-          description = "This email isn't registered. Create a new account to continue.";
-        } else if (status?.exists === true) {
+        if (status?.exists === true) {
           title = "Wrong password";
           description = "The password doesn't match this email. Try again or reset your password.";
+        } else if (status?.exists === false && status.deleted) {
+          title = "This account was deleted";
+          description = "The account for this email has been deleted. Create a new account to continue.";
         } else {
-          title = "Email or password doesn't match";
-          description = "Check your details, reset your password, or create a new account.";
+          title = "Wrong email or password";
+          description = "Please check your details and try again. If you don't have an account yet, create one.";
         }
       } else if (raw.includes("not confirmed") || raw.includes("confirm")) {
         title = "Email not verified yet";
