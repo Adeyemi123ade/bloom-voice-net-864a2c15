@@ -1,9 +1,18 @@
-// Called from the client immediately after a Google OAuth sign-in completes.
-// If the user account was just created (within the last 60s) AND was created
-// via Google (no email/password identity yet) AND the profile has no phone
-// number, we treat this as a "Google sign-up", which is forbidden by product
-// policy. We delete the auth user so the email is freed up, and return the
-// Google-supplied name/email so the client can pre-fill the register form.
+// Called from the client right after a Google OAuth sign-in completes.
+// New behaviour (per product policy): we DO allow Google for both new and
+// existing users. The job of this function is just to tell the client which
+// case applies:
+//
+//   allowed = true  → user already finished registration (has a phone on
+//                     profile). Let them straight into the app.
+//   allowed = false → user is brand new via Google. Keep the auth session
+//                     alive, return the Google email + name so the client
+//                     can pre-fill /register, and the user finishes by
+//                     calling complete-google-registration.
+//
+// We also log the attempt to google_signin_attempts so we can detect the
+// "wrong Google account picked repeatedly" pattern in
+// request-google-step-up-otp.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
 
 const corsHeaders = {
@@ -36,20 +45,16 @@ Deno.serve(async (req) => {
 
     const admin = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
-    // Did this user sign in via Google? Check identity providers.
+    // Was this sign-in via Google?
     const identities = (user.identities || []) as Array<{ provider?: string }>;
-    const googleOnly = identities.length > 0 && identities.every((i) => i.provider === "google");
-    if (!googleOnly) {
+    const isGoogle = identities.some((i) => i.provider === "google");
+    if (!isGoogle) {
       return new Response(JSON.stringify({ allowed: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Was the account created very recently? (= sign-UP, not sign-IN)
-    const createdAt = new Date(user.created_at).getTime();
-    const justCreated = Date.now() - createdAt < 60_000;
-
-    // Has the user completed registration (phone is required by our form)?
+    // Has the user completed registration? Phone on profile = done.
     const { data: profile } = await admin
       .from("profiles")
       .select("phone")
@@ -57,25 +62,22 @@ Deno.serve(async (req) => {
       .maybeSingle();
     const hasPhone = !!profile?.phone;
 
-    if (!justCreated || hasPhone) {
+    if (hasPhone) {
       return new Response(JSON.stringify({ allowed: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // It's a brand-new Google sign-up — block it.
+    // Brand-new Google user — needs to finish the form. Keep the session.
     const meta = (user.user_metadata || {}) as Record<string, unknown>;
     const fullName = String(
       meta.full_name || meta.name || meta.display_name || "",
     ).trim();
     const email = (user.email || "").toLowerCase();
 
-    // Sign the user out everywhere, then remove the account.
-    await admin.auth.admin.signOut(user.id, "global");
-    await admin.auth.admin.deleteUser(user.id);
-
     return new Response(JSON.stringify({
       allowed: false,
+      pending_registration: true,
       email,
       full_name: fullName,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
