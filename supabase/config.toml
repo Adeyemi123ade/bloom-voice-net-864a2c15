@@ -19,3 +19,5 @@ project_id = "tlyqomftfabnpczxefkp"
     verify_jwt = false
   [functions.verify-device-otp]
     verify_jwt = false
+  [functions.check-google-signup]
+    verify_jwt = false
