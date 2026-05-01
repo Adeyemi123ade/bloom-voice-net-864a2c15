@@ -183,8 +183,11 @@ Deno.serve(async (req) => {
     await admin.rpc("enqueue_email", {
       queue_name: "auth_emails",
       payload: {
-        run_id: messageId,
+        // No pre-existing run — let the Lovable Email API create one inline
+        // via idempotency_key (purpose: transactional). Passing a fabricated
+        // run_id causes "run_not_found" 404s.
         message_id: messageId,
+        idempotency_key: messageId,
         to: user.email,
         from: "ChiChat <noreply@notify.kajolacooperative.com>",
         sender_domain: "notify.kajolacooperative.com",
