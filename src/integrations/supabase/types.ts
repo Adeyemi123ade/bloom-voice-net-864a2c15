@@ -184,6 +184,24 @@ export type Database = {
         }
         Relationships: []
       }
+      deleted_accounts: {
+        Row: {
+          deleted_at: string
+          email: string
+          id: string
+        }
+        Insert: {
+          deleted_at?: string
+          email: string
+          id?: string
+        }
+        Update: {
+          deleted_at?: string
+          email?: string
+          id?: string
+        }
+        Relationships: []
+      }
       device_login_challenges: {
         Row: {
           attempts: number
@@ -529,6 +547,7 @@ export type Database = {
           device_label: string | null
           id: string
           last_verified_at: string
+          platform: string
           user_id: string
         }
         Insert: {
@@ -537,6 +556,7 @@ export type Database = {
           device_label?: string | null
           id?: string
           last_verified_at?: string
+          platform?: string
           user_id: string
         }
         Update: {
@@ -545,6 +565,7 @@ export type Database = {
           device_label?: string | null
           id?: string
           last_verified_at?: string
+          platform?: string
           user_id?: string
         }
         Relationships: []
