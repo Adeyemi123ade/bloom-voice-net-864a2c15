@@ -157,6 +157,44 @@ export default function Register() {
     setErrors({});
     setSubmitting(true);
 
+    // Google-completion path: an existing Google session is live. Just
+    // finish the profile (phone + password + name). No email OTP.
+    if (googleVerified) {
+      const { data, error: fnErr } = await supabase.functions.invoke("complete-google-registration", {
+        body: {
+          name: parsed.data.name,
+          phone: e164,
+          password: parsed.data.password,
+        },
+      });
+      setSubmitting(false);
+      if (fnErr || (data && (data as { error?: string }).error)) {
+        const code = (data as { error?: string } | null)?.error;
+        if (code === "phone_taken") {
+          setErrors({ phone: "This phone number is already registered" });
+          return;
+        }
+        if (code === "invalid_phone") {
+          setErrors({ phone: "That phone number doesn't look right" });
+          return;
+        }
+        if (code === "invalid_password") {
+          setErrors({ password: "Password must be 8+ chars with a number and an uppercase letter" });
+          return;
+        }
+        toast({
+          title: "Couldn't finish your account",
+          description: "Please try again in a moment.",
+          variant: "destructive",
+        });
+        return;
+      }
+      toast({ title: "Welcome to ChiChat" });
+      navigate("/home", { replace: true });
+      return;
+    }
+
+    // Standard email/password sign-up.
     const { data: signUpData, error } = await supabase.auth.signUp({
       email: parsed.data.email,
       password: parsed.data.password,
