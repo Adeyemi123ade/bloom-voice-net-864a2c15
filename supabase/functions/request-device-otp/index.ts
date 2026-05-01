@@ -137,12 +137,18 @@ Deno.serve(async (req) => {
 
     // Send the code via email through the shared queue infrastructure so it
     // benefits from retries and deliverability tracking.
-    const subject = reason === "device_takeover"
-      ? "ChiChat: confirm new sign-in on this phone"
-      : "ChiChat: verify this device";
-    const intro = reason === "device_takeover"
-      ? "Someone (hopefully you) is trying to sign in to ChiChat on a phone that's already in use by another account. Use this code to continue:"
-      : "We noticed a sign-in to your ChiChat account on a new device. Enter this code in the app to confirm it's you:";
+    const subject =
+      reason === "device_takeover"
+        ? "ChiChat: confirm new sign-in on this phone"
+        : reason === "web_mobile_active"
+          ? "ChiChat: confirm sign-in on the web"
+          : "ChiChat: verify this device";
+    const intro =
+      reason === "device_takeover"
+        ? "Someone (hopefully you) is trying to sign in to ChiChat on a phone that's already in use by another account. Use this code to continue:"
+        : reason === "web_mobile_active"
+          ? "Your ChiChat account is currently signed in on a phone. Continuing on the web will sign that phone out. Use this code to confirm it's you:"
+          : "We noticed a sign-in to your ChiChat account on a new device. Enter this code in the app to confirm it's you:";
 
     const display = `${code.slice(0, 3)} ${code.slice(3)}`;
     const html = `
@@ -183,7 +189,7 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         reason,
-        other_display_name: other?.other_display_name ?? null,
+        other_display_name: otherDisplayName,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
