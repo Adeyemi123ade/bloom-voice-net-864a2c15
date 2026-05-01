@@ -231,13 +231,3 @@ export default function Settings() {
     </MobileFrame>
   );
 }
-
-/** Strip technical noise (URLs, UUIDs, JSON blobs) before showing errors to users. */
-function friendly(e: unknown): string {
-  const raw = e instanceof Error ? e.message : String(e ?? "");
-  return raw
-    .replace(/https?:\/\/\S+/gi, "")
-    .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, "")
-    .replace(/\s{2,}/g, " ")
-    .trim() || "Please try again.";
-}
