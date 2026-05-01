@@ -137,7 +137,7 @@ export default function VerifyDevice() {
 
   const cancelAndSignOut = async () => {
     await supabase.auth.signOut();
-    navigate("/login", { replace: true });
+    navigate("/", { replace: true });
   };
 
   if (!user) return null;
@@ -146,15 +146,26 @@ export default function VerifyDevice() {
     ? "Account already active on another device"
     : isWebTakingOverMobile
       ? "Account already active on another device"
-      : "Verify this device";
-  const blurb = isTakeover
-    ? `${state.otherDisplayName || "Another ChiChat account"} is currently signed in on this phone. Continuing will sign them out. Enter the 6-digit code we sent to your email to confirm.`
+      : "Sign in on this device?";
+  const confirmBlurb = isTakeover
+    ? `${state.otherDisplayName || "Another ChiChat account"} is currently signed in on this phone. If you continue, they'll be signed out and we'll send a 6-digit code to ${user.email} to confirm it's you.`
     : isWebTakingOverMobile
-      ? `Your ChiChat account is currently active on ${state.otherDisplayName || "your phone"}. To sign in here on the web, your phone will be signed out. We've sent a 6-digit code to ${user.email} to confirm it's you.`
-      : `For your security, enter the 6-digit code we sent to ${user.email} to confirm this is you on a new device.`;
+      ? `Your ChiChat account is currently active on ${state.otherDisplayName || "your phone"}. If you continue, your phone will be signed out and we'll send a 6-digit code to ${user.email} to confirm it's you.`
+      : `Your account is already active on another device. If you continue, we'll send a 6-digit code to ${user.email} to confirm this sign-in.`;
+  const confirmCta = isTakeover
+    ? "Continue and sign the other account out"
+    : isWebTakingOverMobile
+      ? "Continue and sign my phone out"
+      : "Continue and send code";
+  const otpBlurb = isTakeover
+    ? `Enter the 6-digit code we sent to ${user.email} to confirm.`
+    : isWebTakingOverMobile
+      ? `We've sent a 6-digit code to ${user.email}. Enter it to finish signing in here.`
+      : `Enter the 6-digit code we sent to ${user.email} to confirm this sign-in.`;
 
-  // Pre-OTP confirm screen for web takeover.
-  if (isWebTakingOverMobile && !confirmedTakeover) {
+  // Pre-OTP confirm screen — shown for ALL reasons. The OTP is NOT sent
+  // until the user explicitly confirms here.
+  if (!confirmedTakeover) {
     return (
       <MobileFrame>
         <div className="h-full w-full flex flex-col bg-background overflow-y-auto">
@@ -162,13 +173,14 @@ export default function VerifyDevice() {
             <BrandHero className="mt-1 mb-5" message="Account already active on another device" />
             <h1 className="text-xl font-bold text-foreground text-center">{headline}</h1>
             <p className="text-base text-muted-foreground text-center mt-3 leading-relaxed max-w-xs">
-              {blurb}
+              {confirmBlurb}
             </p>
             <Button
-              onClick={() => setConfirmedTakeover(true)}
+              onClick={confirmAndSendOtp}
+              disabled={sendingInitial}
               className="w-full max-w-xs h-11 mt-8 text-base bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg"
             >
-              Continue and sign my phone out
+              {sendingInitial ? "Sending code…" : confirmCta}
             </Button>
             <button
               type="button"
