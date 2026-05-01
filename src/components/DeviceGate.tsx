@@ -90,24 +90,28 @@ export default function DeviceGate({ children }: { children: ReactNode }) {
         }
 
         // Step 2: device gate (email/password sign-ins).
+        // IMPORTANT: dry_run probes the state WITHOUT sending an OTP. The
+        // verify screen will request the actual code only after the user
+        // explicitly confirms they want to continue on this device.
         const { data, error } = await supabase.functions.invoke("request-device-otp", {
           body: {
             device_id: getDeviceId(),
             device_label: getDeviceLabel(),
             platform: getAppPlatform(),
+            dry_run: true,
           },
         });
         if (cancelled) return;
         if (error || !data) {
           // Hard fail: do NOT grant access. Sign the user out and bounce
-          // them back to login with a clear message.
+          // them back to the splash with a clear message.
           await supabase.auth.signOut();
           toast({
             title: "Couldn't verify this device",
-            description: "We couldn't send a verification code. Please check your connection and sign in again.",
+            description: "We couldn't reach the verification service. Please check your connection and sign in again.",
             variant: "destructive",
           });
-          navigate("/login", { replace: true });
+          navigate("/", { replace: true });
           return;
         }
         if (data.reason === "trusted") {
@@ -115,7 +119,9 @@ export default function DeviceGate({ children }: { children: ReactNode }) {
           setVerified(true);
           return;
         }
-        // Verification required — block access and route to the OTP screen.
+        // Verification required — block access and route to the confirm/OTP screen.
+        // No OTP has been sent yet; the verify screen handles that after the
+        // user confirms they want to proceed.
         navigate("/verify-device", {
           replace: true,
           state: {
