@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { z } from "zod";
 import { ArrowLeft, Eye, EyeOff } from "lucide-react";
@@ -55,13 +55,15 @@ function defaultCountry(): CountryEntry {
 
 export default function Register() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const prefill = (location.state as { prefill?: { email?: string; name?: string } } | null)?.prefill;
   const { user, loading: authLoading } = useAuth();
   useEffect(() => {
     if (!authLoading && user) navigate("/home", { replace: true });
   }, [authLoading, user, navigate]);
 
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [name, setName] = useState(prefill?.name ?? "");
+  const [email, setEmail] = useState(prefill?.email ?? "");
   const [country, setCountry] = useState<CountryEntry>(() => defaultCountry());
   const [phoneLocal, setPhoneLocal] = useState("");
   const [password, setPassword] = useState("");
@@ -101,15 +103,24 @@ export default function Register() {
 
   const handleGoogle = async () => {
     setGoogleLoading(true);
+    // Per product policy: Google can ONLY be used by users who already have
+    // an account. We send them through OAuth, but if they're brand new the
+    // server will block them and bounce back here with their details
+    // pre-filled (handled by DeviceGate).
     const result = await lovable.auth.signInWithOAuth("google", {
       redirect_uri: `${window.location.origin}/home`,
     });
     if (result.error) {
       setGoogleLoading(false);
-      toast({ title: "Google sign-up failed", description: result.error.message, variant: "destructive" });
+      toast({
+        title: "Google didn't work",
+        description: "Please try again, or fill the form below to create your account.",
+        variant: "destructive",
+      });
       return;
     }
     if (result.redirected) return;
+    // In-line OAuth (no redirect) — let DeviceGate handle the new-user check.
     navigate("/home");
   };
 
