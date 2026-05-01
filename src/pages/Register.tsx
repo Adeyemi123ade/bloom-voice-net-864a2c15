@@ -60,8 +60,10 @@ export default function Register() {
   const googleVerified = !!prefill?.googleVerified;
   const { user, loading: authLoading } = useAuth();
   useEffect(() => {
-    if (!authLoading && user) navigate("/home", { replace: true });
-  }, [authLoading, user, navigate]);
+    // Don't redirect away when the user is mid-Google-completion: they're
+    // signed in but their profile isn't finished yet.
+    if (!authLoading && user && !googleVerified) navigate("/home", { replace: true });
+  }, [authLoading, user, navigate, googleVerified]);
 
   const [name, setName] = useState(prefill?.name ?? "");
   const [email, setEmail] = useState(prefill?.email ?? "");
