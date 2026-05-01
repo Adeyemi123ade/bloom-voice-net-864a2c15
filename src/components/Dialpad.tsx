@@ -270,8 +270,8 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
           )}
         </div>
 
-        {/* Compact keypad panel */}
-        <div className="mx-4 mb-4 rounded-2xl bg-secondary/30 border border-border/40 p-3 shrink-0">
+        {/* Compact keypad panel — shifted down ~2cm per request */}
+        <div className="mx-4 mb-4 mt-[75px] rounded-2xl bg-secondary/30 border border-border/40 p-3 shrink-0">
           {/* Number display */}
           <div className="relative mb-2">
             <input
@@ -331,16 +331,18 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
             ))}
           </div>
 
-          <div className="mt-2 flex justify-center">
+          <div className="mt-1.5 grid grid-cols-3 gap-1.5">
+            <div />
             <button
               onClick={callTyped}
               disabled={!value}
               aria-label="Call"
-              className="w-14 h-14 rounded-full flex items-center justify-center shadow-md disabled:cursor-not-allowed transition-colors"
+              className="h-11 rounded-xl flex items-center justify-center disabled:cursor-not-allowed transition-colors"
               style={{ backgroundColor: "#0B5D3B", color: "#FFFFFF" }}
             >
-              <Phone className="w-6 h-6" />
+              <Phone className="w-5 h-5" />
             </button>
+            <div />
           </div>
         </div>
 
