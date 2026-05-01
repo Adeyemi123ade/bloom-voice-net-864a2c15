@@ -561,6 +561,7 @@ export default function CallScreen() {
           onUpgradeToVideo={upgradeToVideo}
           onEndCall={endCall}
         />
+        </div>
       </div>
     </MobileFrame>
   );
