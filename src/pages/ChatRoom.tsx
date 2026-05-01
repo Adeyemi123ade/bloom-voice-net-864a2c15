@@ -149,7 +149,26 @@ export default function ChatRoom() {
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "messages", filter: `conversation_id=eq.${conversationId}` },
-        (payload) => setMessages((prev) => [...prev, payload.new as Message]),
+        (payload) => {
+          const incoming = payload.new as Message;
+          setMessages((prev) => {
+            // Replace matching optimistic message (same sender + content, temp id starts with "tmp-")
+            const idx = prev.findIndex(
+              (m) =>
+                m.id.startsWith("tmp-") &&
+                m.sender_id === incoming.sender_id &&
+                m.content === incoming.content,
+            );
+            if (idx !== -1) {
+              const next = prev.slice();
+              next[idx] = incoming;
+              return next;
+            }
+            // Skip if we already have it (echo race)
+            if (prev.some((m) => m.id === incoming.id)) return prev;
+            return [...prev, incoming];
+          });
+        },
       )
       .on(
         "postgres_changes",
