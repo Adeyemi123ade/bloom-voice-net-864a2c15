@@ -32,9 +32,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { device_id, device_label, platform } = await req.json();
+    const { device_id, device_label, platform, dry_run } = await req.json();
     const deviceId = typeof device_id === "string" ? device_id.trim() : "";
     const plat: "mobile" | "web" = platform === "mobile" ? "mobile" : "web";
+    const dryRun = dry_run === true;
     if (!deviceId || deviceId.length > 128) {
       return new Response(JSON.stringify({ error: "invalid_device" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
