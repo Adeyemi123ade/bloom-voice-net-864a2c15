@@ -11,7 +11,7 @@ import {
   Text,
 } from 'npm:@react-email/components@0.0.22'
 import { getEmailOtpCode, OtpCodeBlock } from './_otp-block.tsx'
-import { BrandHeader, BrandHero, FeatureStrip, SignOff } from './_brand.tsx'
+import { BrandHeader } from './_brand.tsx'
 
 interface ReauthenticationEmailProps {
   token: string
@@ -29,7 +29,6 @@ export const ReauthenticationEmail = ({ token, displayCode, firstName }: Reauthe
     <Body style={main}>
       <Container style={container}>
         <BrandHeader />
-        <BrandHero />
 
         <Heading style={h1}>
           {firstName ? `Hi ${firstName}, just confirming it's you` : "Just confirming it's you"} 🔐
@@ -45,9 +44,6 @@ export const ReauthenticationEmail = ({ token, displayCode, firstName }: Reauthe
           If you didn&rsquo;t request this, you can safely ignore this email.
           Never share this code with anyone.
         </Text>
-
-        <FeatureStrip />
-        <SignOff message="A small step to keep your account safe." />
 
         <div style={hr} />
         <Text style={tinyFooter}>© ChiChat · Experience the possibilities</Text>

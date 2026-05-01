@@ -11,7 +11,7 @@ import {
   Text,
 } from 'npm:@react-email/components@0.0.22'
 import { getEmailOtpCode, OtpCodeBlock } from './_otp-block.tsx'
-import { BrandHeader, BrandHero, FeatureStrip, SignOff } from './_brand.tsx'
+import { BrandHeader } from './_brand.tsx'
 
 interface MagicLinkEmailProps {
   siteName: string
@@ -31,7 +31,6 @@ export const MagicLinkEmail = ({ token, displayCode, firstName }: MagicLinkEmail
     <Body style={main}>
       <Container style={container}>
         <BrandHeader />
-        <BrandHero />
 
         <Heading style={h1}>
           {firstName ? `Welcome back, ${firstName}!` : 'Welcome back!'} <span style={{ color: '#F5C518' }}>👋</span>
@@ -47,9 +46,6 @@ export const MagicLinkEmail = ({ token, displayCode, firstName }: MagicLinkEmail
           If you didn&rsquo;t ask to sign in, you can safely ignore this email.
           Never share this code with anyone.
         </Text>
-
-        <FeatureStrip />
-        <SignOff message="The conversations you love are just a tap away." />
 
         <div style={hr} />
         <Text style={tinyFooter}>© ChiChat · Experience the possibilities</Text>

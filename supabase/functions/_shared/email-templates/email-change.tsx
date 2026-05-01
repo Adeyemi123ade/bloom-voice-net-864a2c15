@@ -11,7 +11,7 @@ import {
   Preview,
   Text,
 } from 'npm:@react-email/components@0.0.22'
-import { BrandHeader, BrandHero, FeatureStrip, SignOff } from './_brand.tsx'
+import { BrandHeader } from './_brand.tsx'
 
 interface EmailChangeEmailProps {
   siteName: string
@@ -31,7 +31,6 @@ export const EmailChangeEmail = ({
     <Body style={main}>
       <Container style={container}>
         <BrandHeader />
-        <BrandHero />
 
         <Heading style={h1}>Confirm your new email</Heading>
 
@@ -55,9 +54,6 @@ export const EmailChangeEmail = ({
         <Text style={footer}>
           If you didn&rsquo;t request this change, please secure your account immediately.
         </Text>
-
-        <FeatureStrip />
-        <SignOff message="Your account, your control. We're just here to help." />
 
         <div style={hr} />
         <Text style={tinyFooter}>© ChiChat · Experience the possibilities</Text>
