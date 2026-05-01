@@ -108,7 +108,7 @@ export default function Register() {
     // server will block them and bounce back here with their details
     // pre-filled (handled by DeviceGate).
     const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: `${window.location.origin}/home`,
+      redirect_uri: `${window.location.origin}/auth/google-return`,
     });
     if (result.error) {
       setGoogleLoading(false);
@@ -120,8 +120,7 @@ export default function Register() {
       return;
     }
     if (result.redirected) return;
-    // In-line OAuth (no redirect) — let DeviceGate handle the new-user check.
-    navigate("/home");
+    navigate("/auth/google-return");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
