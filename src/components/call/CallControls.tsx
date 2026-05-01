@@ -67,6 +67,18 @@ export default function CallControls({
         )}
 
         <button
+          onClick={onToggleMute}
+          className={`w-12 h-12 rounded-full flex items-center justify-center ${
+            muted
+              ? "bg-destructive text-destructive-foreground"
+              : "bg-secondary text-foreground hover:bg-secondary/80"
+          }`}
+          aria-label="Mute"
+        >
+          {muted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+        </button>
+
+        <button
           onClick={onSwitchCamera}
           disabled={!isVideo || !videoEnabled || !canSwitchCamera}
           className={`w-12 h-12 rounded-full flex items-center justify-center bg-secondary text-foreground hover:bg-secondary/80 ${
