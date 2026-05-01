@@ -36,7 +36,7 @@ const RemoteMedia = forwardRef<HTMLDivElement, Props>(
               type="button"
               onClick={onSwap}
               aria-label="Swap video"
-              className="fixed bottom-36 right-4 z-30 w-24 h-32 rounded-xl bg-secondary border border-border overflow-hidden shadow-lg active:scale-95 transition-transform"
+              className="fixed bottom-44 right-4 z-30 w-72 h-96 rounded-xl bg-secondary border border-border overflow-hidden shadow-lg active:scale-95 transition-transform"
             >
               <div
                 ref={swapped ? remoteVideoRef : localPreviewRef}
