@@ -67,11 +67,20 @@ export default function Settings() {
     if (!user) return;
     setDeleting(true);
     try {
-      // Best-effort server wipe. We never surface server errors to the user —
-      // they always see the same friendly success message.
-      try {
-        await supabase.functions.invoke("delete-account", {});
-      } catch { /* ignore — proceed with local cleanup */ }
+      // Server wipe MUST succeed — otherwise the email stays locked and the
+      // user can never re-register with it. Surface failures clearly.
+      const { data, error } = await supabase.functions.invoke("delete-account", {});
+      const serverFailed = !!error || (data && (data as { error?: string }).error);
+      if (serverFailed) {
+        setDeleting(false);
+        toast({
+          title: "We couldn't fully remove your account",
+          description:
+            "Something went wrong on our side. Please check your connection and try again — your account is still active.",
+          variant: "destructive",
+        });
+        return;
+      }
 
       // Kill every session on every device for this account.
       try { await supabase.auth.signOut({ scope: "global" }); } catch { /* ignore */ }
