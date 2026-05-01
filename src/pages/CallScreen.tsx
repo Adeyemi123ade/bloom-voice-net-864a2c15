@@ -47,6 +47,7 @@ export default function CallScreen() {
   const [canSwitchCamera, setCanSwitchCamera] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [needsTapForSound, setNeedsTapForSound] = useState(false);
+  const [videoSwapped, setVideoSwapped] = useState(false);
 
   const roomRef = useRef<Room | null>(null);
   const localAudioRef = useRef<LocalAudioTrack | null>(null);
@@ -510,6 +511,8 @@ export default function CallScreen() {
           localPreviewRef={localVideoEl}
           remoteVideoRef={remoteVideoEl}
           remoteAudioRef={remoteAudioEl}
+          swapped={videoSwapped}
+          onSwap={() => setVideoSwapped((s) => !s)}
         />
 
         {needsTapForSound && status === "connected" && (

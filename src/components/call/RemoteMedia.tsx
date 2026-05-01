@@ -5,24 +5,43 @@ type Props = {
   localPreviewRef: React.RefObject<HTMLDivElement>;
   remoteVideoRef: React.RefObject<HTMLDivElement>;
   remoteAudioRef: React.RefObject<HTMLAudioElement>;
+  /** When true, swap which video is shown big vs in the small PiP tile. */
+  swapped?: boolean;
+  onSwap?: () => void;
 };
 
 /**
  * Renders the remote video container (when video) and an always-present
  * <audio> element that twilio audio tracks attach to. Using a real <audio>
  * element (not a div) is what actually makes remote sound play in browsers.
+ *
+ * Both the big stage and the small PiP tile are always mounted so Twilio's
+ * attached <video> elements keep playing. We just flip which container is
+ * full-size vs the floating thumbnail when the user taps to swap.
  */
 const RemoteMedia = forwardRef<HTMLDivElement, Props>(
-  ({ showVideo, localPreviewRef, remoteVideoRef, remoteAudioRef }, _ref) => {
+  ({ showVideo, localPreviewRef, remoteVideoRef, remoteAudioRef, swapped = false, onSwap }, _ref) => {
     return (
       <>
         {showVideo ? (
           <div className="mx-6 mt-2 flex-1 rounded-2xl bg-black/40 border border-border relative overflow-hidden">
-            <div ref={remoteVideoRef} className="absolute inset-0" />
+            {/* Big stage — remote by default, local when swapped */}
             <div
-              ref={localPreviewRef}
-              className="absolute bottom-2 right-2 w-20 h-28 rounded-lg bg-secondary border border-border overflow-hidden"
+              ref={swapped ? localPreviewRef : remoteVideoRef}
+              className="absolute inset-0"
             />
+            {/* Small PiP tile — tap to swap which feed is big */}
+            <button
+              type="button"
+              onClick={onSwap}
+              aria-label="Swap video"
+              className="absolute bottom-2 right-2 w-20 h-28 rounded-lg bg-secondary border border-border overflow-hidden active:scale-95 transition-transform"
+            >
+              <div
+                ref={swapped ? remoteVideoRef : localPreviewRef}
+                className="absolute inset-0"
+              />
+            </button>
           </div>
         ) : (
           <div className="flex-1" />
