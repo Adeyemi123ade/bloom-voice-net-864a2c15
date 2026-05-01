@@ -27,9 +27,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { device_id, code, device_label } = await req.json();
+    const { device_id, code, device_label, platform } = await req.json();
     const deviceId = typeof device_id === "string" ? device_id.trim() : "";
     const cleanCode = typeof code === "string" ? code.replace(/\D/g, "") : "";
+    const plat: "mobile" | "web" = platform === "mobile" ? "mobile" : "web";
     if (!deviceId || cleanCode.length !== 6) {
       return new Response(JSON.stringify({ error: "invalid_input" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
