@@ -526,8 +526,13 @@ export default function CallScreen() {
           muted={muted}
           videoEnabled={videoEnabled}
           isVideo={isVideo}
+          speakerOn={speakerOn}
+          canSwitchCamera={canSwitchCamera}
           onToggleMute={toggleMute}
           onToggleVideo={toggleVideo}
+          onToggleSpeaker={toggleSpeaker}
+          onSwitchCamera={switchCamera}
+          onUpgradeToVideo={upgradeToVideo}
           onEndCall={endCall}
         />
       </div>
