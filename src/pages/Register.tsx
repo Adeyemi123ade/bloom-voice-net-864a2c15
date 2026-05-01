@@ -304,6 +304,7 @@ export default function Register() {
                   autoComplete="email"
                   value={email}
                   onChange={(e) => {
+                    if (googleVerified) return;
                     setEmail(e.target.value);
                     if (errors.email) {
                       setErrors((prev) => {
@@ -313,13 +314,19 @@ export default function Register() {
                       });
                     }
                   }}
-                  onBlur={handleEmailBlur}
+                  onBlur={googleVerified ? undefined : handleEmailBlur}
                   placeholder="you@example.com"
                   maxLength={255}
-                  className="mt-1 h-11 text-base bg-input border-border text-foreground placeholder:text-muted-foreground"
+                  readOnly={googleVerified}
+                  className={`mt-1 h-11 text-base bg-input border-border text-foreground placeholder:text-muted-foreground ${googleVerified ? "opacity-80" : ""}`}
                   aria-invalid={!!errors.email}
                 />
-                {emailChecking && !errors.email && (
+                {googleVerified && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Verified by Google. You can't change this here.
+                  </p>
+                )}
+                {!googleVerified && emailChecking && !errors.email && (
                   <p className="text-sm text-muted-foreground mt-1">Checking…</p>
                 )}
                 {errors.email && (
