@@ -215,7 +215,8 @@ export default function OutboundCall() {
             <button
               onClick={hangUp}
               aria-label="End call"
-              className="w-16 h-16 rounded-full bg-destructive hover:bg-destructive/90 text-destructive-foreground flex items-center justify-center"
+              className="w-16 h-16 rounded-full flex items-center justify-center"
+              style={{ backgroundColor: "#0B5D3B", color: "#FFFFFF" }}
             >
               <PhoneOff className="w-6 h-6" />
             </button>
