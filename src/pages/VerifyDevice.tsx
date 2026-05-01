@@ -28,6 +28,12 @@ export default function VerifyDevice() {
     otherDisplayName?: string | null;
   } | null) ?? {};
 
+  const reason: DeviceReason = state.reason ?? "new_device";
+  const isTakeover = reason === "device_takeover";
+  const isWebTakingOverMobile = reason === "web_mobile_active";
+  // Web-mobile takeover requires explicit confirmation BEFORE we show the OTP.
+  const [confirmedTakeover, setConfirmedTakeover] = useState(!isWebTakingOverMobile);
+
   const [code, setCode] = useState("");
   const [verifying, setVerifying] = useState(false);
   const [resending, setResending] = useState(false);
@@ -51,6 +57,7 @@ export default function VerifyDevice() {
       body: {
         device_id: getDeviceId(),
         device_label: getDeviceLabel(),
+        platform: getAppPlatform(),
         code: codeValue,
       },
     });
@@ -66,7 +73,12 @@ export default function VerifyDevice() {
       return;
     }
     markDeviceVerified(user.id);
-    toast({ title: state.reason === "device_takeover" ? "This phone is now yours" : "Device verified" });
+    const okTitle = isTakeover
+      ? "This phone is now yours"
+      : isWebTakingOverMobile
+        ? "Signed in. Your phone has been signed out."
+        : "Device verified";
+    toast({ title: okTitle });
     navigate("/home", { replace: true });
   };
 
@@ -82,7 +94,11 @@ export default function VerifyDevice() {
     if (secondsLeft > 0) return;
     setResending(true);
     const { error } = await supabase.functions.invoke("request-device-otp", {
-      body: { device_id: getDeviceId(), device_label: getDeviceLabel() },
+      body: {
+        device_id: getDeviceId(),
+        device_label: getDeviceLabel(),
+        platform: getAppPlatform(),
+      },
     });
     setResending(false);
     if (error) {
@@ -100,11 +116,46 @@ export default function VerifyDevice() {
 
   if (!user) return null;
 
-  const isTakeover = state.reason === "device_takeover";
-  const headline = isTakeover ? "This phone is in use" : "Verify this device";
+  const headline = isTakeover
+    ? "This phone is in use"
+    : isWebTakingOverMobile
+      ? "Your account is open on your phone"
+      : "Verify this device";
   const blurb = isTakeover
     ? `${state.otherDisplayName || "Another ChiChat account"} is currently signed in on this phone. Continuing will sign them out. Enter the 6-digit code we sent to your email to confirm.`
-    : `For your security, enter the 6-digit code we sent to ${user.email} to confirm this is you on a new device.`;
+    : isWebTakingOverMobile
+      ? `Your ChiChat account is currently active on ${state.otherDisplayName || "your phone"}. To sign in here on the web, your phone will be signed out. We've sent a 6-digit code to ${user.email} to confirm it's you.`
+      : `For your security, enter the 6-digit code we sent to ${user.email} to confirm this is you on a new device.`;
+
+  // Pre-OTP confirm screen for web takeover.
+  if (isWebTakingOverMobile && !confirmedTakeover) {
+    return (
+      <MobileFrame>
+        <div className="h-full w-full flex flex-col bg-background overflow-y-auto">
+          <div className="flex-1 flex flex-col px-4 pt-6 pb-6 items-center">
+            <BrandHero className="mt-1 mb-5" message="Account already in use" />
+            <h1 className="text-xl font-bold text-foreground text-center">{headline}</h1>
+            <p className="text-base text-muted-foreground text-center mt-3 leading-relaxed max-w-xs">
+              {blurb}
+            </p>
+            <Button
+              onClick={() => setConfirmedTakeover(true)}
+              className="w-full max-w-xs h-11 mt-8 text-base bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg"
+            >
+              Continue and sign my phone out
+            </Button>
+            <button
+              type="button"
+              onClick={cancelAndSignOut}
+              className="text-sm text-muted-foreground hover:text-foreground mt-4"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </MobileFrame>
+    );
+  }
 
   return (
     <MobileFrame>
