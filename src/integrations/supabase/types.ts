@@ -184,6 +184,45 @@ export type Database = {
         }
         Relationships: []
       }
+      device_login_challenges: {
+        Row: {
+          attempts: number
+          code_hash: string
+          consumed_at: string | null
+          created_at: string
+          device_id: string
+          email: string
+          expires_at: string
+          id: string
+          reason: string
+          user_id: string
+        }
+        Insert: {
+          attempts?: number
+          code_hash: string
+          consumed_at?: string | null
+          created_at?: string
+          device_id: string
+          email: string
+          expires_at: string
+          id?: string
+          reason: string
+          user_id: string
+        }
+        Update: {
+          attempts?: number
+          code_hash?: string
+          consumed_at?: string | null
+          created_at?: string
+          device_id?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          reason?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       device_push_tokens: {
         Row: {
           created_at: string
@@ -483,6 +522,33 @@ export type Database = {
         }
         Relationships: []
       }
+      user_devices: {
+        Row: {
+          created_at: string
+          device_id: string
+          device_label: string | null
+          id: string
+          last_verified_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          device_id: string
+          device_label?: string | null
+          id?: string
+          last_verified_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          device_id?: string
+          device_label?: string | null
+          id?: string
+          last_verified_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -492,6 +558,13 @@ export type Database = {
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
+      }
+      device_is_bound_to_other: {
+        Args: { _device_id: string; _user_id: string }
+        Returns: {
+          other_display_name: string
+          other_user_id: string
+        }[]
       }
       enqueue_email: {
         Args: { payload: Json; queue_name: string }
