@@ -44,6 +44,23 @@ export default function DeviceGate({ children }: { children: ReactNode }) {
     (async () => {
       setChecking(true);
       try {
+        // Step 1: block brand-new Google sign-ups (must register first).
+        const { data: googleCheck } = await supabase.functions.invoke("check-google-signup");
+        if (cancelled) return;
+        if (googleCheck && googleCheck.allowed === false) {
+          await supabase.auth.signOut();
+          toast({
+            title: "You don't have an account yet",
+            description: "Please register first. We've pre-filled the form with your Google details.",
+          });
+          navigate("/register", {
+            replace: true,
+            state: { prefill: { email: googleCheck.email, name: googleCheck.full_name } },
+          });
+          return;
+        }
+
+        // Step 2: device gate.
         const { data, error } = await supabase.functions.invoke("request-device-otp", {
           body: { device_id: getDeviceId(), device_label: getDeviceLabel() },
         });
