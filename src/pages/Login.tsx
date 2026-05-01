@@ -38,7 +38,11 @@ export default function Login() {
     });
     if (result.error) {
       setGoogleLoading(false);
-      toast({ title: "Google sign-in failed", description: result.error.message, variant: "destructive" });
+      toast({
+        title: "Google sign-in didn't work",
+        description: "We couldn't connect to your Google account. Please try again, or sign in with your email and password.",
+        variant: "destructive",
+      });
       return;
     }
     if (result.redirected) return;
@@ -65,11 +69,25 @@ export default function Login() {
     });
     setSubmitting(false);
     if (error) {
-      toast({
-        title: "Sign in failed",
-        description: error.message,
-        variant: "destructive",
-      });
+      const raw = (error.message || "").toLowerCase();
+      let title = "We couldn't sign you in";
+      let description = "Check your email and password, or create a new account if you don't have one yet.";
+
+      if (raw.includes("invalid") || raw.includes("credentials")) {
+        title = "Email or password doesn't match";
+        description = "Either this account doesn't exist (or was deleted), or the password is wrong. Check your details, reset your password, or create a new account.";
+      } else if (raw.includes("not confirmed") || raw.includes("confirm")) {
+        title = "Email not verified yet";
+        description = "Please check your inbox for the verification code we sent you.";
+      } else if (raw.includes("rate") || raw.includes("too many")) {
+        title = "Too many attempts";
+        description = "Please wait a moment and try again.";
+      } else if (raw.includes("network") || raw.includes("fetch")) {
+        title = "No internet connection";
+        description = "Check your connection and try again.";
+      }
+
+      toast({ title, description, variant: "destructive" });
       return;
     }
     toast({ title: "Welcome back" });
