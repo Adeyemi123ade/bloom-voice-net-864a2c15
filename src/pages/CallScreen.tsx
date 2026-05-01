@@ -153,7 +153,7 @@ export default function CallScreen() {
         .eq("status", "ringing");
       void logCallMessage("no_answer", 0);
       cleanupAndExit();
-    }, 10_000);
+    }, 45_000);
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [role, status, callId]);
@@ -243,6 +243,9 @@ export default function CallScreen() {
       localAudioRef.current?.stop();
       localVideoRef.current?.stop();
       roomRef.current?.disconnect();
+      // Clear video DOM immediately so the local preview disappears the moment the call ends.
+      if (localVideoEl.current) localVideoEl.current.innerHTML = "";
+      if (remoteVideoEl.current) remoteVideoEl.current.innerHTML = "";
     } catch {
       /* ignore */
     }
@@ -354,8 +357,16 @@ export default function CallScreen() {
       room.participants.forEach(handleParticipant);
       room.on("participantConnected", handleParticipant);
       room.on("participantDisconnected", () => {
-        toast({ title: "Other participant left" });
-        endCall();
+        // Twilio fires this on transient network blips during ICE/DTLS renegotiation.
+        // Wait briefly and only end the call if the remote really stayed gone.
+        window.setTimeout(() => {
+          if (endedRef.current) return;
+          if (!roomRef.current) return;
+          if (roomRef.current.participants.size === 0) {
+            toast({ title: "Other participant left" });
+            endCall();
+          }
+        }, 3500);
       });
       room.on("disconnected", cleanupAndExit);
 
