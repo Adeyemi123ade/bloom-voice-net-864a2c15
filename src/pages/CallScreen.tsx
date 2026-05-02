@@ -10,6 +10,7 @@ import {
   type RemoteParticipant,
   type RemoteTrack,
   type RemoteTrackPublication,
+  type RemoteVideoTrack,
 } from "twilio-video";
 import { Volume2 } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
