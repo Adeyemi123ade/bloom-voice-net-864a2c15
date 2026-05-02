@@ -124,6 +124,9 @@ const CSS = `
 .chichat-splash .cta-wrap {
   display: flex; justify-content: center; width: 100%;
   flex-shrink: 0;
+  /* Lift CTA ~1cm above the device gesture area so button + Sign in
+     never sit flush against the bottom of the decorative phone frame. */
+  margin-bottom: 38px;
   animation: chichat-rise 0.8s cubic-bezier(0.22,1,0.36,1) 1.70s both;
 }
 @media (orientation: landscape) and (max-height: 500px) {
