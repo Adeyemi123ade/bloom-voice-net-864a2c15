@@ -294,21 +294,17 @@ export default function CallScreen() {
     if (track.kind === "audio") {
       const el = remoteAudioEl.current;
       if (!el) return;
-      // Attach into our existing <audio> element so it actually plays.
       (track as unknown as { attach: (el: HTMLMediaElement) => HTMLMediaElement }).attach(el);
       void tryPlayRemoteAudio();
     } else if (track.kind === "video") {
-      const container = remoteVideoEl.current;
-      if (!container) return;
-      const videoEl = (
-        track as unknown as { attach: () => HTMLVideoElement }
-      ).attach();
-      videoEl.style.width = "100%";
-      videoEl.style.height = "100%";
-      videoEl.style.objectFit = "cover";
-      videoEl.setAttribute("playsinline", "true");
-      videoEl.muted = true; // video element shouldn't double-play audio
-      container.appendChild(videoEl);
+      // Hand the track to RemoteMedia, which owns DOM attachment.
+      setRemoteVideoTrack(track as RemoteVideoTrack);
+    }
+  };
+
+  const detachRemoteTrack = (track: RemoteTrack) => {
+    if (track.kind === "video") {
+      setRemoteVideoTrack((curr) => (curr === (track as RemoteVideoTrack) ? null : curr));
     }
   };
 
@@ -317,6 +313,7 @@ export default function CallScreen() {
       if (pub.track) attachRemoteTrack(pub.track);
     });
     participant.on("trackSubscribed", (track: RemoteTrack) => attachRemoteTrack(track));
+    participant.on("trackUnsubscribed", (track: RemoteTrack) => detachRemoteTrack(track));
   };
 
   const joinRoom = async () => {
