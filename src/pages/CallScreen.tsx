@@ -252,8 +252,8 @@ export default function CallScreen() {
       localVideoRef.current?.stop();
       roomRef.current?.disconnect();
       // Clear video DOM immediately so the local preview disappears the moment the call ends.
-      if (localVideoEl.current) localVideoEl.current.innerHTML = "";
-      if (remoteVideoEl.current) remoteVideoEl.current.innerHTML = "";
+      setLocalVideoTrack(null);
+      setRemoteVideoTrack(null);
     } catch {
       /* ignore */
     }
