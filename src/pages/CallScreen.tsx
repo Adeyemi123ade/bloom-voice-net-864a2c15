@@ -209,8 +209,8 @@ export default function CallScreen() {
         remoteAudioEl.current.srcObject = null;
       }
       clearPreparedCallMedia();
-      if (localVideoEl.current) localVideoEl.current.innerHTML = "";
-      if (remoteVideoEl.current) remoteVideoEl.current.innerHTML = "";
+      setLocalVideoTrack(null);
+      setRemoteVideoTrack(null);
     } catch {
       /* ignore */
     }
