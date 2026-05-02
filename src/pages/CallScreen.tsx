@@ -486,8 +486,8 @@ export default function CallScreen() {
       >
         <RemoteMedia
           showVideo={videoFullscreen}
-          localPreviewRef={localVideoEl}
-          remoteVideoRef={remoteVideoEl}
+          localVideoTrack={localVideoTrack}
+          remoteVideoTrack={remoteVideoTrack}
           remoteAudioRef={remoteAudioEl}
           swapped={videoSwapped}
           onSwap={() => setVideoSwapped((s) => !s)}
