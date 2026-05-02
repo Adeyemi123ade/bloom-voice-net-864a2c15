@@ -6,6 +6,8 @@ interface ChiChatCallsPlugin {
   startForegroundCall(): Promise<void>;
   stopForegroundCall(): Promise<void>;
   requestIgnoreBatteryOptimizations(): Promise<{ ok: boolean }>;
+  canUseFullScreenIntent(): Promise<{ granted: boolean }>;
+  requestFullScreenIntentPermission(): Promise<{ ok: boolean }>;
 }
 
 const ChiChatCalls = registerPlugin<ChiChatCallsPlugin>("ChiChatCalls");
@@ -37,5 +39,24 @@ export async function requestIgnoreBatteryOptimizations(): Promise<void> {
     await ChiChatCalls.requestIgnoreBatteryOptimizations();
   } catch (e) {
     console.warn("[chichat-calls] requestIgnoreBatteryOptimizations failed", e);
+  }
+}
+
+/**
+ * Ensure the user has granted Full-Screen-Intent permission. Required on
+ * Android 14+ for the screen to wake / lock-screen ringer to appear when an
+ * incoming call notification arrives. We only prompt once per app launch.
+ */
+let fsiAsked = false;
+export async function ensureFullScreenIntentPermission(): Promise<void> {
+  if (!isAndroidNative() || fsiAsked) return;
+  fsiAsked = true;
+  try {
+    const { granted } = await ChiChatCalls.canUseFullScreenIntent();
+    if (!granted) {
+      await ChiChatCalls.requestFullScreenIntentPermission();
+    }
+  } catch (e) {
+    console.warn("[chichat-calls] full-screen-intent check failed", e);
   }
 }

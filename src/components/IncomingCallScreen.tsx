@@ -8,6 +8,7 @@ import { toast } from "@/hooks/use-toast";
 import { getSelectedRingtone, playRingtone } from "@/lib/ringtones";
 import { startNativeCallNotifications } from "@/lib/nativeCallNotifications";
 import { registerForCallPush } from "@/lib/fcmRegistration";
+import { ensureFullScreenIntentPermission } from "@/lib/nativeCalls";
 import { formatCallMediaError, prepareCallMedia } from "@/lib/callMedia";
 
 type IncomingCall = {
@@ -131,6 +132,9 @@ export default function IncomingCallScreen() {
 
     void startNativeCallNotifications(user.id);
     void registerForCallPush(user.id);
+    // Android 14+ requires explicit user grant for full-screen-intent before
+    // the OS will wake the screen / show the ringing UI from a locked phone.
+    void ensureFullScreenIntentPermission();
 
     const handle = async (callId: string) => {
       if (handled.current.has(callId)) return;
