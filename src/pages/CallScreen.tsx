@@ -10,6 +10,7 @@ import {
   type RemoteParticipant,
   type RemoteTrack,
   type RemoteTrackPublication,
+  type RemoteVideoTrack,
 } from "twilio-video";
 import { Volume2 } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
@@ -48,12 +49,14 @@ export default function CallScreen() {
   const [seconds, setSeconds] = useState(0);
   const [needsTapForSound, setNeedsTapForSound] = useState(false);
   const [videoSwapped, setVideoSwapped] = useState(false);
+  // Tracks rendered by RemoteMedia. Keeping them in state guarantees the
+  // child re-attaches whenever a track is added, replaced, or removed.
+  const [localVideoTrack, setLocalVideoTrack] = useState<LocalVideoTrack | null>(null);
+  const [remoteVideoTrack, setRemoteVideoTrack] = useState<RemoteVideoTrack | null>(null);
 
   const roomRef = useRef<Room | null>(null);
   const localAudioRef = useRef<LocalAudioTrack | null>(null);
   const localVideoRef = useRef<LocalVideoTrack | null>(null);
-  const localVideoEl = useRef<HTMLDivElement>(null);
-  const remoteVideoEl = useRef<HTMLDivElement>(null);
   const remoteAudioEl = useRef<HTMLAudioElement>(null);
   const tickTimer = useRef<number | null>(null);
   const endedRef = useRef(false);
@@ -206,8 +209,8 @@ export default function CallScreen() {
         remoteAudioEl.current.srcObject = null;
       }
       clearPreparedCallMedia();
-      if (localVideoEl.current) localVideoEl.current.innerHTML = "";
-      if (remoteVideoEl.current) remoteVideoEl.current.innerHTML = "";
+      setLocalVideoTrack(null);
+      setRemoteVideoTrack(null);
     } catch {
       /* ignore */
     }
@@ -249,8 +252,8 @@ export default function CallScreen() {
       localVideoRef.current?.stop();
       roomRef.current?.disconnect();
       // Clear video DOM immediately so the local preview disappears the moment the call ends.
-      if (localVideoEl.current) localVideoEl.current.innerHTML = "";
-      if (remoteVideoEl.current) remoteVideoEl.current.innerHTML = "";
+      setLocalVideoTrack(null);
+      setRemoteVideoTrack(null);
     } catch {
       /* ignore */
     }
@@ -291,21 +294,17 @@ export default function CallScreen() {
     if (track.kind === "audio") {
       const el = remoteAudioEl.current;
       if (!el) return;
-      // Attach into our existing <audio> element so it actually plays.
       (track as unknown as { attach: (el: HTMLMediaElement) => HTMLMediaElement }).attach(el);
       void tryPlayRemoteAudio();
     } else if (track.kind === "video") {
-      const container = remoteVideoEl.current;
-      if (!container) return;
-      const videoEl = (
-        track as unknown as { attach: () => HTMLVideoElement }
-      ).attach();
-      videoEl.style.width = "100%";
-      videoEl.style.height = "100%";
-      videoEl.style.objectFit = "cover";
-      videoEl.setAttribute("playsinline", "true");
-      videoEl.muted = true; // video element shouldn't double-play audio
-      container.appendChild(videoEl);
+      // Hand the track to RemoteMedia, which owns DOM attachment.
+      setRemoteVideoTrack(track as RemoteVideoTrack);
+    }
+  };
+
+  const detachRemoteTrack = (track: RemoteTrack) => {
+    if (track.kind === "video") {
+      setRemoteVideoTrack((curr) => (curr === (track as RemoteVideoTrack) ? null : curr));
     }
   };
 
@@ -314,6 +313,7 @@ export default function CallScreen() {
       if (pub.track) attachRemoteTrack(pub.track);
     });
     participant.on("trackSubscribed", (track: RemoteTrack) => attachRemoteTrack(track));
+    participant.on("trackUnsubscribed", (track: RemoteTrack) => detachRemoteTrack(track));
   };
 
   const joinRoom = async () => {
@@ -335,15 +335,7 @@ export default function CallScreen() {
         const video = preparedMedia?.videoTrack ?? await createLocalVideoTrack({ width: 640 });
         localVideoRef.current = video;
         tracks.push(video);
-        if (localVideoEl.current) {
-          const el = video.attach();
-          el.style.width = "100%";
-          el.style.height = "100%";
-          el.style.objectFit = "cover";
-          el.setAttribute("playsinline", "true");
-          (el as HTMLVideoElement).muted = true;
-          localVideoEl.current.appendChild(el);
-        }
+        setLocalVideoTrack(video);
       } else if (preparedMedia?.videoTrack) {
         // Voice call: never publish video. Stop any prepared video track immediately.
         try { preparedMedia.videoTrack.stop(); } catch { /* ignore */ }
@@ -447,16 +439,7 @@ export default function CallScreen() {
       await room.localParticipant.publishTrack(newTrack);
       localVideoRef.current = newTrack;
       // Refresh local preview.
-      if (localVideoEl.current) {
-        localVideoEl.current.innerHTML = "";
-        const el = newTrack.attach();
-        el.style.width = "100%";
-        el.style.height = "100%";
-        el.style.objectFit = "cover";
-        el.setAttribute("playsinline", "true");
-        (el as HTMLVideoElement).muted = true;
-        localVideoEl.current.appendChild(el);
-      }
+      setLocalVideoTrack(newTrack);
       setFacingMode(next);
       setVideoEnabled(true);
     } catch (err) {
@@ -479,16 +462,7 @@ export default function CallScreen() {
       });
       await room.localParticipant.publishTrack(newTrack);
       localVideoRef.current = newTrack;
-      if (localVideoEl.current) {
-        localVideoEl.current.innerHTML = "";
-        const el = newTrack.attach();
-        el.style.width = "100%";
-        el.style.height = "100%";
-        el.style.objectFit = "cover";
-        el.setAttribute("playsinline", "true");
-        (el as HTMLVideoElement).muted = true;
-        localVideoEl.current.appendChild(el);
-      }
+      setLocalVideoTrack(newTrack);
       setIsVideo(true);
       setVideoEnabled(true);
       setFacingMode("user");
@@ -512,8 +486,8 @@ export default function CallScreen() {
       >
         <RemoteMedia
           showVideo={videoFullscreen}
-          localPreviewRef={localVideoEl}
-          remoteVideoRef={remoteVideoEl}
+          localVideoTrack={localVideoTrack}
+          remoteVideoTrack={remoteVideoTrack}
           remoteAudioRef={remoteAudioEl}
           swapped={videoSwapped}
           onSwap={() => setVideoSwapped((s) => !s)}

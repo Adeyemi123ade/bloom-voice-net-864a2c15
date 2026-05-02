@@ -1,9 +1,14 @@
 import { forwardRef, useEffect, useRef, useState, useCallback } from "react";
+import type { LocalVideoTrack, RemoteVideoTrack } from "twilio-video";
+
+type AttachableVideoTrack = LocalVideoTrack | RemoteVideoTrack;
 
 type Props = {
   showVideo: boolean;
-  localPreviewRef: React.RefObject<HTMLDivElement>;
-  remoteVideoRef: React.RefObject<HTMLDivElement>;
+  /** Local camera track (your own preview). */
+  localVideoTrack: AttachableVideoTrack | null;
+  /** Remote camera track (the other party). */
+  remoteVideoTrack: AttachableVideoTrack | null;
   remoteAudioRef: React.RefObject<HTMLAudioElement>;
   /** When true, swap which video is shown big vs in the small PiP tile. */
   swapped?: boolean;
@@ -11,15 +16,18 @@ type Props = {
 };
 
 /**
- * PiP tile is draggable anywhere on the screen. A click without drag swaps
- * the big/small feeds; a drag just repositions the tile.
+ * Owns DOM attachment for both video tracks so swap / drag / re-renders
+ * never lose a track. Big stage shows the remote feed (or local if swapped),
+ * PiP shows the other one. Tap the PiP to swap; drag to reposition.
  */
 const RemoteMedia = forwardRef<HTMLDivElement, Props>(
-  ({ showVideo, localPreviewRef, remoteVideoRef, remoteAudioRef, swapped = false, onSwap }, _ref) => {
-    // PiP dimensions (reduced ~130% from 288x384 → ~125x167)
+  ({ showVideo, localVideoTrack, remoteVideoTrack, remoteAudioRef, swapped = false, onSwap }, _ref) => {
     const PIP_W = 150;
     const PIP_H = 200;
     const MARGIN = 8;
+
+    const bigRef = useRef<HTMLDivElement>(null);
+    const pipRef = useRef<HTMLDivElement>(null);
 
     const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
     const draggingRef = useRef(false);
@@ -28,7 +36,46 @@ const RemoteMedia = forwardRef<HTMLDivElement, Props>(
       px: 0, py: 0, ox: 0, oy: 0,
     });
 
-    // Initialise position to bottom-right once we know viewport size.
+    // Decide which track goes where.
+    const bigTrack = swapped ? localVideoTrack : remoteVideoTrack;
+    const pipTrack = swapped ? remoteVideoTrack : localVideoTrack;
+
+    // Generic attach helper — clears the container then attaches the track
+    // as a styled <video> element. Returns a cleanup that detaches the track.
+    const attachTrackTo = useCallback(
+      (container: HTMLDivElement | null, track: AttachableVideoTrack | null, mutedEl: boolean) => {
+        if (!container) return () => {};
+        container.innerHTML = "";
+        if (!track) return () => {};
+        const el = (track as unknown as { attach: () => HTMLVideoElement }).attach();
+        el.style.width = "100%";
+        el.style.height = "100%";
+        el.style.objectFit = "cover";
+        el.setAttribute("playsinline", "true");
+        el.muted = mutedEl;
+        container.appendChild(el);
+        return () => {
+          try {
+            (track as unknown as { detach: (el: HTMLMediaElement) => HTMLMediaElement[] }).detach(el);
+          } catch { /* ignore */ }
+          if (el.parentNode) el.parentNode.removeChild(el);
+        };
+      },
+      [],
+    );
+
+    // Re-attach whenever showVideo flips, swap toggles, or a track changes.
+    useEffect(() => {
+      if (!showVideo) return;
+      const cleanupBig = attachTrackTo(bigRef.current, bigTrack, /*mutedEl*/ swapped /* big shows local? mute it */);
+      const cleanupPip = attachTrackTo(pipRef.current, pipTrack, /*mutedEl*/ !swapped /* pip shows local? mute it */);
+      return () => {
+        cleanupBig();
+        cleanupPip();
+      };
+    }, [showVideo, swapped, bigTrack, pipTrack, attachTrackTo]);
+
+    // Initialise PiP position to bottom-right once we know viewport size.
     useEffect(() => {
       if (!showVideo) return;
       if (pos) return;
@@ -36,11 +83,10 @@ const RemoteMedia = forwardRef<HTMLDivElement, Props>(
       const vh = window.innerHeight;
       setPos({
         x: vw - PIP_W - 16,
-        y: vh - PIP_H - 176, // sit above the controls bar
+        y: vh - PIP_H - 176,
       });
     }, [showVideo, pos]);
 
-    // Keep PiP on-screen if viewport resizes.
     useEffect(() => {
       const onResize = () => {
         setPos((p) => {
@@ -90,12 +136,9 @@ const RemoteMedia = forwardRef<HTMLDivElement, Props>(
       <>
         {showVideo ? (
           <>
-            {/* Full-bleed big stage — sits behind header & controls */}
+            {/* Full-bleed big stage */}
             <div className="fixed inset-0 z-0 bg-black">
-              <div
-                ref={swapped ? localPreviewRef : remoteVideoRef}
-                className="absolute inset-0"
-              />
+              <div ref={bigRef} className="absolute inset-0" />
             </div>
             {/* Draggable PiP tile — drag to reposition, tap to swap */}
             <div
@@ -115,16 +158,12 @@ const RemoteMedia = forwardRef<HTMLDivElement, Props>(
               }}
               className="fixed z-30 rounded-xl bg-secondary border border-border overflow-hidden shadow-lg cursor-grab active:cursor-grabbing select-none"
             >
-              <div
-                ref={swapped ? remoteVideoRef : localPreviewRef}
-                className="absolute inset-0 pointer-events-none"
-              />
+              <div ref={pipRef} className="absolute inset-0 pointer-events-none" />
             </div>
           </>
         ) : (
           <div className="flex-1" />
         )}
-        {/* Real audio element — Twilio attaches remote audio tracks here. */}
         <audio
           ref={remoteAudioRef}
           autoPlay
