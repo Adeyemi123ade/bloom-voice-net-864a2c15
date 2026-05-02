@@ -462,16 +462,7 @@ export default function CallScreen() {
       });
       await room.localParticipant.publishTrack(newTrack);
       localVideoRef.current = newTrack;
-      if (localVideoEl.current) {
-        localVideoEl.current.innerHTML = "";
-        const el = newTrack.attach();
-        el.style.width = "100%";
-        el.style.height = "100%";
-        el.style.objectFit = "cover";
-        el.setAttribute("playsinline", "true");
-        (el as HTMLVideoElement).muted = true;
-        localVideoEl.current.appendChild(el);
-      }
+      setLocalVideoTrack(newTrack);
       setIsVideo(true);
       setVideoEnabled(true);
       setFacingMode("user");
