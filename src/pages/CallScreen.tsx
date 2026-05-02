@@ -335,15 +335,7 @@ export default function CallScreen() {
         const video = preparedMedia?.videoTrack ?? await createLocalVideoTrack({ width: 640 });
         localVideoRef.current = video;
         tracks.push(video);
-        if (localVideoEl.current) {
-          const el = video.attach();
-          el.style.width = "100%";
-          el.style.height = "100%";
-          el.style.objectFit = "cover";
-          el.setAttribute("playsinline", "true");
-          (el as HTMLVideoElement).muted = true;
-          localVideoEl.current.appendChild(el);
-        }
+        setLocalVideoTrack(video);
       } else if (preparedMedia?.videoTrack) {
         // Voice call: never publish video. Stop any prepared video track immediately.
         try { preparedMedia.videoTrack.stop(); } catch { /* ignore */ }
