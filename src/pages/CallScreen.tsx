@@ -49,12 +49,14 @@ export default function CallScreen() {
   const [seconds, setSeconds] = useState(0);
   const [needsTapForSound, setNeedsTapForSound] = useState(false);
   const [videoSwapped, setVideoSwapped] = useState(false);
+  // Tracks rendered by RemoteMedia. Keeping them in state guarantees the
+  // child re-attaches whenever a track is added, replaced, or removed.
+  const [localVideoTrack, setLocalVideoTrack] = useState<LocalVideoTrack | null>(null);
+  const [remoteVideoTrack, setRemoteVideoTrack] = useState<RemoteVideoTrack | null>(null);
 
   const roomRef = useRef<Room | null>(null);
   const localAudioRef = useRef<LocalAudioTrack | null>(null);
   const localVideoRef = useRef<LocalVideoTrack | null>(null);
-  const localVideoEl = useRef<HTMLDivElement>(null);
-  const remoteVideoEl = useRef<HTMLDivElement>(null);
   const remoteAudioEl = useRef<HTMLAudioElement>(null);
   const tickTimer = useRef<number | null>(null);
   const endedRef = useRef(false);
