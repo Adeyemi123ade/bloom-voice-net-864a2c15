@@ -9,6 +9,7 @@ import { toast } from "@/hooks/use-toast";
 import { formatDisplay, toE164 } from "@/lib/phone";
 import SaveContactDialog from "@/components/SaveContactDialog";
 import { loadManualContacts, loadCachedContacts } from "@/lib/deviceContacts";
+import { startCallForegroundService, stopCallForegroundService } from "@/lib/nativeCalls";
 
 type Status = "connecting" | "ringing" | "connected" | "ended" | "failed";
 
@@ -79,6 +80,11 @@ export default function OutboundCall() {
 
         if (cancelled || endedRef.current) return;
 
+        // Start the Android foreground service BEFORE connecting so the
+        // audio session is already in MODE_IN_COMMUNICATION when WebRTC
+        // begins streaming. Without this, both ends hear silence.
+        await startCallForegroundService();
+
         const call = await device.connect({ params: { To: e164 } });
         callRef.current = call;
         setStatus("ringing");
@@ -132,6 +138,7 @@ export default function OutboundCall() {
     } catch {
       /* ignore */
     }
+    void stopCallForegroundService();
     callRef.current = null;
     deviceRef.current = null;
   };
