@@ -27,6 +27,7 @@ import GoogleReturn from "./pages/GoogleReturn.tsx";
 import OutboundCall from "./pages/OutboundCall.tsx";
 import NewContact from "./pages/NewContact.tsx";
 import InviteFriends from "./pages/InviteFriends.tsx";
+import MicTest from "./pages/MicTest.tsx";
 import MessageNotifier from "./components/MessageNotifier.tsx";
 import IncomingCallScreen from "./components/IncomingCallScreen.tsx";
 import DeviceGate from "./components/DeviceGate.tsx";
