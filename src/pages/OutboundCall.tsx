@@ -138,6 +138,7 @@ export default function OutboundCall() {
     } catch {
       /* ignore */
     }
+    void stopCallForegroundService();
     callRef.current = null;
     deviceRef.current = null;
   };
