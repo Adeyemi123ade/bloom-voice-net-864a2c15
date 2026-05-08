@@ -320,6 +320,11 @@ export default function CallScreen() {
     if (roomRef.current) return;
     setStatus("connecting");
     try {
+      // On Android native, the voice audio route must be active before
+      // Twilio starts capturing/publishing WebRTC tracks. Starting this only
+      // after "connected" can leave both sides with silent call media.
+      await startCallForegroundService();
+
       const { data: tokenData, error: tokenErr } = await supabase.functions.invoke(
         "twilio-token",
         { body: { roomName } },
