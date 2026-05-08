@@ -9,6 +9,7 @@ import { toast } from "@/hooks/use-toast";
 import { formatDisplay, toE164 } from "@/lib/phone";
 import SaveContactDialog from "@/components/SaveContactDialog";
 import { loadManualContacts, loadCachedContacts } from "@/lib/deviceContacts";
+import { startCallForegroundService, stopCallForegroundService } from "@/lib/nativeCalls";
 
 type Status = "connecting" | "ringing" | "connected" | "ended" | "failed";
 
