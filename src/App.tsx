@@ -67,6 +67,7 @@ const App = () => (
                 <Route path="/verify-email" element={<VerifyEmail />} />
                 <Route path="/verify-device" element={<VerifyDevice />} />
                 <Route path="/dial/:number" element={<OutboundCall />} />
+                <Route path="/mic-test" element={<MicTest />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
