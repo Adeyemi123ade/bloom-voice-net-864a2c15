@@ -80,6 +80,11 @@ export default function OutboundCall() {
 
         if (cancelled || endedRef.current) return;
 
+        // Start the Android foreground service BEFORE connecting so the
+        // audio session is already in MODE_IN_COMMUNICATION when WebRTC
+        // begins streaming. Without this, both ends hear silence.
+        await startCallForegroundService();
+
         const call = await device.connect({ params: { To: e164 } });
         callRef.current = call;
         setStatus("ringing");
