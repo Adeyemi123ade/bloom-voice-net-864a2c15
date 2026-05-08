@@ -27,6 +27,7 @@ import GoogleReturn from "./pages/GoogleReturn.tsx";
 import OutboundCall from "./pages/OutboundCall.tsx";
 import NewContact from "./pages/NewContact.tsx";
 import InviteFriends from "./pages/InviteFriends.tsx";
+import MicTest from "./pages/MicTest.tsx";
 import MessageNotifier from "./components/MessageNotifier.tsx";
 import IncomingCallScreen from "./components/IncomingCallScreen.tsx";
 import DeviceGate from "./components/DeviceGate.tsx";
@@ -66,6 +67,7 @@ const App = () => (
                 <Route path="/verify-email" element={<VerifyEmail />} />
                 <Route path="/verify-device" element={<VerifyDevice />} />
                 <Route path="/dial/:number" element={<OutboundCall />} />
+                <Route path="/mic-test" element={<MicTest />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
