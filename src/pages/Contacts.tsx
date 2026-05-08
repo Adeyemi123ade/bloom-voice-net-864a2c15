@@ -44,6 +44,8 @@ import {
 import { ActiveRow, EmptyState, InviteRow } from "@/components/contacts/ContactRows";
 import { SectionList, sectionLetter } from "@/components/contacts/ContactSectionList";
 import { shareChichatInvite } from "@/components/contacts/ShareInviteCard";
+import { clearPreparedCallMedia, formatCallMediaError, prepareCallMedia } from "@/lib/callMedia";
+import { requestIgnoreBatteryOptimizations } from "@/lib/nativeCalls";
 
 export default function Contacts() {
   const navigate = useNavigate();
@@ -284,6 +286,20 @@ export default function Contacts() {
 
   const callActive = async (c: ActiveContact) => {
     if (!user) return;
+    if (!localStorage.getItem("chichat:battery-prompt-shown")) {
+      void requestIgnoreBatteryOptimizations();
+      localStorage.setItem("chichat:battery-prompt-shown", "1");
+    }
+    try {
+      await prepareCallMedia(false);
+    } catch (error) {
+      toast({
+        title: "Call permission needed",
+        description: formatCallMediaError(error, false),
+        variant: "destructive",
+      });
+      return;
+    }
     try {
       const conversationId = await supabase
         .rpc("start_direct_conversation", { _other_user: c.user_id })
@@ -296,7 +312,10 @@ export default function Contacts() {
       const { error: roomErr } = await supabase.functions.invoke("twilio-room", {
         body: { action: "create", roomName },
       });
-      if (roomErr) throw roomErr;
+      if (roomErr) {
+        clearPreparedCallMedia();
+        throw roomErr;
+      }
 
       const { data: callRow, error: callErr } = await supabase
         .from("calls")
@@ -326,6 +345,7 @@ export default function Contacts() {
         { replace: true },
       );
     } catch (err) {
+      clearPreparedCallMedia();
       const msg = err instanceof Error ? err.message : "Could not start call";
       toast({ title: "Call failed", description: msg, variant: "destructive" });
     }
