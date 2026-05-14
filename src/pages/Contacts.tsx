@@ -534,6 +534,16 @@ export default function Contacts() {
               label="New Contact"
               onClick={() => navigate("/contacts/new")}
             />
+            {canPickWebContacts && (
+              <>
+                <Divider />
+                <ActionRow
+                  icon={Smartphone}
+                  label={syncing ? "Importing…" : "Import from phone"}
+                  onClick={importFromPhone}
+                />
+              </>
+            )}
             <Divider />
             <ActionRow
               icon={Heart}
