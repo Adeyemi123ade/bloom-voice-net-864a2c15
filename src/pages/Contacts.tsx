@@ -21,11 +21,14 @@ import { formatDisplay } from "@/lib/phone";
 import {
   DeviceContact,
   isNativePlatform,
+  isWebContactPickerSupported,
   loadCachedContacts,
   loadManualContacts,
   loadNativeContacts,
+  pickWebContacts,
   removeManualContact,
   saveCachedContacts,
+  saveManualContacts,
 } from "@/lib/deviceContacts";
 import {
   isGoogleConnected,
