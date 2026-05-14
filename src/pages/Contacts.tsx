@@ -7,6 +7,7 @@ import {
   MessageSquare,
   Phone,
   Search,
+  Smartphone,
   UserPlus,
   Users,
 } from "lucide-react";
@@ -20,11 +21,14 @@ import { formatDisplay } from "@/lib/phone";
 import {
   DeviceContact,
   isNativePlatform,
+  isWebContactPickerSupported,
   loadCachedContacts,
   loadManualContacts,
   loadNativeContacts,
+  pickWebContacts,
   removeManualContact,
   saveCachedContacts,
+  saveManualContacts,
 } from "@/lib/deviceContacts";
 import {
   isGoogleConnected,
@@ -206,6 +210,50 @@ export default function Contacts() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Could not load contacts";
       toast({ title: "Sync failed", description: msg, variant: "destructive" });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const canPickWebContacts = isWebContactPickerSupported() && !isNativePlatform();
+
+  const importFromPhone = async () => {
+    setSyncing(true);
+    try {
+      const picked = await pickWebContacts();
+      if (!picked.length) {
+        toast({ title: "No contacts selected" });
+        return;
+      }
+      const existing = loadManualContacts();
+      const byPhone = new Map(existing.map((c) => [c.phones[0], c]));
+      for (const c of picked) {
+        const key = c.phones[0];
+        if (!byPhone.has(key)) byPhone.set(key, c);
+      }
+      const updatedManual = Array.from(byPhone.values());
+      saveManualContacts(updatedManual);
+      const cached = loadCachedContacts() ?? [];
+      const merged = mergeContacts(cached, updatedManual);
+      setContacts(merged);
+      await runMatch(merged);
+      toast({
+        title: `Imported ${picked.length} contact${picked.length === 1 ? "" : "s"}`,
+      });
+    } catch (err) {
+      const code = err instanceof Error ? err.message : "";
+      if (code === "NOT_SUPPORTED") {
+        toast({
+          title: "Not supported on this browser",
+          description: "Open Chichat in Chrome on Android to import phone contacts.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Import cancelled",
+          description: err instanceof Error ? err.message : "Try again.",
+        });
+      }
     } finally {
       setSyncing(false);
     }
@@ -486,6 +534,16 @@ export default function Contacts() {
               label="New Contact"
               onClick={() => navigate("/contacts/new")}
             />
+            {canPickWebContacts && (
+              <>
+                <Divider />
+                <ActionRow
+                  icon={Smartphone}
+                  label={syncing ? "Importing…" : "Import from phone"}
+                  onClick={importFromPhone}
+                />
+              </>
+            )}
             <Divider />
             <ActionRow
               icon={Heart}

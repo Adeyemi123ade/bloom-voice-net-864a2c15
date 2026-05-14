@@ -53,6 +53,51 @@ export async function loadNativeContacts(): Promise<DeviceContact[]> {
   return list;
 }
 
+/**
+ * True when the browser supports the Contact Picker API
+ * (Android Chrome 80+, served over HTTPS, in the top-level frame).
+ */
+export function isWebContactPickerSupported(): boolean {
+  try {
+    return (
+      typeof navigator !== "undefined" &&
+      "contacts" in navigator &&
+      typeof (navigator as Navigator & { contacts?: { select?: unknown } })
+        .contacts?.select === "function"
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Show the native Android Chrome contact picker. The user picks one or more
+ * contacts and the browser returns just those — we never get bulk access.
+ */
+export async function pickWebContacts(): Promise<DeviceContact[]> {
+  if (!isWebContactPickerSupported()) throw new Error("NOT_SUPPORTED");
+  const nav = navigator as Navigator & {
+    contacts: {
+      select: (
+        props: string[],
+        opts?: { multiple?: boolean },
+      ) => Promise<Array<{ name?: string[]; tel?: string[] }>>;
+    };
+  };
+  const picked = await nav.contacts.select(["name", "tel"], { multiple: true });
+  const list: DeviceContact[] = [];
+  for (const c of picked ?? []) {
+    const name = (c.name?.[0] ?? "").trim();
+    const phones: string[] = [];
+    for (const t of c.tel ?? []) {
+      const e = toE164(t);
+      if (e && !phones.includes(e)) phones.push(e);
+    }
+    if (phones.length) list.push({ name: name || phones[0], phones });
+  }
+  return list;
+}
+
 const CACHE_KEY = "chichat:contacts:v1";
 const CACHE_TTL_MS = 30 * 60 * 1000;
 
