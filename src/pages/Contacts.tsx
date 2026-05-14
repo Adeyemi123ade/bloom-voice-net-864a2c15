@@ -7,6 +7,7 @@ import {
   MessageSquare,
   Phone,
   Search,
+  Smartphone,
   UserPlus,
   Users,
 } from "lucide-react";
