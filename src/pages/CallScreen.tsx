@@ -55,6 +55,9 @@ export default function CallScreen() {
   // child re-attaches whenever a track is added, replaced, or removed.
   const [localVideoTrack, setLocalVideoTrack] = useState<LocalVideoTrack | null>(null);
   const [remoteVideoTrack, setRemoteVideoTrack] = useState<RemoteVideoTrack | null>(null);
+  const [upgradeRequest, setUpgradeRequest] = useState<"incoming" | "outgoing" | null>(null);
+  const callChannelRef = useRef<RealtimeChannel | null>(null);
+  const upgradeTimeoutRef = useRef<number | null>(null);
 
   const roomRef = useRef<Room | null>(null);
   const localAudioRef = useRef<LocalAudioTrack | null>(null);
