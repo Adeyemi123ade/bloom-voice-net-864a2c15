@@ -17,6 +17,8 @@ import MobileFrame from "@/components/MobileFrame";
 import CallHeader from "@/components/call/CallHeader";
 import CallControls from "@/components/call/CallControls";
 import RemoteMedia from "@/components/call/RemoteMedia";
+import VideoUpgradePrompt from "@/components/call/VideoUpgradePrompt";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useAuth } from "@/hooks/useAuth";
 import { useRingback } from "@/hooks/useRingback";
 import { supabase } from "@/integrations/supabase/client";
@@ -53,6 +55,9 @@ export default function CallScreen() {
   // child re-attaches whenever a track is added, replaced, or removed.
   const [localVideoTrack, setLocalVideoTrack] = useState<LocalVideoTrack | null>(null);
   const [remoteVideoTrack, setRemoteVideoTrack] = useState<RemoteVideoTrack | null>(null);
+  const [upgradeRequest, setUpgradeRequest] = useState<"incoming" | "outgoing" | null>(null);
+  const callChannelRef = useRef<RealtimeChannel | null>(null);
+  const upgradeTimeoutRef = useRef<number | null>(null);
 
   const roomRef = useRef<Room | null>(null);
   const localAudioRef = useRef<LocalAudioTrack | null>(null);
@@ -119,7 +124,7 @@ export default function CallScreen() {
   useEffect(() => {
     if (!callId) return;
     const ch = supabase
-      .channel(`call-${callId}`)
+      .channel(`call-${callId}`, { config: { broadcast: { self: false } } })
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "calls", filter: `id=eq.${callId}` },
@@ -128,12 +133,31 @@ export default function CallScreen() {
           handleCallStatus(row.status);
         },
       )
+      .on("broadcast", { event: "video-upgrade-request" }, () => {
+        if (isVideo || endedRef.current) return;
+        setUpgradeRequest("incoming");
+      })
+      .on("broadcast", { event: "video-upgrade-response" }, ({ payload }) => {
+        const accepted = !!(payload as { accepted?: boolean })?.accepted;
+        if (upgradeTimeoutRef.current) window.clearTimeout(upgradeTimeoutRef.current);
+        setUpgradeRequest(null);
+        if (accepted) {
+          void publishLocalVideo();
+        } else {
+          toast({ title: "Video request declined" });
+        }
+      })
+      .on("broadcast", { event: "video-upgrade-cancel" }, () => {
+        setUpgradeRequest((curr) => (curr === "incoming" ? null : curr));
+      })
       .subscribe();
+    callChannelRef.current = ch;
     return () => {
+      callChannelRef.current = null;
       supabase.removeChannel(ch);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [callId, status, role]);
+  }, [callId, status, role, isVideo]);
 
   useEffect(() => {
     if (!callId || status === "ended") return;
@@ -456,8 +480,8 @@ export default function CallScreen() {
     }
   };
 
-  // Upgrade an active voice call to a video call by adding a camera track on the fly.
-  const upgradeToVideo = async () => {
+  // Actually publish a local camera track and flip UI to video mode.
+  const publishLocalVideo = async () => {
     const room = roomRef.current;
     if (!room || isVideo) return;
     try {
@@ -476,6 +500,68 @@ export default function CallScreen() {
         title: "Couldn't switch to video",
         description: formatCallMediaError(err, true),
         variant: "destructive",
+      });
+    }
+  };
+
+  // Request the other party's consent before switching to video. Both sides
+  // must enable their camera so the call is truly video on both ends.
+  const upgradeToVideo = () => {
+    const room = roomRef.current;
+    const ch = callChannelRef.current;
+    if (!room || isVideo || !ch || upgradeRequest) return;
+    setUpgradeRequest("outgoing");
+    void ch.send({
+      type: "broadcast",
+      event: "video-upgrade-request",
+      payload: { fromUserId: user?.id },
+    });
+    if (upgradeTimeoutRef.current) window.clearTimeout(upgradeTimeoutRef.current);
+    upgradeTimeoutRef.current = window.setTimeout(() => {
+      setUpgradeRequest((curr) => {
+        if (curr === "outgoing") {
+          toast({ title: "No response to video request" });
+          return null;
+        }
+        return curr;
+      });
+    }, 20_000);
+  };
+
+  const cancelVideoUpgrade = () => {
+    const ch = callChannelRef.current;
+    if (upgradeTimeoutRef.current) window.clearTimeout(upgradeTimeoutRef.current);
+    setUpgradeRequest(null);
+    if (ch) {
+      void ch.send({
+        type: "broadcast",
+        event: "video-upgrade-cancel",
+        payload: { fromUserId: user?.id },
+      });
+    }
+  };
+
+  const acceptVideoUpgrade = async () => {
+    const ch = callChannelRef.current;
+    setUpgradeRequest(null);
+    if (ch) {
+      void ch.send({
+        type: "broadcast",
+        event: "video-upgrade-response",
+        payload: { accepted: true, fromUserId: user?.id },
+      });
+    }
+    await publishLocalVideo();
+  };
+
+  const declineVideoUpgrade = () => {
+    const ch = callChannelRef.current;
+    setUpgradeRequest(null);
+    if (ch) {
+      void ch.send({
+        type: "broadcast",
+        event: "video-upgrade-response",
+        payload: { accepted: false, fromUserId: user?.id },
       });
     }
   };
@@ -527,6 +613,15 @@ export default function CallScreen() {
               : ""
           }
         >
+        {upgradeRequest && status === "connected" && (
+          <VideoUpgradePrompt
+            mode={upgradeRequest}
+            fromName={other?.display_name}
+            onAccept={acceptVideoUpgrade}
+            onDecline={declineVideoUpgrade}
+            onCancel={cancelVideoUpgrade}
+          />
+        )}
         <CallControls
           muted={muted}
           videoEnabled={videoEnabled}
