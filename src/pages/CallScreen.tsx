@@ -17,6 +17,8 @@ import MobileFrame from "@/components/MobileFrame";
 import CallHeader from "@/components/call/CallHeader";
 import CallControls from "@/components/call/CallControls";
 import RemoteMedia from "@/components/call/RemoteMedia";
+import VideoUpgradePrompt from "@/components/call/VideoUpgradePrompt";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useAuth } from "@/hooks/useAuth";
 import { useRingback } from "@/hooks/useRingback";
 import { supabase } from "@/integrations/supabase/client";
