@@ -480,8 +480,8 @@ export default function CallScreen() {
     }
   };
 
-  // Upgrade an active voice call to a video call by adding a camera track on the fly.
-  const upgradeToVideo = async () => {
+  // Actually publish a local camera track and flip UI to video mode.
+  const publishLocalVideo = async () => {
     const room = roomRef.current;
     if (!room || isVideo) return;
     try {
@@ -500,6 +500,68 @@ export default function CallScreen() {
         title: "Couldn't switch to video",
         description: formatCallMediaError(err, true),
         variant: "destructive",
+      });
+    }
+  };
+
+  // Request the other party's consent before switching to video. Both sides
+  // must enable their camera so the call is truly video on both ends.
+  const upgradeToVideo = () => {
+    const room = roomRef.current;
+    const ch = callChannelRef.current;
+    if (!room || isVideo || !ch || upgradeRequest) return;
+    setUpgradeRequest("outgoing");
+    void ch.send({
+      type: "broadcast",
+      event: "video-upgrade-request",
+      payload: { fromUserId: user?.id },
+    });
+    if (upgradeTimeoutRef.current) window.clearTimeout(upgradeTimeoutRef.current);
+    upgradeTimeoutRef.current = window.setTimeout(() => {
+      setUpgradeRequest((curr) => {
+        if (curr === "outgoing") {
+          toast({ title: "No response to video request" });
+          return null;
+        }
+        return curr;
+      });
+    }, 20_000);
+  };
+
+  const cancelVideoUpgrade = () => {
+    const ch = callChannelRef.current;
+    if (upgradeTimeoutRef.current) window.clearTimeout(upgradeTimeoutRef.current);
+    setUpgradeRequest(null);
+    if (ch) {
+      void ch.send({
+        type: "broadcast",
+        event: "video-upgrade-cancel",
+        payload: { fromUserId: user?.id },
+      });
+    }
+  };
+
+  const acceptVideoUpgrade = async () => {
+    const ch = callChannelRef.current;
+    setUpgradeRequest(null);
+    if (ch) {
+      void ch.send({
+        type: "broadcast",
+        event: "video-upgrade-response",
+        payload: { accepted: true, fromUserId: user?.id },
+      });
+    }
+    await publishLocalVideo();
+  };
+
+  const declineVideoUpgrade = () => {
+    const ch = callChannelRef.current;
+    setUpgradeRequest(null);
+    if (ch) {
+      void ch.send({
+        type: "broadcast",
+        event: "video-upgrade-response",
+        payload: { accepted: false, fromUserId: user?.id },
       });
     }
   };
