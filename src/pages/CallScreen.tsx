@@ -613,6 +613,15 @@ export default function CallScreen() {
               : ""
           }
         >
+        {upgradeRequest && status === "connected" && (
+          <VideoUpgradePrompt
+            mode={upgradeRequest}
+            fromName={other?.display_name}
+            onAccept={acceptVideoUpgrade}
+            onDecline={declineVideoUpgrade}
+            onCancel={cancelVideoUpgrade}
+          />
+        )}
         <CallControls
           muted={muted}
           videoEnabled={videoEnabled}
