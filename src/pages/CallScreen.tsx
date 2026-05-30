@@ -124,7 +124,7 @@ export default function CallScreen() {
   useEffect(() => {
     if (!callId) return;
     const ch = supabase
-      .channel(`call-${callId}`)
+      .channel(`call-${callId}`, { config: { broadcast: { self: false } } })
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "calls", filter: `id=eq.${callId}` },
@@ -133,12 +133,31 @@ export default function CallScreen() {
           handleCallStatus(row.status);
         },
       )
+      .on("broadcast", { event: "video-upgrade-request" }, () => {
+        if (isVideo || endedRef.current) return;
+        setUpgradeRequest("incoming");
+      })
+      .on("broadcast", { event: "video-upgrade-response" }, ({ payload }) => {
+        const accepted = !!(payload as { accepted?: boolean })?.accepted;
+        if (upgradeTimeoutRef.current) window.clearTimeout(upgradeTimeoutRef.current);
+        setUpgradeRequest(null);
+        if (accepted) {
+          void publishLocalVideo();
+        } else {
+          toast({ title: "Video request declined" });
+        }
+      })
+      .on("broadcast", { event: "video-upgrade-cancel" }, () => {
+        setUpgradeRequest((curr) => (curr === "incoming" ? null : curr));
+      })
       .subscribe();
+    callChannelRef.current = ch;
     return () => {
+      callChannelRef.current = null;
       supabase.removeChannel(ch);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [callId, status, role]);
+  }, [callId, status, role, isVideo]);
 
   useEffect(() => {
     if (!callId || status === "ended") return;
