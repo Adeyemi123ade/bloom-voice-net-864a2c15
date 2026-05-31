@@ -199,15 +199,19 @@ export default function Register() {
       body: { email: parsed.data.email, phone: e164 },
     });
     if (availabilityError || (availability as { error?: string } | null)?.error) {
-      setSubmitting(false);
-      toast({
-        title: "Couldn't check your account details",
-        description: "Please try again in a moment.",
-        variant: "destructive",
-      });
-      return;
+      const emailExists = await checkEmailExists(parsed.data.email);
+      if (emailExists === true) {
+        setSubmitting(false);
+        setErrors({ email: "This email is already registered — sign in instead" });
+        toast({
+          title: "Email already registered",
+          description: `${parsed.data.email} already has an account. Try signing in.`,
+          variant: "destructive",
+        });
+        return;
+      }
     }
-    const availabilityResult = availability as { email_exists?: boolean; phone_exists?: boolean } | null;
+    const availabilityResult = availabilityError ? null : availability as { email_exists?: boolean; phone_exists?: boolean } | null;
     if (availabilityResult?.email_exists || availabilityResult?.phone_exists) {
       setSubmitting(false);
       const nextErrors: FormErrors = {};
