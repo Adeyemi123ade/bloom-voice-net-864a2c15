@@ -25,5 +25,3 @@ project_id = "tlyqomftfabnpczxefkp"
     verify_jwt = false
   [functions.check-google-signup]
     verify_jwt = false
-[functions.reveal-lovable-key]
-verify_jwt = false
