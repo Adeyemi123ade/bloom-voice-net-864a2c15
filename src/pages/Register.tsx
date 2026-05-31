@@ -195,6 +195,37 @@ export default function Register() {
       return;
     }
 
+    const { data: availability, error: availabilityError } = await supabase.functions.invoke("check-registration-availability", {
+      body: { email: parsed.data.email, phone: e164 },
+    });
+    if (availabilityError || (availability as { error?: string } | null)?.error) {
+      setSubmitting(false);
+      toast({
+        title: "Couldn't check your account details",
+        description: "Please try again in a moment.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const availabilityResult = availability as { email_exists?: boolean; phone_exists?: boolean } | null;
+    if (availabilityResult?.email_exists || availabilityResult?.phone_exists) {
+      setSubmitting(false);
+      const nextErrors: FormErrors = {};
+      if (availabilityResult.email_exists) nextErrors.email = "This email is already registered — sign in instead";
+      if (availabilityResult.phone_exists) nextErrors.phone = `${e164} is already registered — sign in instead`;
+      setErrors(nextErrors);
+      toast({
+        title: availabilityResult.email_exists && availabilityResult.phone_exists
+          ? "Email and phone already registered"
+          : availabilityResult.email_exists
+            ? "Email already registered"
+            : "Phone number already registered",
+        description: "This account detail is already in use. Sign in instead, or use different details for a new account.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Standard email/password sign-up.
     const { data: signUpData, error } = await supabase.auth.signUp({
       email: parsed.data.email,
