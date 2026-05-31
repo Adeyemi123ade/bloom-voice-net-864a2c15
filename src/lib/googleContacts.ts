@@ -32,10 +32,14 @@ function resolveRedirectUri(): string {
     origin.startsWith("https://") &&
     !origin.includes("localhost") &&
     !origin.startsWith("capacitor://");
-  // Use the live web origin when we're already on a real https domain
-  // (covers preview + published + custom domains). Otherwise fall back to
-  // the published URL so Google always sees an allowed redirect.
-  return isWebHttps
+  // Lovable preview domains (lovableproject.com / preview ids on lovable.app)
+  // are NOT registered with Google's OAuth client — only the published web
+  // origin is. Force the production redirect for those so Google doesn't 404
+  // the user with a redirect_uri_mismatch.
+  const isPreview =
+    origin.includes("lovableproject.com") ||
+    origin.includes("id-preview--");
+  return isWebHttps && !isPreview
     ? `${origin}/settings`
     : "https://bloom-voice-net.lovable.app/settings";
 }
@@ -49,7 +53,21 @@ export async function startGoogleContactsConnect(): Promise<void> {
   );
   if (error || !data?.url) throw error ?? new Error("Failed to build auth URL");
   sessionStorage.setItem(PENDING_KEY, JSON.stringify({ redirect_uri } satisfies PendingState));
-  window.location.href = data.url;
+
+  // If the redirect URI is on a different origin than we're on now (e.g.
+  // running inside the Lovable preview iframe but redirecting to the
+  // published URL), open Google in a new tab so the user isn't stranded on a
+  // different origin. Same-origin flows stay in-tab as before.
+  const sameOrigin = redirect_uri.startsWith(window.location.origin);
+  if (sameOrigin) {
+    window.location.href = data.url;
+  } else {
+    const popup = window.open(data.url, "_blank", "noopener,noreferrer");
+    if (!popup) {
+      // Popup blocked — fall back so the user can still complete the flow.
+      window.location.href = data.url;
+    }
+  }
 }
 
 /** Call after redirect back from Google with ?code=... in URL. */
