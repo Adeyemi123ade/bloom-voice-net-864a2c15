@@ -9,14 +9,23 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { toE164 } from "@/lib/phone";
 
 
 const loginSchema = z.object({
-  email: z.string().trim().email({ message: "Enter a valid email address" }).max(255),
+  identifier: z.string().trim().min(1, { message: "Enter your email or phone number" }).max(255),
   password: z.string().min(1, { message: "Password is required" }).max(72),
 });
 
-type FormErrors = Partial<Record<"email" | "password", string>>;
+type FormErrors = Partial<Record<"identifier" | "password", string>>;
+
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
+function normalizeIdentifier(value: string) {
+  const trimmed = value.trim();
+  if (EMAIL_RE.test(trimmed)) return trimmed.toLowerCase();
+  return toE164(trimmed);
+}
 
 export default function Login() {
   const navigate = useNavigate();
@@ -24,7 +33,7 @@ export default function Login() {
   useEffect(() => {
     if (!authLoading && user) navigate("/home", { replace: true });
   }, [authLoading, user, navigate]);
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
@@ -55,7 +64,7 @@ export default function Login() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const result = loginSchema.safeParse({ email, password });
+    const result = loginSchema.safeParse({ identifier, password });
     if (!result.success) {
       const fieldErrors: FormErrors = {};
       result.error.issues.forEach((issue) => {
@@ -63,6 +72,11 @@ export default function Login() {
         if (!fieldErrors[key]) fieldErrors[key] = issue.message;
       });
       setErrors(fieldErrors);
+      return;
+    }
+    const normalizedIdentifier = normalizeIdentifier(result.data.identifier);
+    if (!normalizedIdentifier) {
+      setErrors({ identifier: "Enter a valid email or full phone number" });
       return;
     }
     setErrors({});
@@ -75,22 +89,32 @@ export default function Login() {
         10000,
       ),
     );
-    const signInPromise = supabase.auth.signInWithPassword({
-      email: result.data.email,
-      password: result.data.password,
-    }).then((res) => ({ error: res.error as Error | null }));
-    const { error } = (await Promise.race([signInPromise, timeoutPromise])) as { error: Error | null };
+    const signInPromise = supabase.functions.invoke("sign-in-with-identifier", {
+      body: {
+        identifier: normalizedIdentifier,
+        password: result.data.password,
+      },
+    }).then((res) => ({ data: res.data, error: res.error as Error | null }));
+    const { data, error } = (await Promise.race([signInPromise, timeoutPromise])) as { data?: any; error: Error | null };
     setSubmitting(false);
-    if (error) {
-      const raw = (error.message || "").toLowerCase();
+    const errorCode = (data as { error?: string } | null)?.error;
+    if (error || errorCode) {
+      const raw = (errorCode || error?.message || "").toLowerCase();
       let title = "Account not recognized";
       let description = "We couldn't sign you in with those details. Check them and try again, or create a new account.";
 
-      if (raw.includes("invalid") || raw.includes("credentials")) {
-        // Stay generic on purpose: don't reveal whether the email exists,
-        // and don't mention "deleted" — uninstall = fresh user, no history.
-        title = "Account not recognized";
-        description = "We couldn't sign you in with those details. Check them and try again, or create a new account.";
+      if (raw.includes("email_not_registered")) {
+        title = "Email not registered";
+        description = "This email does not have a ChiChat account yet. Create a new account to continue.";
+      } else if (raw.includes("phone_not_registered")) {
+        title = "Phone number not registered";
+        description = "This phone number is not on ChiChat yet. Create a new account to continue.";
+      } else if (raw.includes("wrong_password")) {
+        title = "Wrong password";
+        description = "This account exists, but the password is not correct. Try again or reset your password.";
+      } else if (raw.includes("invalid_identifier") || raw.includes("missing_details")) {
+        title = "Check your details";
+        description = "Enter a valid email or full phone number, then try again.";
       } else if (raw.includes("not confirmed") || raw.includes("confirm")) {
         title = "Email not verified yet";
         description = "Please check your inbox for the verification code we sent you.";
@@ -104,6 +128,12 @@ export default function Login() {
 
       toast({ title, description });
       return;
+    }
+    if (data?.session?.access_token && data?.session?.refresh_token) {
+      await supabase.auth.setSession({
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+      });
     }
     toast({ title: "Welcome back" });
     navigate("/home");
