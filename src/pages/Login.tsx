@@ -27,6 +27,14 @@ function normalizeIdentifier(value: string) {
   return null;
 }
 
+async function signInDirect(email: string, password: string) {
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (!error) return { data, errorCode: "" };
+  const msg = (error.message || "").toLowerCase();
+  if (msg.includes("confirm") || msg.includes("verified")) return { data: null, errorCode: "email_not_verified" };
+  return { data: null, errorCode: "wrong_password" };
+}
+
 export default function Login() {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
@@ -90,12 +98,27 @@ export default function Login() {
         10000,
       ),
     );
-    const signInPromise = supabase.functions.invoke("sign-in-with-identifier", {
-      body: {
-        identifier: normalizedIdentifier,
-        password: result.data.password,
-      },
-    }).then((res) => ({ data: res.data, error: res.error as Error | null }));
+    const signInPromise = (async () => {
+      if (EMAIL_RE.test(normalizedIdentifier)) {
+        const signedIn = await signInDirect(normalizedIdentifier, result.data.password);
+        return { data: signedIn.errorCode ? { error: signedIn.errorCode } : signedIn.data, error: null };
+      }
+
+      const invoked = await supabase.functions.invoke("sign-in-with-identifier", {
+        body: { identifier: normalizedIdentifier, password: result.data.password },
+      });
+      if (!invoked.error) return { data: invoked.data, error: null };
+
+      const resolved = await (supabase as any).rpc("resolve_email_for_phone", { _phone: normalizedIdentifier });
+      const status = resolved.data?.status;
+      if (status === "not_found") return { data: { error: "phone_not_registered" }, error: null };
+      if (status === "ambiguous") return { data: { error: "phone_ambiguous" }, error: null };
+      if (status === "found" && resolved.data?.email) {
+        const signedIn = await signInDirect(String(resolved.data.email), result.data.password);
+        return { data: signedIn.errorCode ? { error: signedIn.errorCode } : signedIn.data, error: null };
+      }
+      return { data: { error: "phone_signin_unavailable" }, error: null };
+    })();
     const { data, error } = (await Promise.race([signInPromise, timeoutPromise])) as { data?: any; error: Error | null };
     setSubmitting(false);
     const errorCode = (data as { error?: string } | null)?.error;
@@ -110,6 +133,9 @@ export default function Login() {
       } else if (raw.includes("phone_not_registered")) {
         title = "Phone number not registered";
         description = "This phone number is not on ChiChat yet. Create a new account to continue.";
+      } else if (raw.includes("phone_signin_unavailable")) {
+        title = "Phone sign-in not ready";
+        description = "Sign in with your email for now. Your phone number can still be used after the backend update finishes.";
       } else if (raw.includes("phone_ambiguous")) {
         title = "Enter full phone number";
         description = "Add the country code, for example +234…, so we can find the exact account.";
