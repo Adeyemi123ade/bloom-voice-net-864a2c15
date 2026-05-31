@@ -106,14 +106,14 @@ export default function Register() {
 
   const handleGoogle = async () => {
     setGoogleLoading(true);
-    // Per product policy: Google can ONLY be used by users who already have
-    // an account. We send them through OAuth, but if they're brand new the
-    // server will block them and bounce back here with their details
-    // pre-filled (handled by DeviceGate).
+    // Always send Google through the clean canonical domain so the account
+    // chooser shows "chichatapp.com" instead of leaking preview hostnames
+    // like "id-preview--…lovable.app" to the user.
+    const CANONICAL_ORIGIN = "https://chichatapp.com";
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/google-return`,
+        redirectTo: `${CANONICAL_ORIGIN}/auth/google-return`,
       },
     });
     if (error) {
@@ -121,7 +121,6 @@ export default function Register() {
       toast({
         title: "Google didn't work",
         description: "Please try again, or fill the form below to create your account.",
-        variant: "destructive",
       });
     }
   };
