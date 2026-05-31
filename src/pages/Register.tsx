@@ -358,13 +358,10 @@ export default function Register() {
                     aria-invalid={!!errors.phone}
                   />
                 </div>
-                {errors.phone ? (
+                {errors.phone && (
                   <p className="text-sm text-destructive mt-1">{errors.phone}</p>
-                ) : (
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Pick your country, then enter the rest of your number.
-                  </p>
                 )}
+
               </div>
 
               <div>
