@@ -602,6 +602,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      account_identifier_status: {
+        Args: { _email?: string; _phone?: string }
+        Returns: Json
+      }
       cleanup_expired_auth_otp_aliases: { Args: never; Returns: number }
       delete_email: {
         Args: { message_id: number; queue_name: string }
@@ -652,6 +656,7 @@ export type Database = {
           read_ct: number
         }[]
       }
+      resolve_email_for_phone: { Args: { _phone: string }; Returns: Json }
       start_direct_conversation: {
         Args: { _other_user: string }
         Returns: string
