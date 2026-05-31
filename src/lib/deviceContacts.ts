@@ -99,7 +99,10 @@ export async function pickWebContacts(): Promise<DeviceContact[]> {
 }
 
 const CACHE_KEY = "chichat:contacts:v1";
-const CACHE_TTL_MS = 30 * 60 * 1000;
+// Keep the cache effectively forever — it's just a UX optimization so previously
+// loaded device/Google contacts stay visible across sessions even if the next
+// sync is delayed or fails. Native/Google sync flows overwrite it on success.
+const CACHE_TTL_MS = 365 * 24 * 60 * 60 * 1000;
 
 interface CachedSync {
   at: number;
