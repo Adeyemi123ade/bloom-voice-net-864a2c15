@@ -454,7 +454,7 @@ export default function Register() {
                   Sign in
                 </Link>
               </p>
-              <p className="text-sm text-foreground text-center mt-2 font-semibold">
+              <p className="text-foreground text-center mt-2 font-semibold" style={{ fontSize: "0.9625rem" }}>
                 By continuing, you agree to our{" "}
                 <Link to="/terms" className="text-primary underline underline-offset-2">
                   Terms &amp; Privacy Policy
