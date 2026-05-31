@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { toE164 } from "@/lib/phone";
 
 
 const loginSchema = z.object({
@@ -24,7 +23,8 @@ const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 function normalizeIdentifier(value: string) {
   const trimmed = value.trim();
   if (EMAIL_RE.test(trimmed)) return trimmed.toLowerCase();
-  return toE164(trimmed);
+  if (trimmed.replace(/\D/g, "").length >= 7) return trimmed;
+  return null;
 }
 
 export default function Login() {
@@ -109,6 +109,9 @@ export default function Login() {
       } else if (raw.includes("phone_not_registered")) {
         title = "Phone number not registered";
         description = "This phone number is not on ChiChat yet. Create a new account to continue.";
+      } else if (raw.includes("phone_ambiguous")) {
+        title = "Enter full phone number";
+        description = "Add the country code, for example +234…, so we can find the exact account.";
       } else if (raw.includes("wrong_password")) {
         title = "Wrong password";
         description = "This account exists, but the password is not correct. Try again or reset your password.";
