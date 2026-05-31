@@ -26,7 +26,7 @@ Deno.serve(async (req) => {
     const password = String(body.password ?? "");
 
     if (!identifier || !password || password.length > 72) {
-      return json({ error: "missing_details" }, 400);
+      return json({ error: "missing_details" });
     }
 
     const url = Deno.env.get("SUPABASE_URL");
@@ -53,11 +53,11 @@ Deno.serve(async (req) => {
         const savedDigits = String(profile.phone ?? "").replace(/\D/g, "");
         return savedDigits === phoneDigits || (!!localDigits && savedDigits.endsWith(localDigits));
       });
-      if (matches.length === 0) return json({ error: "phone_not_registered" }, 404);
-      if (matches.length > 1) return json({ error: "phone_ambiguous" }, 409);
+      if (matches.length === 0) return json({ error: "phone_not_registered" });
+      if (matches.length > 1) return json({ error: "phone_ambiguous" });
 
       const { data: userRes, error: userErr } = await admin.auth.admin.getUserById(matches[0].id);
-      if (userErr || !userRes.user?.email) return json({ error: "phone_not_registered" }, 404);
+      if (userErr || !userRes.user?.email) return json({ error: "phone_not_registered" });
       email = userRes.user.email.toLowerCase();
     } else if (isEmail) {
       email = identifier;
@@ -74,16 +74,16 @@ Deno.serve(async (req) => {
         if (data.users.length < perPage) break;
         page += 1;
       }
-      if (!exists) return json({ error: "email_not_registered" }, 404);
+      if (!exists) return json({ error: "email_not_registered" });
     } else {
-      return json({ error: "invalid_identifier" }, 400);
+      return json({ error: "invalid_identifier" });
     }
 
     const { data, error } = await authClient.auth.signInWithPassword({ email, password });
     if (error) {
       const msg = (error.message || "").toLowerCase();
-      if (msg.includes("confirm") || msg.includes("verified")) return json({ error: "email_not_verified" }, 403);
-      return json({ error: "wrong_password" }, 401);
+      if (msg.includes("confirm") || msg.includes("verified")) return json({ error: "email_not_verified" });
+      return json({ error: "wrong_password" });
     }
 
     return json({ session: data.session, user: data.user });
