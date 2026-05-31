@@ -4,7 +4,7 @@ import * as React from 'npm:react@18.3.1'
 import { Section, Text } from 'npm:@react-email/components@0.0.22'
 
 const LOGO_URL =
-  'https://tlyqomftfabnpczxefkp.supabase.co/storage/v1/object/public/email-assets/chichat-logo.png'
+  'https://pnpabtxvsrkrldpfmtaz.supabase.co/storage/v1/object/public/email-assets/chichat-logo.png'
 
 /**
  * Branded ChiChat email header — round logo + wordmark + tagline.
