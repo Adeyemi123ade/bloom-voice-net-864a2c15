@@ -102,7 +102,7 @@ export default function Login() {
         description = "Check your connection and try again.";
       }
 
-      toast({ title, description, variant: "destructive" });
+      toast({ title, description });
       return;
     }
     toast({ title: "Welcome back" });
