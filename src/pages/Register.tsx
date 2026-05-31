@@ -213,30 +213,43 @@ export default function Register() {
         msg.includes("user already") ||
         (error as { status?: number }).status === 422;
       if (duplicate) {
-        setErrors({ email: "Email already in use — sign in instead" });
+        setErrors({ email: "This email is already registered — sign in instead" });
         toast({
-          title: "Email already in use",
-          description: "This is an existing account. Use Sign in to access it.",
+          title: "Email already registered",
+          description: `${parsed.data.email} already has an account. Try signing in.`,
           variant: "destructive",
         });
       } else {
         toast({
-          title: "Sign up failed",
-          description: error.message,
+          title: "We couldn't create your account",
+          description: error.message || "Please try again in a moment.",
           variant: "destructive",
         });
       }
       return;
     }
-    // Save phone to profile (handle_new_user trigger created the row)
+    // Save phone to profile (handle_new_user trigger created the row without phone)
     if (signUpData.user?.id && e164) {
       const { error: profileError } = await supabase
         .from("profiles")
         .update({ phone: e164 })
         .eq("id", signUpData.user.id);
-      if (profileError && profileError.code === "23505") {
+      if (profileError) {
         setSubmitting(false);
-        setErrors({ phone: "This phone number is already registered" });
+        if (profileError.code === "23505") {
+          setErrors({ phone: `${e164} is already registered to another account` });
+          toast({
+            title: "Phone number already registered",
+            description: `${e164} is already in use. Use a different number, or sign in to the existing account.`,
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Couldn't save your phone number",
+            description: profileError.message || "Please try again.",
+            variant: "destructive",
+          });
+        }
         return;
       }
     }
