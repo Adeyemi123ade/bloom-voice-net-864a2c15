@@ -33,10 +33,14 @@ export default function Login() {
 
   const handleGoogle = async () => {
     setGoogleLoading(true);
+    // Always send Google through the clean canonical domain so the account
+    // chooser shows "chichatapp.com" instead of leaking preview hostnames
+    // like "id-preview--…lovable.app" to the user.
+    const CANONICAL_ORIGIN = "https://chichatapp.com";
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/google-return`,
+        redirectTo: `${CANONICAL_ORIGIN}/auth/google-return`,
       },
     });
     if (error) {
@@ -44,7 +48,6 @@ export default function Login() {
       toast({
         title: "Google sign-in didn't work",
         description: "We couldn't connect to your Google account. Please try again, or sign in with your email and password.",
-        variant: "destructive",
       });
     }
     // On success the browser redirects to Google; nothing else to do here.
