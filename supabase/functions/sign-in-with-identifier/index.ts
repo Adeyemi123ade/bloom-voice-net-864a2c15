@@ -21,7 +21,8 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}));
-    const identifier = String(body.identifier ?? "").trim().toLowerCase();
+    const rawIdentifier = String(body.identifier ?? "").trim();
+    const identifier = rawIdentifier.toLowerCase();
     const password = String(body.password ?? "");
 
     if (!identifier || !password || password.length > 72) {
@@ -39,18 +40,23 @@ Deno.serve(async (req) => {
     let email = "";
     const isEmail = EMAIL.test(identifier);
     const isPhone = E164.test(identifier);
+    const phoneDigits = rawIdentifier.replace(/\D/g, "");
 
-    if (isPhone) {
-      const { data: profile, error: profileErr } = await admin
-        .from("profiles")
-        .select("id")
-        .eq("phone", identifier)
-        .maybeSingle();
+    if (isPhone || phoneDigits.length >= 7) {
+      const { data: profiles, error: profileErr } = isPhone
+        ? await admin.from("profiles").select("id, phone").eq("phone", identifier)
+        : await admin.from("profiles").select("id, phone").not("phone", "is", null).limit(1000);
 
       if (profileErr) return json({ error: "lookup_failed" }, 500);
-      if (!profile?.id) return json({ error: "phone_not_registered" }, 404);
+      const localDigits = phoneDigits.replace(/^0+/, "");
+      const matches = (profiles ?? []).filter((profile) => {
+        const savedDigits = String(profile.phone ?? "").replace(/\D/g, "");
+        return savedDigits === phoneDigits || (!!localDigits && savedDigits.endsWith(localDigits));
+      });
+      if (matches.length === 0) return json({ error: "phone_not_registered" }, 404);
+      if (matches.length > 1) return json({ error: "phone_ambiguous" }, 409);
 
-      const { data: userRes, error: userErr } = await admin.auth.admin.getUserById(profile.id);
+      const { data: userRes, error: userErr } = await admin.auth.admin.getUserById(matches[0].id);
       if (userErr || !userRes.user?.email) return json({ error: "phone_not_registered" }, 404);
       email = userRes.user.email.toLowerCase();
     } else if (isEmail) {
