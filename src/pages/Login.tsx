@@ -162,22 +162,22 @@ export default function Login() {
         <form onSubmit={handleSubmit} className="mt-3 flex-1 flex flex-col">
           <div className="space-y-2.5">
             <div>
-              <Label htmlFor="email" className="text-2xs text-muted-foreground">
-                Email address
+              <Label htmlFor="identifier" className="text-2xs text-muted-foreground">
+                Email or phone number
               </Label>
               <Input
-                id="email"
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
+                id="identifier"
+                type="text"
+                autoComplete="username"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
+                placeholder="you@example.com or +2348012345678"
                 maxLength={255}
                 className="mt-1 h-9 text-xs bg-input border-border text-foreground placeholder:text-muted-foreground"
-                aria-invalid={!!errors.email}
+                aria-invalid={!!errors.identifier}
               />
-              {errors.email && (
-                <p className="text-2xs text-destructive mt-1">{errors.email}</p>
+              {errors.identifier && (
+                <p className="text-2xs text-destructive mt-1">{errors.identifier}</p>
               )}
             </div>
 
