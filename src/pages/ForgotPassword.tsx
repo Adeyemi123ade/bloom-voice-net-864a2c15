@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { checkEmailStatus } from "@/lib/checkEmail";
 
 const schema = z.object({
   email: z.string().trim().email({ message: "Enter a valid email address" }).max(255),
@@ -28,6 +29,12 @@ export default function ForgotPassword() {
     }
     setError(undefined);
     setSubmitting(true);
+    const status = await checkEmailStatus(result.data.email);
+    if (status && !status.exists) {
+      setSubmitting(false);
+      setError("Account not recognized");
+      return;
+    }
     // No redirectTo — Supabase will send a 6-digit OTP code, not a magic link.
     const { error: err } = await supabase.auth.resetPasswordForEmail(result.data.email);
     setSubmitting(false);
