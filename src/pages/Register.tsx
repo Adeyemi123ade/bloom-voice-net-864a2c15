@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { lovable } from "@/integrations/lovable";
 
 import { toE164 } from "@/lib/phone";
 import CountryPicker from "@/components/CountryPicker";
@@ -106,17 +107,11 @@ export default function Register() {
 
   const handleGoogle = async () => {
     setGoogleLoading(true);
-    // Always send Google through the clean canonical domain so the account
-    // chooser shows "chichatapp.com" instead of leaking preview hostnames
-    // like "id-preview--…lovable.app" to the user.
     const CANONICAL_ORIGIN = "https://chichatapp.com";
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${CANONICAL_ORIGIN}/auth/google-return`,
-      },
+    const result = await lovable.auth.signInWithOAuth("google", {
+      redirect_uri: `${CANONICAL_ORIGIN}/auth/google-return`,
     });
-    if (error) {
+    if (result.error) {
       setGoogleLoading(false);
       toast({
         title: "Google didn't work",
