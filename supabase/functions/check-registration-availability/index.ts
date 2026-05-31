@@ -25,7 +25,7 @@ Deno.serve(async (req) => {
     const phone = String(body.phone ?? "").trim();
 
     if (!EMAIL.test(email) || email.length > 255 || !E164.test(phone)) {
-      return json({ error: "invalid_details" }, 400);
+      return json({ error: "invalid_details" });
     }
 
     const url = Deno.env.get("SUPABASE_URL");
