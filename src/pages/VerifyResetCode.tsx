@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/input-otp";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { checkEmailStatus } from "@/lib/checkEmail";
 
 const OTP_LENGTH = 6;
 
@@ -85,6 +86,17 @@ export default function VerifyResetCode() {
   const resend = async () => {
     if (!email || secondsLeft > 0) return;
     setResending(true);
+    const status = await checkEmailStatus(email);
+    if (status && !status.exists) {
+      setResending(false);
+      toast({
+        title: "Account not recognized",
+        description: "Use the email you registered with.",
+        variant: "destructive",
+      });
+      navigate("/forgot-password", { replace: true });
+      return;
+    }
     const { error } = await supabase.auth.resetPasswordForEmail(email);
     setResending(false);
     if (error) {
