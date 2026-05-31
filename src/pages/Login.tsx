@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
+
 
 const loginSchema = z.object({
   email: z.string().trim().email({ message: "Enter a valid email address" }).max(255),
@@ -33,20 +33,21 @@ export default function Login() {
 
   const handleGoogle = async () => {
     setGoogleLoading(true);
-    const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: `${window.location.origin}/auth/google-return`,
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/google-return`,
+      },
     });
-    if (result.error) {
+    if (error) {
       setGoogleLoading(false);
       toast({
         title: "Google sign-in didn't work",
         description: "We couldn't connect to your Google account. Please try again, or sign in with your email and password.",
         variant: "destructive",
       });
-      return;
     }
-    if (result.redirected) return;
-    navigate("/auth/google-return");
+    // On success the browser redirects to Google; nothing else to do here.
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
