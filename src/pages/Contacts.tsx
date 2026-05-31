@@ -138,6 +138,45 @@ export default function Contacts() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
+  // Auto-refresh Google contacts in the background: on tab focus and every 5
+  // minutes while the page is open. Keeps contacts fresh without the user
+  // tapping the refresh icon. Native uses device contacts directly so we skip.
+  useEffect(() => {
+    if (!user || isNativePlatform()) return;
+    let cancelled = false;
+
+    const backgroundSync = async () => {
+      if (cancelled) return;
+      try {
+        const connected = await isGoogleConnected();
+        if (!connected || cancelled) return;
+        const list = await syncGoogleContacts();
+        if (cancelled) return;
+        const fresh = mergeContacts(list, loadManualContacts());
+        setContacts(fresh);
+        if (fresh.length) await runMatch(fresh);
+      } catch {
+        /* silent — user can retry via the refresh button */
+      }
+    };
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void backgroundSync();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    const interval = window.setInterval(backgroundSync, 5 * 60 * 1000);
+
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+      window.clearInterval(interval);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+
   const loadInvited = async () => {
     if (!user) return;
     const { data } = await supabase
