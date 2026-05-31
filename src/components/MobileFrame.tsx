@@ -18,8 +18,8 @@ interface Props {
  */
 export default function MobileFrame({ children, bottomNav }: Props) {
   return (
-    <div className="fixed inset-0 bg-background overflow-hidden">
-      <div className="relative w-full h-full bg-background overflow-hidden">
+    <div className="fixed inset-0 bg-background overflow-hidden flex items-center justify-center">
+      <div className="relative w-full h-full bg-background overflow-hidden mx-auto md:max-w-[460px] md:h-[min(100vh,820px)] md:rounded-2xl md:shadow-2xl md:border md:border-border">
         <div
           className={
             bottomNav
