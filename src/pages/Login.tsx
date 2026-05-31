@@ -108,15 +108,6 @@ export default function Login() {
         body: { identifier: normalizedIdentifier, password: result.data.password },
       });
       if (!invoked.error) return { data: invoked.data, error: null };
-
-      const resolved = await (supabase as any).rpc("resolve_email_for_phone", { _phone: normalizedIdentifier });
-      const status = resolved.data?.status;
-      if (status === "not_found") return { data: { error: "phone_not_registered" }, error: null };
-      if (status === "ambiguous") return { data: { error: "phone_ambiguous" }, error: null };
-      if (status === "found" && resolved.data?.email) {
-        const signedIn = await signInDirect(String(resolved.data.email), result.data.password);
-        return { data: signedIn.errorCode ? { error: signedIn.errorCode } : signedIn.data, error: null };
-      }
       return { data: { error: "phone_signin_unavailable" }, error: null };
     })();
     const { data, error } = (await Promise.race([signInPromise, timeoutPromise])) as { data?: any; error: Error | null };
