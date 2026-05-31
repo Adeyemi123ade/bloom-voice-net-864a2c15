@@ -261,17 +261,18 @@ export default function Register() {
           <div className="mt-2">
             <BrandHero
               className="mb-3"
-              message="Welcome to ChiChat — where conversations don't end and people never feel far away."
+              message="Join Chichat and experience the possibilities."
             />
             <h1 className="text-xl font-bold text-foreground leading-tight">
               {googleVerified ? "Finish setting up" : "Create your account"}
             </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              {googleVerified
-                ? "We got your name and email from Google. Add a phone number and password to finish."
-                : "Join Chichat and experience the possibilities."}
-            </p>
+            {googleVerified && (
+              <p className="text-sm text-muted-foreground mt-1">
+                We got your name and email from Google. Add a phone number and password to finish.
+              </p>
+            )}
           </div>
+
 
           <form onSubmit={handleSubmit} className="mt-4 flex-1 flex flex-col">
             <div className="space-y-3">
@@ -357,13 +358,10 @@ export default function Register() {
                     aria-invalid={!!errors.phone}
                   />
                 </div>
-                {errors.phone ? (
+                {errors.phone && (
                   <p className="text-sm text-destructive mt-1">{errors.phone}</p>
-                ) : (
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Pick your country, then enter the rest of your number.
-                  </p>
                 )}
+
               </div>
 
               <div>
@@ -456,7 +454,7 @@ export default function Register() {
                   Sign in
                 </Link>
               </p>
-              <p className="text-sm text-foreground text-center mt-2 font-semibold">
+              <p className="text-foreground text-center mt-2 font-semibold" style={{ fontSize: "0.9625rem" }}>
                 By continuing, you agree to our{" "}
                 <Link to="/terms" className="text-primary underline underline-offset-2">
                   Terms &amp; Privacy Policy
