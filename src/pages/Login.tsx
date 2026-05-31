@@ -57,6 +57,7 @@ export default function Login() {
       toast({
         title: "Google sign-in didn't work",
         description: "We couldn't connect to your Google account. Please try again, or sign in with your email and password.",
+        variant: "destructive",
       });
     }
     // On success the browser redirects to Google; nothing else to do here.
@@ -129,7 +130,7 @@ export default function Login() {
         description = "Check your connection and try again.";
       }
 
-      toast({ title, description });
+      toast({ title, description, variant: "destructive" });
       return;
     }
     if (data?.session?.access_token && data?.session?.refresh_token) {
