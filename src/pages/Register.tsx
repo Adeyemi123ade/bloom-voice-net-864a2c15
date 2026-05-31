@@ -110,20 +110,20 @@ export default function Register() {
     // an account. We send them through OAuth, but if they're brand new the
     // server will block them and bounce back here with their details
     // pre-filled (handled by DeviceGate).
-    const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: `${window.location.origin}/auth/google-return`,
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/google-return`,
+      },
     });
-    if (result.error) {
+    if (error) {
       setGoogleLoading(false);
       toast({
         title: "Google didn't work",
         description: "Please try again, or fill the form below to create your account.",
         variant: "destructive",
       });
-      return;
     }
-    if (result.redirected) return;
-    navigate("/auth/google-return");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
