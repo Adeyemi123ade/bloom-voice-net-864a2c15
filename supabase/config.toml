@@ -15,6 +15,10 @@ project_id = "tlyqomftfabnpczxefkp"
     verify_jwt = false
   [functions.check-user-exists]
     verify_jwt = false
+  [functions.sign-in-with-identifier]
+    verify_jwt = false
+  [functions.check-registration-availability]
+    verify_jwt = false
   [functions.request-device-otp]
     verify_jwt = false
   [functions.verify-device-otp]
