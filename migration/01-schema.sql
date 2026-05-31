@@ -607,8 +607,19 @@ CREATE POLICY "Service role can insert suppressed emails" ON public.suppressed_e
 -- ============================================================
 -- REALTIME
 -- ============================================================
-ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.typing_indicators;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.calls;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.profiles;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.conversations;
+DO $$
+DECLARE
+  t text;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['messages','typing_indicators','calls','profiles','conversations']
+  LOOP
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_publication_tables
+      WHERE pubname = 'supabase_realtime'
+        AND schemaname = 'public'
+        AND tablename = t
+    ) THEN
+      EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE public.%I', t);
+    END IF;
+  END LOOP;
+END $$;
