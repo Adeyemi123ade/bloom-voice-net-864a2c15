@@ -169,6 +169,40 @@ const CSS = `
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* Tablet: reorient as a centered portrait column instead of full-bleed landscape */
+@media (min-width: 768px) {
+  .chichat-splash { background: #000; }
+  .chichat-splash .carousel,
+  .chichat-splash .tint,
+  .chichat-splash .frame-outer,
+  .chichat-splash .frame-inner,
+  .chichat-splash .content {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    width: min(460px, 100%);
+    max-width: 460px;
+  }
+  .chichat-splash .frame-outer,
+  .chichat-splash .frame-inner {
+    transform: translateX(-50%);
+  }
+}
+
+/* Desktop: drop the decorative phone frame entirely for a mature look */
+@media (min-width: 1024px) {
+  .chichat-splash .frame-outer,
+  .chichat-splash .frame-inner {
+    display: none !important;
+  }
+  .chichat-splash .carousel,
+  .chichat-splash .tint,
+  .chichat-splash .content {
+    width: min(520px, 100%);
+    max-width: 520px;
+  }
+}
 `;
 
 interface Props {
