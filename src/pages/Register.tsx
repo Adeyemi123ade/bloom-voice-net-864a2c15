@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
+
 import { toE164 } from "@/lib/phone";
 import CountryPicker from "@/components/CountryPicker";
 import { allCountries, type CountryEntry } from "@/lib/countries";
