@@ -41,14 +41,16 @@ export default function Profile() {
     (async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("display_name, avatar_url, phone")
+        .select("display_name, avatar_url")
         .eq("id", user.id)
         .maybeSingle();
       if (data) {
         setDisplayName(data.display_name ?? "");
         setAvatarUrl(data.avatar_url);
-        setPhone((data as { phone?: string | null }).phone ?? "");
       }
+      const { data: priv } = await supabase.rpc("get_my_profile_private");
+      const row = Array.isArray(priv) ? priv[0] : priv;
+      setPhone((row as { phone?: string | null } | null)?.phone ?? "");
       // About is stored in user metadata for now (no schema change)
       setAbout((user.user_metadata as any)?.about ?? "");
     })();
