@@ -115,11 +115,9 @@ export async function syncGoogleContacts(): Promise<DeviceContact[]> {
 }
 
 async function getMyDefaultCountry() {
-  const { data } = await supabase
-    .from("profiles")
-    .select("phone")
-    .maybeSingle();
-  return countryFromE164((data as { phone?: string | null } | null)?.phone);
+  const { data } = await supabase.rpc("get_my_profile_private");
+  const row = Array.isArray(data) ? data[0] : data;
+  return countryFromE164((row as { phone?: string | null } | null)?.phone);
 }
 
 function normalizeImportedPhone(raw: string, defaultCountry?: ReturnType<typeof countryFromE164>) {

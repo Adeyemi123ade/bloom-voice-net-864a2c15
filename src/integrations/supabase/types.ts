@@ -626,6 +626,13 @@ export type Database = {
         Args: { _backup_email: string }
         Returns: string
       }
+      get_my_profile_private: {
+        Args: never
+        Returns: {
+          backup_email: string
+          phone: string
+        }[]
+      }
       is_conversation_participant: {
         Args: { _conversation_id: string; _user_id: string }
         Returns: boolean
