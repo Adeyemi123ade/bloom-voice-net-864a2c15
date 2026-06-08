@@ -664,6 +664,17 @@ export type Database = {
         }[]
       }
       resolve_email_for_phone: { Args: { _phone: string }; Returns: Json }
+      search_users: {
+        Args: { _limit?: number; _query: string }
+        Returns: {
+          avatar_url: string
+          display_name: string
+          id: string
+          is_online: boolean
+          last_seen_at: string
+          show_last_seen: boolean
+        }[]
+      }
       start_direct_conversation: {
         Args: { _other_user: string }
         Returns: string

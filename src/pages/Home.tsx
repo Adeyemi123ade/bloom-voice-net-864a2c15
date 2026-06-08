@@ -261,14 +261,17 @@ export default function Home() {
     };
   }, [user]);
 
-  const loadPeople = async () => {
+  const loadPeople = async (search?: string) => {
     if (!user) return;
-    const { data } = await supabase
-      .from("profiles")
-      .select("id, display_name, avatar_url, is_online, last_seen_at, show_last_seen")
-      .neq("id", user.id)
-      .order("display_name", { ascending: true })
-      .limit(50);
+    const q = (search ?? "").trim();
+    const { data, error } = await supabase.rpc("search_users", {
+      _query: q,
+      _limit: 100,
+    });
+    if (error) {
+      setPeople([]);
+      return;
+    }
     setPeople((data ?? []) as Profile[]);
   };
 
@@ -287,11 +290,13 @@ export default function Home() {
   };
 
   const [peopleQuery, setPeopleQuery] = useState("");
-  const filteredPeople = useMemo(() => {
-    const q = peopleQuery.trim().toLowerCase();
-    if (!q) return people;
-    return people.filter((p) => p.display_name?.toLowerCase().includes(q));
-  }, [people, peopleQuery]);
+  useEffect(() => {
+    if (!openNew) return;
+    const t = setTimeout(() => { loadPeople(peopleQuery); }, 250);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [peopleQuery, openNew]);
+  const filteredPeople = people;
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
