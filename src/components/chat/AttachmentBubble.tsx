@@ -119,6 +119,8 @@ export function AttachmentBubble({
   const isVideo = meta.mime.startsWith("video/");
   const isAudio = meta.mime.startsWith("audio/");
   const timeText = formatTimestamp(timestamp);
+  const mediaUrl = useSignedMediaUrl(meta.url);
+
 
   if (isImage) {
     return (
