@@ -133,7 +133,7 @@ export function AttachmentBubble({
           className="block rounded-2xl overflow-hidden relative"
         >
           <img
-            src={meta.url}
+            src={mediaUrl}
             alt={meta.name}
             loading="lazy"
             className="w-[180px] h-[180px] object-cover block"
@@ -154,7 +154,7 @@ export function AttachmentBubble({
         )}
         {imgOpen && (
           <ImageViewer
-            url={meta.url}
+            url={mediaUrl}
             name={meta.name}
             onClose={() => setImgOpen(false)}
             onDelete={onDelete}
@@ -169,7 +169,7 @@ export function AttachmentBubble({
       <>
         <div className="relative w-[200px]">
           <video
-            src={meta.url}
+            src={mediaUrl}
             controls
             playsInline
             className="w-full max-h-[260px] rounded-2xl bg-black block"
@@ -195,7 +195,7 @@ export function AttachmentBubble({
   if (isAudio) {
     return (
       <div className="flex flex-col gap-1 min-w-[200px]">
-        <audio src={meta.url} controls className="w-full h-9" />
+        <audio src={mediaUrl} controls className="w-full h-9" />
         {meta.caption && (
           <p className="text-[13px] whitespace-pre-wrap break-words">{meta.caption}</p>
         )}
@@ -213,7 +213,7 @@ export function AttachmentBubble({
   return (
     <div className="flex flex-col gap-1">
       <a
-        href={meta.url}
+        href={mediaUrl}
         target="_blank"
         rel="noopener noreferrer"
         onClick={(e) => e.stopPropagation()}
