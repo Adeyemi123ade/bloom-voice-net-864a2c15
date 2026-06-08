@@ -9,7 +9,12 @@ const corsHeaders = {
 
 const CONTACTS_SCOPE = "https://www.googleapis.com/auth/contacts";
 const CONTACTS_READONLY_SCOPE = "https://www.googleapis.com/auth/contacts.readonly";
-const SCOPES = [CONTACTS_SCOPE, "https://www.googleapis.com/auth/userinfo.email"];
+const DIRECTORY_SCOPE = "https://www.googleapis.com/auth/directory.readonly";
+const SCOPES = [
+  CONTACTS_SCOPE, 
+  DIRECTORY_SCOPE,
+  "https://www.googleapis.com/auth/userinfo.email"
+];
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });

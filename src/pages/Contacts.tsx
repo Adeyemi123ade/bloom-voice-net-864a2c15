@@ -121,7 +121,7 @@ export default function Contacts() {
         if (connected) {
           setSyncing(true);
           try {
-            const list = await syncGoogleContacts();
+            const { contacts: list } = await syncGoogleContacts();
             const fresh = mergeContacts(list, loadManualContacts());
             setContacts(fresh);
             if (fresh.length) await runMatch(fresh);
@@ -150,7 +150,7 @@ export default function Contacts() {
       try {
         const connected = await isGoogleConnected();
         if (!connected || cancelled) return;
-        const list = await syncGoogleContacts();
+        const { contacts: list } = await syncGoogleContacts();
         if (cancelled) return;
         const fresh = mergeContacts(list, loadManualContacts());
         setContacts(fresh);
@@ -240,7 +240,7 @@ export default function Contacts() {
     try {
       const list = isNativePlatform()
         ? await loadNativeContacts()
-        : await syncGoogleContacts();
+        : (await syncGoogleContacts()).contacts;
       if (isNativePlatform()) saveCachedContacts(list);
       const merged = mergeContacts(list, loadManualContacts());
       setContacts(merged);

@@ -23,25 +23,35 @@ interface PendingState {
  * Build a redirect URI Google will accept. Inside the native shell, the page's
  * origin is `http://localhost` or `capacitor://`, which Google's OAuth rejects
  * with a 403 ("disallowed_useragent" / redirect_uri_mismatch). To stay seamless,
- * we always send users back to the production web URL — that single redirect
- * URI is the only one registered in the Google Cloud Console.
+ * we always send users back to a registered production URL.
  */
 function resolveRedirectUri(): string {
   const origin = typeof window !== "undefined" ? window.location.origin : "";
-  const isWebHttps =
-    origin.startsWith("https://") &&
-    !origin.includes("localhost") &&
-    !origin.startsWith("capacitor://");
-  // Lovable preview domains (lovableproject.com / preview ids on lovable.app)
-  // are NOT registered with Google's OAuth client — only the published web
-  // origin is. Force the production redirect for those so Google doesn't 404
-  // the user with a redirect_uri_mismatch.
+  
+  // Local development: Google supports http://localhost:PORT
+  if (origin.startsWith("http://localhost")) {
+    return `${origin}/settings`;
+  }
+
+  // Known production/staging origins. If on one of these, use it.
+  const isRegistered =
+    origin.includes("chichatapp.com") ||
+    origin.includes("bloom-voice-net.lovable.app");
+
+  const isWebHttps = origin.startsWith("https://");
   const isPreview =
     origin.includes("lovableproject.com") ||
     origin.includes("id-preview--");
-  return isWebHttps && !isPreview
-    ? `${origin}/settings`
-    : "https://bloom-voice-net.lovable.app/settings";
+
+  // If on a preview domain, or non-HTTPS (except localhost), or an unknown custom domain,
+  // fallback to the primary registered one so the flow doesn't immediately fail.
+  // Note: If you want chichatapp.com to work, you MUST add https://chichatapp.com/settings
+  // to your Google Cloud Console "Authorized redirect URIs".
+  if (!isWebHttps || isPreview || !isRegistered) {
+    return "https://bloom-voice-net.lovable.app/settings";
+  }
+
+  return `${origin}/settings`;
 }
 
 /** Start Google OAuth flow for Contacts (People API). */
@@ -88,10 +98,11 @@ export async function completeGoogleContactsConnect(code: string): Promise<{ ema
 }
 
 /** Pull contacts from Google People API and merge into local cache. */
-export async function syncGoogleContacts(): Promise<DeviceContact[]> {
+export async function syncGoogleContacts(): Promise<{ contacts: DeviceContact[], warning?: string }> {
   const { data, error } = await supabase.functions.invoke("google-contacts-sync", {});
   if (error) throw await normalizeGoogleContactsError(error);
   if (data?.reconnectRequired) throw new GoogleContactsReconnectRequired();
+  
   const defaultCountry = await getMyDefaultCountry();
   const incoming: DeviceContact[] = ((data?.contacts ?? []) as { name: string; phones: string[] }[])
     .map((c) => ({
@@ -111,7 +122,7 @@ export async function syncGoogleContacts(): Promise<DeviceContact[]> {
   }
   const merged = [...map.values()];
   saveCachedContacts(merged);
-  return merged;
+  return { contacts: merged, warning: data?.warning };
 }
 
 async function getMyDefaultCountry() {

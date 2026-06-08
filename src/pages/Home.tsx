@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, MessageSquarePlus, Settings as SettingsIcon, Phone, PhoneIncoming, PhoneOutgoing, PhoneMissed, Video, Mic, Paperclip, Users } from "lucide-react";
+import { Search, MessageSquarePlus, Phone, PhoneIncoming, PhoneOutgoing, PhoneMissed, Video, Mic, Paperclip } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -311,6 +311,14 @@ export default function Home() {
         <div className="px-4 pt-5 pb-3 flex items-center justify-between">
           <h1 className="text-[20px] font-bold text-foreground">Chats</h1>
           <Dialog open={openNew} onOpenChange={(o) => { setOpenNew(o); if (o) { setPeopleQuery(""); loadPeople(); } }}>
+            <DialogTrigger asChild>
+              <button
+                aria-label="Start new chat"
+                className="w-9 h-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 active:scale-95 transition"
+              >
+                <MessageSquarePlus className="w-5 h-5" />
+              </button>
+            </DialogTrigger>
             <DialogContent className="max-w-[320px] bg-card border-border">
               <DialogHeader>
                 <DialogTitle className="text-sm">Start a new chat</DialogTitle>
