@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Pause, Play } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { fmtDuration } from "@/lib/chat/format";
+import { useSignedMediaUrl } from "@/lib/signedMedia";
+
 
 // --- Single-instance audio manager (prevents overlap & playback bugs) ---
 type AudioCtl = {
