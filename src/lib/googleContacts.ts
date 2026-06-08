@@ -33,13 +33,12 @@ function resolveRedirectUri(): string {
     return `${origin}/settings`;
   }
 
-  // Always send users to the single registered redirect URL in Google Cloud
-  // Console. Custom domains (chichatapp.com) and preview URLs are NOT
-  // registered there — sending them would trigger redirect_uri_mismatch.
-  // The OAuth completion page on bloom-voice-net.lovable.app handles the
-  // code exchange and shows a success toast; the user can then return to
-  // their original tab. This keeps the flow working on every origin.
-  return "https://bloom-voice-net.lovable.app/settings";
+  // Keep the redirect on the live ChiChat domain so the user keeps the same
+  // browser session after Google sends them back.
+  if (origin === "https://www.chichatapp.com") {
+    return "https://www.chichatapp.com/settings";
+  }
+  return "https://chichatapp.com/settings";
 }
 
 /** Start Google OAuth flow for Contacts (People API). */
