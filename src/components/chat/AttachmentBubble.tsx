@@ -2,7 +2,7 @@ import { Download, Eye, FileText, FileSpreadsheet, Presentation, FileArchive, Fi
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
-import { getSignedChatMediaUrl, useSignedMediaUrl } from "@/lib/signedMedia";
+import { useSignedMediaUrl } from "@/lib/signedMedia";
 
 
 export const FILE_PREFIX = "[file]";
