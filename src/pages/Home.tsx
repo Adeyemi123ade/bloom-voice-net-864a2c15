@@ -264,18 +264,14 @@ export default function Home() {
   const loadPeople = async (search?: string) => {
     if (!user) return;
     const q = (search ?? "").trim();
-    let qb = supabase
-      .from("profiles")
-      .select("id, display_name, avatar_url, is_online, last_seen_at, show_last_seen")
-      .neq("id", user.id);
-    if (q) {
-      const digits = q.replace(/\D/g, "");
-      const escaped = q.replace(/[%,()]/g, " ");
-      const orParts = [`display_name.ilike.%${escaped}%`];
-      if (digits.length >= 3) orParts.push(`phone.ilike.%${digits}%`);
-      qb = qb.or(orParts.join(","));
+    const { data, error } = await supabase.rpc("search_users", {
+      _query: q,
+      _limit: 100,
+    });
+    if (error) {
+      setPeople([]);
+      return;
     }
-    const { data } = await qb.order("display_name", { ascending: true }).limit(100);
     setPeople((data ?? []) as Profile[]);
   };
 
