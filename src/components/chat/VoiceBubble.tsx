@@ -100,7 +100,9 @@ function useAudioPlayer(id: string, url: string) {
 }
 
 export function VoiceBubble({ id, url, mine }: { id: string; url: string; mine: boolean }) {
-  const { playing, dur, pos, toggle } = useAudioPlayer(id, url);
+  const signedUrl = useSignedMediaUrl(url);
+  const { playing, dur, pos, toggle } = useAudioPlayer(id, signedUrl);
+
   const pct = dur ? (pos / dur) * 100 : 0;
   return (
     <div className="flex items-center gap-2 min-w-[140px]">
