@@ -679,6 +679,10 @@ export type Database = {
         Args: { _other_user: string }
         Returns: string
       }
+      update_my_profile: {
+        Args: { _display_name: string; _phone: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
