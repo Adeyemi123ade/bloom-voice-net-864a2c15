@@ -27,31 +27,19 @@ interface PendingState {
  */
 function resolveRedirectUri(): string {
   const origin = typeof window !== "undefined" ? window.location.origin : "";
-  
+
   // Local development: Google supports http://localhost:PORT
   if (origin.startsWith("http://localhost")) {
     return `${origin}/settings`;
   }
 
-  // Known production/staging origins. If on one of these, use it.
-  const isRegistered =
-    origin.includes("chichatapp.com") ||
-    origin.includes("bloom-voice-net.lovable.app");
-
-  const isWebHttps = origin.startsWith("https://");
-  const isPreview =
-    origin.includes("lovableproject.com") ||
-    origin.includes("id-preview--");
-
-  // If on a preview domain, or non-HTTPS (except localhost), or an unknown custom domain,
-  // fallback to the primary registered one so the flow doesn't immediately fail.
-  // Note: If you want chichatapp.com to work, you MUST add https://chichatapp.com/settings
-  // to your Google Cloud Console "Authorized redirect URIs".
-  if (!isWebHttps || isPreview || !isRegistered) {
-    return "https://bloom-voice-net.lovable.app/settings";
-  }
-
-  return `${origin}/settings`;
+  // Always send users to the single registered redirect URL in Google Cloud
+  // Console. Custom domains (chichatapp.com) and preview URLs are NOT
+  // registered there — sending them would trigger redirect_uri_mismatch.
+  // The OAuth completion page on bloom-voice-net.lovable.app handles the
+  // code exchange and shows a success toast; the user can then return to
+  // their original tab. This keeps the flow working on every origin.
+  return "https://bloom-voice-net.lovable.app/settings";
 }
 
 /** Start Google OAuth flow for Contacts (People API). */
