@@ -105,22 +105,18 @@ export default function Profile() {
       }
     }
     setSaving(true);
-    const { error } = await supabase
-      .from("profiles")
-      .upsert(
-        {
-          id: user.id,
-          display_name: displayName.trim() || null,
-          phone: normalizedPhone,
-        },
-        { onConflict: "id" }
-      );
+    const { error } = await supabase.rpc("update_my_profile", {
+      _display_name: displayName.trim(),
+      _phone: normalizedPhone,
+    });
     await supabase.auth.updateUser({ data: { about: about.trim() } });
     setSaving(false);
     if (error) {
-      const msg = error.message.includes("profiles_phone_unique")
-        ? "That phone number is already linked to another account."
-        : error.message;
+      const msg =
+        error.message.includes("phone_taken") ||
+        error.message.includes("profiles_phone_unique")
+          ? "That phone number is already linked to another account."
+          : "Could not save your profile. Please try again.";
       toast({ title: "Save failed", description: msg, variant: "destructive" });
     } else {
       if (normalizedPhone) setPhone(normalizedPhone);
