@@ -311,6 +311,14 @@ export default function Home() {
         <div className="px-4 pt-5 pb-3 flex items-center justify-between">
           <h1 className="text-[20px] font-bold text-foreground">Chats</h1>
           <Dialog open={openNew} onOpenChange={(o) => { setOpenNew(o); if (o) { setPeopleQuery(""); loadPeople(); } }}>
+            <DialogTrigger asChild>
+              <button
+                aria-label="Start new chat"
+                className="w-9 h-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 active:scale-95 transition"
+              >
+                <MessageSquarePlus className="w-5 h-5" />
+              </button>
+            </DialogTrigger>
             <DialogContent className="max-w-[320px] bg-card border-border">
               <DialogHeader>
                 <DialogTitle className="text-sm">Start a new chat</DialogTitle>
