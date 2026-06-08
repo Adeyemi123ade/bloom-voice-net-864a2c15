@@ -105,9 +105,9 @@ export default function PhoneSettings() {
         setGoogleOpen(true);
         toast({ title: "Google connected", description: "Account linked." });
         setSyncing(true);
-        const list = await syncGoogleContacts();
+        const { contacts: list, warning } = await syncGoogleContacts();
         toast({
-          title: list.length === 0 ? "No contacts found in Google" : "Contacts synced",
+          title: list.length === 0 ? (warning || "No contacts found") : "Contacts synced",
           description:
             list.length === 0
               ? "This Google account has no saved contacts with phone numbers."
@@ -144,9 +144,9 @@ export default function PhoneSettings() {
   const syncGoogleNow = async () => {
     setSyncing(true);
     try {
-      const list = await syncGoogleContacts();
+      const { contacts: list, warning } = await syncGoogleContacts();
       toast({
-        title: list.length === 0 ? "No contacts found in Google" : "Contacts synced",
+        title: list.length === 0 ? (warning || "No contacts found") : "Contacts synced",
         description:
           list.length === 0
             ? "This Google account has no saved contacts with phone numbers."
