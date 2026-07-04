@@ -3,6 +3,7 @@
 // register form can pre-fill itself when a brand-new Google user is bounced
 // back to /register. No PII beyond name is returned.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
+import { checkRateLimit, clientIp } from "../_shared/rateLimit.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -26,6 +27,16 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
+
+    // Public, unauthenticated email-enumeration surface — cap at 5 req/min/IP.
+    const ip = clientIp(req);
+    const withinLimit = await checkRateLimit(admin, "check-user-exists", ip, 5, 60);
+    if (!withinLimit) {
+      return new Response(JSON.stringify({ error: "rate_limited" }), {
+        status: 429,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     let exists = false;
     let page = 1;

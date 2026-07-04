@@ -3,6 +3,7 @@
 // because it's used during signup/login before the user is authenticated.
 // Only returns a boolean — never any user data.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
+import { checkRateLimit, clientIp } from "../_shared/rateLimit.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -34,6 +35,16 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
+
+    // Public, unauthenticated email-enumeration surface — cap at 5 req/min/IP.
+    const ip = clientIp(req);
+    const withinLimit = await checkRateLimit(admin, "check-email-exists", ip, 5, 60);
+    if (!withinLimit) {
+      return new Response(JSON.stringify({ error: "rate_limited" }), {
+        status: 429,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // Page through users and look for a matching email. The user list is small
     // for this app; for very large bases you'd want a DB function, but the

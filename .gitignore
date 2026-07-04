@@ -12,6 +12,15 @@ dist
 dist-ssr
 *.local
 
+# Environment / secrets
+.env
+
+# Local JDK used for Android builds (not part of the repo)
+jdk/
+
+# Supabase CLI local state
+supabase/.temp/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
