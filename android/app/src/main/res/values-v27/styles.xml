@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- windowShowWhenLocked and windowTurnScreenOn are handled
+         programmatically in IncomingCallActivity.java for API 27+ -->
+</resources>
