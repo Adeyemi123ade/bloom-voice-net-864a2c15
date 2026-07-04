@@ -52,6 +52,15 @@ export default function DeviceGate({ children }: { children: ReactNode }) {
       setVerified(false);
       return;
     }
+    // A Supabase session existing does NOT mean the account is verified —
+    // signUp() can hand back a session for an account that hasn't confirmed
+    // its email OTP yet. Never let an unconfirmed session reach a protected
+    // screen; send it back to finish verification instead.
+    if (!user.email_confirmed_at) {
+      setVerified(false);
+      navigate("/verify-email", { replace: true, state: { email: user.email } });
+      return;
+    }
     // Dual-device verification temporarily disabled. Trust every signed-in
     // session. We still run the Google-signup probe so brand-new Google users
     // get routed to /register to finish their profile.
@@ -99,6 +108,10 @@ export default function DeviceGate({ children }: { children: ReactNode }) {
 
   // No user — let the underlying route's own guards handle redirect; render nothing.
   if (!user) return <LoadingShell label="Signing you in…" />;
+
+  // Session exists but the email OTP hasn't been confirmed yet — never render
+  // the protected screen; the effect above is already navigating away.
+  if (!user.email_confirmed_at) return <LoadingShell label="Signing you in…" />;
 
   // Render the protected screen immediately. Device verification runs silently
   // in the background; if it determines a real verification step is required,

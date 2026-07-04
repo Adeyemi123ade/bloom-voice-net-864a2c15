@@ -40,7 +40,14 @@ export default function Login() {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   useEffect(() => {
-    if (!authLoading && user) navigate("/home", { replace: true });
+    if (authLoading || !user) return;
+    // A session can exist for an account that hasn't confirmed its email OTP
+    // yet — don't treat that as "already logged in".
+    if (!user.email_confirmed_at) {
+      navigate("/verify-email", { replace: true, state: { email: user.email } });
+      return;
+    }
+    navigate("/home", { replace: true });
   }, [authLoading, user, navigate]);
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");

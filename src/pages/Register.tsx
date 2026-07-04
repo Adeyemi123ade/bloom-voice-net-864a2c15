@@ -63,7 +63,15 @@ export default function Register() {
   useEffect(() => {
     // Don't redirect away when the user is mid-Google-completion: they're
     // signed in but their profile isn't finished yet.
-    if (!authLoading && user && !googleVerified) navigate("/home", { replace: true });
+    if (authLoading || !user || googleVerified) return;
+    // A session can exist for an account that hasn't confirmed its email OTP
+    // yet (e.g. the user hit Back after signUp). Never treat that as "already
+    // logged in" — send them to finish verification instead of into the app.
+    if (!user.email_confirmed_at) {
+      navigate("/verify-email", { replace: true, state: { email: user.email } });
+      return;
+    }
+    navigate("/home", { replace: true });
   }, [authLoading, user, navigate, googleVerified]);
 
   const [name, setName] = useState(prefill?.name ?? "");
