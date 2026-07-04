@@ -201,7 +201,21 @@ export default function Register() {
     const { data: availability, error: availabilityError } = await supabase.functions.invoke("check-registration-availability", {
       body: { email: parsed.data.email, phone: e164 },
     });
-    if (availabilityError || (availability as { error?: string } | null)?.error) {
+    const availErrCode = (availability as { error?: string } | null)?.error;
+    if (availErrCode === "invalid_details") {
+      // The backend's stricter E.164 check rejected the number even though it
+      // passed client-side parsing — surface this as a phone problem, not a
+      // generic "couldn't register" failure.
+      setSubmitting(false);
+      setErrors({ phone: "That phone number doesn't look right — check the country code and number." });
+      toast({
+        title: "Check your phone number",
+        description: "Make sure you've selected the right country code and entered a valid number.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (availabilityError || availErrCode) {
       const emailExists = await checkEmailExists(parsed.data.email);
       if (emailExists === true) {
         setSubmitting(false);

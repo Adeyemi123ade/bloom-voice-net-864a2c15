@@ -33,6 +33,7 @@ compromised and rotate it immediately (GitHub: Settings → Developer settings
 | `check-user-exists` | Public: does this email/Google account already exist? | `false` | — |
 | `check-google-signup` | Post-Google-OAuth: tells client new vs. existing user | `false` | — |
 | `check-registration-availability` | Public: checks email + phone availability before signup | `false` | — |
+| `check-signup-email-status` | Public: lets /verify-email find out if the OTP email actually failed to send (reads `email_send_log`), instead of assuming success | `false` | — |
 | `sign-in-with-identifier` | Sign-in by phone/username identifier | `false` | — |
 | `complete-google-registration` | Finishes profile for a Google-signup user (phone + password) | `true` | — |
 | `google-oauth-callback` | Exchanges Google OAuth code for tokens, stores per-user | `true` | `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` |
