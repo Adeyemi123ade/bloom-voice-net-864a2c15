@@ -44,6 +44,7 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    const userId = claimsData.claims.sub as string;
 
     const body = await req.json().catch(() => ({}));
     const action = String(body?.action ?? "").trim();
@@ -53,6 +54,29 @@ Deno.serve(async (req) => {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // "complete" ends an existing call's room — without an ownership check,
+    // any authenticated user who learns/guesses a room name could kill
+    // someone else's active call (DoS). "create" happens *before* the
+    // `calls` row exists (the client pre-creates the empty Twilio room, then
+    // inserts the `calls` row), so there's nothing to check it against yet —
+    // and creating an empty, auto-expiring (1 min) room shell grants no
+    // access on its own; real access is gated by twilio-token instead.
+    if (action === "complete") {
+      // `supabase` above carries the caller's own JWT, so this SELECT is
+      // already scoped by the "Participants view own calls" RLS policy.
+      const { data: callRow, error: callErr } = await supabase
+        .from("calls")
+        .select("caller_id, callee_id")
+        .eq("room_name", roomName)
+        .maybeSingle();
+      if (callErr || !callRow || (callRow.caller_id !== userId && callRow.callee_id !== userId)) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     const auth = basicAuth(API_KEY_SID, API_KEY_SECRET);

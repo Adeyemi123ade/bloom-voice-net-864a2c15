@@ -12,6 +12,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { checkEmailStatus } from "@/lib/checkEmail";
+import { markRecoveryPending } from "@/lib/recoveryPending";
 
 const OTP_LENGTH = 6;
 
@@ -71,7 +72,12 @@ export default function VerifyResetCode() {
         refresh_token: data.session.refresh_token,
       });
     }
-    // Recovery session is now active — go straight to set-password screen.
+    // This is now a real, fully-privileged session — mark it as
+    // recovery-pending so DeviceGate keeps it out of the app until the
+    // password is actually changed (see recoveryPending.ts).
+    if (data?.user?.id) {
+      markRecoveryPending(data.user.id as string);
+    }
     navigate("/reset-password", { replace: true });
   };
 

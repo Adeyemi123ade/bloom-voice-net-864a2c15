@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import PasswordStrengthBar from "@/components/PasswordStrengthBar";
+import { clearRecoveryPending } from "@/lib/recoveryPending";
 
 const schema = z
   .object({
@@ -74,12 +75,13 @@ export default function ResetPassword() {
     }
     setErrors({});
     setSubmitting(true);
-    const { error } = await supabase.auth.updateUser({ password: result.data.password });
+    const { data, error } = await supabase.auth.updateUser({ password: result.data.password });
     setSubmitting(false);
     if (error) {
       toast({ title: "Couldn't reset password", description: error.message, variant: "destructive" });
       return;
     }
+    if (data.user?.id) clearRecoveryPending(data.user.id);
     toast({ title: "Password updated", description: "You're signed in." });
     navigate("/home");
   };

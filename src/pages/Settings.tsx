@@ -6,6 +6,7 @@ import {
   Cloud,
   LogOut,
   Smartphone,
+  Trash2,
   User as UserIcon,
 } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
@@ -18,6 +19,16 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { getMyBackup, type BackupRow } from "@/lib/chatBackup";
 
 export default function Settings() {
@@ -26,6 +37,8 @@ export default function Settings() {
 
   const [working, setWorking] = useState(false);
   const [backup, setBackup] = useState<BackupRow | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const onWeb = isWebApp();
 
   useEffect(() => {
@@ -60,6 +73,38 @@ export default function Settings() {
       window.location.replace("/");
     } finally {
       setWorking(false);
+    }
+  };
+
+  // Permanently deletes the account and all associated data server-side,
+  // then ends the local session. Goes through the delete-account edge
+  // function so cleanup (profile, messages, calls, device bindings, email
+  // records, and finally the auth user itself) always runs consistently —
+  // this is the only supported way to delete an account.
+  const handleDeleteAccount = async () => {
+    setDeleting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("delete-account");
+      const result = data as { ok?: boolean; error?: string; detail?: string } | null;
+      if (error || !result?.ok) {
+        toast({
+          title: "Couldn't delete your account",
+          description: result?.detail || "Please try again in a moment.",
+          variant: "destructive",
+        });
+        setDeleting(false);
+        return;
+      }
+      try { await supabase.auth.signOut(); } catch { /* ignore */ }
+      toast({ title: "Account deleted" });
+      window.location.replace("/");
+    } catch {
+      toast({
+        title: "Couldn't delete your account",
+        description: "Please check your connection and try again.",
+        variant: "destructive",
+      });
+      setDeleting(false);
     }
   };
 
@@ -136,6 +181,19 @@ export default function Settings() {
                 <ChevronRight className="w-4 h-4 text-muted-foreground" />
               </button>
 
+              <button
+                onClick={() => setDeleteOpen(true)}
+                className="w-full flex items-center gap-3 px-3 py-3 rounded-md bg-background border border-destructive/30 text-left"
+              >
+                <Trash2 className="w-4 h-4 text-destructive" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-destructive">Delete account</p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    Permanently remove your account and all data
+                  </p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+              </button>
             </CollapsibleContent>
           </Collapsible>
 
@@ -156,6 +214,36 @@ export default function Settings() {
             </div>
           )}
         </div>
+
+        <AlertDialog open={deleteOpen} onOpenChange={(open) => !deleting && setDeleteOpen(open)}>
+          <AlertDialogContent className="max-w-[320px]">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-base">
+                Delete your account?
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-sm">
+                This permanently deletes your profile, messages, calls, and contacts.
+                This cannot be undone, and this email can be used to register a new
+                account afterward.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deleting} className="text-sm h-10">
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleDeleteAccount();
+                }}
+                disabled={deleting}
+                className="text-sm h-10 bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {deleting ? "Deleting…" : "Delete account"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </MobileFrame>
   );

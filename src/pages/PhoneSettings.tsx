@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
+  ArrowLeft,
   Check,
   ChevronRight,
   Contact2,
@@ -91,6 +92,7 @@ export default function PhoneSettings() {
   const oauthHandledRef = useRef<string | null>(null);
   useEffect(() => {
     const code = params.get("code");
+    const state = params.get("state");
     if (!code || !user) return;
     if (oauthHandledRef.current === code) return;
     oauthHandledRef.current = code;
@@ -100,7 +102,7 @@ export default function PhoneSettings() {
     setParams(params, { replace: true });
     (async () => {
       try {
-        const r = await completeGoogleContactsConnect(code);
+        const r = await completeGoogleContactsConnect(code, state);
         setGoogleEmail(r.email);
         setGoogleOpen(true);
         toast({ title: "Google connected", description: "Account linked." });
@@ -238,7 +240,14 @@ export default function PhoneSettings() {
     <MobileFrame>
       <div className="h-full w-full flex flex-col bg-background overflow-y-auto">
         {/* Header */}
-        <div className="px-3 pt-4 pb-3 border-b border-border sticky top-0 bg-background z-10">
+        <div className="px-2 pt-4 pb-3 flex items-center gap-2 border-b border-border sticky top-0 bg-background z-10">
+          <button
+            onClick={() => navigate(-1)}
+            className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-secondary"
+            aria-label="Back"
+          >
+            <ArrowLeft className="w-5 h-5 text-foreground" />
+          </button>
           <h1 className="text-sm font-semibold text-foreground">Phone settings</h1>
         </div>
 

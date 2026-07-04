@@ -193,7 +193,23 @@ export default function CallScreen() {
   useEffect(() => {
     if (role !== "callee" || !callId) return;
     (async () => {
-      await supabase.from("calls").update({ status: "accepted" }).eq("id", callId);
+      // Guard on status="ringing" like the caller's timeout does — if the
+      // caller's 45s timeout (or a decline/end from elsewhere) already fired
+      // right as we tapped Accept, this update affects zero rows. Without the
+      // guard we'd flip the row back to "accepted" and join a room the
+      // caller has already torn down, with nothing left to detect it.
+      const { data } = await supabase
+        .from("calls")
+        .update({ status: "accepted" })
+        .eq("id", callId)
+        .eq("status", "ringing")
+        .select("id")
+        .maybeSingle();
+      if (!data) {
+        toast({ title: "Call ended" });
+        cleanupAndExit();
+        return;
+      }
       joinRoom();
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps

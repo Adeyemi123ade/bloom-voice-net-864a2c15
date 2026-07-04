@@ -25,3 +25,5 @@ project_id = "pnpabtxvsrkrldpfmtaz"
     verify_jwt = false
   [functions.check-google-signup]
     verify_jwt = false
+  [functions.check-signup-email-status]
+    verify_jwt = false

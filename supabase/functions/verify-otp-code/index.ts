@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { checkRateLimit, clientIp } from '../_shared/rateLimit.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -39,6 +40,17 @@ Deno.serve(async (req) => {
   if (!url || !anonKey || !serviceKey) return json({ error: 'Please try again' }, 500)
 
   const admin = createClient(url, serviceKey)
+
+  // A 6-digit code has only 1,000,000 combinations. Without a cap here, an
+  // attacker who can get a code sent to a victim's email (trivially true for
+  // "recovery" — anyone can trigger a password-reset email) could brute-force
+  // it within its 5-minute validity window. Key by email so guesses against
+  // one target are capped regardless of source IP.
+  const withinEmailLimit = await checkRateLimit(admin, `verify-otp-code:${type}`, email, 10, 300)
+  if (!withinEmailLimit) return json({ error: 'Too many attempts. Please request a new code.' }, 429)
+  const withinIpLimit = await checkRateLimit(admin, 'verify-otp-code', clientIp(req), 30, 300)
+  if (!withinIpLimit) return json({ error: 'Too many attempts. Please try again later.' }, 429)
+
   let token = code
 
   if (code.length === 6) {

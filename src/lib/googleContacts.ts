@@ -67,8 +67,19 @@ export async function startGoogleContactsConnect(): Promise<void> {
   }
 }
 
-/** Call after redirect back from Google with ?code=... in URL. */
-export async function completeGoogleContactsConnect(code: string): Promise<{ email: string | null }> {
+/**
+ * Call after redirect back from Google with ?code=&state=... in URL.
+ * `state` is the value we sent Google in the initial auth request (the
+ * user id that started the flow) — pass it through so the backend can
+ * reject a code exchange started by someone else (CSRF / account-linking
+ * confusion: without this, an attacker could get their own Google auth code
+ * accepted into a victim's account by tricking the victim into completing
+ * the attacker's OAuth redirect).
+ */
+export async function completeGoogleContactsConnect(
+  code: string,
+  state: string | null,
+): Promise<{ email: string | null }> {
   const pending = sessionStorage.getItem(PENDING_KEY);
   const redirect_uri = pending
     ? (JSON.parse(pending) as PendingState).redirect_uri
@@ -76,7 +87,7 @@ export async function completeGoogleContactsConnect(code: string): Promise<{ ema
   sessionStorage.removeItem(PENDING_KEY);
   const { data, error } = await supabase.functions.invoke(
     "google-oauth-callback",
-    { body: { action: "exchange", code, redirect_uri } },
+    { body: { action: "exchange", code, redirect_uri, state } },
   );
   if (error) throw await normalizeGoogleContactsError(error);
   if (data?.reconnectRequired) throw new GoogleContactsReconnectRequired();

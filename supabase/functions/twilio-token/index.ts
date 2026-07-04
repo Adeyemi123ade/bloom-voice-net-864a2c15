@@ -53,6 +53,24 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Room names are derived from conversationId + a millisecond timestamp —
+    // not a secret. Without this check, any authenticated user who can guess
+    // a room name could mint a valid token and join/eavesdrop on someone
+    // else's call. `supabase` above carries the caller's own JWT, so this
+    // SELECT is already scoped by the "Participants view own calls" RLS
+    // policy — a non-participant gets zero rows back regardless.
+    const { data: callRow, error: callErr } = await supabase
+      .from("calls")
+      .select("caller_id, callee_id")
+      .eq("room_name", roomName)
+      .maybeSingle();
+    if (callErr || !callRow || (callRow.caller_id !== userId && callRow.callee_id !== userId)) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const now = Math.floor(Date.now() / 1000);
     const payload = {
       jti: `${API_KEY_SID}-${now}`,

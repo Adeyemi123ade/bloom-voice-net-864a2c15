@@ -29,12 +29,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       resolved = true;
       setState({ session, user: session?.user ?? null, loading: false });
       if (event === "SIGNED_OUT") {
-        // Wipe per-user device-verified flags so next sign-in re-checks the gate.
+        // Wipe per-user device-verified / recovery-pending flags so next
+        // sign-in re-checks the gate instead of inheriting stale state.
         try {
           for (const storage of [localStorage, sessionStorage]) {
             const keys = Object.keys(storage);
             for (const k of keys) {
-              if (k.startsWith("chichat.device_verified.")) storage.removeItem(k);
+              if (
+                k.startsWith("chichat.device_verified.") ||
+                k.startsWith("chichat.recovery_pending.")
+              ) {
+                storage.removeItem(k);
+              }
             }
           }
         } catch { /* ignore */ }
