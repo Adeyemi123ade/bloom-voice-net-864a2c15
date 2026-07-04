@@ -91,6 +91,7 @@ export default function PhoneSettings() {
   const oauthHandledRef = useRef<string | null>(null);
   useEffect(() => {
     const code = params.get("code");
+    const state = params.get("state");
     if (!code || !user) return;
     if (oauthHandledRef.current === code) return;
     oauthHandledRef.current = code;
@@ -100,7 +101,7 @@ export default function PhoneSettings() {
     setParams(params, { replace: true });
     (async () => {
       try {
-        const r = await completeGoogleContactsConnect(code);
+        const r = await completeGoogleContactsConnect(code, state);
         setGoogleEmail(r.email);
         setGoogleOpen(true);
         toast({ title: "Google connected", description: "Account linked." });

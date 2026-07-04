@@ -17,6 +17,7 @@ import CountryPicker from "@/components/CountryPicker";
 import { allCountries, type CountryEntry } from "@/lib/countries";
 import PasswordStrengthBar from "@/components/PasswordStrengthBar";
 import { checkEmailExists } from "@/lib/checkEmail";
+import { isRecoveryPending } from "@/lib/recoveryPending";
 
 const baseSchema = z.object({
   name: z
@@ -69,6 +70,12 @@ export default function Register() {
     // logged in" — send them to finish verification instead of into the app.
     if (!user.email_confirmed_at) {
       navigate("/verify-email", { replace: true, state: { email: user.email } });
+      return;
+    }
+    // Same trap, for an unfinished password reset: verifying a recovery code
+    // establishes a real session before a new password is set.
+    if (isRecoveryPending(user.id)) {
+      navigate("/reset-password", { replace: true });
       return;
     }
     navigate("/home", { replace: true });

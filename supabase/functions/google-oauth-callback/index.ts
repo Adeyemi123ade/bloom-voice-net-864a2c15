@@ -54,6 +54,17 @@ Deno.serve(async (req) => {
     }
 
     if (action === "exchange") {
+      // The `state` param is set to the initiating user's id in the
+      // "auth_url" action above and echoed back by Google unmodified. Verify
+      // it matches the CURRENT caller before redeeming the code — otherwise
+      // an attacker could get their own Google account linked to a victim's
+      // ChiChat account by getting the victim to submit the attacker's code
+      // (CSRF / account-linking confusion).
+      const state = body.state as string | undefined;
+      if (!state || state !== user.id) {
+        return json({ error: "Invalid or missing OAuth state" }, 401);
+      }
+
       const code = body.code as string;
       const redirectUri = normalizeRedirectUri(body.redirect_uri as string | undefined);
       const tokenRes = await fetch("https://oauth2.googleapis.com/token", {

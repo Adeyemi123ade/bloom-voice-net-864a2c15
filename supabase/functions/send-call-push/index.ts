@@ -104,6 +104,27 @@ Deno.serve(async (req) => {
       });
     }
 
+    // This client uses the service role, so RLS doesn't apply here — verify
+    // ownership explicitly. Without this, any authenticated user could push
+    // a spoofed "incoming call" (arbitrary callerName/callType) to any other
+    // user's device just by knowing their user id.
+    const { data: callRow, error: callErr } = await supabase
+      .from("calls")
+      .select("caller_id, callee_id")
+      .eq("id", callId)
+      .maybeSingle();
+    if (
+      callErr ||
+      !callRow ||
+      callRow.caller_id !== userData.user.id ||
+      callRow.callee_id !== calleeId
+    ) {
+      return new Response(JSON.stringify({ error: "unauthorized" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Sign a short token so the native "Decline" button can call call-action
     // without needing a full user session on the device.
     const secret = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;

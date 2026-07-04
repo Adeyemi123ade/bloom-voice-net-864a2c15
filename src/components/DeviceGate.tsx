@@ -8,6 +8,7 @@ import {
   isDeviceVerifiedLocally,
   markDeviceVerified,
 } from "@/lib/deviceVerified";
+import { isRecoveryPending } from "@/lib/recoveryPending";
 import { toast } from "@/hooks/use-toast";
 import MobileFrame from "@/components/MobileFrame";
 
@@ -61,6 +62,15 @@ export default function DeviceGate({ children }: { children: ReactNode }) {
       navigate("/verify-email", { replace: true, state: { email: user.email } });
       return;
     }
+    // Verifying a password-reset code establishes a real session before the
+    // user actually sets a new password — same trap as the email-confirm
+    // case above. Never let that session into the app until the password is
+    // actually changed.
+    if (isRecoveryPending(user.id)) {
+      setVerified(false);
+      navigate("/reset-password", { replace: true });
+      return;
+    }
     // Dual-device verification temporarily disabled. Trust every signed-in
     // session. We still run the Google-signup probe so brand-new Google users
     // get routed to /register to finish their profile.
@@ -112,6 +122,9 @@ export default function DeviceGate({ children }: { children: ReactNode }) {
   // Session exists but the email OTP hasn't been confirmed yet — never render
   // the protected screen; the effect above is already navigating away.
   if (!user.email_confirmed_at) return <LoadingShell label="Signing you in…" />;
+
+  // Session came from an unfinished password reset — same story.
+  if (isRecoveryPending(user.id)) return <LoadingShell label="Signing you in…" />;
 
   // Render the protected screen immediately. Device verification runs silently
   // in the background; if it determines a real verification step is required,

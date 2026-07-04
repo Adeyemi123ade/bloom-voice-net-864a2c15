@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
+import { clearRecoveryPending, isRecoveryPending } from "@/lib/recoveryPending";
 
 
 const loginSchema = z.object({
@@ -45,6 +46,12 @@ export default function Login() {
     // yet — don't treat that as "already logged in".
     if (!user.email_confirmed_at) {
       navigate("/verify-email", { replace: true, state: { email: user.email } });
+      return;
+    }
+    // Same trap, for an unfinished password reset: verifying a recovery code
+    // establishes a real session before a new password is set.
+    if (isRecoveryPending(user.id)) {
+      navigate("/reset-password", { replace: true });
       return;
     }
     navigate("/home", { replace: true });
@@ -157,6 +164,11 @@ export default function Login() {
         access_token: data.session.access_token,
         refresh_token: data.session.refresh_token,
       });
+    }
+    // A deliberate, credentialed login always supersedes any earlier
+    // abandoned password-reset attempt for this account.
+    if (data?.session?.user?.id) {
+      clearRecoveryPending(data.session.user.id as string);
     }
     toast({ title: "Welcome back" });
     navigate("/home");
