@@ -3,8 +3,8 @@ import { toE164 } from "./phone";
 
 export interface DeviceContact {
   name: string;
-  phones: string[]; // E.164
-  avatar?: string | null; // data URL or remote URL
+  phones: string[]; // E.164 where possible, raw as fallback
+  avatar?: string | null;
 }
 
 /** True when running inside a Capacitor native shell (iOS/Android). */
@@ -17,6 +17,19 @@ export function isNativePlatform(): boolean {
 }
 
 /**
+ * Normalize a phone number to E.164 if possible, otherwise return the raw
+ * number stripped of formatting so it can still be stored and matched.
+ */
+function normalizePhone(raw: string): string | null {
+  if (!raw) return null;
+  const e164 = toE164(raw);
+  if (e164) return e164;
+  // Fallback: strip everything except digits and leading +
+  const stripped = raw.replace(/[^\d+]/g, "");
+  return stripped.length >= 7 ? stripped : null;
+}
+
+/**
  * Load device contacts on a native build via @capacitor-community/contacts.
  * Throws on web or when permission is denied so the caller can show a clear message.
  */
@@ -24,7 +37,6 @@ export async function loadNativeContacts(): Promise<DeviceContact[]> {
   if (!isNativePlatform()) {
     throw new Error("NOT_NATIVE");
   }
-  // Lazy import so the web bundle never tries to evaluate native code paths.
   const mod = await import("@capacitor-community/contacts");
   const Contacts = mod.Contacts;
 
@@ -45,10 +57,14 @@ export async function loadNativeContacts(): Promise<DeviceContact[]> {
       "";
     const phones: string[] = [];
     for (const p of c.phones ?? []) {
-      const e = toE164(p.number ?? "");
-      if (e && !phones.includes(e)) phones.push(e);
+      const normalized = normalizePhone(p.number ?? "");
+      if (normalized && !phones.includes(normalized)) {
+        phones.push(normalized);
+      }
     }
-    if (phones.length) list.push({ name: name.trim() || phones[0], phones });
+    if (phones.length) {
+      list.push({ name: name.trim() || phones[0], phones });
+    }
   }
   return list;
 }

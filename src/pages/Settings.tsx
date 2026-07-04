@@ -6,7 +6,6 @@ import {
   Cloud,
   LogOut,
   Smartphone,
-  Trash2,
   User as UserIcon,
 } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
@@ -19,25 +18,12 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 import { getMyBackup, type BackupRow } from "@/lib/chatBackup";
-import { clearContactsCache } from "@/lib/deviceContacts";
 
 export default function Settings() {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
 
-  const [confirmStage, setConfirmStage] = useState(false);
   const [working, setWorking] = useState(false);
   const [backup, setBackup] = useState<BackupRow | null>(null);
   const onWeb = isWebApp();
@@ -64,36 +50,6 @@ export default function Settings() {
     if (!user) return;
     (async () => setBackup(await getMyBackup()))();
   }, [user]);
-
-
-  // Mobile "Uninstall app": local-only wipe + global sign-out. No backend
-  // delete — accounts are never deleted, only the app is removed from this
-  // phone. If the user comes back they sign in with the same email.
-  const uninstallOnDevice = async () => {
-    if (!user) return;
-    setWorking(true);
-    try {
-      try { await supabase.auth.signOut({ scope: "global" }); } catch { /* ignore */ }
-      try {
-        clearContactsCache();
-        localStorage.clear();
-        sessionStorage.clear();
-        if (typeof indexedDB !== "undefined" && indexedDB.databases) {
-          const dbs = await indexedDB.databases();
-          await Promise.all(
-            dbs.map((d) => d.name ? new Promise<void>((res) => {
-              const req = indexedDB.deleteDatabase(d.name!);
-              req.onsuccess = req.onerror = req.onblocked = () => res();
-            }) : Promise.resolve())
-          );
-        }
-      } catch { /* ignore */ }
-      toast({ title: "App removed from this device" });
-      window.location.replace("/");
-    } finally {
-      setWorking(false);
-    }
-  };
 
   // Web "Sign out": just end the session on this browser.
   const signOutWeb = async () => {
@@ -185,12 +141,10 @@ export default function Settings() {
 
           <div className="flex-1" />
 
-          {/* Bottom action — Web shows "Sign out" (just ends the session on
-              this browser). Mobile keeps "Uninstall app" which wipes the app
-              from this device only. Accounts are never deleted; the email
-              stays usable for future sign-ins from any device. */}
-          <div className="pt-10 pb-4">
-            {onWeb ? (
+          {/* Bottom action — Web only shows "Sign out". Mobile has no button;
+              users uninstall the app natively through Android. */}
+          {onWeb && (
+            <div className="pt-10 pb-4">
               <button
                 onClick={signOutWeb}
                 disabled={working}
@@ -199,54 +153,8 @@ export default function Settings() {
                 <LogOut className="w-6 h-6" />
                 {working ? "Signing out…" : "Sign out"}
               </button>
-            ) : (
-              <AlertDialog onOpenChange={(o) => !o && setConfirmStage(false)}>
-                <AlertDialogTrigger asChild>
-                  <button className="w-full h-16 rounded-xl bg-destructive text-destructive-foreground text-lg font-bold flex items-center justify-center gap-3 shadow-lg shadow-destructive/30 hover:bg-destructive/90 active:scale-[0.99] transition">
-                    <Trash2 className="w-6 h-6" />
-                    Uninstall app
-                  </button>
-                </AlertDialogTrigger>
-                <p className="text-xs text-muted-foreground text-center mt-2 px-4">
-                  Removes the app and its data from this device. Your account stays — sign back in any time. Back up your chats first.
-                </p>
-                <AlertDialogContent className="max-w-[320px]">
-                  <AlertDialogHeader>
-                    <AlertDialogTitle className="text-base">
-                      {confirmStage ? "Are you absolutely sure?" : "Uninstall Chichat?"}
-                    </AlertDialogTitle>
-                    <AlertDialogDescription className="text-sm">
-                      {confirmStage
-                        ? "This removes the app and all of its data from this device. Your account stays — you can sign back in with the same email any time."
-                        : "Uninstalling clears chats, contacts and presence from this device. Your account is not deleted — you can sign back in later. Tip: back up your chats first."}
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel className="text-sm h-10">Cancel</AlertDialogCancel>
-                    {confirmStage ? (
-                      <AlertDialogAction
-                        onClick={uninstallOnDevice}
-                        disabled={working}
-                        className="bg-destructive hover:bg-destructive/90 text-destructive-foreground text-sm h-10"
-                      >
-                        {working ? "Uninstalling…" : "Yes, uninstall"}
-                      </AlertDialogAction>
-                    ) : (
-                      <AlertDialogAction
-                        onClick={(e) => {
-                          e.preventDefault();
-                          setConfirmStage(true);
-                        }}
-                        className="bg-destructive hover:bg-destructive/90 text-destructive-foreground text-sm h-10"
-                      >
-                        Continue
-                      </AlertDialogAction>
-                    )}
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
     </MobileFrame>

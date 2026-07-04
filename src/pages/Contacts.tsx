@@ -62,6 +62,7 @@ export default function Contacts() {
   const [query, setQuery] = useState("");
   const [googleConnected, setGoogleConnected] = useState<boolean | null>(null);
   const [connectingGoogle, setConnectingGoogle] = useState(false);
+  const [permissionDenied, setPermissionDenied] = useState(false);
   const [actionSheet, setActionSheet] = useState<{
     title: string;
     subtitle?: string;
@@ -87,48 +88,26 @@ export default function Contacts() {
       if (merged.length) await runMatch(merged);
       await loadInvited();
 
+      // On native Android: load device contacts directly.
       if (isNativePlatform()) {
-        setGoogleConnected(true);
         setSyncing(true);
         try {
           const list = await loadNativeContacts();
           saveCachedContacts(list);
           const fresh = mergeContacts(list, loadManualContacts());
           setContacts(fresh);
+          setGoogleConnected(true);
           if (fresh.length) await runMatch(fresh);
         } catch (err) {
           const code = err instanceof Error ? err.message : "";
           if (code === "PERMISSION_DENIED") {
-            toast({
-              title: "Contacts permission needed",
-              description: "Allow contacts access in your phone settings to see who's on Chichat.",
-              variant: "destructive",
-            });
+            setPermissionDenied(true);
+            setGoogleConnected(true);
           }
         } finally {
           setSyncing(false);
         }
         return;
-      }
-
-      try {
-        const connected = await isGoogleConnected();
-        setGoogleConnected(connected);
-        if (connected) {
-          setSyncing(true);
-          try {
-            const list = await syncGoogleContacts();
-            const fresh = mergeContacts(list, loadManualContacts());
-            setContacts(fresh);
-            if (fresh.length) await runMatch(fresh);
-          } catch {
-            /* user can retry from Settings */
-          } finally {
-            setSyncing(false);
-          }
-        }
-      } catch {
-        setGoogleConnected(false);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -494,8 +473,40 @@ export default function Contacts() {
             />
           </div>
 
-          {/* Google connection prompt — only when not yet linked. */}
-          {googleConnected === false && (
+          {/* Contacts permission denied — Android only */}
+          {permissionDenied && (
+            <div className="mx-4 mt-3 p-4 rounded-xl bg-secondary border border-border text-center">
+              <p className="text-sm font-semibold text-foreground">
+                Contacts access needed
+              </p>
+              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                Allow ChiChat to access your contacts so you can see which friends are already on the app.
+              </p>
+              <Button
+                onClick={async () => {
+                  setPermissionDenied(false);
+                  setSyncing(true);
+                  try {
+                    const list = await loadNativeContacts();
+                    saveCachedContacts(list);
+                    const fresh = mergeContacts(list, loadManualContacts());
+                    setContacts(fresh);
+                    if (fresh.length) await runMatch(fresh);
+                  } catch {
+                    setPermissionDenied(true);
+                  } finally {
+                    setSyncing(false);
+                  }
+                }}
+                className="mt-3 w-full h-10 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-sm font-semibold"
+              >
+                Allow contacts access
+              </Button>
+            </div>
+          )}
+
+          {/* Google connection prompt — only on web when not yet linked. */}
+          {googleConnected === false && !isNativePlatform() && (
             <div className="mx-4 mt-3 p-3 rounded-xl bg-secondary border border-border">
               <p className="text-sm font-semibold text-foreground">
                 Connect your Google account
