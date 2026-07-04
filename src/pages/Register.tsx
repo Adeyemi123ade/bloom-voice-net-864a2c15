@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
+
 import { toE164 } from "@/lib/phone";
 import CountryPicker from "@/components/CountryPicker";
 import { allCountries, type CountryEntry } from "@/lib/countries";
@@ -106,24 +107,17 @@ export default function Register() {
 
   const handleGoogle = async () => {
     setGoogleLoading(true);
-    // Per product policy: Google can ONLY be used by users who already have
-    // an account. We send them through OAuth, but if they're brand new the
-    // server will block them and bounce back here with their details
-    // pre-filled (handled by DeviceGate).
+    const CANONICAL_ORIGIN = "https://chichatapp.com";
     const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: `${window.location.origin}/auth/google-return`,
+      redirect_uri: `${CANONICAL_ORIGIN}/auth/google-return`,
     });
     if (result.error) {
       setGoogleLoading(false);
       toast({
         title: "Google didn't work",
         description: "Please try again, or fill the form below to create your account.",
-        variant: "destructive",
       });
-      return;
     }
-    if (result.redirected) return;
-    navigate("/auth/google-return");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -196,6 +190,41 @@ export default function Register() {
       return;
     }
 
+    const { data: availability, error: availabilityError } = await supabase.functions.invoke("check-registration-availability", {
+      body: { email: parsed.data.email, phone: e164 },
+    });
+    if (availabilityError || (availability as { error?: string } | null)?.error) {
+      const emailExists = await checkEmailExists(parsed.data.email);
+      if (emailExists === true) {
+        setSubmitting(false);
+        setErrors({ email: "This email is already registered — sign in instead" });
+        toast({
+          title: "Email already registered",
+          description: `${parsed.data.email} already has an account. Try signing in.`,
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+    const availabilityResult = availabilityError ? null : availability as { email_exists?: boolean; phone_exists?: boolean } | null;
+    if (availabilityResult?.email_exists || availabilityResult?.phone_exists) {
+      setSubmitting(false);
+      const nextErrors: FormErrors = {};
+      if (availabilityResult.email_exists) nextErrors.email = "This email is already registered — sign in instead";
+      if (availabilityResult.phone_exists) nextErrors.phone = `${e164} is already registered — sign in instead`;
+      setErrors(nextErrors);
+      toast({
+        title: availabilityResult.email_exists && availabilityResult.phone_exists
+          ? "Email and phone already registered"
+          : availabilityResult.email_exists
+            ? "Email already registered"
+            : "Phone number already registered",
+        description: "This account detail is already in use. Sign in instead, or use different details for a new account.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Standard email/password sign-up.
     const { data: signUpData, error } = await supabase.auth.signUp({
       email: parsed.data.email,
@@ -214,30 +243,43 @@ export default function Register() {
         msg.includes("user already") ||
         (error as { status?: number }).status === 422;
       if (duplicate) {
-        setErrors({ email: "Email already in use — sign in instead" });
+        setErrors({ email: "This email is already registered — sign in instead" });
         toast({
-          title: "Email already in use",
-          description: "This is an existing account. Use Sign in to access it.",
+          title: "Email already registered",
+          description: `${parsed.data.email} already has an account. Try signing in.`,
           variant: "destructive",
         });
       } else {
         toast({
-          title: "Sign up failed",
-          description: error.message,
+          title: "We couldn't create your account",
+          description: error.message || "Please try again in a moment.",
           variant: "destructive",
         });
       }
       return;
     }
-    // Save phone to profile (handle_new_user trigger created the row)
+    // Save phone to profile (handle_new_user trigger created the row without phone)
     if (signUpData.user?.id && e164) {
       const { error: profileError } = await supabase
         .from("profiles")
         .update({ phone: e164 })
         .eq("id", signUpData.user.id);
-      if (profileError && profileError.code === "23505") {
+      if (profileError) {
         setSubmitting(false);
-        setErrors({ phone: "This phone number is already registered" });
+        if (profileError.code === "23505") {
+          setErrors({ phone: `${e164} is already registered to another account` });
+          toast({
+            title: "Phone number already registered",
+            description: `${e164} is already in use. Use a different number, or sign in to the existing account.`,
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Couldn't save your phone number",
+            description: profileError.message || "Please try again.",
+            variant: "destructive",
+          });
+        }
         return;
       }
     }
@@ -262,17 +304,18 @@ export default function Register() {
           <div className="mt-2">
             <BrandHero
               className="mb-3"
-              message="Welcome to ChiChat — where conversations don't end and people never feel far away."
+              message="Join Chichat and experience the possibilities."
             />
             <h1 className="text-xl font-bold text-foreground leading-tight">
               {googleVerified ? "Finish setting up" : "Create your account"}
             </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              {googleVerified
-                ? "We got your name and email from Google. Add a phone number and password to finish."
-                : "Join Chichat and experience the possibilities."}
-            </p>
+            {googleVerified && (
+              <p className="text-sm text-muted-foreground mt-1">
+                We got your name and email from Google. Add a phone number and password to finish.
+              </p>
+            )}
           </div>
+
 
           <form onSubmit={handleSubmit} className="mt-4 flex-1 flex flex-col">
             <div className="space-y-3">
@@ -358,13 +401,10 @@ export default function Register() {
                     aria-invalid={!!errors.phone}
                   />
                 </div>
-                {errors.phone ? (
+                {errors.phone && (
                   <p className="text-sm text-destructive mt-1">{errors.phone}</p>
-                ) : (
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Pick your country, then enter the rest of your number.
-                  </p>
                 )}
+
               </div>
 
               <div>
@@ -457,7 +497,7 @@ export default function Register() {
                   Sign in
                 </Link>
               </p>
-              <p className="text-sm text-foreground text-center mt-2 font-semibold">
+              <p className="text-foreground text-center mt-2 font-semibold" style={{ fontSize: "0.9625rem" }}>
                 By continuing, you agree to our{" "}
                 <Link to="/terms" className="text-primary underline underline-offset-2">
                   Terms &amp; Privacy Policy

@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Pause, Play } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { fmtDuration } from "@/lib/chat/format";
+import { useSignedMediaUrl } from "@/lib/signedMedia";
+
 
 // --- Single-instance audio manager (prevents overlap & playback bugs) ---
 type AudioCtl = {
@@ -98,7 +100,9 @@ function useAudioPlayer(id: string, url: string) {
 }
 
 export function VoiceBubble({ id, url, mine }: { id: string; url: string; mine: boolean }) {
-  const { playing, dur, pos, toggle } = useAudioPlayer(id, url);
+  const signedUrl = useSignedMediaUrl(url);
+  const { playing, dur, pos, toggle } = useAudioPlayer(id, signedUrl);
+
   const pct = dur ? (pos / dur) * 100 : 0;
   return (
     <div className="flex items-center gap-2 min-w-[140px]">

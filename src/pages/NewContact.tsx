@@ -49,12 +49,14 @@ export default function NewContact() {
         if (user) {
           const { data } = await supabase
             .from("profiles")
-            .select("phone, avatar_url")
+            .select("avatar_url")
             .eq("id", user.id)
             .maybeSingle();
           const myAvatar = (data as { avatar_url?: string | null } | null)?.avatar_url;
           if (myAvatar) setAvatar(myAvatar);
-          const myPhone = (data as { phone?: string | null } | null)?.phone;
+          const { data: priv } = await supabase.rpc("get_my_profile_private");
+          const privRow = Array.isArray(priv) ? priv[0] : priv;
+          const myPhone = (privRow as { phone?: string | null } | null)?.phone;
           if (myPhone) {
             const hit = findByDialPrefix(myPhone);
             if (hit) {

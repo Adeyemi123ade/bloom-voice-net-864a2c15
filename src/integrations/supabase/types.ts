@@ -602,6 +602,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      account_identifier_status: {
+        Args: { _email?: string; _phone?: string }
+        Returns: Json
+      }
       cleanup_expired_auth_otp_aliases: { Args: never; Returns: number }
       delete_email: {
         Args: { message_id: number; queue_name: string }
@@ -621,6 +625,13 @@ export type Database = {
       find_user_by_backup_email: {
         Args: { _backup_email: string }
         Returns: string
+      }
+      get_my_profile_private: {
+        Args: never
+        Returns: {
+          backup_email: string
+          phone: string
+        }[]
       }
       is_conversation_participant: {
         Args: { _conversation_id: string; _user_id: string }
@@ -652,9 +663,25 @@ export type Database = {
           read_ct: number
         }[]
       }
+      resolve_email_for_phone: { Args: { _phone: string }; Returns: Json }
+      search_users: {
+        Args: { _limit?: number; _query: string }
+        Returns: {
+          avatar_url: string
+          display_name: string
+          id: string
+          is_online: boolean
+          last_seen_at: string
+          show_last_seen: boolean
+        }[]
+      }
       start_direct_conversation: {
         Args: { _other_user: string }
         Returns: string
+      }
+      update_my_profile: {
+        Args: { _display_name: string; _phone: string }
+        Returns: undefined
       }
     }
     Enums: {

@@ -7,6 +7,7 @@ import {
   MessageSquare,
   Phone,
   Search,
+  Smartphone,
   UserPlus,
   Users,
 } from "lucide-react";
@@ -20,11 +21,14 @@ import { formatDisplay } from "@/lib/phone";
 import {
   DeviceContact,
   isNativePlatform,
+  isWebContactPickerSupported,
   loadCachedContacts,
   loadManualContacts,
   loadNativeContacts,
+  pickWebContacts,
   removeManualContact,
   saveCachedContacts,
+  saveManualContacts,
 } from "@/lib/deviceContacts";
 import {
   isGoogleConnected,
@@ -109,9 +113,68 @@ export default function Contacts() {
         }
         return;
       }
+
+      try {
+        const connected = await isGoogleConnected();
+        setGoogleConnected(connected);
+        if (connected) {
+          setSyncing(true);
+          try {
+            const { contacts: list } = await syncGoogleContacts();
+            const fresh = mergeContacts(list, loadManualContacts());
+            setContacts(fresh);
+            if (fresh.length) await runMatch(fresh);
+          } catch {
+            /* user can retry from Settings */
+          } finally {
+            setSyncing(false);
+          }
+        }
+      } catch {
+        setGoogleConnected(false);
+      }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
+  // Auto-refresh Google contacts in the background: on tab focus and every 5
+  // minutes while the page is open. Keeps contacts fresh without the user
+  // tapping the refresh icon. Native uses device contacts directly so we skip.
+  useEffect(() => {
+    if (!user || isNativePlatform()) return;
+    let cancelled = false;
+
+    const backgroundSync = async () => {
+      if (cancelled) return;
+      try {
+        const connected = await isGoogleConnected();
+        if (!connected || cancelled) return;
+        const { contacts: list } = await syncGoogleContacts();
+        if (cancelled) return;
+        const fresh = mergeContacts(list, loadManualContacts());
+        setContacts(fresh);
+        if (fresh.length) await runMatch(fresh);
+      } catch {
+        /* silent — user can retry via the refresh button */
+      }
+    };
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void backgroundSync();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    const interval = window.setInterval(backgroundSync, 5 * 60 * 1000);
+
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+      window.clearInterval(interval);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
 
   const loadInvited = async () => {
     if (!user) return;
@@ -176,7 +239,7 @@ export default function Contacts() {
     try {
       const list = isNativePlatform()
         ? await loadNativeContacts()
-        : await syncGoogleContacts();
+        : (await syncGoogleContacts()).contacts;
       if (isNativePlatform()) saveCachedContacts(list);
       const merged = mergeContacts(list, loadManualContacts());
       setContacts(merged);
@@ -185,6 +248,50 @@ export default function Contacts() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Could not load contacts";
       toast({ title: "Sync failed", description: msg, variant: "destructive" });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const canPickWebContacts = isWebContactPickerSupported() && !isNativePlatform();
+
+  const importFromPhone = async () => {
+    setSyncing(true);
+    try {
+      const picked = await pickWebContacts();
+      if (!picked.length) {
+        toast({ title: "No contacts selected" });
+        return;
+      }
+      const existing = loadManualContacts();
+      const byPhone = new Map(existing.map((c) => [c.phones[0], c]));
+      for (const c of picked) {
+        const key = c.phones[0];
+        if (!byPhone.has(key)) byPhone.set(key, c);
+      }
+      const updatedManual = Array.from(byPhone.values());
+      saveManualContacts(updatedManual);
+      const cached = loadCachedContacts() ?? [];
+      const merged = mergeContacts(cached, updatedManual);
+      setContacts(merged);
+      await runMatch(merged);
+      toast({
+        title: `Imported ${picked.length} contact${picked.length === 1 ? "" : "s"}`,
+      });
+    } catch (err) {
+      const code = err instanceof Error ? err.message : "";
+      if (code === "NOT_SUPPORTED") {
+        toast({
+          title: "Not supported on this browser",
+          description: "Open Chichat in Chrome on Android to import phone contacts.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Import cancelled",
+          description: err instanceof Error ? err.message : "Try again.",
+        });
+      }
     } finally {
       setSyncing(false);
     }
@@ -465,6 +572,16 @@ export default function Contacts() {
               label="New Contact"
               onClick={() => navigate("/contacts/new")}
             />
+            {canPickWebContacts && (
+              <>
+                <Divider />
+                <ActionRow
+                  icon={Smartphone}
+                  label={syncing ? "Importing…" : "Import from phone"}
+                  onClick={importFromPhone}
+                />
+              </>
+            )}
             <Divider />
             <ActionRow
               icon={Heart}

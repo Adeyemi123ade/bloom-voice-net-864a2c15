@@ -1,9 +1,4 @@
 // Fetches contacts from Google People API for the authenticated user.
-// Pulls from THREE sources so users who don't manually save to Google Contacts
-// still get useful results:
-//   1. people/me/connections      → saved Google Contacts
-//   2. otherContacts              → people you've emailed (auto-collected)
-//   3. people:listDirectoryPeople → workspace directory (if any)
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 
 const corsHeaders = {
@@ -57,7 +52,9 @@ Deno.serve(async (req) => {
     }
 
     let accessToken = row.access_token as string;
-    if (new Date(row.expires_at).getTime() < Date.now() + 60000 && row.refresh_token) {
+    const isExpired = new Date(row.expires_at).getTime() < Date.now() + 60000;
+    
+    if (isExpired && row.refresh_token) {
       const r = await fetch("https://oauth2.googleapis.com/token", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -75,22 +72,29 @@ Deno.serve(async (req) => {
           access_token: t.access_token,
           expires_at: new Date(Date.now() + (t.expires_in ?? 3600) * 1000).toISOString(),
         }).eq("user_id", user.id);
+      } else {
+        console.error("Token refresh failed", t);
+        // If refresh fails (e.g. revoked), we might need to reconnect.
+        if (t.error === "invalid_grant") {
+           return json({
+             error: "Google session expired. Please reconnect.",
+             reconnectRequired: true,
+           });
+        }
       }
+    } else if (isExpired && !row.refresh_token) {
+       return json({
+         error: "Google session expired and no refresh token available. Please reconnect.",
+         reconnectRequired: true,
+       });
     }
 
     const map = new Map<string, Contact>();
-    const sources = {
-      saved: 0,
-      other: 0,
-      directory: 0,
-    };
+    const sources = { saved: 0, other: 0, directory: 0 };
     const debug = {
       savedRaw: 0,
       otherRaw: 0,
       directoryRaw: 0,
-      savedWithPhones: 0,
-      otherWithPhones: 0,
-      directoryWithPhones: 0,
       savedError: null as string | null,
       otherError: null as string | null,
       directoryError: null as string | null,
@@ -110,39 +114,48 @@ Deno.serve(async (req) => {
       debug.savedError = result.errorMessage;
       for (const c of result.contacts) {
         sources.saved++;
-        debug.savedWithPhones++;
         mergeContact(map, c);
       }
     }
 
-    // 2. "Other contacts" — auto-collected from Gmail interactions.
-    //    These often don't have phone numbers, but when they do they're useful.
+    // 2. "Other contacts"
     {
       const result = await fetchOtherContacts(accessToken);
       debug.otherRaw = result.rawCount;
       debug.otherError = result.errorMessage;
       for (const c of result.contacts) {
         sources.other++;
-        debug.otherWithPhones++;
         mergeContact(map, c);
       }
     }
 
-    // 3. Workspace directory (only returns data when the user is on Google Workspace)
+    // 3. Workspace directory
     {
       const result = await fetchDirectoryPeople(accessToken);
       debug.directoryRaw = result.rawCount;
       debug.directoryError = result.errorMessage;
       for (const c of result.contacts) {
         sources.directory++;
-        debug.directoryWithPhones++;
         mergeContact(map, c);
       }
     }
 
     const contacts = [...map.values()];
     console.log("google-contacts-sync", JSON.stringify({ userId: user.id, totalReturned: contacts.length, sources, debug }));
-    return json({ contacts, sources, debug, totalReturned: contacts.length });
+    
+    // Help users troubleshoot empty syncs
+    let warning = null;
+    if (contacts.length === 0) {
+      if (debug.savedError?.includes("not enabled")) {
+        warning = "Google People API is not enabled in your Google Cloud Project.";
+      } else if (debug.savedRaw > 0) {
+        warning = `Found ${debug.savedRaw} contacts, but none had phone numbers.`;
+      } else {
+        warning = "No contacts found in this Google account.";
+      }
+    }
+
+    return json({ contacts, sources, debug, totalReturned: contacts.length, warning });
   } catch (e) {
     return json({ error: String(e) }, 500);
   }
@@ -165,7 +178,6 @@ async function fetchConnections(
     if (!res.ok) {
       errorMessage = errorSummary(data);
       if (isInsufficientScope(data)) return { contacts: [], rawCount, errorMessage, scopeError: true };
-      // Don't fail the whole sync for non-scope issues — just stop paging.
       break;
     }
     const people = data.connections ?? [];
@@ -226,7 +238,7 @@ async function fetchDirectoryPeople(
     const data = await res.json();
     if (!res.ok) {
       errorMessage = errorSummary(data);
-      break; // directory is workspace-only — silently ignore
+      break;
     }
     const people = data.people ?? [];
     rawCount += people.length;

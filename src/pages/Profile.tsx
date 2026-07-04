@@ -41,14 +41,16 @@ export default function Profile() {
     (async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("display_name, avatar_url, phone")
+        .select("display_name, avatar_url")
         .eq("id", user.id)
         .maybeSingle();
       if (data) {
         setDisplayName(data.display_name ?? "");
         setAvatarUrl(data.avatar_url);
-        setPhone((data as { phone?: string | null }).phone ?? "");
       }
+      const { data: priv } = await supabase.rpc("get_my_profile_private");
+      const row = Array.isArray(priv) ? priv[0] : priv;
+      setPhone((row as { phone?: string | null } | null)?.phone ?? "");
       // About is stored in user metadata for now (no schema change)
       setAbout((user.user_metadata as any)?.about ?? "");
     })();
@@ -103,22 +105,18 @@ export default function Profile() {
       }
     }
     setSaving(true);
-    const { error } = await supabase
-      .from("profiles")
-      .upsert(
-        {
-          id: user.id,
-          display_name: displayName.trim() || null,
-          phone: normalizedPhone,
-        },
-        { onConflict: "id" }
-      );
+    const { error } = await supabase.rpc("update_my_profile", {
+      _display_name: displayName.trim(),
+      _phone: normalizedPhone,
+    });
     await supabase.auth.updateUser({ data: { about: about.trim() } });
     setSaving(false);
     if (error) {
-      const msg = error.message.includes("profiles_phone_unique")
-        ? "That phone number is already linked to another account."
-        : error.message;
+      const msg =
+        error.message.includes("phone_taken") ||
+        error.message.includes("profiles_phone_unique")
+          ? "That phone number is already linked to another account."
+          : "Could not save your profile. Please try again.";
       toast({ title: "Save failed", description: msg, variant: "destructive" });
     } else {
       if (normalizedPhone) setPhone(normalizedPhone);

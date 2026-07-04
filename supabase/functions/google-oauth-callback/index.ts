@@ -9,7 +9,13 @@ const corsHeaders = {
 
 const CONTACTS_SCOPE = "https://www.googleapis.com/auth/contacts";
 const CONTACTS_READONLY_SCOPE = "https://www.googleapis.com/auth/contacts.readonly";
-const SCOPES = [CONTACTS_SCOPE, "https://www.googleapis.com/auth/userinfo.email"];
+const DIRECTORY_SCOPE = "https://www.googleapis.com/auth/directory.readonly";
+const SCOPES = [
+  CONTACTS_SCOPE, 
+  DIRECTORY_SCOPE,
+  "https://www.googleapis.com/auth/userinfo.email"
+];
+const CANONICAL_REDIRECT_URI = "https://chichatapp.com/settings";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -35,7 +41,7 @@ Deno.serve(async (req) => {
     const clientSecret = Deno.env.get("GOOGLE_OAUTH_CLIENT_SECRET")!;
 
     if (action === "auth_url") {
-      const redirectUri = body.redirect_uri as string;
+      const redirectUri = normalizeRedirectUri(body.redirect_uri as string | undefined);
       const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
       url.searchParams.set("client_id", clientId);
       url.searchParams.set("redirect_uri", redirectUri);
@@ -49,7 +55,7 @@ Deno.serve(async (req) => {
 
     if (action === "exchange") {
       const code = body.code as string;
-      const redirectUri = body.redirect_uri as string;
+      const redirectUri = normalizeRedirectUri(body.redirect_uri as string | undefined);
       const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -117,4 +123,9 @@ function json(b: unknown, status = 200) {
 function hasContactsScope(scope: string) {
   const granted = new Set(scope.split(/\s+/).filter(Boolean));
   return granted.has(CONTACTS_SCOPE) || granted.has(CONTACTS_READONLY_SCOPE);
+}
+
+function normalizeRedirectUri(redirectUri?: string) {
+  if (redirectUri?.startsWith("http://localhost")) return redirectUri;
+  return CANONICAL_REDIRECT_URI;
 }

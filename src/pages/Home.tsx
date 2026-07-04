@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, MessageSquarePlus, Settings as SettingsIcon, Phone, PhoneIncoming, PhoneOutgoing, PhoneMissed, Video, Mic, Paperclip, Users } from "lucide-react";
+import { Search, MessageSquarePlus, Phone, PhoneIncoming, PhoneOutgoing, PhoneMissed, Video, Mic, Paperclip } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -261,14 +261,17 @@ export default function Home() {
     };
   }, [user]);
 
-  const loadPeople = async () => {
+  const loadPeople = async (search?: string) => {
     if (!user) return;
-    const { data } = await supabase
-      .from("profiles")
-      .select("id, display_name, avatar_url, is_online, last_seen_at, show_last_seen")
-      .neq("id", user.id)
-      .order("display_name", { ascending: true })
-      .limit(50);
+    const q = (search ?? "").trim();
+    const { data, error } = await supabase.rpc("search_users", {
+      _query: q,
+      _limit: 100,
+    });
+    if (error) {
+      setPeople([]);
+      return;
+    }
     setPeople((data ?? []) as Profile[]);
   };
 
@@ -287,11 +290,13 @@ export default function Home() {
   };
 
   const [peopleQuery, setPeopleQuery] = useState("");
-  const filteredPeople = useMemo(() => {
-    const q = peopleQuery.trim().toLowerCase();
-    if (!q) return people;
-    return people.filter((p) => p.display_name?.toLowerCase().includes(q));
-  }, [people, peopleQuery]);
+  useEffect(() => {
+    if (!openNew) return;
+    const t = setTimeout(() => { loadPeople(peopleQuery); }, 250);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [peopleQuery, openNew]);
+  const filteredPeople = people;
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -311,6 +316,14 @@ export default function Home() {
         <div className="px-4 pt-5 pb-3 flex items-center justify-between">
           <h1 className="text-[20px] font-bold text-foreground">Chats</h1>
           <Dialog open={openNew} onOpenChange={(o) => { setOpenNew(o); if (o) { setPeopleQuery(""); loadPeople(); } }}>
+            <DialogTrigger asChild>
+              <button
+                aria-label="Start new chat"
+                className="w-9 h-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 active:scale-95 transition"
+              >
+                <MessageSquarePlus className="w-5 h-5" />
+              </button>
+            </DialogTrigger>
             <DialogContent className="max-w-[320px] bg-card border-border">
               <DialogHeader>
                 <DialogTitle className="text-sm">Start a new chat</DialogTitle>

@@ -23,21 +23,22 @@ interface PendingState {
  * Build a redirect URI Google will accept. Inside the native shell, the page's
  * origin is `http://localhost` or `capacitor://`, which Google's OAuth rejects
  * with a 403 ("disallowed_useragent" / redirect_uri_mismatch). To stay seamless,
- * we always send users back to the production web URL — that single redirect
- * URI is the only one registered in the Google Cloud Console.
+ * we always send users back to a registered production URL.
  */
 function resolveRedirectUri(): string {
   const origin = typeof window !== "undefined" ? window.location.origin : "";
-  const isWebHttps =
-    origin.startsWith("https://") &&
-    !origin.includes("localhost") &&
-    !origin.startsWith("capacitor://");
-  // Use the live web origin when we're already on a real https domain
-  // (covers preview + published + custom domains). Otherwise fall back to
-  // the published URL so Google always sees an allowed redirect.
-  return isWebHttps
-    ? `${origin}/settings`
-    : "https://bloom-voice-net.lovable.app/settings";
+
+  // Local development: Google supports http://localhost:PORT
+  if (origin.startsWith("http://localhost")) {
+    return `${origin}/settings`;
+  }
+
+  // Keep the redirect on the live ChiChat domain so the user keeps the same
+  // browser session after Google sends them back.
+  if (origin === "https://www.chichatapp.com") {
+    return "https://www.chichatapp.com/settings";
+  }
+  return "https://chichatapp.com/settings";
 }
 
 /** Start Google OAuth flow for Contacts (People API). */
@@ -49,7 +50,21 @@ export async function startGoogleContactsConnect(): Promise<void> {
   );
   if (error || !data?.url) throw error ?? new Error("Failed to build auth URL");
   sessionStorage.setItem(PENDING_KEY, JSON.stringify({ redirect_uri } satisfies PendingState));
-  window.location.href = data.url;
+
+  // If the redirect URI is on a different origin than we're on now (e.g.
+  // running inside the Lovable preview iframe but redirecting to the
+  // published URL), open Google in a new tab so the user isn't stranded on a
+  // different origin. Same-origin flows stay in-tab as before.
+  const sameOrigin = redirect_uri.startsWith(window.location.origin);
+  if (sameOrigin) {
+    window.location.href = data.url;
+  } else {
+    const popup = window.open(data.url, "_blank", "noopener,noreferrer");
+    if (!popup) {
+      // Popup blocked — fall back so the user can still complete the flow.
+      window.location.href = data.url;
+    }
+  }
 }
 
 /** Call after redirect back from Google with ?code=... in URL. */
@@ -70,10 +85,11 @@ export async function completeGoogleContactsConnect(code: string): Promise<{ ema
 }
 
 /** Pull contacts from Google People API and merge into local cache. */
-export async function syncGoogleContacts(): Promise<DeviceContact[]> {
+export async function syncGoogleContacts(): Promise<{ contacts: DeviceContact[], warning?: string }> {
   const { data, error } = await supabase.functions.invoke("google-contacts-sync", {});
   if (error) throw await normalizeGoogleContactsError(error);
   if (data?.reconnectRequired) throw new GoogleContactsReconnectRequired();
+  
   const defaultCountry = await getMyDefaultCountry();
   const incoming: DeviceContact[] = ((data?.contacts ?? []) as { name: string; phones: string[] }[])
     .map((c) => ({
@@ -93,15 +109,13 @@ export async function syncGoogleContacts(): Promise<DeviceContact[]> {
   }
   const merged = [...map.values()];
   saveCachedContacts(merged);
-  return merged;
+  return { contacts: merged, warning: data?.warning };
 }
 
 async function getMyDefaultCountry() {
-  const { data } = await supabase
-    .from("profiles")
-    .select("phone")
-    .maybeSingle();
-  return countryFromE164((data as { phone?: string | null } | null)?.phone);
+  const { data } = await supabase.rpc("get_my_profile_private");
+  const row = Array.isArray(data) ? data[0] : data;
+  return countryFromE164((row as { phone?: string | null } | null)?.phone);
 }
 
 function normalizeImportedPhone(raw: string, defaultCountry?: ReturnType<typeof countryFromE164>) {
