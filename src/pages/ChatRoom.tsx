@@ -34,6 +34,25 @@ import {
   saveHidden,
 } from "@/lib/chat/format";
 
+// A row coming from Supabase (initial fetch or realtime payload) is only
+// guaranteed to match the DB schema, not this shape — content in particular
+// has been observed null on some rows, and every render/handler below calls
+// string methods on it directly, which throws (blanking the whole app, no
+// error boundary) the instant such a row reaches state. Normalize on the way in.
+function normalizeMessage(raw: Record<string, unknown>): Message {
+  return {
+    id: String(raw.id),
+    conversation_id: String(raw.conversation_id),
+    sender_id: String(raw.sender_id),
+    content: typeof raw.content === "string" ? raw.content : "",
+    created_at: String(raw.created_at),
+    delivered_at: (raw.delivered_at as string | null) ?? null,
+    read_at: (raw.read_at as string | null) ?? null,
+    edited_at: (raw.edited_at as string | null) ?? null,
+    deleted_for_everyone: Boolean(raw.deleted_for_everyone),
+  };
+}
+
 type Message = {
   id: string;
   conversation_id: string;
@@ -117,7 +136,7 @@ export default function ChatRoom() {
         .select("*")
         .eq("conversation_id", conversationId)
         .order("created_at", { ascending: true });
-      setMessages((msgs ?? []) as Message[]);
+      setMessages((msgs ?? []).map(normalizeMessage));
     })();
   }, [user, conversationId]);
 
@@ -150,7 +169,7 @@ export default function ChatRoom() {
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "messages", filter: `conversation_id=eq.${conversationId}` },
         (payload) => {
-          const incoming = payload.new as Message;
+          const incoming = normalizeMessage(payload.new as Record<string, unknown>);
           setMessages((prev) => {
             // Replace matching optimistic message (same sender + content, temp id starts with "tmp-")
             const idx = prev.findIndex(
@@ -174,7 +193,7 @@ export default function ChatRoom() {
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "messages", filter: `conversation_id=eq.${conversationId}` },
         (payload) => {
-          const updated = payload.new as Message;
+          const updated = normalizeMessage(payload.new as Record<string, unknown>);
           setMessages((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
         },
       )
