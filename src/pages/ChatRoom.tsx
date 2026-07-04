@@ -45,7 +45,13 @@ function normalizeMessage(raw: Record<string, unknown>): Message {
     conversation_id: String(raw.conversation_id),
     sender_id: String(raw.sender_id),
     content: typeof raw.content === "string" ? raw.content : "",
-    created_at: String(raw.created_at),
+    // String(undefined) is the literal text "undefined", which then fails to
+    // parse as a date and renders as "Invalid Date" — fall back to "now"
+    // instead of ever handing the UI an unparseable timestamp.
+    created_at:
+      typeof raw.created_at === "string" && !Number.isNaN(Date.parse(raw.created_at))
+        ? raw.created_at
+        : new Date().toISOString(),
     delivered_at: (raw.delivered_at as string | null) ?? null,
     read_at: (raw.read_at as string | null) ?? null,
     edited_at: (raw.edited_at as string | null) ?? null,
@@ -80,6 +86,11 @@ export default function ChatRoom() {
   const { user, loading } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [other, setOther] = useState<Profile | null>(null);
+  // Lets the realtime channel's callbacks read the latest `other` without
+  // needing it in the effect's dependency array — see the channel effect
+  // below for why that matters.
+  const otherRef = useRef<Profile | null>(null);
+  otherRef.current = other;
   const [text, setText] = useState("");
   const [otherTyping, setOtherTyping] = useState(false);
   const [hidden, setHidden] = useState<Set<string>>(new Set());
@@ -222,14 +233,24 @@ export default function ChatRoom() {
       )
       .on(
         "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "profiles", filter: other ? `id=eq.${other.id}` : undefined },
-        (payload) => setOther((p) => (p ? ({ ...p, ...(payload.new as any) } as Profile) : p)),
+        { event: "UPDATE", schema: "public", table: "profiles" },
+        (payload) => {
+          const row = payload.new as { id: string };
+          if (!otherRef.current || row.id !== otherRef.current.id) return;
+          setOther((p) => (p ? ({ ...p, ...row } as Profile) : p));
+        },
       )
       .subscribe();
     return () => {
       supabase.removeChannel(ch);
     };
-  }, [user, conversationId, other?.id]);
+    // Deliberately excludes `other?.id`: it starts null and flips to a real
+    // id moments after mount once the async profile fetch resolves, which
+    // used to tear down and recreate this whole channel right after the
+    // initial subscribe — a rejoin race that could leave the client
+    // silently unsubscribed from new messages until the page was reloaded.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, conversationId]);
 
   // Track whether the initial messages have been positioned at the bottom yet.
   // First load: instant jump to the last message (no animation).
