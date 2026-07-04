@@ -140,8 +140,14 @@ export default function Login() {
         title = "Enter full phone number";
         description = "Add the country code, for example +234…, so we can find the exact account.";
       } else if (raw.includes("wrong_password")) {
-        title = "Wrong password";
-        description = "This account exists, but the password is not correct. Try again or reset your password.";
+        // Supabase deliberately returns the same generic error for "wrong
+        // password" and "no account with this email" (anti-enumeration —
+        // it should be impossible to tell which case you're in from the
+        // login form). Don't assert the account exists; that's a real,
+        // specific claim we can't actually verify, and it's flatly wrong
+        // when the account doesn't exist (e.g. was deleted).
+        title = "Incorrect email or password";
+        description = "Double-check your details and try again, or reset your password.";
       } else if (raw.includes("invalid_identifier") || raw.includes("missing_details")) {
         title = "Check your details";
         description = "Enter a valid email or full phone number, then try again.";
