@@ -26,9 +26,9 @@ compromised and rotate it immediately (GitHub: Settings → Developer settings
 
 | Function | Purpose | Auth (`verify_jwt`) | Extra secrets used |
 |---|---|---|---|
-| `auth-email-hook` | Supabase Auth email webhook — renders and enqueues signup/recovery/magic-link/invite/email-change emails | `false` (verified via `LOVABLE_API_KEY` webhook signature instead) | `LOVABLE_API_KEY` |
-| `verify-otp-code` | Verifies a 6-digit signup/recovery OTP against the short-code alias table | `false` (public — used pre-auth) | — |
-| `process-email-queue` | Dispatches queued auth/transactional emails (rate-limit aware) | `true` | `LOVABLE_API_KEY`, `LOVABLE_SEND_URL` |
+| `auth-email-hook` | Supabase Auth "Send Email" webhook — renders and sends signup/recovery/magic-link/invite/email-change emails directly via Resend | `false` (verified via Supabase's own Standard Webhooks signature, `SEND_EMAIL_HOOK_SECRET`, instead) | `SEND_EMAIL_HOOK_SECRET`, `RESEND_API_KEY` |
+| `verify-otp-code` | Verifies the 6-digit signup/recovery/etc. OTP directly against Supabase Auth | `false` (public — used pre-auth) | — |
+| `process-email-queue` | Dispatches queued *transactional* emails only (auth emails no longer go through this queue — see `auth-email-hook`) | `true` | `LOVABLE_API_KEY`, `LOVABLE_SEND_URL` |
 | `check-email-exists` | Public: is this email already registered? | `false` | — |
 | `check-user-exists` | Public: does this email/Google account already exist? | `false` | — |
 | `check-google-signup` | Post-Google-OAuth: tells client new vs. existing user | `false` | — |
@@ -50,6 +50,31 @@ compromised and rotate it immediately (GitHub: Settings → Developer settings
 | `twilio-voice-token` | Mints a Twilio Voice SDK token for outbound PSTN calls | `true` | `TWILIO_ACCOUNT_SID`, `TWILIO_API_KEY_SID`, `TWILIO_API_KEY_SECRET`, `TWILIO_TWIML_APP_SID` |
 | `twilio-voice-twiml` | TwiML webhook Twilio calls when placing an outbound call | `false` (hit directly by Twilio, not the app) | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`, `TWILIO_VOICE_TWIML_URL` |
 | `send-call-push` | Sends an FCM push to wake the callee's device for an incoming call | `true` | `FCM_SERVICE_ACCOUNT_JSON` |
+
+## Auth email setup (dashboard configuration, not in this repo)
+
+`auth-email-hook` only receives traffic if Supabase Auth is actually
+configured to call it. This is dashboard state, invisible in this repo,
+and the single biggest point of silent failure for signup/recovery emails:
+
+1. **Authentication → Hooks → Send Email** must be enabled, type **HTTPS**,
+   pointing to `https://pnpabtxvsrkrldpfmtaz.supabase.co/functions/v1/auth-email-hook`
+   (the classic `/functions/v1/` path — not the `*.functions.supabase.co`
+   short-domain form).
+2. The **secret** Supabase generates for that hook must be copied into the
+   `SEND_EMAIL_HOOK_SECRET` edge function secret, exactly.
+3. `RESEND_API_KEY` (a Resend API key, separate from anything configured
+   under Auth → SMTP settings — that's a different, unrelated integration)
+   must be set as an edge function secret too.
+4. Also check **Authentication → Rate Limits** if emails mysteriously stop
+   during heavy testing — Supabase enforces its own project-level email
+   send-rate cap independent of any of the above.
+
+If none of this is configured, `auth-email-hook` simply never gets called —
+no error, no log entry, nothing. Check the function's own Logs tab after a
+real signup attempt if emails aren't arriving; an empty log for that time
+window means Auth isn't invoking the hook at all (a dashboard config
+problem), not a bug in the function itself.
 
 ## Vault secrets (SQL / pg_cron only, not edge-function env vars)
 

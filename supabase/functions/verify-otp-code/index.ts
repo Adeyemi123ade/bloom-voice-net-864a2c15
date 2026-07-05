@@ -51,37 +51,17 @@ Deno.serve(async (req) => {
   const withinIpLimit = await checkRateLimit(admin, 'verify-otp-code', clientIp(req), 30, 300)
   if (!withinIpLimit) return json({ error: 'Too many attempts. Please try again later.' }, 429)
 
-  let token = code
-
-  if (code.length === 6) {
-    const { data: alias } = await admin
-      .from('auth_otp_aliases')
-      .select('full_token')
-      .eq('email', email)
-      .eq('email_type', type)
-      .eq('short_code', code)
-      .gt('expires_at', new Date().toISOString())
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    if (alias?.full_token) token = String(alias.full_token)
-  }
-
+  // Supabase's own OTP token *is* the 6-digit code the user typed — the
+  // auth-email-hook renders it directly, no separate short-code alias table
+  // needed. Just verify it as-is.
   const authClient = createClient(url, anonKey)
   const { data, error } = await authClient.auth.verifyOtp({
     email,
-    token,
+    token: code,
     type: type as 'signup' | 'recovery' | 'magiclink' | 'invite' | 'email_change' | 'email',
   })
 
   if (error) return json({ error: 'Wrong or expired code' }, 400)
-
-  await admin
-    .from('auth_otp_aliases')
-    .delete()
-    .eq('email', email)
-    .eq('email_type', type)
 
   return json({ session: data.session, user: data.user })
 })
