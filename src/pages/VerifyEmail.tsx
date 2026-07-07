@@ -30,7 +30,6 @@ export default function VerifyEmail() {
   const [verifying, setVerifying] = useState(false);
   const [resending, setResending] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(45);
-  const [sendFailed, setSendFailed] = useState(false);
   const autoSubmitted = useRef(false);
 
   useEffect(() => {
@@ -42,27 +41,6 @@ export default function VerifyEmail() {
       navigate("/register", { replace: true });
     }
   }, [email, navigate]);
-
-  // signUp()/resend() succeeding only means the email was *enqueued* — actual
-  // delivery happens async via the dispatcher. Check back a few seconds later
-  // so we can tell the user if it actually failed, instead of only ever
-  // showing the "code sent" success state.
-  const checkSendStatus = async () => {
-    if (!email) return;
-    const { data } = await supabase.functions.invoke("check-signup-email-status", {
-      body: { email },
-    });
-    if ((data as { failed?: boolean } | null)?.failed) {
-      setSendFailed(true);
-    }
-  };
-
-  useEffect(() => {
-    if (!email) return;
-    const t = setTimeout(checkSendStatus, 6000);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [email]);
 
   // Countdown for "Resend code"
   useEffect(() => {
@@ -125,8 +103,6 @@ export default function VerifyEmail() {
     }
     toast({ title: "New code sent" });
     setSecondsLeft(45);
-    setSendFailed(false);
-    setTimeout(checkSendStatus, 6000);
   };
 
   if (!email) return null;
@@ -158,13 +134,6 @@ export default function VerifyEmail() {
             <span className="text-foreground font-semibold">{email}</span>.
             It expires in 5 minutes.
           </p>
-
-          {sendFailed && (
-            <div className="mt-4 w-full max-w-xs rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive text-center">
-              We couldn't send your verification code. Use Resend below, or
-              double-check your email address.
-            </div>
-          )}
 
           <div className="mt-7 w-full flex justify-center">
             <InputOTP
