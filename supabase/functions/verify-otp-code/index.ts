@@ -63,5 +63,20 @@ Deno.serve(async (req) => {
 
   if (error) return json({ error: 'Wrong or expired code' }, 400)
 
+  // Register.tsx writes the chosen phone number to profiles right after
+  // signUp(), but that call runs before this OTP is verified — with no
+  // session yet (email confirmation required), it hits RLS and silently
+  // updates zero rows. Do it here instead, where we hold the service-role
+  // key and a confirmed user id, so it actually persists. Best-effort: a
+  // phone that collided with another account in the meantime shouldn't
+  // block a successful email verification — the user can still set it
+  // later from Profile.
+  if (type === 'signup' && data.user?.id) {
+    const phone = (data.user.user_metadata as Record<string, unknown> | null)?.phone
+    if (typeof phone === 'string' && phone) {
+      await admin.from('profiles').update({ phone }).eq('id', data.user.id)
+    }
+  }
+
   return json({ session: data.session, user: data.user })
 })

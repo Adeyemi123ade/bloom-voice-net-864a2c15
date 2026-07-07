@@ -255,7 +255,7 @@ export default function Register() {
     }
 
     // Standard email/password sign-up.
-    const { data: signUpData, error } = await supabase.auth.signUp({
+    const { error } = await supabase.auth.signUp({
       email: parsed.data.email,
       password: parsed.data.password,
       options: {
@@ -287,31 +287,13 @@ export default function Register() {
       }
       return;
     }
-    // Save phone to profile (handle_new_user trigger created the row without phone)
-    if (signUpData.user?.id && e164) {
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .update({ phone: e164 })
-        .eq("id", signUpData.user.id);
-      if (profileError) {
-        setSubmitting(false);
-        if (profileError.code === "23505") {
-          setErrors({ phone: `${e164} is already registered to another account` });
-          toast({
-            title: "Phone number already registered",
-            description: `${e164} is already in use. Use a different number, or sign in to the existing account.`,
-            variant: "destructive",
-          });
-        } else {
-          toast({
-            title: "Couldn't save your phone number",
-            description: profileError.message || "Please try again.",
-            variant: "destructive",
-          });
-        }
-        return;
-      }
-    }
+    // Phone is NOT saved to the profile here: with email confirmation
+    // required, signUp() returns no session yet, so an update from this
+    // client would hit RLS and silently touch zero rows. It's saved
+    // server-side (service role) by verify-otp-code once the OTP confirms
+    // the account and a real session exists — see that function's signup
+    // branch. availabilityResult.phone_exists was already checked above,
+    // so a collision here is a rare last-second race, not the common case.
     setSubmitting(false);
     // Route to the OTP entry screen.
     navigate("/verify-email", { state: { email: parsed.data.email }, replace: true });
