@@ -22,18 +22,39 @@ compromised and rotate it immediately (GitHub: Settings → Developer settings
 | `SUPABASE_ANON_KEY` | Anon/public key, auto-injected — safe to expose client-side |
 | `SUPABASE_SERVICE_ROLE_KEY` | Service-role key for admin-level DB/auth operations — **never** expose this client-side |
 
+## Email architecture (as of the Resend migration)
+
+Two separate paths now handle mail, and they don't share code:
+
+- **Supabase Auth emails** (signup/recovery/magic-link/email-change/reauthentication OTPs)
+  are sent directly by Supabase's built-in mailer, configured with Resend as
+  custom SMTP (Supabase Dashboard → Project Settings → Authentication → SMTP
+  Settings — host `smtp.resend.com`, user `resend`, password = a Resend API
+  key). Email content comes from Supabase Dashboard → Authentication → Email
+  Templates (using the `{{ .Token }}` variable for the 6-digit code), not
+  from this repo. The old `auth-email-hook` function and the Send Email Hook
+  it was wired to have been retired — do not re-enable that hook while custom
+  SMTP is active, or Supabase will call the hook instead of using SMTP.
+- **App-triggered transactional emails** (currently just device-verification
+  codes from `request-device-otp`) still go through the `auth_emails` /
+  `transactional_emails` pgmq queues and the `process-email-queue` dispatcher,
+  which now calls the Resend HTTP API directly (`api.resend.com/emails`)
+  instead of the old Lovable email API.
+
+`verify-otp-code` no longer needs the `auth_otp_aliases` short-code table —
+since Supabase's native templates show the real `verifyOtp` token directly,
+the code the user types is passed straight through.
+
 ## Per-function secrets
 
 | Function | Purpose | Auth (`verify_jwt`) | Extra secrets used |
 |---|---|---|---|
-| `auth-email-hook` | Supabase Auth email webhook — renders and enqueues signup/recovery/magic-link/invite/email-change emails | `false` (verified via `LOVABLE_API_KEY` webhook signature instead) | `LOVABLE_API_KEY` |
-| `verify-otp-code` | Verifies a 6-digit signup/recovery OTP against the short-code alias table | `false` (public — used pre-auth) | — |
-| `process-email-queue` | Dispatches queued auth/transactional emails (rate-limit aware) | `true` | `LOVABLE_API_KEY`, `LOVABLE_SEND_URL` |
+| `verify-otp-code` | Verifies a 6-digit signup/recovery OTP via `supabase.auth.verifyOtp` | `false` (public — used pre-auth) | — |
+| `process-email-queue` | Dispatches queued app-triggered emails (device-verification codes) via Resend, rate-limit aware | `true` | `RESEND_API_KEY` |
 | `check-email-exists` | Public: is this email already registered? | `false` | — |
 | `check-user-exists` | Public: does this email/Google account already exist? | `false` | — |
 | `check-google-signup` | Post-Google-OAuth: tells client new vs. existing user | `false` | — |
 | `check-registration-availability` | Public: checks email + phone availability before signup | `false` | — |
-| `check-signup-email-status` | Public: lets /verify-email find out if the OTP email actually failed to send (reads `email_send_log`), instead of assuming success | `false` | — |
 | `sign-in-with-identifier` | Sign-in by phone/username identifier | `false` | — |
 | `complete-google-registration` | Finishes profile for a Google-signup user (phone + password) | `true` | — |
 | `google-oauth-callback` | Exchanges Google OAuth code for tokens, stores per-user | `true` | `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` |

@@ -1,4 +1,3 @@
-import { sendLovableEmail } from 'npm:@lovable.dev/email-js'
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
 const MAX_RETRIES = 5
@@ -32,6 +31,42 @@ function getRetryAfterSeconds(error: unknown): number {
     return (error as { retryAfterSeconds: number | null }).retryAfterSeconds ?? 60
   }
   return 60
+}
+
+// Send via Resend's HTTP API directly. Throws an Error with a `.status` and
+// (for 429s) `.retryAfterSeconds` so the existing isRateLimited/isForbidden
+// checks below keep working unchanged.
+async function sendResendEmail(
+  payload: { to: string; from: string; subject: string; html: string; text: string },
+  apiKey: string
+): Promise<void> {
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: payload.from,
+      to: payload.to,
+      subject: payload.subject,
+      html: payload.html,
+      text: payload.text,
+    }),
+  })
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    const err = new Error(`Resend send failed (${res.status}): ${body.slice(0, 300)}`) as Error & {
+      status: number
+      retryAfterSeconds?: number | null
+    }
+    err.status = res.status
+    if (res.status === 429) {
+      const retryAfter = res.headers.get('retry-after')
+      err.retryAfterSeconds = retryAfter ? Number(retryAfter) : null
+    }
+    throw err
+  }
 }
 
 function parseJwtClaims(token: string): Record<string, unknown> | null {
@@ -79,7 +114,7 @@ async function moveToDlq(
 }
 
 Deno.serve(async (req) => {
-  const apiKey = Deno.env.get('LOVABLE_API_KEY')
+  const apiKey = Deno.env.get('RESEND_API_KEY')
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
@@ -249,25 +284,15 @@ Deno.serve(async (req) => {
       }
 
       try {
-        await sendLovableEmail(
+        await sendResendEmail(
           {
-            run_id: payload.run_id,
             to: payload.to,
             from: payload.from,
-            sender_domain: payload.sender_domain,
             subject: payload.subject,
             html: payload.html,
             text: payload.text,
-            purpose: payload.purpose,
-            label: payload.label,
-            idempotency_key: payload.idempotency_key,
-            unsubscribe_token: payload.unsubscribe_token,
-            message_id: payload.message_id,
           },
-          // sendUrl is optional — when LOVABLE_SEND_URL is not set, the library
-          // falls back to the default Lovable API endpoint (https://api.lovable.dev).
-          // Set LOVABLE_SEND_URL as a Supabase secret to override (e.g. for local dev).
-          { apiKey, sendUrl: Deno.env.get('LOVABLE_SEND_URL') }
+          apiKey
         )
 
         // Log success

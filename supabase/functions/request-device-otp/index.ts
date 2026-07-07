@@ -180,23 +180,6 @@ Deno.serve(async (req) => {
     const text = `${intro}\n\nYour code: ${code}\n\nIt expires in 10 minutes.`;
 
     const messageId = crypto.randomUUID();
-    let unsubscribeToken = crypto.randomUUID();
-    const { data: existingToken } = await admin
-      .from("email_unsubscribe_tokens")
-      .select("token")
-      .eq("email", recipientEmail)
-      .is("used_at", null)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (existingToken?.token) {
-      unsubscribeToken = existingToken.token;
-    } else {
-      await admin.from("email_unsubscribe_tokens").insert({
-        email: recipientEmail,
-        token: unsubscribeToken,
-      });
-    }
 
     await admin.from("email_send_log").insert({
       message_id: messageId,
@@ -207,18 +190,12 @@ Deno.serve(async (req) => {
     await admin.rpc("enqueue_email", {
       queue_name: "auth_emails",
       payload: {
-        // Runtime-triggered email: no fabricated run_id. The API requires an
-        // idempotency key and unsubscribe token for this path.
         message_id: messageId,
-        idempotency_key: messageId,
-        unsubscribe_token: unsubscribeToken,
         to: recipientEmail,
-        from: "ChiChat <noreply@notify.kajolacooperative.com>",
-        sender_domain: "notify.kajolacooperative.com",
+        from: "ChiChat <noreply@chichatapp.com>",
         subject,
         html,
         text,
-        purpose: "transactional",
         label: `device_${reason}`,
         queued_at: new Date().toISOString(),
       },
