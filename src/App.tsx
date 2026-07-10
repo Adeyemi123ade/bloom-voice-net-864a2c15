@@ -32,6 +32,7 @@ import MessageNotifier from "./components/MessageNotifier.tsx";
 import IncomingCallScreen from "./components/IncomingCallScreen.tsx";
 import DeviceGate from "./components/DeviceGate.tsx";
 import ErrorBoundary from "./components/ErrorBoundary.tsx";
+import BackButtonGuard from "./components/BackButtonGuard.tsx";
 
 const queryClient = new QueryClient();
 
@@ -44,6 +45,7 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <DeviceGate>
+              <BackButtonGuard />
               <MessageNotifier />
               <IncomingCallScreen />
               <ErrorBoundary>

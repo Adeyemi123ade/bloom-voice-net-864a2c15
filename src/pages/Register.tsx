@@ -18,6 +18,7 @@ import { allCountries, type CountryEntry } from "@/lib/countries";
 import PasswordStrengthBar from "@/components/PasswordStrengthBar";
 import { checkEmailExists } from "@/lib/checkEmail";
 import { isRecoveryPending } from "@/lib/recoveryPending";
+import { markVerifyEmailPending, getVerifyEmailPending } from "@/lib/verifyEmailPending";
 
 const baseSchema = z.object({
   name: z
@@ -64,7 +65,19 @@ export default function Register() {
   useEffect(() => {
     // Don't redirect away when the user is mid-Google-completion: they're
     // signed in but their profile isn't finished yet.
-    if (authLoading || !user || googleVerified) return;
+    if (authLoading || googleVerified) return;
+    // No live session — but a signup can still be pending confirmation even
+    // without one (e.g. the user hit Back before a session was established,
+    // or refreshed and lost the in-memory router state). Without this check
+    // they'd land on a blank Register form with no way back to the OTP
+    // screen, while the code they were emailed has nowhere to be entered.
+    if (!user) {
+      const pendingEmail = getVerifyEmailPending();
+      if (pendingEmail) {
+        navigate("/verify-email", { replace: true, state: { email: pendingEmail } });
+      }
+      return;
+    }
     // A session can exist for an account that hasn't confirmed its email OTP
     // yet (e.g. the user hit Back after signUp). Never treat that as "already
     // logged in" — send them to finish verification instead of into the app.
@@ -313,6 +326,9 @@ export default function Register() {
       }
     }
     setSubmitting(false);
+    // Persist the pending email so the OTP screen survives a back-navigation
+    // or refresh — see verifyEmailPending.ts for why router state alone isn't enough.
+    markVerifyEmailPending(parsed.data.email);
     // Route to the OTP entry screen.
     navigate("/verify-email", { state: { email: parsed.data.email }, replace: true });
   };
