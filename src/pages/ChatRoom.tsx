@@ -555,21 +555,52 @@ export default function ChatRoom() {
   };
   const uploadVoice = async (blob: Blob) => {
     if (!user || !conversationId) return;
+    // Optimistic, same pattern send() already uses for text — without this,
+    // voice notes only appeared once the realtime INSERT event echoed back,
+    // which could lag or silently miss, leaving the sender staring at their
+    // own chat with nothing there until a manual refresh.
+    const tmpId = `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const localUrl = URL.createObjectURL(blob);
+    const optimistic: Message = {
+      id: tmpId,
+      conversation_id: conversationId,
+      sender_id: user.id,
+      content: `${VOICE_PREFIX}${localUrl}`,
+      created_at: new Date().toISOString(),
+      delivered_at: null,
+      read_at: null,
+      edited_at: null,
+      deleted_for_everyone: false,
+    };
+    setMessages((prev) => [...prev, optimistic]);
+
     const path = `${user.id}/${conversationId}/${Date.now()}.webm`;
     const { error: upErr } = await supabase.storage
       .from("chat-media")
       .upload(path, blob, { contentType: "audio/webm" });
     if (upErr) {
+      setMessages((prev) => prev.filter((m) => m.id !== tmpId));
+      URL.revokeObjectURL(localUrl);
       toast({ title: "Upload failed", description: upErr.message, variant: "destructive" });
       return;
     }
     const { data: pub } = supabase.storage.from("chat-media").getPublicUrl(path);
+    const finalContent = `${VOICE_PREFIX}${pub.publicUrl}`;
+    // Swap the placeholder to the real URL now, still under the tmp- id — the
+    // realtime handler's existing "replace matching optimistic message"
+    // logic (tmp- id + sender + content) takes it from here once the row
+    // actually arrives, identical to how text messages reconcile.
+    setMessages((prev) => prev.map((m) => (m.id === tmpId ? { ...m, content: finalContent } : m)));
+    URL.revokeObjectURL(localUrl);
     const { error } = await supabase.from("messages").insert({
       conversation_id: conversationId,
       sender_id: user.id,
-      content: `${VOICE_PREFIX}${pub.publicUrl}`,
+      content: finalContent,
     });
-    if (error) toast({ title: "Send failed", description: error.message, variant: "destructive" });
+    if (error) {
+      setMessages((prev) => prev.filter((m) => m.id !== tmpId));
+      toast({ title: "Send failed", description: error.message, variant: "destructive" });
+    }
   };
 
   // Attachment upload — stage the file and show caption preview, send on confirm.
@@ -596,6 +627,31 @@ export default function ChatRoom() {
     const f = pendingFile.file;
     const caption = text.trim();
     setUploading(true);
+    // Same optimistic pattern as text/voice — show the attachment immediately
+    // using the local preview URL already sitting in pendingFile, instead of
+    // waiting on the realtime echo.
+    const tmpId = `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const optimisticContent = encodeFileMessage({
+      url: pendingFile.previewUrl,
+      mime: f.type || "application/octet-stream",
+      name: f.name,
+      size: f.size,
+      caption,
+    });
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: tmpId,
+        conversation_id: conversationId,
+        sender_id: user.id,
+        content: optimisticContent,
+        created_at: new Date().toISOString(),
+        delivered_at: null,
+        read_at: null,
+        edited_at: null,
+        deleted_for_everyone: false,
+      },
+    ]);
     try {
       const safeName = f.name.replace(/[^\w.\-]+/g, "_");
       const path = `${user.id}/${conversationId}/${Date.now()}-${safeName}`;
@@ -611,6 +667,9 @@ export default function ChatRoom() {
         size: f.size,
         caption,
       });
+      // Swap to the real URL, still under the tmp- id, so the realtime
+      // handler's existing reconciliation logic can find and replace it.
+      setMessages((prev) => prev.map((m) => (m.id === tmpId ? { ...m, content } : m)));
       const { error } = await supabase.from("messages").insert({
         conversation_id: conversationId,
         sender_id: user.id,
@@ -621,6 +680,7 @@ export default function ChatRoom() {
       setPendingFile(null);
       setText("");
     } catch (err) {
+      setMessages((prev) => prev.filter((m) => m.id !== tmpId));
       const msg = err instanceof Error ? err.message : "Upload failed";
       toast({ title: "Upload failed", description: msg, variant: "destructive" });
     } finally {
