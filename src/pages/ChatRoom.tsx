@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-  ArrowLeft, Send, Check, CheckCheck, Mic, Square, Trash2, Pencil, X,
+  ArrowLeft, Send, Check, CheckCheck, Mic, Trash2, Pencil, X,
   Paperclip, Copy, Forward, Phone, Video, Camera, MoreVertical, Search, Info,
 } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
@@ -29,6 +29,7 @@ import {
 } from "@/components/chat/AttachmentBubble";
 import CallBackSheet from "@/components/call/CallBackSheet";
 import { VoiceBubble } from "@/components/chat/VoiceBubble";
+import { VoiceRecorderBar } from "@/components/chat/VoiceRecorderBar";
 import { CallSystemBubble } from "@/components/chat/CallSystemBubble";
 import { CallRow, SwipeRow } from "@/components/chat/MessageRows";
 import {
@@ -113,6 +114,7 @@ export default function ChatRoom() {
   const [recording, setRecording] = useState(false);
   const [recSec, setRecSec] = useState(0);
   const recorderRef = useRef<MediaRecorder | null>(null);
+  const recStreamRef = useRef<MediaStream | null>(null);
   const recChunks = useRef<Blob[]>([]);
   const recTimer = useRef<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -521,6 +523,7 @@ export default function ChatRoom() {
       rec.ondataavailable = (e) => e.data.size > 0 && recChunks.current.push(e.data);
       rec.onstop = async () => {
         stream.getTracks().forEach((t) => t.stop());
+        recStreamRef.current = null;
         if (recTimer.current) window.clearInterval(recTimer.current);
         const blob = new Blob(recChunks.current, { type: "audio/webm" });
         await uploadVoice(blob);
@@ -528,6 +531,7 @@ export default function ChatRoom() {
       };
       rec.start();
       recorderRef.current = rec;
+      recStreamRef.current = stream;
       setRecording(true);
       setRecSec(0);
       recTimer.current = window.setInterval(() => setRecSec((s) => s + 1), 1000);
@@ -541,6 +545,7 @@ export default function ChatRoom() {
     if (cancel) {
       r.onstop = () => {
         r.stream.getTracks().forEach((t) => t.stop());
+        recStreamRef.current = null;
         if (recTimer.current) window.clearInterval(recTimer.current);
         setRecSec(0);
       };
@@ -1043,16 +1048,17 @@ export default function ChatRoom() {
               >
                 <X className="w-4 h-4 text-foreground" />
               </button>
-              <div className="flex-1 flex items-center gap-2 px-3 h-9 rounded-md bg-input border border-border">
-                <span className="w-2 h-2 rounded-full bg-destructive animate-pulse" />
-                <span className="text-xs text-foreground">Recording {fmtDuration(recSec)}</span>
+              <div className="flex-1 flex items-center gap-2 px-2 h-9 rounded-md bg-input border border-border overflow-hidden">
+                <span className="w-2 h-2 rounded-full bg-destructive animate-pulse shrink-0" />
+                <span className="text-xs text-foreground shrink-0 tabular-nums">{fmtDuration(recSec)}</span>
+                <VoiceRecorderBar stream={recStreamRef.current} />
               </div>
               <button
                 onClick={() => stopRecording(false)}
-                aria-label="Send voice"
+                aria-label="Send voice note"
                 className="w-9 h-9 rounded-full bg-primary hover:bg-primary/90 flex items-center justify-center"
               >
-                <Square className="w-4 h-4 text-primary-foreground" fill="currentColor" />
+                <Send className="w-4 h-4 text-primary-foreground" />
               </button>
             </>
           ) : (
