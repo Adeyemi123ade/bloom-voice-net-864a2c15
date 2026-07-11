@@ -1019,7 +1019,7 @@ export default function ChatRoom() {
                       }}
                     />
                   ) : (
-                    <p className="text-base whitespace-pre-wrap break-words">{body}</p>
+                    <p className="text-sm whitespace-pre-wrap break-words">{body}</p>
                   )}
                   {!bareAttachment && (
                     <div className={`flex items-center gap-1 mt-0.5 ${mine ? "justify-end" : "justify-start"}`}>
@@ -1222,7 +1222,7 @@ export default function ChatRoom() {
                       : "Type a message"
                 }
                 disabled={uploading}
-                className="h-10 text-base md:text-base bg-input border-border"
+                className="h-10 text-sm md:text-sm bg-input border-border"
               />
               {!pendingFile && (
                 <button
