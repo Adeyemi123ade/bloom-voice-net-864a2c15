@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft, Send, Check, CheckCheck, Mic, Trash2, Pencil, X,
   Paperclip, Copy, Forward, Phone, Video, Camera, MoreVertical, Search, Info,
+  Type, Loader2,
 } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
 import { Input } from "@/components/ui/input";
@@ -112,6 +113,7 @@ export default function ChatRoom() {
   const [clearChatOpen, setClearChatOpen] = useState(false);
   const [callSheet, setCallSheet] = useState<"voice" | "video" | null>(null);
   const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
   const [recSec, setRecSec] = useState(0);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const recStreamRef = useRef<MediaStream | null>(null);
@@ -521,14 +523,9 @@ export default function ChatRoom() {
       const rec = new MediaRecorder(stream);
       recChunks.current = [];
       rec.ondataavailable = (e) => e.data.size > 0 && recChunks.current.push(e.data);
-      rec.onstop = async () => {
-        stream.getTracks().forEach((t) => t.stop());
-        recStreamRef.current = null;
-        if (recTimer.current) window.clearInterval(recTimer.current);
-        const blob = new Blob(recChunks.current, { type: "audio/webm" });
-        await uploadVoice(blob);
-        setRecSec(0);
-      };
+      // onstop is (re)assigned by stopRecording right before it's called, based
+      // on which button ended the recording — send as a voice note, transcribe
+      // to text, or discard. No default handler needed here.
       rec.start();
       recorderRef.current = rec;
       recStreamRef.current = stream;
@@ -539,19 +536,46 @@ export default function ChatRoom() {
       toast({ title: "Microphone blocked", description: e.message, variant: "destructive" });
     }
   };
-  const stopRecording = (cancel = false) => {
+  const stopRecording = (mode: "send" | "cancel" | "transcribe" = "send") => {
     const r = recorderRef.current;
     if (!r) return;
-    if (cancel) {
-      r.onstop = () => {
-        r.stream.getTracks().forEach((t) => t.stop());
-        recStreamRef.current = null;
-        if (recTimer.current) window.clearInterval(recTimer.current);
-        setRecSec(0);
-      };
-    }
+    r.onstop = async () => {
+      r.stream.getTracks().forEach((t) => t.stop());
+      recStreamRef.current = null;
+      if (recTimer.current) window.clearInterval(recTimer.current);
+      const blob = new Blob(recChunks.current, { type: "audio/webm" });
+      setRecSec(0);
+      if (mode === "send") await uploadVoice(blob);
+      else if (mode === "transcribe") await transcribeAndFill(blob);
+    };
     r.stop();
     setRecording(false);
+  };
+  const transcribeAndFill = async (blob: Blob) => {
+    if (blob.size === 0) return;
+    setTranscribing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("transcribe-voice", { body: blob });
+      if (error) throw error;
+      const transcript = (data as { text?: string } | null)?.text?.trim();
+      if (!transcript) {
+        toast({
+          title: "Couldn't hear anything",
+          description: "Try recording again, a bit closer to the mic.",
+          variant: "destructive",
+        });
+        return;
+      }
+      setText((prev) => (prev.trim() ? `${prev.trim()} ${transcript}` : transcript));
+    } catch (e) {
+      toast({
+        title: "Transcription failed",
+        description: e instanceof Error ? e.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setTranscribing(false);
+    }
   };
   const uploadVoice = async (blob: Blob) => {
     if (!user || !conversationId) return;
@@ -1099,10 +1123,15 @@ export default function ChatRoom() {
           className="px-3 pt-2 pb-4 border-t border-border flex items-center gap-2 bg-background"
           onClick={(e) => e.stopPropagation()}
         >
-          {recording ? (
+          {transcribing ? (
+            <div className="flex-1 flex items-center gap-2 px-3 h-9 rounded-md bg-input border border-border">
+              <Loader2 className="w-4 h-4 text-primary animate-spin" />
+              <span className="text-xs text-muted-foreground">Transcribing…</span>
+            </div>
+          ) : recording ? (
             <>
               <button
-                onClick={() => stopRecording(true)}
+                onClick={() => stopRecording("cancel")}
                 aria-label="Cancel recording"
                 className="w-9 h-9 rounded-full bg-secondary hover:bg-secondary/80 flex items-center justify-center"
               >
@@ -1114,7 +1143,15 @@ export default function ChatRoom() {
                 <VoiceRecorderBar stream={recStreamRef.current} />
               </div>
               <button
-                onClick={() => stopRecording(false)}
+                onClick={() => stopRecording("transcribe")}
+                aria-label="Convert to text"
+                title="Convert to text"
+                className="w-9 h-9 rounded-full bg-secondary hover:bg-secondary/80 flex items-center justify-center"
+              >
+                <Type className="w-4 h-4 text-foreground" />
+              </button>
+              <button
+                onClick={() => stopRecording("send")}
                 aria-label="Send voice note"
                 className="w-9 h-9 rounded-full bg-primary hover:bg-primary/90 flex items-center justify-center"
               >
