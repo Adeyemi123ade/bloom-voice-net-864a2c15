@@ -1,4 +1,5 @@
 import { parsePhoneNumberFromString, validatePhoneNumberLength, CountryCode } from "libphonenumber-js";
+import examples from "libphonenumber-js/examples.mobile.json";
 
 /**
  * Normalize a raw phone string to E.164 (e.g. +2348012345678).
@@ -53,13 +54,41 @@ export function countryFromE164(raw: string | null | undefined): CountryCode | u
     }
 }
 
+const mobileDigitLengthCache = new Map<string, number | null>();
+
 /**
- * True once `localDigits` already has more digits than the selected
- * country's numbers can have — used to stop accepting further keystrokes
- * in phone inputs instead of only rejecting the whole number on submit.
+ * How many digits a normal mobile number has in this country (e.g. 10 for
+ * NG, 9 for GH), derived from libphonenumber-js's example mobile number.
+ * NOT the same as "any length libphonenumber-js considers plausible" —
+ * validatePhoneNumberLength alone accepts the union of every number
+ * category a country has (mobile, premium-rate, etc.), which for NG spans
+ * 10-14 digits — far too loose for capping an ordinary mobile input.
+ */
+function mobileDigitLength(country: CountryCode): number | null {
+    if (mobileDigitLengthCache.has(country)) return mobileDigitLengthCache.get(country)!;
+    let length: number | null = null;
+    try {
+        const example = (examples as Record<string, string>)[country];
+        const parsed = example ? parsePhoneNumberFromString(example, country) : null;
+        length = parsed?.nationalNumber?.length ?? null;
+    } catch {
+        length = null;
+    }
+    mobileDigitLengthCache.set(country, length);
+    return length;
+}
+
+/**
+ * True once `localDigits` already has more digits than a normal mobile
+ * number in the selected country has — used to stop accepting further
+ * keystrokes in phone inputs instead of only rejecting on submit.
  */
 export function isTooManyDigits(localDigits: string, country: CountryCode): boolean {
     if (!localDigits) return false;
+    const expected = mobileDigitLength(country);
+    if (expected != null) return localDigits.length > expected;
+    // No example number for this country — fall back to the looser
+    // (but still correct) length-range check rather than no limit at all.
     try {
         return validatePhoneNumberLength(localDigits, country) === "TOO_LONG";
     } catch {

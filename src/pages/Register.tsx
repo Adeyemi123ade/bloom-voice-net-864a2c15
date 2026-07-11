@@ -446,7 +446,16 @@ export default function Register() {
                       // long for the selected country — e.g. NG numbers are
                       // 10 digits after +234, so an 11th digit is rejected
                       // instead of silently accepted and only caught on submit.
-                      if (isTooManyDigits(digitsOnly, country.code)) return;
+                      // The browser has already written the keystroke into the
+                      // input's DOM value by the time this fires; skipping
+                      // setState alone doesn't undo that (React only corrects
+                      // the DOM on a state change, and rejecting without
+                      // updating state means no re-render happens at all) — so
+                      // the DOM value must be reset back explicitly here.
+                      if (isTooManyDigits(digitsOnly, country.code)) {
+                        e.target.value = phoneLocal;
+                        return;
+                      }
                       setPhoneLocal(cleaned);
                     }}
                     placeholder="801 234 5678"
