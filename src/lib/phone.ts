@@ -1,4 +1,4 @@
-import { parsePhoneNumberFromString, CountryCode } from "libphonenumber-js";
+import { parsePhoneNumberFromString, validatePhoneNumberLength, CountryCode } from "libphonenumber-js";
 
 /**
  * Normalize a raw phone string to E.164 (e.g. +2348012345678).
@@ -50,6 +50,20 @@ export function countryFromE164(raw: string | null | undefined): CountryCode | u
         return parsePhoneNumberFromString(raw)?.country;
     } catch {
         return undefined;
+    }
+}
+
+/**
+ * True once `localDigits` already has more digits than the selected
+ * country's numbers can have — used to stop accepting further keystrokes
+ * in phone inputs instead of only rejecting the whole number on submit.
+ */
+export function isTooManyDigits(localDigits: string, country: CountryCode): boolean {
+    if (!localDigits) return false;
+    try {
+        return validatePhoneNumberLength(localDigits, country) === "TOO_LONG";
+    } catch {
+        return false;
     }
 }
 
