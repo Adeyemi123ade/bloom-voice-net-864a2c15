@@ -12,7 +12,7 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 
-import { toE164 } from "@/lib/phone";
+import { toE164, isTooManyDigits } from "@/lib/phone";
 import CountryPicker from "@/components/CountryPicker";
 import { allCountries, type CountryEntry } from "@/lib/countries";
 import PasswordStrengthBar from "@/components/PasswordStrengthBar";
@@ -439,7 +439,16 @@ export default function Register() {
                     autoComplete="tel"
                     inputMode="tel"
                     value={phoneLocal}
-                    onChange={(e) => setPhoneLocal(e.target.value.replace(/[^\d\s-]/g, ""))}
+                    onChange={(e) => {
+                      const cleaned = e.target.value.replace(/[^\d\s-]/g, "");
+                      const digitsOnly = cleaned.replace(/\D/g, "");
+                      // Stop accepting digits once the number is already too
+                      // long for the selected country — e.g. NG numbers are
+                      // 10 digits after +234, so an 11th digit is rejected
+                      // instead of silently accepted and only caught on submit.
+                      if (isTooManyDigits(digitsOnly, country.code)) return;
+                      setPhoneLocal(cleaned);
+                    }}
                     placeholder="801 234 5678"
                     maxLength={20}
                     className="flex-1 h-12 text-base bg-input border-border text-foreground placeholder:text-muted-foreground"

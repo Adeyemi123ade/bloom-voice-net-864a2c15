@@ -10,6 +10,7 @@ import MobileFrame from "@/components/MobileFrame";
 import CountryPicker from "@/components/CountryPicker";
 import { allCountries, findByDialPrefix, type CountryEntry } from "@/lib/countries";
 import { parsePhoneNumberFromString, type CountryCode } from "libphonenumber-js";
+import { isTooManyDigits } from "@/lib/phone";
 
 async function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -255,7 +256,12 @@ export default function NewContact() {
                   type="tel"
                   inputMode="tel"
                   value={phoneLocal}
-                  onChange={(e) => setPhoneLocal(e.target.value)}
+                  onChange={(e) => {
+                    const cleaned = e.target.value.replace(/[^\d\s-]/g, "");
+                    const digitsOnly = cleaned.replace(/\D/g, "");
+                    if (country && isTooManyDigits(digitsOnly, country.code)) return;
+                    setPhoneLocal(cleaned);
+                  }}
                   placeholder="Phone number"
                   className="flex-1 min-w-0 h-12 px-4 rounded-xl bg-secondary/40 border border-border/40 text-sm placeholder:text-muted-foreground/70 focus:outline-none focus:border-primary/50"
                 />
