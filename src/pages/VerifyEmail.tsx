@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/input-otp";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { getVerifyEmailPending, clearVerifyEmailPending } from "@/lib/verifyEmailPending";
 
 const OTP_LENGTH = 6;
 
@@ -25,7 +26,9 @@ export default function VerifyEmail() {
   const location = useLocation();
   const stateEmail = (location.state as { email?: string } | null)?.email ?? "";
 
-  const [email] = useState(stateEmail);
+  // Router state is lost on refresh/back-navigation — fall back to the
+  // persisted pending email so this screen survives both.
+  const [email] = useState(() => stateEmail || getVerifyEmailPending() || "");
   const [code, setCode] = useState("");
   const [verifying, setVerifying] = useState(false);
   const [resending, setResending] = useState(false);
@@ -72,6 +75,7 @@ export default function VerifyEmail() {
         refresh_token: data.session.refresh_token,
       });
     }
+    clearVerifyEmailPending();
     toast({ title: "Email verified — welcome to ChiChat!" });
     navigate("/welcome", { replace: true });
   };
@@ -112,7 +116,7 @@ export default function VerifyEmail() {
       <div className="h-full w-full flex flex-col bg-background overflow-y-auto">
         <div className="px-4 pt-4">
           <button
-            onClick={() => navigate("/register")}
+            onClick={() => { clearVerifyEmailPending(); navigate("/register"); }}
             aria-label="Back"
             className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-secondary transition-colors -ml-1"
           >
@@ -181,7 +185,11 @@ export default function VerifyEmail() {
 
           <p className="text-sm text-muted-foreground mt-3 text-center">
             Wrong email?{" "}
-            <Link to="/register" className="text-accent font-semibold hover:underline">
+            <Link
+              to="/register"
+              onClick={() => clearVerifyEmailPending()}
+              className="text-accent font-semibold hover:underline"
+            >
               Start over
             </Link>
           </p>
