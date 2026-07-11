@@ -2,11 +2,18 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft, Send, Check, CheckCheck, Mic, Square, Trash2, Pencil, X,
-  Paperclip, Copy, Forward, Phone, Video,
+  Paperclip, Copy, Forward, Phone, Video, Camera, MoreVertical, Search, Info,
 } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import ContactInfoSheet from "@/components/chat/ContactInfoSheet";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -98,6 +105,10 @@ export default function ChatRoom() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [contactInfoOpen, setContactInfoOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [clearChatOpen, setClearChatOpen] = useState(false);
   const [callSheet, setCallSheet] = useState<"voice" | "video" | null>(null);
   const [recording, setRecording] = useState(false);
   const [recSec, setRecSec] = useState(0);
@@ -105,6 +116,7 @@ export default function ChatRoom() {
   const recChunks = useRef<Blob[]>([]);
   const recTimer = useRef<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const typingTimeout = useRef<number | null>(null);
   const [pendingFile, setPendingFile] = useState<{
@@ -612,6 +624,17 @@ export default function ChatRoom() {
   };
 
   const visible = useMemo(() => messages.filter((m) => !hidden.has(m.id)), [messages, hidden]);
+  const searchResults = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return visible;
+    return visible.filter(
+      (m) => !m.deleted_for_everyone && m.content.toLowerCase().includes(q),
+    );
+  }, [visible, searchQuery]);
+  const clearChat = () => {
+    setClearChatOpen(false);
+    deleteForMe(messages);
+  };
 
   const allMine = onlySelected
     ? onlySelected.sender_id === user?.id
@@ -626,8 +649,28 @@ export default function ChatRoom() {
   return (
     <MobileFrame>
       <div className="h-full w-full flex flex-col bg-background" onClick={clearSelection}>
-        {/* Header OR Selection action bar */}
-        {selectionCount > 0 ? (
+        {/* Header OR Search bar OR Selection action bar */}
+        {searchOpen ? (
+          <div
+            className="px-2 pt-4 pb-3 flex items-center gap-1 border-b border-border bg-card"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              aria-label="Close search"
+              onClick={() => { setSearchOpen(false); setSearchQuery(""); }}
+              className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-secondary shrink-0"
+            >
+              <ArrowLeft className="w-5 h-5 text-foreground" />
+            </button>
+            <Input
+              autoFocus
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search in this chat"
+              className="h-9 text-xs bg-input border-border flex-1"
+            />
+          </div>
+        ) : selectionCount > 0 ? (
           <div
             className="px-2 pt-4 pb-3 flex items-center gap-1 border-b border-border bg-card"
             onClick={(e) => e.stopPropagation()}
@@ -735,15 +778,43 @@ export default function ChatRoom() {
             >
               <Video className="w-5 h-5 text-foreground" />
             </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  aria-label="More options"
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-secondary"
+                >
+                  <MoreVertical className="w-5 h-5 text-foreground" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                <DropdownMenuItem onClick={() => setContactInfoOpen(true)}>
+                  <Info className="w-4 h-4 mr-2" /> View contact
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setSearchOpen(true)}>
+                  <Search className="w-4 h-4 mr-2" /> Search
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setClearChatOpen(true)}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" /> Clear chat
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         )}
 
         {/* Messages */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-3 space-y-2">
-          {visible.length === 0 && (
+          {searchOpen && searchQuery.trim() && searchResults.length === 0 && (
+            <p className="text-xs text-muted-foreground text-center mt-6">No matches</p>
+          )}
+          {!searchOpen && visible.length === 0 && (
             <p className="text-xs text-muted-foreground text-center mt-6">Say hello 👋</p>
           )}
-          {visible.map((m) => {
+          {(searchOpen && searchQuery.trim() ? searchResults : visible).map((m) => {
             const mine = m.sender_id === user?.id;
             const isVoice = m.content.startsWith(VOICE_PREFIX);
             const isCall = m.content.startsWith(CALL_PREFIX);
@@ -804,10 +875,10 @@ export default function ChatRoom() {
                   className={`max-w-[92%] select-none transition-shadow ${
                     bareAttachment
                       ? `rounded-2xl ${isSelected ? "ring-2 ring-accent" : ""}`
-                      : `px-4 py-2.5 rounded-2xl ${
+                      : `px-4 py-2.5 rounded-2xl shadow-sm ${
                           mine
                             ? "bg-primary text-primary-foreground rounded-br-sm"
-                            : "bg-secondary text-foreground rounded-bl-sm"
+                            : "bg-card text-foreground rounded-bl-sm"
                         } ${isDeleted ? "italic opacity-70" : ""} ${
                           isSelected ? "ring-2 ring-accent" : ""
                         }`
@@ -868,7 +939,7 @@ export default function ChatRoom() {
           })}
           {otherTyping && (
             <div className="flex justify-start">
-              <div className="bg-secondary text-foreground px-3 py-2 rounded-2xl rounded-bl-sm">
+              <div className="bg-card text-foreground px-3 py-2 rounded-2xl rounded-bl-sm shadow-sm">
                 <div className="flex gap-1 items-center h-3">
                   <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:-0.3s]" />
                   <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:-0.15s]" />
@@ -993,6 +1064,14 @@ export default function ChatRoom() {
                 className="hidden"
                 onChange={onPickFile}
               />
+              <input
+                ref={cameraRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={onPickFile}
+              />
               {!pendingFile && (
                 <button
                   onClick={() => fileRef.current?.click()}
@@ -1022,6 +1101,15 @@ export default function ChatRoom() {
                 disabled={uploading}
                 className="h-9 text-xs bg-input border-border"
               />
+              {!pendingFile && (
+                <button
+                  onClick={() => cameraRef.current?.click()}
+                  aria-label="Take photo"
+                  className="w-9 h-9 rounded-full hover:bg-secondary flex items-center justify-center"
+                >
+                  <Camera className="w-4 h-4 text-foreground" />
+                </button>
+              )}
               {pendingFile ? (
                 <button
                   onClick={sendPending}
@@ -1095,6 +1183,39 @@ export default function ChatRoom() {
         name={other?.display_name ?? "Contact"}
         type={callSheet ?? "voice"}
         onConfirm={() => callSheet && startCall(callSheet)}
+      />
+      {clearChatOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-[60] bg-black/30"
+            onClick={() => setClearChatOpen(false)}
+          />
+          <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[61] w-[280px] rounded-xl bg-background border border-border shadow-lg overflow-hidden">
+            <div className="px-4 py-3 border-b border-border">
+              <p className="text-sm font-semibold text-foreground">Clear this chat?</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                All messages will be removed from your view. This only affects you — {other?.display_name ?? "the other person"} will still see them.
+              </p>
+            </div>
+            <button
+              onClick={clearChat}
+              className="w-full h-11 text-sm text-destructive hover:bg-secondary border-b border-border"
+            >
+              Clear chat
+            </button>
+            <button
+              onClick={() => setClearChatOpen(false)}
+              className="w-full h-11 text-sm text-foreground hover:bg-secondary"
+            >
+              Cancel
+            </button>
+          </div>
+        </>
+      )}
+      <ContactInfoSheet
+        open={contactInfoOpen}
+        onOpenChange={setContactInfoOpen}
+        contact={other}
       />
     </MobileFrame>
   );

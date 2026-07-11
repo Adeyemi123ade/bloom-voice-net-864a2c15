@@ -62,10 +62,8 @@ export function CallSystemBubble({
     <button
       type="button"
       onClick={handleTap}
-      className={`min-w-[70%] max-w-[85%] flex items-center gap-3 pl-2 pr-3 py-2 rounded-2xl text-left ${
-        mine
-          ? "bg-primary/15 text-foreground rounded-br-sm"
-          : "bg-secondary text-foreground rounded-bl-sm"
+      className={`w-fit max-w-[85%] flex items-center gap-3 pl-2 pr-3 py-2 rounded-2xl text-left bg-card text-foreground shadow-sm ${
+        mine ? "rounded-br-sm" : "rounded-bl-sm"
       } hover:opacity-90 transition`}
     >
       {/* Left: circular icon */}
