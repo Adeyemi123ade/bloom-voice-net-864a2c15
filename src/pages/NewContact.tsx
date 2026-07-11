@@ -259,7 +259,12 @@ export default function NewContact() {
                   onChange={(e) => {
                     const cleaned = e.target.value.replace(/[^\d\s-]/g, "");
                     const digitsOnly = cleaned.replace(/\D/g, "");
-                    if (country && isTooManyDigits(digitsOnly, country.code)) return;
+                    // See Register.tsx's phone input for why the DOM value
+                    // must be reset explicitly, not just the state skipped.
+                    if (country && isTooManyDigits(digitsOnly, country.code)) {
+                      e.target.value = phoneLocal;
+                      return;
+                    }
                     setPhoneLocal(cleaned);
                   }}
                   placeholder="Phone number"
