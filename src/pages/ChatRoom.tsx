@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-  Send, Check, CheckCheck, Mic, Square, Trash2, Pencil, X,
+  ArrowLeft, Send, Check, CheckCheck, Mic, Square, Trash2, Pencil, X,
   Paperclip, Copy, Forward, Phone, Video,
 } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
@@ -680,6 +680,13 @@ export default function ChatRoom() {
           </div>
         ) : (
           <div className="px-3 pt-4 pb-3 flex items-center gap-2 border-b border-border">
+            <button
+              aria-label="Back"
+              onClick={(e) => { e.stopPropagation(); navigate(-1); }}
+              className="w-9 h-9 -ml-1 rounded-full flex items-center justify-center hover:bg-secondary shrink-0"
+            >
+              <ArrowLeft className="w-5 h-5 text-foreground" />
+            </button>
             <div className="relative">
               <Avatar className="w-9 h-9">
                 <AvatarImage src={other?.avatar_url ?? undefined} />
