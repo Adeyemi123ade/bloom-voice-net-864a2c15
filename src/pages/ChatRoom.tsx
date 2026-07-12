@@ -11,7 +11,6 @@ import { useTheme } from "next-themes";
 import MobileFrame from "@/components/MobileFrame";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -126,6 +125,7 @@ export default function ChatRoom() {
   const recChunks = useRef<Blob[]>([]);
   const recTimer = useRef<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const composerInputRef = useRef<HTMLInputElement>(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const typingTimeout = useRef<number | null>(null);
@@ -1226,8 +1226,10 @@ export default function ChatRoom() {
                 </button>
               )}
               <Input
+                ref={composerInputRef}
                 value={text}
                 onChange={(e) => (pendingFile ? setText(e.target.value) : onType(e.target.value))}
+                onFocus={() => setEmojiOpen(false)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
@@ -1247,7 +1249,10 @@ export default function ChatRoom() {
               />
               {!pendingFile && (
                 <button
-                  onClick={() => setEmojiOpen(true)}
+                  onClick={() => {
+                    composerInputRef.current?.blur();
+                    setEmojiOpen((v) => !v);
+                  }}
                   aria-label="Emoji"
                   className="w-9 h-9 rounded-full hover:bg-secondary flex items-center justify-center"
                 >
@@ -1284,6 +1289,19 @@ export default function ChatRoom() {
             </>
           )}
         </div>
+        {emojiOpen && (
+          <div className="border-t border-border bg-background h-[300px] overflow-hidden shrink-0">
+            <EmojiPicker
+              onEmojiClick={onEmojiClick}
+              theme={resolvedTheme === "dark" ? EmojiTheme.DARK : EmojiTheme.LIGHT}
+              width="100%"
+              height={300}
+              searchDisabled
+              skinTonesDisabled
+              previewConfig={{ showPreview: false }}
+            />
+          </div>
+        )}
       </div>
       {deleteOpen && (
         <>
@@ -1361,23 +1379,6 @@ export default function ChatRoom() {
         onOpenChange={setContactInfoOpen}
         contact={other}
       />
-      <Sheet open={emojiOpen} onOpenChange={setEmojiOpen}>
-        <SheetContent
-          side="bottom"
-          className="rounded-t-3xl px-0 pt-3 pb-0 max-w-md mx-auto bg-background border-border h-[360px] overflow-hidden"
-        >
-          <div className="mx-auto h-1 w-10 rounded-full bg-muted-foreground/30 mb-2" />
-          <EmojiPicker
-            onEmojiClick={onEmojiClick}
-            theme={resolvedTheme === "dark" ? EmojiTheme.DARK : EmojiTheme.LIGHT}
-            width="100%"
-            height={330}
-            searchDisabled={false}
-            skinTonesDisabled
-            previewConfig={{ showPreview: false }}
-          />
-        </SheetContent>
-      </Sheet>
     </MobileFrame>
   );
 }
