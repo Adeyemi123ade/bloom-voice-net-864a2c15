@@ -49,7 +49,7 @@ export function BrandHero({
           </div>
           {message ? (
             <p
-              className="text-xs mt-3 leading-snug"
+              className="text-base mt-3 leading-snug"
               style={{ color: "#FFFFFF" }}
             >
               {message}

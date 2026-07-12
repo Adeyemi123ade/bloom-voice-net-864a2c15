@@ -206,7 +206,7 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
               onOpenChange(false);
               navigate(prefill ? `/contacts/new?phone=${encodeURIComponent(prefill)}` : "/contacts/new");
             }}
-            className="h-10 px-3 rounded-full hover:bg-secondary flex items-center gap-2 text-sm font-medium text-foreground"
+            className="h-10 px-3 rounded-full hover:bg-secondary flex items-center gap-2 text-base font-medium text-foreground"
           >
             <UserPlus className="w-5 h-5" />
             Add contact
@@ -222,7 +222,7 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search contacts..."
-              className="w-full h-12 pl-11 pr-4 rounded-2xl bg-secondary/40 border border-border/30 text-sm placeholder:text-muted-foreground/70 focus:outline-none focus:border-primary/40"
+              className="w-full h-12 pl-11 pr-4 rounded-2xl bg-secondary/40 border border-border/30 text-base placeholder:text-muted-foreground/70 focus:outline-none focus:border-primary/40"
             />
           </div>
         </div>
@@ -230,7 +230,7 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
         {/* Contact list — capped height so keypad starts right below it (no big gap) */}
         <div className="px-5 pb-2 max-h-[28vh] overflow-y-auto space-y-2 shrink-0">
           {filteredContacts.length === 0 ? (
-            <p className="text-xs text-muted-foreground/70 italic py-6 text-center">
+            <p className="text-base text-muted-foreground/70 italic py-6 text-center">
               {search ? "No matching contact" : "Your contacts will appear here"}
             </p>
           ) : (
@@ -251,8 +251,8 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
                     )}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate text-foreground">{c.name}</p>
-                    <p className="text-xs text-muted-foreground truncate">
+                    <p className="text-base font-semibold truncate text-foreground">{c.name}</p>
+                    <p className="text-base text-muted-foreground truncate">
                       {formatDisplay(c.phones[0]) || c.phones[0]}
                     </p>
                   </div>

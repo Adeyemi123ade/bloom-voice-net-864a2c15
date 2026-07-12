@@ -388,14 +388,14 @@ function ImageViewer({
           <div className="absolute left-1/2 -translate-x-1/2 bottom-8 w-[260px] rounded-xl bg-background border border-border shadow-xl overflow-hidden">
             <button
               onClick={() => setMenuOpen(false)}
-              className="w-full h-11 text-sm text-foreground hover:bg-secondary border-b border-border flex items-center justify-center gap-2"
+              className="w-full h-11 text-base text-foreground hover:bg-secondary border-b border-border flex items-center justify-center gap-2"
             >
               <Eye className="w-4 h-4" />
               Preview (pinch to zoom)
             </button>
             <button
               onClick={triggerDownload}
-              className="w-full h-11 text-sm text-foreground hover:bg-secondary flex items-center justify-center gap-2"
+              className="w-full h-11 text-base text-foreground hover:bg-secondary flex items-center justify-center gap-2"
             >
               <Download className="w-4 h-4" />
               Download to phone

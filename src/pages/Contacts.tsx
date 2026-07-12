@@ -549,7 +549,7 @@ export default function Contacts() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search names or numbers"
-                className="h-10 pl-9 text-sm bg-secondary/40 border-border"
+                className="h-11 pl-9 text-base bg-secondary/40 border-border"
               />
             </div>
           </div>
@@ -593,10 +593,10 @@ export default function Contacts() {
           {/* Contacts permission denied — Android only */}
           {permissionDenied && (
             <div className="mx-4 mt-3 p-4 rounded-xl bg-secondary border border-border text-center">
-              <p className="text-sm font-semibold text-foreground">
+              <p className="text-base font-semibold text-foreground">
                 Contacts access needed
               </p>
-              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+              <p className="text-base text-muted-foreground mt-1 leading-relaxed">
                 Allow ChiChat to access your contacts so you can see which friends are already on the app.
               </p>
               <Button
@@ -615,7 +615,7 @@ export default function Contacts() {
                     setSyncing(false);
                   }
                 }}
-                className="mt-3 w-full h-10 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-sm font-semibold"
+                className="mt-3 w-full h-11 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-base font-semibold"
               >
                 Allow contacts access
               </Button>
@@ -625,17 +625,17 @@ export default function Contacts() {
           {/* Google connection prompt — only on web when not yet linked. */}
           {googleConnected === false && !isNativePlatform() && (
             <div className="mx-4 mt-3 p-3 rounded-xl bg-secondary border border-border">
-              <p className="text-sm font-semibold text-foreground">
+              <p className="text-base font-semibold text-foreground">
                 Connect your Google account
               </p>
-              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+              <p className="text-base text-muted-foreground mt-1 leading-relaxed">
                 We'll show your Google contacts here so you can message friends already on
                 Chichat or invite the rest with one tap.
               </p>
               <Button
                 onClick={connectGoogle}
                 disabled={connectingGoogle}
-                className="mt-3 w-full h-10 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-sm font-semibold"
+                className="mt-3 w-full h-11 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-base font-semibold"
               >
                 {connectingGoogle ? (
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
@@ -646,7 +646,7 @@ export default function Contacts() {
           )}
 
           {syncing && totalContacts === 0 && (
-            <p className="px-4 pt-4 text-xs text-muted-foreground text-center">
+            <p className="px-4 pt-4 text-base text-muted-foreground text-center">
               Loading contacts…
             </p>
           )}
@@ -679,7 +679,7 @@ export default function Contacts() {
           {filteredInvite.length > 0 && (
             <div className="mt-6">
               <div className="px-4 py-2 flex items-center justify-between">
-                <h2 className="text-sm font-bold text-foreground">Invite to Chichat</h2>
+                <h2 className="text-base font-bold text-foreground">Invite to Chichat</h2>
                 <span className="text-xs text-muted-foreground">
                   {filteredInvite.length}
                 </span>
@@ -764,7 +764,7 @@ function ActionRow({
       className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-secondary/60 text-left"
     >
       <Icon className="w-5 h-5 text-primary" />
-      <span className="flex-1 text-sm font-semibold text-foreground">{label}</span>
+      <span className="flex-1 text-base font-semibold text-foreground">{label}</span>
       <span className="text-muted-foreground text-lg leading-none">›</span>
     </button>
   );

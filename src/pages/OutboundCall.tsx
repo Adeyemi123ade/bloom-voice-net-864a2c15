@@ -192,9 +192,9 @@ export default function OutboundCall() {
             <Phone className="w-10 h-10" style={{ color: "#FFFFFF" }} />
           </div>
           <div>
-            <p className="text-xs text-muted-foreground">Calling</p>
+            <p className="text-base text-muted-foreground">Calling</p>
             <p className="text-lg font-semibold mt-1">{display || "Unknown"}</p>
-            <p className="text-xs text-muted-foreground mt-2">{statusText}</p>
+            <p className="text-base text-muted-foreground mt-2">{statusText}</p>
           </div>
         </div>
 

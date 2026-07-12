@@ -44,7 +44,7 @@ export default function CallHeader({ isVideo, other, status, seconds, role = "ca
       <h1 className="text-base font-semibold text-foreground">
         {other?.display_name ?? "Contact"}
       </h1>
-      <p className="text-xs text-muted-foreground">
+      <p className="text-base text-muted-foreground">
         {status === "ringing" && "Ringing…"}
         {status === "connecting" && "Connecting…"}
         {status === "connected" && fmt(seconds)}

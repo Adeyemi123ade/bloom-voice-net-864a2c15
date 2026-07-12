@@ -133,7 +133,7 @@ export default function ChatBackup() {
                   ? `Last backup ${new Date(backup.last_backup_at).toLocaleDateString()}`
                   : "No backup yet"}
               </p>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-base text-muted-foreground">
                 {backup
                   ? `${backup.message_count} messages · ${bytesLabel(backup.total_bytes)}`
                   : "Back up your chats to restore them later"}
@@ -144,7 +144,7 @@ export default function ChatBackup() {
           <div className="flex items-center justify-between px-1">
             <div>
               <p className="text-base font-semibold text-foreground">Auto-backup daily</p>
-              <p className="text-sm text-muted-foreground">Keeps your chats safe automatically</p>
+              <p className="text-base text-muted-foreground">Keeps your chats safe automatically</p>
             </div>
             <Switch
               checked={backup?.auto_backup_enabled ?? true}
@@ -156,12 +156,12 @@ export default function ChatBackup() {
             <div className="px-3 py-3 rounded-lg bg-primary/10 border border-primary/30">
               <div className="flex items-center gap-2 mb-2">
                 <Loader2 className="w-4 h-4 text-primary animate-spin" />
-                <p className="text-sm font-semibold text-foreground">Backing up your chats…</p>
+                <p className="text-base font-semibold text-foreground">Backing up your chats…</p>
               </div>
               <div className="h-1.5 w-full rounded-full bg-secondary overflow-hidden">
                 <div className="h-full w-1/3 bg-primary animate-[indeterminate_1.4s_ease-in-out_infinite]" />
               </div>
-              <p className="text-xs text-muted-foreground mt-2">
+              <p className="text-base text-muted-foreground mt-2">
                 Please don't close the app until this finishes.
               </p>
             </div>
@@ -190,14 +190,14 @@ export default function ChatBackup() {
                 <AlertDialogTitle className="text-base">
                   Restore chats from your latest backup?
                 </AlertDialogTitle>
-                <AlertDialogDescription className="text-sm">
+                <AlertDialogDescription className="text-base">
                   This will pull in your most recent saved chats. Existing messages
                   on this device won't be removed.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel className="text-sm h-10">Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={onConfirmRestore} className="text-sm h-10">
+                <AlertDialogCancel className="text-base h-10">Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={onConfirmRestore} className="text-base h-10">
                   OK
                 </AlertDialogAction>
               </AlertDialogFooter>

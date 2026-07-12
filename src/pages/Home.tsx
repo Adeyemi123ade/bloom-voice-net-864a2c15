@@ -326,7 +326,7 @@ export default function Home() {
             </DialogTrigger>
             <DialogContent className="max-w-[320px] bg-card border-border">
               <DialogHeader>
-                <DialogTitle className="text-sm">Start a new chat</DialogTitle>
+                <DialogTitle className="text-base">Start a new chat</DialogTitle>
               </DialogHeader>
               <div className="relative">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
@@ -335,12 +335,12 @@ export default function Home() {
                   value={peopleQuery}
                   onChange={(e) => setPeopleQuery(e.target.value)}
                   placeholder="Search contacts"
-                  className="h-8 pl-8 text-xs bg-input border-border"
+                  className="h-9 pl-8 text-base bg-input border-border"
                 />
               </div>
               <div className="max-h-[300px] overflow-y-auto -mx-2 mt-1">
                 {filteredPeople.length === 0 && (
-                  <p className="text-xs text-muted-foreground px-2 py-3 text-center">
+                  <p className="text-base text-muted-foreground px-2 py-3 text-center">
                     {people.length === 0 ? "No other users yet." : "No contacts match."}
                   </p>
                 )}
@@ -353,7 +353,7 @@ export default function Home() {
                     <div className="relative">
                       <Avatar className="w-8 h-8">
                         <AvatarImage src={p.avatar_url ?? undefined} />
-                        <AvatarFallback className="bg-primary/20 text-foreground text-xs font-semibold">
+                        <AvatarFallback className="bg-primary/20 text-foreground text-base font-semibold">
                           {initials(p.display_name)}
                         </AvatarFallback>
                       </Avatar>
@@ -362,7 +362,7 @@ export default function Home() {
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-foreground truncate">
+                      <p className="text-base font-medium text-foreground truncate">
                         {p.display_name ?? "Unknown"}
                       </p>
                       {isReallyOnline(p) && (
@@ -384,7 +384,7 @@ export default function Home() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search chats and contacts"
-              className="h-8 pl-8 text-xs bg-input border-border"
+              className="h-9 pl-8 text-base bg-input border-border"
             />
           </div>
         </div>
@@ -392,19 +392,19 @@ export default function Home() {
         {/* List */}
         <div className="flex-1 overflow-y-auto px-2 pb-4">
           {fetching && (
-            <p className="text-xs text-muted-foreground text-center mt-6">Loading…</p>
+            <p className="text-base text-muted-foreground text-center mt-6">Loading…</p>
           )}
           {!fetching && filtered.length === 0 && (
             <div className="text-center mt-10 px-6">
-              <p className="text-xs font-semibold text-foreground">
+              <p className="text-base font-semibold text-foreground">
                 {query ? "No matches" : "No chats yet"}
               </p>
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="text-base text-muted-foreground mt-1">
                 {query ? "Try a different name." : "Tap the new chat icon to start a conversation."}
               </p>
               <Button
                 onClick={() => { setOpenNew(true); setPeopleQuery(query); loadPeople(); }}
-                className="mt-4 h-8 text-xs bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg"
+                className="mt-4 h-9 text-base bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg"
               >
                 {query ? "Search contacts" : "Start chatting"}
               </Button>
@@ -437,7 +437,7 @@ export default function Home() {
               <div className="relative shrink-0">
                 <Avatar className="w-10 h-10">
                   <AvatarImage src={c.other.avatar_url ?? undefined} />
-                  <AvatarFallback className="bg-primary/20 text-foreground text-xs font-semibold">
+                  <AvatarFallback className="bg-primary/20 text-foreground text-base font-semibold">
                     {initials(c.other.display_name)}
                   </AvatarFallback>
                 </Avatar>
@@ -447,7 +447,7 @@ export default function Home() {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-xs font-semibold text-foreground truncate">
+                  <p className="text-base font-semibold text-foreground truncate">
                     {c.other.display_name ?? "Unknown"}
                   </p>
                   <span className="text-2xs text-muted-foreground shrink-0">
@@ -458,7 +458,7 @@ export default function Home() {
                   {PreviewIcon && (
                     <PreviewIcon className={`w-3 h-3 shrink-0 ${iconClass}`} />
                   )}
-                  <p className={`text-xs truncate ${preview.kind === "call" && preview.missed ? "text-destructive" : "text-muted-foreground"}`}>
+                  <p className={`text-base truncate ${preview.kind === "call" && preview.missed ? "text-destructive" : "text-muted-foreground"}`}>
                     {preview.text || (isReallyOnline(c.other) ? "online" : "")}
                   </p>
                 </div>

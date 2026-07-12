@@ -136,11 +136,11 @@ export default function Profile() {
           >
             <ArrowLeft className="w-5 h-5 text-foreground" />
           </button>
-          <h1 className="text-sm font-semibold text-foreground">Profile</h1>
+          <h1 className="text-lg font-bold text-foreground">Profile</h1>
         </div>
 
         <div className="flex-1 px-6 py-5 flex flex-col items-center">
-          <p className="text-xs text-muted-foreground mb-3">
+          <p className="text-base text-muted-foreground mb-3">
             Hello {displayName || "friend"} 👋
           </p>
           <div className="relative">
@@ -172,44 +172,44 @@ export default function Profile() {
           </div>
 
           <div className="w-full mt-5 space-y-1.5">
-            <Label htmlFor="name" className="text-xs text-muted-foreground">Display name</Label>
+            <Label htmlFor="name" className="text-base text-muted-foreground">Display name</Label>
             <Input
               id="name"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               placeholder="Your name"
-              className="h-9 text-xs bg-input border-border"
+              className="h-11 text-base bg-input border-border"
             />
           </div>
 
           <div className="w-full mt-3 space-y-1.5">
-            <Label htmlFor="email" className="text-xs text-muted-foreground">Email address</Label>
+            <Label htmlFor="email" className="text-base text-muted-foreground">Email address</Label>
             <Input
               id="email"
               type="email"
               value={user?.email ?? ""}
               readOnly
               disabled
-              className="h-9 text-xs bg-muted/40 border-border text-muted-foreground cursor-not-allowed"
+              className="h-11 text-base bg-muted/40 border-border text-muted-foreground cursor-not-allowed"
             />
-            <p className="text-2xs text-muted-foreground">
+            <p className="text-base text-muted-foreground">
               Email cannot be changed.
             </p>
           </div>
 
           <div className="w-full mt-3 space-y-1.5">
-            <Label htmlFor="about" className="text-xs text-muted-foreground">About</Label>
+            <Label htmlFor="about" className="text-base text-muted-foreground">About</Label>
             <Textarea
               id="about"
               value={about}
               onChange={(e) => setAbout(e.target.value)}
               placeholder="Hey there! I'm using Chichat."
-              className="min-h-[56px] text-xs bg-input border-border resize-none"
+              className="min-h-[56px] text-base bg-input border-border resize-none"
             />
           </div>
 
           <div className="w-full mt-3 space-y-1.5">
-            <Label htmlFor="phone" className="text-xs text-muted-foreground">
+            <Label htmlFor="phone" className="text-base text-muted-foreground">
               Phone number
             </Label>
             <div className="flex items-center gap-2">
@@ -225,20 +225,20 @@ export default function Profile() {
                   setPhone(cleaned);
                 }}
                 placeholder="+234 801 234 5678"
-                className="h-9 text-xs bg-input border-border flex-1"
+                className="h-11 text-base bg-input border-border flex-1"
               />
               {phone && (
                 <button
                   type="button"
                   onClick={() => setPhone("")}
-                  className="text-2xs text-muted-foreground hover:text-foreground px-2 h-9"
+                  className="text-base text-muted-foreground hover:text-foreground px-2 h-11"
                   aria-label="Clear phone"
                 >
                   Clear
                 </button>
               )}
             </div>
-            <p className="text-2xs text-muted-foreground">
+            <p className="text-base text-muted-foreground">
               Required so friends can find you when they sync their contacts.
             </p>
           </div>
@@ -246,7 +246,7 @@ export default function Profile() {
           <Button
             onClick={save}
             disabled={saving}
-            className="w-full mt-5 h-10 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-xs"
+            className="w-full mt-5 h-11 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-base"
           >
             {saving ? "Saving…" : "Save changes"}
           </Button>

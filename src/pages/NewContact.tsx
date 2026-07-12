@@ -234,7 +234,7 @@ export default function NewContact() {
           {/* Form */}
           <div className="space-y-5">
             <div className="space-y-2">
-              <label className="text-xs font-semibold tracking-[0.15em] text-muted-foreground">
+              <label className="text-sm font-semibold tracking-[0.15em] text-muted-foreground">
                 FULL NAME
               </label>
               <input
@@ -242,12 +242,12 @@ export default function NewContact() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Enter full name"
-                className="w-full h-12 px-4 rounded-xl bg-secondary/40 border border-border/40 text-sm placeholder:text-muted-foreground/70 focus:outline-none focus:border-primary/50"
+                className="w-full h-12 px-4 rounded-xl bg-secondary/40 border border-border/40 text-base placeholder:text-muted-foreground/70 focus:outline-none focus:border-primary/50"
               />
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-semibold tracking-[0.15em] text-muted-foreground">
+              <label className="text-sm font-semibold tracking-[0.15em] text-muted-foreground">
                 PHONE NUMBER
               </label>
               <div className="flex gap-2">
@@ -268,23 +268,23 @@ export default function NewContact() {
                     setPhoneLocal(cleaned);
                   }}
                   placeholder="Phone number"
-                  className="flex-1 min-w-0 h-12 px-4 rounded-xl bg-secondary/40 border border-border/40 text-sm placeholder:text-muted-foreground/70 focus:outline-none focus:border-primary/50"
+                  className="flex-1 min-w-0 h-12 px-4 rounded-xl bg-secondary/40 border border-border/40 text-base placeholder:text-muted-foreground/70 focus:outline-none focus:border-primary/50"
                 />
               </div>
               {e164 && (
-                <p className="text-2xs text-muted-foreground pl-1">Will save as {e164}</p>
+                <p className="text-sm text-muted-foreground pl-1">Will save as {e164}</p>
               )}
             </div>
 
             <div className="space-y-3 pt-2">
-              <p className="text-xs font-semibold tracking-[0.15em] text-muted-foreground">
+              <p className="text-sm font-semibold tracking-[0.15em] text-muted-foreground">
                 SAVE TO
               </p>
 
               <button
                 onClick={onSaveGoogle}
                 disabled={busy !== null}
-                className="w-full h-12 rounded-xl border border-blue-500/60 bg-blue-500/10 hover:bg-blue-500/15 text-blue-400 font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
+                className="w-full h-12 rounded-xl border border-blue-500/60 bg-blue-500/10 hover:bg-blue-500/15 text-blue-400 font-semibold text-base flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
               >
                 <span className="font-bold text-base">G</span>
                 {busy === "google" ? "Saving…" : "Save to Google Contacts"}
@@ -293,7 +293,7 @@ export default function NewContact() {
               <button
                 onClick={onSavePhoneBook}
                 disabled={busy !== null}
-                className="w-full h-12 rounded-xl border border-primary/60 bg-primary/10 hover:bg-primary/15 text-primary font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
+                className="w-full h-12 rounded-xl border border-primary/60 bg-primary/10 hover:bg-primary/15 text-primary font-semibold text-base flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
               >
                 <span aria-hidden>📱</span>
                 {busy === "phone" ? "Saving…" : "Save to Phone Book"}
@@ -301,7 +301,7 @@ export default function NewContact() {
 
               <div className="rounded-xl bg-secondary/30 border border-border/30 px-3 py-3 flex gap-2">
                 <span aria-hidden className="text-blue-400 mt-0.5">ℹ️</span>
-                <p className="text-xs text-muted-foreground leading-relaxed">
+                <p className="text-base text-muted-foreground leading-relaxed">
                   Contacts are saved directly to your phone — not stored inside the app.
                 </p>
               </div>

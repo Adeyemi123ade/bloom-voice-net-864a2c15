@@ -73,7 +73,7 @@ export default function ContactInfoSheet({
           <p className="text-lg font-semibold text-foreground mt-3">
             {contact.display_name ?? "Unknown"}
           </p>
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="text-base text-muted-foreground mt-1">
             {online ? "online" : `last seen ${timeAgo(contact.last_seen_at)}`}
           </p>
         </div>
@@ -81,11 +81,11 @@ export default function ContactInfoSheet({
         <div className="space-y-1">
           <div className="px-3 py-3 rounded-lg bg-card">
             <p className="text-2xs uppercase tracking-wider text-muted-foreground mb-1">Phone</p>
-            <p className="text-sm text-foreground">
+            <p className="text-base text-foreground">
               {loading ? "Checking…" : phone ? formatDisplay(phone) : "Not in your contacts"}
             </p>
             {!loading && !phone && (
-              <p className="text-2xs text-muted-foreground mt-1">
+              <p className="text-base text-muted-foreground mt-1">
                 Save this person to your phone or Google contacts to see their number here.
               </p>
             )}

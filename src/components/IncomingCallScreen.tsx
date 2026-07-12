@@ -263,7 +263,7 @@ export default function IncomingCallScreen() {
           </AvatarFallback>
         </Avatar>
         <h2 className="text-2xl font-bold text-foreground mt-4">{callerName ?? "Unknown"}</h2>
-        <p className="text-sm text-muted-foreground animate-pulse">Ringing…</p>
+        <p className="text-base text-muted-foreground animate-pulse">Ringing…</p>
       </div>
 
       <div className="flex items-center justify-around w-full max-w-xs">
@@ -271,7 +271,7 @@ export default function IncomingCallScreen() {
           <span className="w-16 h-16 rounded-full bg-destructive hover:bg-destructive/90 flex items-center justify-center shadow-lg">
             <PhoneOff className="w-7 h-7 text-destructive-foreground" />
           </span>
-          <span className="text-xs text-foreground">Decline</span>
+          <span className="text-base text-foreground">Decline</span>
         </button>
         <button onClick={accept} aria-label="Accept call" className="flex flex-col items-center gap-2">
           <span className="w-16 h-16 rounded-full bg-primary hover:bg-primary/90 flex items-center justify-center shadow-lg animate-pulse">
@@ -281,7 +281,7 @@ export default function IncomingCallScreen() {
               <Phone className="w-7 h-7 text-primary-foreground" />
             )}
           </span>
-          <span className="text-xs text-foreground">Accept</span>
+          <span className="text-base text-foreground">Accept</span>
         </button>
       </div>
     </div>

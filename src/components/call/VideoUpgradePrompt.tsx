@@ -12,13 +12,13 @@ export default function VideoUpgradePrompt({ mode, fromName, onAccept, onDecline
   if (mode === "outgoing") {
     return (
       <div className="mx-4 mb-2 rounded-xl bg-secondary/90 backdrop-blur px-4 py-3 flex items-center justify-between gap-3 border border-border">
-        <div className="flex items-center gap-2 text-sm text-foreground">
+        <div className="flex items-center gap-2 text-base text-foreground">
           <Video className="w-4 h-4 text-primary animate-pulse" />
           <span>Waiting for {fromName || "them"} to accept video…</span>
         </div>
         <button
           onClick={onCancel}
-          className="text-xs px-3 py-1.5 rounded-full bg-background hover:bg-background/80 text-foreground"
+          className="text-base px-3 py-1.5 rounded-full bg-background hover:bg-background/80 text-foreground"
         >
           Cancel
         </button>
@@ -28,7 +28,7 @@ export default function VideoUpgradePrompt({ mode, fromName, onAccept, onDecline
 
   return (
     <div className="mx-4 mb-2 rounded-xl bg-secondary/95 backdrop-blur px-4 py-3 border border-border">
-      <div className="flex items-center gap-2 text-sm text-foreground mb-3">
+      <div className="flex items-center gap-2 text-base text-foreground mb-3">
         <Video className="w-4 h-4 text-primary" />
         <span>
           <strong>{fromName || "They"}</strong> wants to switch to video
@@ -37,13 +37,13 @@ export default function VideoUpgradePrompt({ mode, fromName, onAccept, onDecline
       <div className="flex gap-2">
         <button
           onClick={onDecline}
-          className="flex-1 h-9 rounded-full bg-background hover:bg-background/80 text-foreground text-sm flex items-center justify-center gap-1"
+          className="flex-1 h-9 rounded-full bg-background hover:bg-background/80 text-foreground text-base flex items-center justify-center gap-1"
         >
           <X className="w-4 h-4" /> Decline
         </button>
         <button
           onClick={onAccept}
-          className="flex-1 h-9 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium flex items-center justify-center gap-1"
+          className="flex-1 h-9 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground text-base font-medium flex items-center justify-center gap-1"
         >
           <Check className="w-4 h-4" /> Accept
         </button>

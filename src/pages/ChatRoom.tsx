@@ -819,7 +819,7 @@ export default function ChatRoom() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search in this chat"
-              className="h-9 text-xs bg-input border-border flex-1"
+              className="h-11 text-base bg-input border-border flex-1"
             />
           </div>
         ) : selectionCount > 0 ? (
@@ -885,7 +885,7 @@ export default function ChatRoom() {
             <div className="relative">
               <Avatar className="w-9 h-9">
                 <AvatarImage src={other?.avatar_url ?? undefined} />
-                <AvatarFallback className="bg-primary/20 text-foreground text-xs font-semibold">
+                <AvatarFallback className="bg-primary/20 text-foreground text-base font-semibold">
                   {initials(other?.display_name)}
                 </AvatarFallback>
               </Avatar>
@@ -897,7 +897,7 @@ export default function ChatRoom() {
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-foreground truncate leading-tight">
+              <p className="text-base font-semibold text-foreground truncate leading-tight">
                 {other?.display_name ?? "Chat"}
               </p>
               {/* Fixed-height status row — never changes header height */}
@@ -961,10 +961,10 @@ export default function ChatRoom() {
         {/* Messages */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-3 space-y-2">
           {searchOpen && searchQuery.trim() && searchResults.length === 0 && (
-            <p className="text-xs text-muted-foreground text-center mt-6">No matches</p>
+            <p className="text-base text-muted-foreground text-center mt-6">No matches</p>
           )}
           {!searchOpen && visible.length === 0 && (
-            <p className="text-xs text-muted-foreground text-center mt-6">Say hello 👋</p>
+            <p className="text-base text-muted-foreground text-center mt-6">Say hello 👋</p>
           )}
           {(searchOpen && searchQuery.trim() ? searchResults : visible).map((m) => {
             const mine = m.sender_id === user?.id;
@@ -1149,7 +1149,7 @@ export default function ChatRoom() {
             onClick={(e) => e.stopPropagation()}
           >
             <Pencil className="w-3 h-3 text-primary" />
-            <span className="text-2xs text-muted-foreground flex-1 truncate">
+            <span className="text-base text-muted-foreground flex-1 truncate">
               Editing: {editing.content}
             </span>
             <button onClick={cancelEdit} className="text-muted-foreground hover:text-foreground">
@@ -1166,10 +1166,10 @@ export default function ChatRoom() {
           >
             <div className="w-1 self-stretch rounded bg-primary" />
             <div className="flex-1 min-w-0">
-              <p className="text-2xs font-semibold text-primary">
+              <p className="text-base font-semibold text-primary">
                 Replying to {replyTo.sender_id === user?.id ? "yourself" : other?.display_name ?? "them"}
               </p>
-              <p className="text-xs text-muted-foreground truncate">
+              <p className="text-base text-muted-foreground truncate">
                 {replyTo.content.startsWith(VOICE_PREFIX)
                   ? "🎤 Voice note"
                   : replyTo.content.startsWith(FILE_PREFIX)
@@ -1370,7 +1370,7 @@ export default function ChatRoom() {
                   setDeleteOpen(false);
                   await deleteForEveryone(selectedList);
                 }}
-                className="w-full h-11 text-sm text-foreground hover:bg-secondary border-b border-border"
+                className="w-full h-11 text-base text-foreground hover:bg-secondary border-b border-border"
               >
                 Delete for everyone
               </button>
@@ -1380,13 +1380,13 @@ export default function ChatRoom() {
                 setDeleteOpen(false);
                 deleteForMe(selectedList);
               }}
-              className="w-full h-11 text-sm text-foreground hover:bg-secondary border-b border-border"
+              className="w-full h-11 text-base text-foreground hover:bg-secondary border-b border-border"
             >
               Delete for me
             </button>
             <button
               onClick={() => setDeleteOpen(false)}
-              className="w-full h-11 text-sm text-foreground hover:bg-secondary"
+              className="w-full h-11 text-base text-foreground hover:bg-secondary"
             >
               Cancel
             </button>
@@ -1408,20 +1408,20 @@ export default function ChatRoom() {
           />
           <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[61] w-[280px] rounded-xl bg-background border border-border shadow-lg overflow-hidden">
             <div className="px-4 py-3 border-b border-border">
-              <p className="text-sm font-semibold text-foreground">Clear this chat?</p>
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="text-base font-semibold text-foreground">Clear this chat?</p>
+              <p className="text-base text-muted-foreground mt-1">
                 All messages will be removed from your view. This only affects you — {other?.display_name ?? "the other person"} will still see them.
               </p>
             </div>
             <button
               onClick={clearChat}
-              className="w-full h-11 text-sm text-destructive hover:bg-secondary border-b border-border"
+              className="w-full h-11 text-base text-destructive hover:bg-secondary border-b border-border"
             >
               Clear chat
             </button>
             <button
               onClick={() => setClearChatOpen(false)}
-              className="w-full h-11 text-sm text-foreground hover:bg-secondary"
+              className="w-full h-11 text-base text-foreground hover:bg-secondary"
             >
               Cancel
             </button>

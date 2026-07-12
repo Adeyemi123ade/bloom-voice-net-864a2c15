@@ -355,7 +355,7 @@ export default function Register() {
               {googleVerified ? "Finish setting up" : "Create your account"}
             </h1>
             {googleVerified && (
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-base text-muted-foreground mt-1">
                 We got your name and email from Google. Add a phone number and password to finish.
               </p>
             )}
@@ -365,7 +365,7 @@ export default function Register() {
           <form onSubmit={handleSubmit} className="mt-4 flex-1 flex flex-col">
             <div className="space-y-3">
               <div>
-                <Label htmlFor="name" className="text-sm text-muted-foreground">
+                <Label htmlFor="name" className="text-base text-muted-foreground">
                   Full name
                 </Label>
                 <Input
@@ -380,12 +380,12 @@ export default function Register() {
                   aria-invalid={!!errors.name}
                 />
                 {errors.name && (
-                  <p className="text-sm text-destructive mt-1">{errors.name}</p>
+                  <p className="text-base text-destructive mt-1">{errors.name}</p>
                 )}
               </div>
 
               <div>
-                <Label htmlFor="email" className="text-sm text-muted-foreground">
+                <Label htmlFor="email" className="text-base text-muted-foreground">
                   Email address
                 </Label>
                 <Input
@@ -412,20 +412,20 @@ export default function Register() {
                   aria-invalid={!!errors.email}
                 />
                 {googleVerified && (
-                  <p className="text-sm text-muted-foreground mt-1">
+                  <p className="text-base text-muted-foreground mt-1">
                     Verified by Google. You can't change this here.
                   </p>
                 )}
                 {!googleVerified && emailChecking && !errors.email && (
-                  <p className="text-sm text-muted-foreground mt-1">Checking…</p>
+                  <p className="text-base text-muted-foreground mt-1">Checking…</p>
                 )}
                 {errors.email && (
-                  <p className="text-sm text-destructive mt-1">{errors.email}</p>
+                  <p className="text-base text-destructive mt-1">{errors.email}</p>
                 )}
               </div>
 
               <div>
-                <Label htmlFor="phone" className="text-sm text-muted-foreground">
+                <Label htmlFor="phone" className="text-base text-muted-foreground">
                   Phone number
                 </Label>
                 <div className="mt-1 flex gap-2">
@@ -465,13 +465,13 @@ export default function Register() {
                   />
                 </div>
                 {errors.phone && (
-                  <p className="text-sm text-destructive mt-1">{errors.phone}</p>
+                  <p className="text-base text-destructive mt-1">{errors.phone}</p>
                 )}
 
               </div>
 
               <div>
-                <Label htmlFor="password" className="text-sm text-muted-foreground">
+                <Label htmlFor="password" className="text-base text-muted-foreground">
                   Password
                 </Label>
                 <div className="relative mt-1">
@@ -497,12 +497,12 @@ export default function Register() {
                 </div>
                 <PasswordStrengthBar password={password} />
                 {errors.password && (
-                  <p className="text-sm text-destructive mt-1">{errors.password}</p>
+                  <p className="text-base text-destructive mt-1">{errors.password}</p>
                 )}
               </div>
 
               <div>
-                <Label htmlFor="confirmPassword" className="text-sm text-muted-foreground">
+                <Label htmlFor="confirmPassword" className="text-base text-muted-foreground">
                   Confirm password
                 </Label>
                 <Input
@@ -517,7 +517,7 @@ export default function Register() {
                   aria-invalid={!!errors.confirmPassword}
                 />
                 {errors.confirmPassword && (
-                  <p className="text-sm text-destructive mt-1">{errors.confirmPassword}</p>
+                  <p className="text-base text-destructive mt-1">{errors.confirmPassword}</p>
                 )}
               </div>
             </div>
@@ -554,7 +554,7 @@ export default function Register() {
                   </Button>
                 </>
               )}
-              <p className="text-sm text-muted-foreground text-center mt-3">
+              <p className="text-base text-muted-foreground text-center mt-3">
                 Already have an account?{" "}
                 <Link to="/login" className="text-accent font-semibold hover:underline">
                   Sign in

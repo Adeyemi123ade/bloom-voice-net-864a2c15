@@ -32,9 +32,9 @@ export default function ContactActionSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="rounded-t-2xl pb-6 max-w-[420px] mx-auto">
         <SheetHeader className="text-left">
-          <SheetTitle className="text-sm">{title}</SheetTitle>
+          <SheetTitle className="text-base">{title}</SheetTitle>
           {subtitle && (
-            <p className="text-xs text-muted-foreground">{subtitle}</p>
+            <p className="text-base text-muted-foreground">{subtitle}</p>
           )}
         </SheetHeader>
         <div className="mt-3 space-y-1">
@@ -52,7 +52,7 @@ export default function ContactActionSheet({
                 }`}
               >
                 <Icon className="w-4 h-4" />
-                <span className="text-xs font-medium">{a.label}</span>
+                <span className="text-base font-medium">{a.label}</span>
               </button>
             );
           })}

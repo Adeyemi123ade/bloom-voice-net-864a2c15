@@ -8,8 +8,8 @@ import { ActiveContact, InviteContact, initials } from "./contactsHelpers";
 export function EmptyState({ title, hint }: { title: string; hint: string }) {
   return (
     <div className="text-center py-10 px-4">
-      <p className="text-sm font-semibold text-foreground">{title}</p>
-      <p className="text-xs text-muted-foreground mt-1">{hint}</p>
+      <p className="text-base font-semibold text-foreground">{title}</p>
+      <p className="text-base text-muted-foreground mt-1">{hint}</p>
     </div>
   );
 }
@@ -33,13 +33,13 @@ export function ActiveRow({
     >
       <Avatar className="w-11 h-11">
         <AvatarImage src={c.avatar_url ?? undefined} />
-        <AvatarFallback className="bg-muted text-muted-foreground text-sm font-semibold">
+        <AvatarFallback className="bg-muted text-muted-foreground text-base font-semibold">
           {initials(c.display_name)}
         </AvatarFallback>
       </Avatar>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
-          <p className="text-sm font-semibold text-foreground truncate">
+          <p className="text-base font-semibold text-foreground truncate">
             {c.display_name}
           </p>
           {c.call_count >= 3 && (
@@ -48,7 +48,7 @@ export function ActiveRow({
             </Badge>
           )}
         </div>
-        <p className="text-xs text-muted-foreground truncate">Hello there!</p>
+        <p className="text-base text-muted-foreground truncate">Hello there!</p>
       </div>
       <Button
         onClick={(e) => {
@@ -87,12 +87,12 @@ export function InviteRow({
       className="flex items-center gap-3 px-3 py-2.5 hover:bg-secondary/60 select-none cursor-pointer"
     >
       <Avatar className="w-11 h-11">
-        <AvatarFallback className="bg-muted text-muted-foreground text-sm font-semibold">
+        <AvatarFallback className="bg-muted text-muted-foreground text-base font-semibold">
           {initials(c.name)}
         </AvatarFallback>
       </Avatar>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-foreground truncate">{c.name}</p>
+        <p className="text-base font-semibold text-foreground truncate">{c.name}</p>
       </div>
       {isManual && (
         <button
@@ -113,8 +113,8 @@ export function InviteRow({
         }}
         className={
           c.invited
-            ? "text-sm font-semibold text-muted-foreground px-2"
-            : "text-sm font-bold text-primary hover:text-primary/80 px-2"
+            ? "text-base font-semibold text-muted-foreground px-2"
+            : "text-base font-bold text-primary hover:text-primary/80 px-2"
         }
       >
         {c.invited ? "Sent" : "Invite"}

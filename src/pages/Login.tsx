@@ -195,7 +195,7 @@ export default function Login() {
           <h1 className="text-[18px] font-bold text-foreground leading-tight">
             Welcome back
           </h1>
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="text-base text-muted-foreground mt-1">
             Sign in to continue to Chichat.
           </p>
         </div>
@@ -203,7 +203,7 @@ export default function Login() {
         <form onSubmit={handleSubmit} className="mt-3 flex-1 flex flex-col">
           <div className="space-y-2.5">
             <div>
-              <Label htmlFor="identifier" className="text-2xs text-muted-foreground">
+              <Label htmlFor="identifier" className="text-base text-muted-foreground">
                 Email or phone number
               </Label>
               <Input
@@ -214,16 +214,16 @@ export default function Login() {
                 onChange={(e) => setIdentifier(e.target.value)}
                 placeholder="you@example.com or +2348012345678"
                 maxLength={255}
-                className="mt-1 h-9 text-xs bg-input border-border text-foreground placeholder:text-muted-foreground"
+                className="mt-1 h-11 text-base bg-input border-border text-foreground placeholder:text-muted-foreground"
                 aria-invalid={!!errors.identifier}
               />
               {errors.identifier && (
-                <p className="text-2xs text-destructive mt-1">{errors.identifier}</p>
+                <p className="text-base text-destructive mt-1">{errors.identifier}</p>
               )}
             </div>
 
             <div>
-              <Label htmlFor="password" className="text-2xs text-muted-foreground">
+              <Label htmlFor="password" className="text-base text-muted-foreground">
                 Password
               </Label>
               <div className="relative mt-1">
@@ -235,7 +235,7 @@ export default function Login() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Your password"
                   maxLength={72}
-                  className="h-9 text-xs bg-input border-border text-foreground placeholder:text-muted-foreground pr-10"
+                  className="h-11 text-base bg-input border-border text-foreground placeholder:text-muted-foreground pr-10"
                   aria-invalid={!!errors.password}
                 />
                 <button
@@ -248,10 +248,10 @@ export default function Login() {
                 </button>
               </div>
               {errors.password && (
-                <p className="text-2xs text-destructive mt-1">{errors.password}</p>
+                <p className="text-base text-destructive mt-1">{errors.password}</p>
               )}
               <div className="text-right mt-1.5">
-                <Link to="/forgot-password" className="text-2xs text-accent font-semibold hover:underline">
+                <Link to="/forgot-password" className="text-base text-accent font-semibold hover:underline">
                   Forgot password?
                 </Link>
               </div>
@@ -262,7 +262,7 @@ export default function Login() {
             <Button
               type="submit"
               disabled={submitting}
-              className="w-full h-8 text-xs bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg"
+              className="w-full h-11 text-base bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg"
             >
               {submitting ? "Signing in…" : "Sign in"}
             </Button>
@@ -276,7 +276,7 @@ export default function Login() {
               onClick={handleGoogle}
               disabled={googleLoading}
               variant="outline"
-              className="w-full h-8 text-xs font-semibold rounded-lg gap-2"
+              className="w-full h-11 text-base font-semibold rounded-lg gap-2"
             >
               <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" aria-hidden="true">
                 <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -286,7 +286,7 @@ export default function Login() {
               </svg>
               {googleLoading ? "Connecting…" : "Continue with Google"}
             </Button>
-            <p className="text-2xs text-muted-foreground text-center mt-2">
+            <p className="text-base text-muted-foreground text-center mt-2">
               Don't have an account?{" "}
               <Link to="/register" className="text-accent font-semibold hover:underline">
                 Create one

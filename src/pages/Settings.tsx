@@ -126,7 +126,7 @@ export default function Settings() {
             </span>
             <div className="flex-1 min-w-0">
               <p className="text-base font-semibold text-foreground">Phone settings</p>
-              <p className="text-sm text-muted-foreground truncate">
+              <p className="text-base text-muted-foreground truncate">
                 Theme, ringtone, Google account
               </p>
             </div>
@@ -143,7 +143,7 @@ export default function Settings() {
             </span>
             <div className="flex-1 min-w-0">
               <p className="text-base font-semibold text-foreground">Chat backup</p>
-              <p className="text-sm text-muted-foreground truncate">
+              <p className="text-base text-muted-foreground truncate">
                 {backup
                   ? `Last: ${new Date(backup.last_backup_at).toLocaleDateString()} · ${backup.message_count} msgs`
                   : "No backup yet"}
@@ -160,7 +160,7 @@ export default function Settings() {
               </span>
               <div className="flex-1 min-w-0">
                 <p className="text-base font-semibold text-foreground">Account</p>
-                <p className="text-sm text-muted-foreground truncate">
+                <p className="text-base text-muted-foreground truncate">
                   Profile · {user?.email ?? "this device"}
                 </p>
               </div>
@@ -173,8 +173,8 @@ export default function Settings() {
               >
                 <UserIcon className="w-4 h-4 text-primary" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-foreground">Profile setting</p>
-                  <p className="text-xs text-muted-foreground truncate">
+                  <p className="text-base font-semibold text-foreground">Profile setting</p>
+                  <p className="text-base text-muted-foreground truncate">
                     Edit name, photo and about
                   </p>
                 </div>
@@ -187,8 +187,8 @@ export default function Settings() {
               >
                 <Trash2 className="w-4 h-4 text-destructive" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-destructive">Delete account</p>
-                  <p className="text-xs text-muted-foreground truncate">
+                  <p className="text-base font-semibold text-destructive">Delete account</p>
+                  <p className="text-base text-muted-foreground truncate">
                     Permanently remove your account and all data
                   </p>
                 </div>

@@ -129,13 +129,13 @@ export default function MicTest() {
       </button>
 
       <h1 className="text-2xl font-bold mb-2">Microphone Test</h1>
-      <p className="text-zinc-400 text-sm mb-6">
+      <p className="text-zinc-400 text-base mb-6">
         Test your microphone and speaker before making calls.
       </p>
 
       {/* Permission status */}
       <div className="bg-zinc-900 rounded-xl p-4 mb-4">
-        <p className="text-sm text-zinc-400">Microphone permission:</p>
+        <p className="text-base text-zinc-400">Microphone permission:</p>
         <p
           className={`text-lg font-semibold capitalize ${
             permissionState === "granted"
@@ -151,7 +151,7 @@ export default function MicTest() {
 
       {/* Error */}
       {error && (
-        <div className="bg-red-900/30 border border-red-500/30 rounded-xl p-4 mb-4 text-red-300 text-sm">
+        <div className="bg-red-900/30 border border-red-500/30 rounded-xl p-4 mb-4 text-red-300 text-base">
           {error}
         </div>
       )}
@@ -159,9 +159,9 @@ export default function MicTest() {
       {/* Volume visualiser */}
       {stream && (
         <div className="bg-zinc-900 rounded-xl p-6 mb-4 flex flex-col items-center">
-          <p className="text-sm text-zinc-400 mb-4">Speak now — watch the bars move</p>
+          <p className="text-base text-zinc-400 mb-4">Speak now — watch the bars move</p>
           <div className="flex items-end gap-1 h-24">{volumeBars}</div>
-          <p className="text-xs text-zinc-500 mt-3">
+          <p className="text-base text-zinc-500 mt-3">
             {volume > 10 ? "Microphone is picking up sound!" : "Say something..."}
           </p>
         </div>
@@ -170,7 +170,7 @@ export default function MicTest() {
       {/* Record / playback */}
       {stream && (
         <div className="bg-zinc-900 rounded-xl p-6 mb-4 flex flex-col items-center gap-4">
-          <p className="text-sm text-zinc-400">Record a short clip and play it back</p>
+          <p className="text-base text-zinc-400">Record a short clip and play it back</p>
           {!recording ? (
             <button
               onClick={startRecording}
@@ -192,7 +192,7 @@ export default function MicTest() {
           {audioURL && (
             <div className="w-full flex flex-col items-center gap-3">
               <audio controls src={audioURL} className="w-full" />
-              <p className="text-xs text-green-400 flex items-center gap-1">
+              <p className="text-base text-green-400 flex items-center gap-1">
                 <Volume2 className="w-4 h-4" />
                 Can you hear your recording? If yes, mic & speaker both work.
               </p>

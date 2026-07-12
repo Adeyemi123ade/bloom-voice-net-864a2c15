@@ -42,7 +42,7 @@ export default function PasswordStrengthBar({ password, className = "" }: Props)
           />
         ))}
       </div>
-      <div className={`mt-1 flex items-center gap-1 text-xs font-medium ${labelColor}`}>
+      <div className={`mt-1 flex items-center gap-1 text-base font-medium ${labelColor}`}>
         <span>{label} password</span>
         {level === 3 && <Check className="w-3.5 h-3.5" />}
       </div>

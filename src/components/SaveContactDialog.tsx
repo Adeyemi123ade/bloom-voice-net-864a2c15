@@ -51,34 +51,34 @@ export default function SaveContactDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[320px]">
         <DialogHeader>
-          <DialogTitle className="text-sm">Save contact</DialogTitle>
-          <DialogDescription className="text-xs">
+          <DialogTitle className="text-base">Save contact</DialogTitle>
+          <DialogDescription className="text-base">
             {formatDisplay(phoneE164) || phoneE164}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-2">
-          <Label htmlFor="contact-name" className="text-xs">Name</Label>
+          <Label htmlFor="contact-name" className="text-base">Name</Label>
           <Input
             id="contact-name"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Contact name"
             autoFocus
-            className="h-9 text-xs"
+            className="h-11 text-base"
           />
         </div>
         <div className="flex gap-2 justify-end pt-2">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
-            className="h-9 text-xs"
+            className="h-11 text-base"
           >
             Cancel
           </Button>
           <Button
             onClick={save}
             disabled={busy}
-            className="h-9 text-xs bg-primary hover:bg-primary/90 text-primary-foreground"
+            className="h-11 text-base bg-primary hover:bg-primary/90 text-primary-foreground"
           >
             {busy ? "Saving…" : "Save"}
           </Button>
