@@ -79,7 +79,15 @@ Deno.serve(async (req) => {
         }),
       });
       const tokens = await tokenRes.json();
-      if (!tokenRes.ok) return json({ error: tokens }, 400);
+      if (!tokenRes.ok) {
+        console.error("google-oauth-callback: token exchange failed", {
+          status: tokenRes.status,
+          redirectUri,
+          clientIdPrefix: clientId?.slice(0, 20),
+          response: tokens,
+        });
+        return json({ error: tokens }, 400);
+      }
 
       // get email
       let email: string | null = null;

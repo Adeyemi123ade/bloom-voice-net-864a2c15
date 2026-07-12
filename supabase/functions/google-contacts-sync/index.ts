@@ -157,6 +157,7 @@ Deno.serve(async (req) => {
 
     return json({ contacts, sources, debug, totalReturned: contacts.length, warning });
   } catch (e) {
+    console.error("google-contacts-sync: unhandled error", e);
     return json({ error: String(e) }, 500);
   }
 });
