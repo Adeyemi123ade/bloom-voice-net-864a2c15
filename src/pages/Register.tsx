@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
 
 import { toE164, isTooManyDigits } from "@/lib/phone";
 import CountryPicker from "@/components/CountryPicker";
@@ -136,10 +135,11 @@ export default function Register() {
   const handleGoogle = async () => {
     setGoogleLoading(true);
     const CANONICAL_ORIGIN = "https://chichatapp.com";
-    const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: `${CANONICAL_ORIGIN}/auth/google-return`,
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: `${CANONICAL_ORIGIN}/auth/google-return` },
     });
-    if (result.error) {
+    if (error) {
       setGoogleLoading(false);
       toast({
         title: "Google didn't work",
