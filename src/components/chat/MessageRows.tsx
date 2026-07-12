@@ -17,6 +17,12 @@ export function CallRow({
 }) {
   const timer = useRef<number | null>(null);
   const fired = useRef(false);
+  // See the matching comment in SwipeRow: mobile browsers fire a synthetic
+  // mousedown/click shortly after a real touchend, which would otherwise
+  // reset `fired` and let the synthetic click re-toggle the selection that
+  // the real long-press just made.
+  const touchActive = useRef(false);
+  const touchEndTimer = useRef<number | null>(null);
   const start = () => {
     fired.current = false;
     if (timer.current) window.clearTimeout(timer.current);
@@ -32,6 +38,20 @@ export function CallRow({
       timer.current = null;
     }
   };
+  const onTouchStart = () => {
+    touchActive.current = true;
+    if (touchEndTimer.current) {
+      window.clearTimeout(touchEndTimer.current);
+      touchEndTimer.current = null;
+    }
+    start();
+  };
+  const onTouchEnd = () => {
+    cancel();
+    touchEndTimer.current = window.setTimeout(() => {
+      touchActive.current = false;
+    }, 700);
+  };
   return (
     <div
       className={`flex ${mine ? "justify-end" : "justify-start"}`}
@@ -40,12 +60,12 @@ export function CallRow({
         if (fired.current) { fired.current = false; return; }
         onTap();
       }}
-      onTouchStart={start}
-      onTouchEnd={cancel}
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
       onTouchMove={cancel}
-      onMouseDown={start}
-      onMouseUp={cancel}
-      onMouseLeave={cancel}
+      onMouseDown={() => { if (!touchActive.current) start(); }}
+      onMouseUp={() => { if (!touchActive.current) cancel(); }}
+      onMouseLeave={() => { if (!touchActive.current) cancel(); }}
       onContextMenu={(e) => { e.preventDefault(); if (!fired.current) { fired.current = true; onLongPress(); } }}
     >
       <div className={isSelected ? "ring-2 ring-primary rounded-2xl" : ""}>
@@ -75,6 +95,16 @@ export function SwipeRow({
   const triggered = useRef(false);
   const longPressTimer = useRef<number | null>(null);
   const longPressFired = useRef(false);
+  // Mobile browsers fire synthetic compatibility mouse events (mousedown,
+  // mouseup, click) shortly AFTER a real touch sequence ends, so code that
+  // only listens for mouse events still works. Without this guard, that
+  // synthetic mousedown hits the same onMouseDown as a real mouse user
+  // would and calls startLongPress() again, which resets longPressFired
+  // back to false — right before the matching synthetic click arrives and
+  // (seeing longPressFired now false) falls through to onTap, instantly
+  // re-toggling off the selection long-press just made.
+  const touchActive = useRef(false);
+  const touchEndTimer = useRef<number | null>(null);
   const THRESHOLD = 60;
 
   const fireLongPress = () => {
@@ -97,6 +127,11 @@ export function SwipeRow({
   };
 
   const onTouchStart = (e: React.TouchEvent) => {
+    touchActive.current = true;
+    if (touchEndTimer.current) {
+      window.clearTimeout(touchEndTimer.current);
+      touchEndTimer.current = null;
+    }
     startX.current = e.touches[0].clientX;
     startY.current = e.touches[0].clientY;
     triggered.current = false;
@@ -132,6 +167,12 @@ export function SwipeRow({
     setDx(0);
     startX.current = null;
     startY.current = null;
+    // Keep ignoring mouse events for a beat after the real touch ends —
+    // the synthetic compatibility events land shortly after touchend, not
+    // during it.
+    touchEndTimer.current = window.setTimeout(() => {
+      touchActive.current = false;
+    }, 700);
   };
 
   const handleClick = (e: React.MouseEvent) => {
@@ -158,9 +199,9 @@ export function SwipeRow({
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
-        onMouseDown={startLongPress}
-        onMouseUp={cancelLongPress}
-        onMouseLeave={cancelLongPress}
+        onMouseDown={() => { if (!touchActive.current) startLongPress(); }}
+        onMouseUp={() => { if (!touchActive.current) cancelLongPress(); }}
+        onMouseLeave={() => { if (!touchActive.current) cancelLongPress(); }}
         onContextMenu={(e) => {
           e.preventDefault();
           if (!longPressFired.current) fireLongPress();
