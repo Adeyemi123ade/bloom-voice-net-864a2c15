@@ -51,10 +51,10 @@ export async function startGoogleContactsConnect(): Promise<void> {
   if (error || !data?.url) throw error ?? new Error("Failed to build auth URL");
   sessionStorage.setItem(PENDING_KEY, JSON.stringify({ redirect_uri } satisfies PendingState));
 
-  // If the redirect URI is on a different origin than we're on now (e.g.
-  // running inside the Lovable preview iframe but redirecting to the
-  // published URL), open Google in a new tab so the user isn't stranded on a
-  // different origin. Same-origin flows stay in-tab as before.
+  // If the redirect URI is on a different origin than we're on now (e.g. a
+  // preview deployment redirecting to the published URL), open Google in a
+  // new tab so the user isn't stranded on a different origin. Same-origin
+  // flows stay in-tab as before.
   const sameOrigin = redirect_uri.startsWith(window.location.origin);
   if (sameOrigin) {
     window.location.href = data.url;
