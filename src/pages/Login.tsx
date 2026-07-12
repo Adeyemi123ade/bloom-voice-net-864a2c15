@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
 import { clearRecoveryPending, isRecoveryPending } from "@/lib/recoveryPending";
 
 
@@ -66,10 +65,11 @@ export default function Login() {
   const handleGoogle = async () => {
     setGoogleLoading(true);
     const CANONICAL_ORIGIN = "https://chichatapp.com";
-    const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: `${CANONICAL_ORIGIN}/auth/google-return`,
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: `${CANONICAL_ORIGIN}/auth/google-return` },
     });
-    if (result.error) {
+    if (error) {
       setGoogleLoading(false);
       toast({
         title: "Google sign-in didn't work",

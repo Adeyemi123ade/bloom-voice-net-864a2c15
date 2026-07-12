@@ -1,6 +1,6 @@
 import type { DeviceContact } from "@/lib/deviceContacts";
 
-export const APP_INVITE_LINK = "https://bloom-voice-net.lovable.app";
+export const APP_INVITE_LINK = "https://chichatapp.com";
 export const BATCH_SIZE = 200;
 export const PRIVACY_DISMISSED_KEY = "chichat:contacts:privacy-dismissed";
 

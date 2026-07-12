@@ -454,7 +454,18 @@ export default function ChatRoom() {
   );
   const selectionCount = selectedList.length;
   const onlySelected = selectionCount === 1 ? selectedList[0] : null;
-  const clearSelection = () => setSelectedIds(new Set());
+  // Mobile browsers can dispatch a stray/ghost click shortly after a real
+  // long-press (synthetic mouse-compat events, or a real click landing on
+  // whatever element ends up under the original touch point once the
+  // screen reflows into selection mode) — see #18/#20/#21. Rather than
+  // keep chasing every place such a click could originate or land,
+  // guard the action itself: a selection that was *just* created by a
+  // long-press can't be wiped by anything for a short window afterward.
+  const longPressGuardUntil = useRef(0);
+  const clearSelection = () => {
+    if (Date.now() < longPressGuardUntil.current) return;
+    setSelectedIds(new Set());
+  };
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -462,6 +473,10 @@ export default function ChatRoom() {
       else next.add(id);
       return next;
     });
+  };
+  const selectFromLongPress = (id: string) => {
+    longPressGuardUntil.current = Date.now() + 500;
+    toggleSelect(id);
   };
 
   // Jump from a search result straight to that message in the full chat —
@@ -760,18 +775,12 @@ export default function ChatRoom() {
     }
   };
 
-  // "Delete for everyone" leaves no trace on either side — no tombstone
-  // bubble, nothing to tap — so deleted messages are filtered out of the
-  // visible list entirely rather than rendered as a placeholder.
-  const visible = useMemo(
-    () => messages.filter((m) => !hidden.has(m.id) && !m.deleted_for_everyone),
-    [messages, hidden],
-  );
+  const visible = useMemo(() => messages.filter((m) => !hidden.has(m.id)), [messages, hidden]);
   const searchResults = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return visible;
     return visible.filter(
-      (m) => m.content.toLowerCase().includes(q),
+      (m) => !m.deleted_for_everyone && m.content.toLowerCase().includes(q),
     );
   }, [visible, searchQuery]);
   const clearChat = () => {
@@ -984,7 +993,7 @@ export default function ChatRoom() {
                       if (searchOpen) jumpToMessage(m.id);
                       else if (selectionCount > 0) toggleSelect(m.id);
                     }}
-                    onLongPress={() => toggleSelect(m.id)}
+                    onLongPress={() => selectFromLongPress(m.id)}
                   >
                     <CallSystemBubble
                       m={m}
@@ -1032,7 +1041,7 @@ export default function ChatRoom() {
                   // (selection requires long-press to avoid accidental opens).
                   if (selectionCount > 0) toggleSelect(m.id);
                 }}
-                onLongPress={() => toggleSelect(m.id)}
+                onLongPress={() => selectFromLongPress(m.id)}
               >
                 <div
                   className={`max-w-[92%] select-none transition-shadow ${
