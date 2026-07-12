@@ -11,6 +11,7 @@ import {
   Play,
   RefreshCw,
   Square,
+  Type,
   Upload,
   X,
 } from "lucide-react";
@@ -23,6 +24,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Monitor, Moon, Sun } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -32,6 +34,10 @@ import {
   syncGoogleContacts,
   GoogleContactsReconnectRequired,
 } from "@/lib/googleContacts";
+import {
+  isVoiceTranscribeEnabled,
+  setVoiceTranscribeEnabled,
+} from "@/lib/transcriptionPrefs";
 import {
   RINGTONES,
   RingtoneId,
@@ -56,6 +62,8 @@ export default function PhoneSettings() {
   const [previewing, setPreviewing] = useState<string | null>(null);
   const stopRef = useRef<(() => void) | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
+
+  const [voiceTranscribe, setVoiceTranscribe] = useState(() => isVoiceTranscribeEnabled());
 
   // Google contacts integration (moved here from Settings).
   const [googleEmail, setGoogleEmail] = useState<string | null>(null);
@@ -164,6 +172,11 @@ export default function PhoneSettings() {
     } finally {
       setSyncing(false);
     }
+  };
+
+  const toggleVoiceTranscribe = (v: boolean) => {
+    setVoiceTranscribe(v);
+    setVoiceTranscribeEnabled(v);
   };
 
   const stopPreview = () => {
@@ -325,6 +338,22 @@ export default function PhoneSettings() {
               )}
             </div>
           )}
+
+          {/* Voice note transcription — a "Transcribe" option on voice notes
+              (sent or received) in chat. Off by default it'd never get
+              discovered, so this defaults on with an easy opt-out here. */}
+          <div className="w-full flex items-center gap-3 px-3 py-3 rounded-lg">
+            <span className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center">
+              <Type className="w-4 h-4 text-primary" />
+            </span>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-foreground">Voice note transcription</p>
+              <p className="text-xs text-muted-foreground truncate">
+                Show a "Transcribe" option on voice notes
+              </p>
+            </div>
+            <Switch checked={voiceTranscribe} onCheckedChange={toggleVoiceTranscribe} />
+          </div>
         </div>
 
         {/* Theme dialog */}

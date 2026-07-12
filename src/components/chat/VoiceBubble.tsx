@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Pause, Play } from "lucide-react";
+import { Loader2, Pause, Play, Type } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { fmtDuration } from "@/lib/chat/format";
 import { useSignedMediaUrl } from "@/lib/signedMedia";
+import { supabase } from "@/integrations/supabase/client";
+import { isVoiceTranscribeEnabled } from "@/lib/transcriptionPrefs";
 
 
 // --- Single-instance audio manager (prevents overlap & playback bugs) ---
@@ -102,27 +104,93 @@ function useAudioPlayer(id: string, url: string) {
 export function VoiceBubble({ id, url, mine }: { id: string; url: string; mine: boolean }) {
   const signedUrl = useSignedMediaUrl(url);
   const { playing, dur, pos, toggle } = useAudioPlayer(id, signedUrl);
+  const [transcript, setTranscript] = useState<string | null>(null);
+  const [showTranscript, setShowTranscript] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
+
+  const onTranscribe = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (transcript) {
+      setShowTranscript((v) => !v);
+      return;
+    }
+    if (!signedUrl) return;
+    setTranscribing(true);
+    try {
+      const audioRes = await fetch(signedUrl);
+      const blob = await audioRes.blob();
+      const { data, error } = await supabase.functions.invoke("transcribe-voice", { body: blob });
+      if (error) throw error;
+      const text = (data as { text?: string } | null)?.text?.trim();
+      if (!text) {
+        toast({
+          title: "Couldn't transcribe",
+          description: "No speech was detected in this voice note.",
+          variant: "destructive",
+        });
+        return;
+      }
+      setTranscript(text);
+      setShowTranscript(true);
+    } catch (e) {
+      toast({
+        title: "Transcription failed",
+        description: e instanceof Error ? e.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setTranscribing(false);
+    }
+  };
 
   const pct = dur ? (pos / dur) * 100 : 0;
   return (
-    <div className="flex items-center gap-2 min-w-[140px]">
-      <button
-        onClick={(e) => { e.stopPropagation(); toggle(); }}
-        className={`w-7 h-7 rounded-full flex items-center justify-center ${
-          mine ? "bg-primary-foreground/20" : "bg-foreground/10"
-        }`}
-      >
-        {playing ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
-      </button>
-      <div className={`flex-1 h-1 rounded-full ${mine ? "bg-primary-foreground/30" : "bg-foreground/20"}`}>
-        <div
-          className={`h-full rounded-full ${mine ? "bg-primary-foreground" : "bg-foreground"}`}
-          style={{ width: `${pct}%` }}
-        />
+    <div className="min-w-[140px]">
+      <div className="flex items-center gap-2">
+        <button
+          onClick={(e) => { e.stopPropagation(); toggle(); }}
+          className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${
+            mine ? "bg-primary-foreground/20" : "bg-foreground/10"
+          }`}
+        >
+          {playing ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+        </button>
+        <div className={`flex-1 h-1 rounded-full ${mine ? "bg-primary-foreground/30" : "bg-foreground/20"}`}>
+          <div
+            className={`h-full rounded-full ${mine ? "bg-primary-foreground" : "bg-foreground"}`}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        <span className={`text-[9px] ${mine ? "text-primary-foreground/80" : "text-muted-foreground"}`}>
+          {fmtDuration(playing || pos ? pos : dur)}
+        </span>
+        {isVoiceTranscribeEnabled() && (
+          <button
+            onClick={onTranscribe}
+            disabled={transcribing}
+            aria-label={transcript ? "Toggle transcript" : "Transcribe"}
+            title={transcript ? "Toggle transcript" : "Transcribe"}
+            className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${
+              mine ? "bg-primary-foreground/20" : "bg-foreground/10"
+            }`}
+          >
+            {transcribing ? (
+              <Loader2 className="w-3 h-3 animate-spin" />
+            ) : (
+              <Type className="w-3 h-3" />
+            )}
+          </button>
+        )}
       </div>
-      <span className={`text-[9px] ${mine ? "text-primary-foreground/80" : "text-muted-foreground"}`}>
-        {fmtDuration(playing || pos ? pos : dur)}
-      </span>
+      {showTranscript && transcript && (
+        <p
+          className={`mt-1.5 text-sm italic leading-snug ${
+            mine ? "text-primary-foreground/90" : "text-foreground/90"
+          }`}
+        >
+          {transcript}
+        </p>
+      )}
     </div>
   );
 }
