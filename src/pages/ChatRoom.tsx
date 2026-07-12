@@ -1019,9 +1019,28 @@ export default function ChatRoom() {
                       }}
                     />
                   ) : (
-                    <p className="text-sm whitespace-pre-wrap break-words">{body}</p>
+                    <p className="text-base whitespace-pre-wrap break-words leading-snug">
+                      {body}
+                      <span
+                        className={`float-right inline-flex items-center gap-1 ml-2 mt-1 text-[10px] leading-none whitespace-nowrap ${
+                          mine ? "text-primary-foreground/70" : "text-muted-foreground"
+                        }`}
+                      >
+                        {m.edited_at && <span>edited</span>}
+                        <span>{formatTime(m.created_at)}</span>
+                        {mine && (
+                          m.read_at ? (
+                            <CheckCheck className="w-3 h-3 text-sky-400" />
+                          ) : m.delivered_at ? (
+                            <CheckCheck className="w-3 h-3 text-primary-foreground/70" />
+                          ) : (
+                            <Check className="w-3 h-3 text-primary-foreground/70" />
+                          )
+                        )}
+                      </span>
+                    </p>
                   )}
-                  {!bareAttachment && (
+                  {!bareAttachment && (isDeleted || isVoice || isFile) && (
                     <div className={`flex items-center gap-1 mt-0.5 ${mine ? "justify-end" : "justify-start"}`}>
                       {m.edited_at && !isDeleted && (
                         <span className={`text-[9px] ${mine ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
@@ -1222,7 +1241,7 @@ export default function ChatRoom() {
                       : "Type a message"
                 }
                 disabled={uploading}
-                className="h-10 text-sm md:text-sm bg-input border-border"
+                className="h-10 text-base md:text-base bg-input border-border"
               />
               {!pendingFile && (
                 <button
