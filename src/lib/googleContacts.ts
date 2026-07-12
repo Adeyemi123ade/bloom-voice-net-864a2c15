@@ -175,5 +175,15 @@ function extractErrorMessage(body: any): string {
   if (typeof direct === "string") return direct;
   if (typeof direct?.message === "string") return direct.message;
   if (typeof direct?.error?.message === "string") return direct.error.message;
+  // Google's raw OAuth token-endpoint error shape, forwarded as-is by
+  // google-oauth-callback on a failed exchange: { error: "invalid_client",
+  // error_description: "..." }. None of the checks above match this (the
+  // inner "error" is a string, not an object with .message), so it was
+  // silently discarded and replaced by the generic fallback below.
+  if (typeof direct?.error === "string") {
+    return direct.error_description
+      ? `${direct.error}: ${direct.error_description}`
+      : direct.error;
+  }
   return "";
 }
