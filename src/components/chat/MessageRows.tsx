@@ -46,8 +46,15 @@ export function CallRow({
     }
     start();
   };
-  const onTouchEnd = () => {
+  const onTouchEnd = (e: React.TouchEvent) => {
     cancel();
+    // Suppress the synthetic mousedown/mouseup/click the browser would
+    // otherwise fire after this touch ends — belt-and-suspenders with the
+    // touchActive guard below: even if a synthetic click still landed, it
+    // could hit a different element after the header reflows into
+    // selection mode and fire clearSelection directly, bypassing this
+    // component's own guard entirely.
+    if (e.cancelable) e.preventDefault();
     touchEndTimer.current = window.setTimeout(() => {
       touchActive.current = false;
     }, 700);
@@ -161,12 +168,19 @@ export function SwipeRow({
       try { (navigator as any).vibrate?.(15); } catch { /* ignore */ }
     }
   };
-  const onTouchEnd = () => {
+  const onTouchEnd = (e: React.TouchEvent) => {
     cancelLongPress();
     if (triggered.current && !longPressFired.current) onReply();
     setDx(0);
     startX.current = null;
     startY.current = null;
+    // Suppress the synthetic mousedown/mouseup/click the browser would
+    // otherwise fire after this touch ends — belt-and-suspenders with the
+    // touchActive guard below: even if a synthetic click still landed, it
+    // could hit a different element after the header reflows into
+    // selection mode and fire clearSelection directly, bypassing this
+    // component's own guard entirely.
+    if (e.cancelable) e.preventDefault();
     // Keep ignoring mouse events for a beat after the real touch ends —
     // the synthetic compatibility events land shortly after touchend, not
     // during it.
