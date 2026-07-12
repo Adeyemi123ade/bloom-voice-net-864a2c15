@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft, Send, Check, CheckCheck, Mic, Trash2, Pencil, X,
-  Paperclip, Copy, Forward, Phone, Video, Camera, MoreVertical, Search, Info,
+  Paperclip, Copy, Share2, Phone, Video, Camera, MoreVertical, Search, Info,
   Type, Loader2,
 } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
@@ -19,6 +19,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { isReallyOnline } from "@/lib/presence";
+import { getSignedChatMediaUrl } from "@/lib/signedMedia";
 import { clearPreparedCallMedia, formatCallMediaError, prepareCallMedia } from "@/lib/callMedia";
 import { requestIgnoreBatteryOptimizations } from "@/lib/nativeCalls";
 import {
@@ -485,10 +486,29 @@ export default function ChatRoom() {
     if (others.length) deleteForMe(others);
   };
   const copyMsg = async (m: Message) => {
-    const txt = m.content.startsWith(VOICE_PREFIX) ? m.content.slice(VOICE_PREFIX.length) : m.content;
     try {
-      await navigator.clipboard.writeText(txt);
-      toast({ title: "Copied" });
+      if (m.content.startsWith(VOICE_PREFIX)) {
+        await navigator.clipboard.writeText(m.content.slice(VOICE_PREFIX.length));
+        toast({ title: "Copied" });
+      } else if (m.content.startsWith(FILE_PREFIX)) {
+        const meta = parseFileMessage(m.content);
+        const url = meta ? await getSignedChatMediaUrl(meta.url) : null;
+        let copiedImage = false;
+        if (meta?.mime.startsWith("image/") && url && "ClipboardItem" in window) {
+          try {
+            const blob = await (await fetch(url)).blob();
+            await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
+            copiedImage = true;
+          } catch {
+            // Fall back to copying the link below.
+          }
+        }
+        if (!copiedImage) await navigator.clipboard.writeText(url ?? meta?.name ?? "");
+        toast({ title: copiedImage ? "Image copied" : "Link copied" });
+      } else {
+        await navigator.clipboard.writeText(m.content);
+        toast({ title: "Copied" });
+      }
     } catch {
       toast({ title: "Copy failed", variant: "destructive" });
     }
@@ -786,11 +806,11 @@ export default function ChatRoom() {
             )}
             {!anyCall && (
               <button
-                aria-label="Forward"
+                aria-label="Share"
                 onClick={() => shareMsgs(selectedList.filter((m) => !m.deleted_for_everyone))}
                 className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
               >
-                <Forward className="w-4 h-4 text-foreground" />
+                <Share2 className="w-4 h-4 text-foreground" />
               </button>
             )}
             {selectionCount === 1 && allMine && !isOnlyDeleted && !isUneditable && (
@@ -999,9 +1019,28 @@ export default function ChatRoom() {
                       }}
                     />
                   ) : (
-                    <p className="text-[13px] whitespace-pre-wrap break-words">{body}</p>
+                    <p className="text-base whitespace-pre-wrap break-words leading-snug">
+                      {body}
+                      <span
+                        className={`float-right inline-flex items-center gap-1 ml-2 mt-1 text-[10px] leading-none whitespace-nowrap ${
+                          mine ? "text-primary-foreground/70" : "text-muted-foreground"
+                        }`}
+                      >
+                        {m.edited_at && <span>edited</span>}
+                        <span>{formatTime(m.created_at)}</span>
+                        {mine && (
+                          m.read_at ? (
+                            <CheckCheck className="w-3 h-3 text-sky-400" />
+                          ) : m.delivered_at ? (
+                            <CheckCheck className="w-3 h-3 text-primary-foreground/70" />
+                          ) : (
+                            <Check className="w-3 h-3 text-primary-foreground/70" />
+                          )
+                        )}
+                      </span>
+                    </p>
                   )}
-                  {!bareAttachment && (
+                  {!bareAttachment && (isDeleted || isVoice || isFile) && (
                     <div className={`flex items-center gap-1 mt-0.5 ${mine ? "justify-end" : "justify-start"}`}>
                       {m.edited_at && !isDeleted && (
                         <span className={`text-[9px] ${mine ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
@@ -1202,7 +1241,7 @@ export default function ChatRoom() {
                       : "Type a message"
                 }
                 disabled={uploading}
-                className="h-9 text-xs bg-input border-border"
+                className="h-10 text-base md:text-base bg-input border-border"
               />
               {!pendingFile && (
                 <button
