@@ -2,12 +2,16 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft, Send, Check, CheckCheck, Mic, Trash2, Pencil, X,
-  Paperclip, Copy, Share2, Phone, Video, Camera, MoreVertical, Search, Info,
+  Paperclip, Copy, Share2, Phone, Video, Smile, MoreVertical, Search, Info,
   Type, Loader2,
 } from "lucide-react";
+import EmojiPicker, { Theme as EmojiTheme } from "emoji-picker-react";
+import type { EmojiClickData } from "emoji-picker-react";
+import { useTheme } from "next-themes";
 import MobileFrame from "@/components/MobileFrame";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -94,6 +98,7 @@ export default function ChatRoom() {
   const { id: conversationId } = useParams();
   const navigate = useNavigate();
   const { user, loading } = useAuth();
+  const { resolvedTheme } = useTheme();
   const [messages, setMessages] = useState<Message[]>([]);
   const [other, setOther] = useState<Profile | null>(null);
   // Lets the realtime channel's callbacks read the latest `other` without
@@ -121,7 +126,7 @@ export default function ChatRoom() {
   const recChunks = useRef<Blob[]>([]);
   const recTimer = useRef<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const cameraRef = useRef<HTMLInputElement>(null);
+  const [emojiOpen, setEmojiOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const typingTimeout = useRef<number | null>(null);
   const [pendingFile, setPendingFile] = useState<{
@@ -432,6 +437,11 @@ export default function ChatRoom() {
     typingTimeout.current = window.setTimeout(async () => {
       await supabase.from("typing_indicators").delete().eq("conversation_id", conversationId).eq("user_id", user.id);
     }, 3000);
+  };
+
+  const onEmojiClick = (data: EmojiClickData) => {
+    if (pendingFile) setText((prev) => prev + data.emoji);
+    else onType(text + data.emoji);
   };
 
   // Selection / actions
@@ -995,7 +1005,7 @@ export default function ChatRoom() {
                 >
                   {quoted && !bareAttachment && (
                     <div
-                      className={`mb-1 px-2 py-1 rounded-md border-l-2 text-xs truncate ${
+                      className={`mb-1 px-2 py-1 rounded-md border-l-2 text-xs line-clamp-4 whitespace-pre-wrap break-words ${
                         mine
                           ? "bg-primary-foreground/10 border-primary-foreground/60 text-primary-foreground/85"
                           : "bg-foreground/5 border-primary text-muted-foreground"
@@ -1206,14 +1216,6 @@ export default function ChatRoom() {
                 className="hidden"
                 onChange={onPickFile}
               />
-              <input
-                ref={cameraRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                className="hidden"
-                onChange={onPickFile}
-              />
               {!pendingFile && (
                 <button
                   onClick={() => fileRef.current?.click()}
@@ -1245,11 +1247,11 @@ export default function ChatRoom() {
               />
               {!pendingFile && (
                 <button
-                  onClick={() => cameraRef.current?.click()}
-                  aria-label="Take photo"
+                  onClick={() => setEmojiOpen(true)}
+                  aria-label="Emoji"
                   className="w-9 h-9 rounded-full hover:bg-secondary flex items-center justify-center"
                 >
-                  <Camera className="w-4 h-4 text-foreground" />
+                  <Smile className="w-4 h-4 text-foreground" />
                 </button>
               )}
               {pendingFile ? (
@@ -1359,6 +1361,23 @@ export default function ChatRoom() {
         onOpenChange={setContactInfoOpen}
         contact={other}
       />
+      <Sheet open={emojiOpen} onOpenChange={setEmojiOpen}>
+        <SheetContent
+          side="bottom"
+          className="rounded-t-3xl px-0 pt-3 pb-0 max-w-md mx-auto bg-background border-border h-[360px] overflow-hidden"
+        >
+          <div className="mx-auto h-1 w-10 rounded-full bg-muted-foreground/30 mb-2" />
+          <EmojiPicker
+            onEmojiClick={onEmojiClick}
+            theme={resolvedTheme === "dark" ? EmojiTheme.DARK : EmojiTheme.LIGHT}
+            width="100%"
+            height={330}
+            searchDisabled={false}
+            skinTonesDisabled
+            previewConfig={{ showPreview: false }}
+          />
+        </SheetContent>
+      </Sheet>
     </MobileFrame>
   );
 }
