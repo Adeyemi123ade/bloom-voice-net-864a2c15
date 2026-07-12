@@ -115,6 +115,9 @@ export default function ChatRoom() {
   const [contactInfoOpen, setContactInfoOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+  const messageRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const highlightTimer = useRef<number | null>(null);
   const [clearChatOpen, setClearChatOpen] = useState(false);
   const [callSheet, setCallSheet] = useState<"voice" | "video" | null>(null);
   const [recording, setRecording] = useState(false);
@@ -459,6 +462,21 @@ export default function ChatRoom() {
       else next.add(id);
       return next;
     });
+  };
+
+  // Jump from a search result straight to that message in the full chat —
+  // closes search (so reopening it always starts a fresh search, per how
+  // this is meant to work) and briefly highlights the target so it's easy
+  // to spot after the scroll.
+  const jumpToMessage = (id: string) => {
+    setSearchOpen(false);
+    setSearchQuery("");
+    requestAnimationFrame(() => {
+      messageRefs.current.get(id)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    setHighlightId(id);
+    if (highlightTimer.current) window.clearTimeout(highlightTimer.current);
+    highlightTimer.current = window.setTimeout(() => setHighlightId(null), 1600);
   };
 
   const startEdit = (m: Message) => {
@@ -945,22 +963,31 @@ export default function ChatRoom() {
 
             if (isCall) {
               return (
-                <CallRow
+                <div
                   key={m.id}
-                  mine={mine}
-                  isSelected={isSelected}
-                  onTap={() => {
-                    if (selectionCount > 0) toggleSelect(m.id);
+                  ref={(el) => {
+                    if (el) messageRefs.current.set(m.id, el);
+                    else messageRefs.current.delete(m.id);
                   }}
-                  onLongPress={() => toggleSelect(m.id)}
+                  className={`transition-colors rounded-2xl ${highlightId === m.id ? "bg-accent/25" : ""}`}
                 >
-                  <CallSystemBubble
-                    m={m}
+                  <CallRow
                     mine={mine}
-                    otherName={other?.display_name}
-                    onCallBack={(t) => setCallSheet(t)}
-                  />
-                </CallRow>
+                    isSelected={isSelected}
+                    onTap={() => {
+                      if (searchOpen) jumpToMessage(m.id);
+                      else if (selectionCount > 0) toggleSelect(m.id);
+                    }}
+                    onLongPress={() => toggleSelect(m.id)}
+                  >
+                    <CallSystemBubble
+                      m={m}
+                      mine={mine}
+                      otherName={other?.display_name}
+                      onCallBack={(t) => setCallSheet(t)}
+                    />
+                  </CallRow>
+                </div>
               );
             }
 
@@ -978,12 +1005,23 @@ export default function ChatRoom() {
             const bareAttachment = isFile && fileMeta && isBareAttachment(fileMeta);
 
             return (
-              <SwipeRow
+              <div
                 key={m.id}
+                ref={(el) => {
+                  if (el) messageRefs.current.set(m.id, el);
+                  else messageRefs.current.delete(m.id);
+                }}
+                className={`transition-colors rounded-2xl ${highlightId === m.id ? "bg-accent/25" : ""}`}
+              >
+              <SwipeRow
                 mine={mine}
                 onReply={() => replyMsg(m)}
                 onTap={(e) => {
                   e.stopPropagation();
+                  if (searchOpen) {
+                    jumpToMessage(m.id);
+                    return;
+                  }
                   // In selection mode, tap toggles. Otherwise tap does nothing
                   // (selection requires long-press to avoid accidental opens).
                   if (selectionCount > 0) toggleSelect(m.id);
@@ -1073,6 +1111,7 @@ export default function ChatRoom() {
                   )}
                 </div>
               </SwipeRow>
+              </div>
             );
           })}
           {otherTyping && (
