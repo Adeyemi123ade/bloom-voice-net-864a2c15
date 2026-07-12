@@ -760,12 +760,18 @@ export default function ChatRoom() {
     }
   };
 
-  const visible = useMemo(() => messages.filter((m) => !hidden.has(m.id)), [messages, hidden]);
+  // "Delete for everyone" leaves no trace on either side — no tombstone
+  // bubble, nothing to tap — so deleted messages are filtered out of the
+  // visible list entirely rather than rendered as a placeholder.
+  const visible = useMemo(
+    () => messages.filter((m) => !hidden.has(m.id) && !m.deleted_for_everyone),
+    [messages, hidden],
+  );
   const searchResults = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return visible;
     return visible.filter(
-      (m) => !m.deleted_for_everyone && m.content.toLowerCase().includes(q),
+      (m) => m.content.toLowerCase().includes(q),
     );
   }, [visible, searchQuery]);
   const clearChat = () => {
