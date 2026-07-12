@@ -79,6 +79,8 @@ export function SwipeRow({
 
   const fireLongPress = () => {
     longPressFired.current = true;
+    triggered.current = false;
+    setDx(0);
     try { (navigator as any).vibrate?.(20); } catch { /* ignore */ }
     onLongPress?.();
   };
@@ -105,6 +107,13 @@ export function SwipeRow({
     const dxRaw = e.touches[0].clientX - startX.current;
     const dyRaw = e.touches[0].clientY - startY.current;
     if (Math.abs(dxRaw) > 6 || Math.abs(dyRaw) > 6) cancelLongPress();
+    // Once long-press has already engaged (selection mode is active for
+    // this message), stop reading further finger movement as a swipe —
+    // otherwise ordinary hand tremor while holding gets misread as
+    // "swipe to reply" and firing that on release immediately clears the
+    // selection that was just made, looking like the action bar "blinks"
+    // and reverts.
+    if (longPressFired.current) return;
     if (Math.abs(dyRaw) > Math.abs(dxRaw)) return;
     if (dxRaw <= 0) {
       setDx(0);
@@ -119,7 +128,7 @@ export function SwipeRow({
   };
   const onTouchEnd = () => {
     cancelLongPress();
-    if (triggered.current) onReply();
+    if (triggered.current && !longPressFired.current) onReply();
     setDx(0);
     startX.current = null;
     startY.current = null;
