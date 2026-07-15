@@ -215,6 +215,7 @@ export default function ChatRoom() {
           // nothing and re-fetch that exact row by id rather than rendering
           // a message with no content until the user manually refreshes.
           if (!incoming.content) {
+            console.warn("[realtime] INSERT payload arrived with blank content, re-fetching", incoming.id);
             const { data } = await supabase
               .from("messages")
               .select("*")
@@ -247,6 +248,7 @@ export default function ChatRoom() {
         async (payload) => {
           let updated = normalizeMessage(payload.new as Record<string, unknown>);
           if (!updated.content) {
+            console.warn("[realtime] UPDATE payload arrived with blank content, re-fetching", updated.id);
             const { data } = await supabase
               .from("messages")
               .select("*")
