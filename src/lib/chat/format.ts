@@ -36,7 +36,13 @@ export function loadHidden(cid: string): Set<string> {
 }
 
 export function saveHidden(cid: string, set: Set<string>) {
-  localStorage.setItem(HIDE_KEY(cid), JSON.stringify(Array.from(set)));
+  try {
+    localStorage.setItem(HIDE_KEY(cid), JSON.stringify(Array.from(set)));
+  } catch {
+    // Storage can be unavailable/full (e.g. private-browsing quirks) —
+    // "Delete for me" already updated in-memory state, so the message stays
+    // hidden for this session even if it won't persist across a reload.
+  }
 }
 
 // Message content prefixes.
