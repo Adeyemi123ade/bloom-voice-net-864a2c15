@@ -5,6 +5,7 @@ import { fmtDuration } from "@/lib/chat/format";
 import { useSignedMediaUrl } from "@/lib/signedMedia";
 import { supabase } from "@/integrations/supabase/client";
 import { isVoiceTranscribeEnabled } from "@/lib/transcriptionPrefs";
+import { getPreferredLanguage } from "@/lib/languagePrefs";
 
 
 // --- Single-instance audio manager (prevents overlap & playback bugs) ---
@@ -119,7 +120,10 @@ export function VoiceBubble({ id, url, mine }: { id: string; url: string; mine: 
     try {
       const audioRes = await fetch(signedUrl);
       const blob = await audioRes.blob();
-      const { data, error } = await supabase.functions.invoke("transcribe-voice", { body: blob });
+      const { data, error } = await supabase.functions.invoke("transcribe-voice", {
+        body: blob,
+        headers: { "x-target-language": getPreferredLanguage() },
+      });
       if (error) throw error;
       const text = (data as { text?: string } | null)?.text?.trim();
       if (!text) {

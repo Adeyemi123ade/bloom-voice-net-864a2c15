@@ -71,7 +71,7 @@ the code the user types is passed straight through.
 | `twilio-voice-token` | Mints a Twilio Voice SDK token for outbound PSTN calls | `true` | `TWILIO_ACCOUNT_SID`, `TWILIO_API_KEY_SID`, `TWILIO_API_KEY_SECRET`, `TWILIO_TWIML_APP_SID` |
 | `twilio-voice-twiml` | TwiML webhook Twilio calls when placing an outbound call | `false` (hit directly by Twilio, not the app) | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`, `TWILIO_VOICE_TWIML_URL` |
 | `send-call-push` | Sends an FCM push to wake the callee's device for an incoming call | `true` | `FCM_SERVICE_ACCOUNT_JSON` |
-| `transcribe-voice` | Transcribes a recorded voice note to text (dictate instead of type) via OpenAI's transcription API | `true` | `OPENAI_API_KEY` |
+| `transcribe-voice` | Transcribes a recorded voice note to text (dictate instead of type, or the "Transcribe" button on a voice note bubble) via OpenAI's transcription API. When the caller sends `X-Target-Language` (the voice-bubble button, not the composer), also translates the transcript into that language via Anthropic's Messages API before returning it. | `true` | `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` (translation only — falls back to the untranslated transcript if missing) |
 
 ## Vault secrets (SQL / pg_cron only, not edge-function env vars)
 

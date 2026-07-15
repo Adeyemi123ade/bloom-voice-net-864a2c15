@@ -5,6 +5,7 @@ import {
   Check,
   ChevronRight,
   Contact2,
+  Globe,
   Loader2,
   Music,
   Palette,
@@ -38,6 +39,8 @@ import {
   isVoiceTranscribeEnabled,
   setVoiceTranscribeEnabled,
 } from "@/lib/transcriptionPrefs";
+import { getPreferredLanguage, setPreferredLanguage } from "@/lib/languagePrefs";
+import { LANGUAGES, languageLabel } from "@/lib/languages";
 import {
   RINGTONES,
   RingtoneId,
@@ -64,6 +67,8 @@ export default function PhoneSettings() {
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   const [voiceTranscribe, setVoiceTranscribe] = useState(() => isVoiceTranscribeEnabled());
+  const [preferredLang, setPreferredLang] = useState(() => getPreferredLanguage());
+  const [langOpen, setLangOpen] = useState(false);
 
   // Google contacts integration (moved here from Settings).
   const [googleEmail, setGoogleEmail] = useState<string | null>(null);
@@ -177,6 +182,13 @@ export default function PhoneSettings() {
   const toggleVoiceTranscribe = (v: boolean) => {
     setVoiceTranscribe(v);
     setVoiceTranscribeEnabled(v);
+  };
+
+  const chooseLang = (code: string) => {
+    setPreferredLang(code);
+    setPreferredLanguage(code);
+    setLangOpen(false);
+    toast({ title: "Language updated" });
   };
 
   const stopPreview = () => {
@@ -354,6 +366,23 @@ export default function PhoneSettings() {
             </div>
             <Switch checked={voiceTranscribe} onCheckedChange={toggleVoiceTranscribe} />
           </div>
+
+          {/* Language a translated voice-note transcript comes back in. */}
+          <button
+            onClick={() => setLangOpen(true)}
+            className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-secondary text-left"
+          >
+            <span className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center">
+              <Globe className="w-4 h-4 text-primary" />
+            </span>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-foreground">Preferred language</p>
+              <p className="text-xs text-muted-foreground truncate">
+                Voice note transcripts translate into {languageLabel(preferredLang)}
+              </p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+          </button>
         </div>
 
         {/* Theme dialog */}
@@ -383,6 +412,33 @@ export default function PhoneSettings() {
                   <Icon className="w-4 h-4 text-primary" />
                   <span className="flex-1">{label}</span>
                   {theme === value && (
+                    <Check className="w-4 h-4 text-primary" />
+                  )}
+                </button>
+              ))}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Language dialog */}
+        <Dialog open={langOpen} onOpenChange={setLangOpen}>
+          <DialogContent className="max-w-[300px] bg-card border-border">
+            <DialogHeader>
+              <DialogTitle className="text-sm">Preferred language</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-1 max-h-[60vh] overflow-y-auto pr-1">
+              {LANGUAGES.map(({ code, label }) => (
+                <button
+                  key={code}
+                  onClick={() => chooseLang(code)}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-left text-xs ${
+                    preferredLang === code
+                      ? "bg-primary/15 text-foreground"
+                      : "hover:bg-secondary text-foreground"
+                  }`}
+                >
+                  <span className="flex-1">{label}</span>
+                  {preferredLang === code && (
                     <Check className="w-4 h-4 text-primary" />
                   )}
                 </button>
