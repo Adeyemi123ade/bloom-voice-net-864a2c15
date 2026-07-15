@@ -66,6 +66,18 @@ export default function CallScreen() {
   const tickTimer = useRef<number | null>(null);
   const endedRef = useRef(false);
   const handledStatusesRef = useRef<Set<string>>(new Set());
+  // joinRoom() is triggered from two independent sources (the realtime
+  // "accepted" postgres_changes event and the 400ms status poll), both of
+  // which read the same `status === "ringing"` closure check. Because that
+  // check runs synchronously but `roomRef.current` isn't set until the
+  // `await connect(...)` below resolves, both sources can pass the guard
+  // before either finishes, opening two Twilio Video connections under the
+  // same identity. Twilio silently disconnects the *older* connection a
+  // moment after the newer one joins — which looked like the call getting
+  // cut a second or two after the callee picked up, even though the
+  // "surviving" room was otherwise healthy. Guard synchronously so only the
+  // first caller actually proceeds.
+  const joiningRef = useRef(false);
 
   const handleCallStatus = (nextStatus: string) => {
     if (nextStatus === "accepted" && status === "ringing") {
@@ -357,7 +369,8 @@ export default function CallScreen() {
   };
 
   const joinRoom = async () => {
-    if (roomRef.current) return;
+    if (roomRef.current || joiningRef.current) return;
+    joiningRef.current = true;
     setStatus("connecting");
     try {
       // On Android native, the voice audio route must be active before
@@ -418,6 +431,8 @@ export default function CallScreen() {
       const msg = formatCallMediaError(err, isVideo);
       toast({ title: "Call failed", description: msg, variant: "destructive" });
       cleanupAndExit();
+    } finally {
+      joiningRef.current = false;
     }
   };
 

@@ -55,6 +55,26 @@ import {
 // has been observed null on some rows, and every render/handler below calls
 // string methods on it directly, which throws (blanking the whole app, no
 // error boundary) the instant such a row reaches state. Normalize on the way in.
+// A single immediate re-fetch after a blank realtime payload can lose the
+// same race that produced the blank payload in the first place (the row
+// commits, the WAL/notify fires, but the REST read landing a few ms later
+// still hasn't observed it under load). One miss used to leave the bubble
+// permanently blank — content never arrives without a manual page reload,
+// which re-runs the full-history fetch instead of this one-shot retry.
+// Retry with backoff instead of a single attempt before giving up.
+const BLANK_CONTENT_RETRY_DELAYS_MS = [250, 500, 1000, 2000, 4000];
+
+async function refetchMessageUntilResolved(id: string): Promise<Record<string, unknown> | null> {
+  let last: Record<string, unknown> | null = null;
+  for (const delay of BLANK_CONTENT_RETRY_DELAYS_MS) {
+    const { data } = await supabase.from("messages").select("*").eq("id", id).maybeSingle();
+    last = (data as Record<string, unknown>) ?? null;
+    if (last && typeof last.content === "string" && last.content) return last;
+    await new Promise((resolve) => setTimeout(resolve, delay));
+  }
+  return last;
+}
+
 function normalizeMessage(raw: Record<string, unknown>): Message {
   return {
     id: String(raw.id),
@@ -216,12 +236,8 @@ export default function ChatRoom() {
           // a message with no content until the user manually refreshes.
           if (!incoming.content) {
             console.warn("[realtime] INSERT payload arrived with blank content, re-fetching", incoming.id);
-            const { data } = await supabase
-              .from("messages")
-              .select("*")
-              .eq("id", incoming.id)
-              .maybeSingle();
-            if (data) incoming = normalizeMessage(data as Record<string, unknown>);
+            const data = await refetchMessageUntilResolved(incoming.id);
+            if (data) incoming = normalizeMessage(data);
           }
           setMessages((prev) => {
             // Replace matching optimistic message (same sender + content, temp id starts with "tmp-")
@@ -249,12 +265,8 @@ export default function ChatRoom() {
           let updated = normalizeMessage(payload.new as Record<string, unknown>);
           if (!updated.content) {
             console.warn("[realtime] UPDATE payload arrived with blank content, re-fetching", updated.id);
-            const { data } = await supabase
-              .from("messages")
-              .select("*")
-              .eq("id", updated.id)
-              .maybeSingle();
-            if (data) updated = normalizeMessage(data as Record<string, unknown>);
+            const data = await refetchMessageUntilResolved(updated.id);
+            if (data) updated = normalizeMessage(data);
             else return;
           }
           setMessages((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
