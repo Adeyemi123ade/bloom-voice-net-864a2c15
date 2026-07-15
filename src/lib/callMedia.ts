@@ -1,4 +1,5 @@
 import { LocalAudioTrack, LocalVideoTrack } from "twilio-video";
+import { isLikelyInAppBrowser } from "@/lib/micPermission";
 
 type PreparedCallMedia = {
   stream: MediaStream;
@@ -63,6 +64,9 @@ export function formatCallMediaError(error: unknown, isVideo: boolean) {
     : "";
 
   if (name === "NotAllowedError") {
+    if (isLikelyInAppBrowser()) {
+      return "This link is open inside an app's built-in browser, which blocks microphone/camera access. Tap the menu (••• or ⋮) and choose \"Open in Chrome\" or \"Open in Safari\", then try again.";
+    }
     return isVideo
       ? "Microphone or camera access was blocked. Allow it and try again."
       : "Microphone access was blocked. Allow it and try again.";

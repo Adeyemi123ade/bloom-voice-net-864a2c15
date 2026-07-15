@@ -23,6 +23,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { isReallyOnline } from "@/lib/presence";
 import { getSignedChatMediaUrl } from "@/lib/signedMedia";
+import { pickRecordingMimeType, extensionForMimeType } from "@/lib/audioMime";
+import { checkMicPrerequisites, describeMicError } from "@/lib/micPermission";
+import { isVoiceTranscribeEnabled } from "@/lib/transcriptionPrefs";
 import { clearPreparedCallMedia, formatCallMediaError, prepareCallMedia } from "@/lib/callMedia";
 import { requestIgnoreBatteryOptimizations } from "@/lib/nativeCalls";
 import {
@@ -127,6 +130,7 @@ export default function ChatRoom() {
   const recStreamRef = useRef<MediaStream | null>(null);
   const recChunks = useRef<Blob[]>([]);
   const recTimer = useRef<number | null>(null);
+  const recMimeTypeRef = useRef<string>("audio/webm");
   const fileRef = useRef<HTMLInputElement>(null);
   const composerInputRef = useRef<HTMLInputElement>(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
@@ -581,9 +585,16 @@ export default function ChatRoom() {
 
   // Voice notes
   const startRecording = async () => {
+    const prereqError = checkMicPrerequisites();
+    if (prereqError) {
+      toast({ title: "Can't record voice", description: prereqError, variant: "destructive" });
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const rec = new MediaRecorder(stream);
+      const mimeType = pickRecordingMimeType();
+      const rec = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      recMimeTypeRef.current = rec.mimeType || mimeType || "audio/webm";
       recChunks.current = [];
       rec.ondataavailable = (e) => e.data.size > 0 && recChunks.current.push(e.data);
       // onstop is (re)assigned by stopRecording right before it's called, based
@@ -595,8 +606,9 @@ export default function ChatRoom() {
       setRecording(true);
       setRecSec(0);
       recTimer.current = window.setInterval(() => setRecSec((s) => s + 1), 1000);
-    } catch (e: any) {
-      toast({ title: "Microphone blocked", description: e.message, variant: "destructive" });
+    } catch (e) {
+      const { title, description } = describeMicError(e);
+      toast({ title, description, variant: "destructive" });
     }
   };
   const stopRecording = (mode: "send" | "cancel" | "transcribe" = "send") => {
@@ -606,7 +618,7 @@ export default function ChatRoom() {
       r.stream.getTracks().forEach((t) => t.stop());
       recStreamRef.current = null;
       if (recTimer.current) window.clearInterval(recTimer.current);
-      const blob = new Blob(recChunks.current, { type: "audio/webm" });
+      const blob = new Blob(recChunks.current, { type: recMimeTypeRef.current });
       setRecSec(0);
       if (mode === "send") await uploadVoice(blob);
       else if (mode === "transcribe") await transcribeAndFill(blob);
@@ -615,7 +627,7 @@ export default function ChatRoom() {
     setRecording(false);
   };
   const transcribeAndFill = async (blob: Blob) => {
-    if (blob.size === 0) return;
+    if (blob.size === 0 || !isVoiceTranscribeEnabled()) return;
     setTranscribing(true);
     try {
       const { data, error } = await supabase.functions.invoke("transcribe-voice", { body: blob });
@@ -661,10 +673,11 @@ export default function ChatRoom() {
     };
     setMessages((prev) => [...prev, optimistic]);
 
-    const path = `${user.id}/${conversationId}/${Date.now()}.webm`;
+    const ext = extensionForMimeType(blob.type);
+    const path = `${user.id}/${conversationId}/${Date.now()}.${ext}`;
     const { error: upErr } = await supabase.storage
       .from("chat-media")
-      .upload(path, blob, { contentType: "audio/webm" });
+      .upload(path, blob, { contentType: blob.type || "audio/webm" });
     if (upErr) {
       setMessages((prev) => prev.filter((m) => m.id !== tmpId));
       URL.revokeObjectURL(localUrl);
@@ -1245,14 +1258,16 @@ export default function ChatRoom() {
                 <span className="text-xs text-foreground shrink-0 tabular-nums">{fmtDuration(recSec)}</span>
                 <VoiceRecorderBar stream={recStreamRef.current} />
               </div>
-              <button
-                onClick={() => stopRecording("transcribe")}
-                aria-label="Convert to text"
-                title="Convert to text"
-                className="w-9 h-9 rounded-full bg-secondary hover:bg-secondary/80 flex items-center justify-center"
-              >
-                <Type className="w-4 h-4 text-foreground" />
-              </button>
+              {isVoiceTranscribeEnabled() && (
+                <button
+                  onClick={() => stopRecording("transcribe")}
+                  aria-label="Convert to text"
+                  title="Convert to text"
+                  className="w-9 h-9 rounded-full bg-secondary hover:bg-secondary/80 flex items-center justify-center"
+                >
+                  <Type className="w-4 h-4 text-foreground" />
+                </button>
+              )}
               <button
                 onClick={() => stopRecording("send")}
                 aria-label="Send voice note"

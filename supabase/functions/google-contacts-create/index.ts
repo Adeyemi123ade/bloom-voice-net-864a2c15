@@ -74,10 +74,14 @@ Deno.serve(async (req) => {
       }),
     });
     const data = await res.json();
-    if (!res.ok) return json({ error: data }, res.status);
+    if (!res.ok) {
+      console.error("google-contacts-create: createContact failed", { status: res.status, response: data });
+      return json({ error: data }, res.status);
+    }
 
     return json({ ok: true, resourceName: data.resourceName });
   } catch (e) {
+    console.error("google-contacts-create: unhandled error", e);
     return json({ error: String(e) }, 500);
   }
 });
