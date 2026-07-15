@@ -35,6 +35,59 @@ Last updated: 2026-07-15.
 
 ## Recently shipped (this session), newest first
 
+- **#30** Root-caused two separate long-standing complaints instead of
+  patching their symptoms:
+  - **Voice notes deliver as an empty placeholder bubble; Delete/Copy/
+    Forward silently no-op on them.** Traced the full send→delivery
+    pipeline (recording → storage upload → `messages` insert → realtime
+    broadcast → receiver render). The sender-side optimistic message was
+    only ever reconciled with its real DB row by matching `sender_id` +
+    exact `content` string against the realtime INSERT echo — if that echo
+    ever arrived with blank `content` (a known, previously-observed
+    replication/read-consistency race — see #28) the match silently failed,
+    leaving the message stuck forever under its temporary `tmp-...` id.
+    Every action on it (delete-for-everyone, etc.) issues a DB write scoped
+    to that id, which matches zero rows and no-ops without erroring —
+    exactly the "looks broken, does nothing" behavior reported. Fixed by no
+    longer depending on the echo at all for reconciling *our own* sends:
+    `send()`/`uploadVoice()`/`sendPending()` now capture the real row id
+    directly from the `insert().select("id")` response and adopt it into
+    local state (and selection state) immediately, synchronously, before
+    the realtime event can even arrive. Also hardened the receiver-side
+    self-heal from #28 (which re-fetches a message that arrives with blank
+    `content`) to retry with backoff instead of a single attempt, since a
+    single re-fetch can itself lose the same race. Added `[msg-send]` /
+    `[voice-send]` / `[realtime]` console diagnostics through the pipeline.
+  - **Google Contacts sync "not functioning."** Two real bugs in
+    `google-contacts-sync`: (1) if the OAuth access-token refresh failed for
+    *any* reason other than `invalid_grant` (network blip, `invalid_client`
+    from a Cloud Console misconfiguration, etc.), the code silently fell
+    through and called the People API with the known-stale token anyway —
+    the resulting 401 wasn't distinguished from "this account genuinely has
+    zero contacts," so a broken token connection and an empty address book
+    looked identical to the user. (2) Same class of gap if the People API
+    rejected the token mid-sync (e.g. user revoked access from their Google
+    Account). Both now return `reconnectRequired: true` with a clear message
+    instead of masquerading as "no contacts found." Also found and fixed a
+    redirect_uri inconsistency in `google-oauth-callback`: the client picks
+    between the bare and `www.` domain based on `window.location.origin`,
+    but the server unconditionally collapsed every non-localhost redirect to
+    the bare domain, so a user starting the connect flow from
+    `www.chichatapp.com` had Google's authorization request built with the
+    wrong domain — the callback landing page then depended on a
+    platform-level cross-domain redirect preserving `?code=&state=` to still
+    work. Server now echoes back the client's asserted redirect_uri when
+    it's one of the two known-good production URIs, removing that
+    dependency. **Still open and NOT fixable from this codebase:** if
+    Contacts sync fails even after these fixes, the most likely remaining
+    cause is Google Cloud Console OAuth consent screen configuration — the
+    `contacts` scope is a sensitive/restricted scope that requires either
+    app verification or the user's Google account being added as a test
+    user, and `directory.readonly` additionally requires a Workspace admin
+    grant for non-personal accounts. This sandbox cannot reach Google's
+    OAuth endpoints or the live Supabase project to verify live behavior end
+    to end — see "Useful technique notes" below for why, and re-verify with
+    the user on real hardware.
 - **#29** Re-audited the long-standing "delete/forward/copy don't work on
   mobile web" complaint after user re-reported it despite #18-22 having been
   confirmed fixed on real hardware. Found the actual remaining root cause by
@@ -137,10 +190,17 @@ Last updated: 2026-07-15.
   from the sign-in flow fixed in #22) — this was originally documented
   against `google-contacts-sync`/`google-oauth-callback`
   (`GOOGLE_OAUTH_CLIENT_ID`/`SECRET`, its own Google Cloud OAuth client,
-  separate from Lovable's broker). #22 did not touch this path. Still
-  unverified whether it's still broken — worth explicitly re-testing
-  Contacts sync specifically (not just sign-in) next time it comes up,
-  since #22 may or may not have been the same underlying issue.
+  separate from Lovable's broker). #22 did not touch this path. #30 fixed
+  two real code bugs here (silent-fallthrough on token refresh failure
+  masquerading as "no contacts"; redirect_uri not matching the domain the
+  user actually started from) but could not verify live behavior end to
+  end (no network access to Google's OAuth endpoints or the live Supabase
+  project from this sandbox — see "Useful technique notes"). If sync still
+  fails after #30, the next thing to check is the Google Cloud Console
+  OAuth consent screen: whether the app is verified for the `contacts`
+  scope, or the testing user's Google account is on the test-users list —
+  that's outside this codebase and needs the user's Google Cloud project
+  access to confirm.
 - **Backend consolidation** (`.lovable/plan.md`) — still just a
   proposal, never executed. `src/integrations/supabase/client.ts` is
   still hard-pinned to the old Supabase project (`pnpabtxvsrkrldpfmtaz`),

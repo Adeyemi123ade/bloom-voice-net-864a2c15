@@ -57,6 +57,14 @@ Deno.serve(async (req) => {
           access_token: t.access_token,
           expires_at: new Date(Date.now() + (t.expires_in ?? 3600) * 1000).toISOString(),
         }).eq("user_id", userId);
+      } else {
+        console.error("google-contacts-create: token refresh failed", { userId, error: t });
+        return json({
+          error: t.error === "invalid_grant"
+            ? "Google session expired. Please reconnect Google Contacts."
+            : "Could not refresh your Google session. Please reconnect Google Contacts.",
+          reconnectRequired: true,
+        }, 401);
       }
     }
 
