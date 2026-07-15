@@ -4,7 +4,7 @@ Running log of what's been done and what's still open, so a new chat
 session (or another person) can pick up here without re-deriving context.
 Update this file instead of relying on chat history carrying over.
 
-Last updated: 2026-07-12.
+Last updated: 2026-07-15.
 
 ## App identity
 
@@ -35,6 +35,48 @@ Last updated: 2026-07-12.
 
 ## Recently shipped (this session), newest first
 
+- **#29** Re-audited the long-standing "delete/forward/copy don't work on
+  mobile web" complaint after user re-reported it despite #18-22 having been
+  confirmed fixed on real hardware. Found the actual remaining root cause by
+  reproducing real Chrome touch→mouse-event synthesis via CDP
+  (`Input.dispatchTouchEvent`, following the technique note below): `SwipeRow`
+  and `CallRow`'s `onTouchEnd` called `e.preventDefault()` **unconditionally**
+  on every touch, not just after a long-press. Confirmed empirically that
+  this fully suppresses the browser's synthetic `click` for a **plain tap
+  too**, not just the ghost click after a long-press — meaning `onTap`
+  (tap-to-add-a-message-to-an-active-selection, tap-a-search-result-to-jump)
+  had **no way to ever fire from a real touchscreen**, only from an actual
+  mouse. This is exactly why it worked on desktop (real clicks) and not on
+  Android web (touch never produces one). Long-press-to-select-the-first-
+  message still worked fine since it doesn't depend on click at all — so a
+  single-message copy/delete could look like it "sort of" works while
+  multi-select and search-jump were dead. Fix: only call `preventDefault()`
+  when this touch actually fired the long-press or completed the
+  swipe-to-reply; a plain tap now lets its click through normally.
+  Also fixed while auditing the same area:
+  - `copyMsg`'s image-copy path awaited the signed-URL fetch *before*
+    calling `navigator.clipboard.write()`, which can lose the click's
+    "transient activation" on the slower/higher-latency mobile network path
+    (stricter browsers require clipboard-write to happen inside that
+    window). Now passes a pending `Promise<Blob>` into `ClipboardItem`
+    instead, so `clipboard.write()` itself is invoked synchronously.
+  - `shareMsgs`'s catch block silently swallowed every error, including
+    real ones (only `AbortError` — user closed the share sheet — should be
+    silent); it now surfaces a toast for anything else.
+  - `AttachmentBubble`'s full-screen `ImageViewer` had its own, never-fixed
+    copy of the exact #18-22 "long-press menu instantly closes" bug: its
+    backdrop's `onClick={() => setMenuOpen(false)}` had no guard against the
+    ghost click landing on it right after the long-press that just opened
+    the menu. Applied the same proven fix (time-guard the close action, not
+    the event).
+  - `saveHidden` (delete-for-me persistence) now catches `localStorage`
+    write failures for symmetry with `loadHidden`, instead of throwing
+    uncaught out of `deleteForMe`.
+  Note: PR #28 (voice playback/blank-incoming-message) was *also* already
+  merged to `main` before this session started — if those symptoms are
+  still being seen, that's either a stale/undeployed build or a genuinely
+  different recurrence worth re-diagnosing fresh rather than assuming #28's
+  fix didn't work.
 - **#22** Bundle of four fixes, all confirmed live and working by the
   user on a real Android device before merge:
   - Long-press "blink and disappear" (Copy/Share/Delete bar appearing

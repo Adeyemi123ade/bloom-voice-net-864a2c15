@@ -266,6 +266,16 @@ function ImageViewer({
   const [menuOpen, setMenuOpen] = useState(false);
   const longPressTimer = useRef<number | null>(null);
   const longPressed = useRef(false);
+  // Same "blink and revert" bug the chat list's long-press select fought
+  // through #18-22: a mobile browser's synthetic ghost click that follows
+  // the real touchend can land on the full-screen backdrop below and
+  // instantly close the menu the long-press just opened. Guard the close
+  // action itself (proven fix from that saga) instead of chasing the event.
+  const menuGuardUntil = useRef(0);
+  const closeMenu = () => {
+    if (Date.now() < menuGuardUntil.current) return;
+    setMenuOpen(false);
+  };
 
   useEffect(() => {
     window.history.pushState({ chichatImageViewer: true }, "");
@@ -305,6 +315,7 @@ function ImageViewer({
     if (longPressTimer.current) window.clearTimeout(longPressTimer.current);
     longPressTimer.current = window.setTimeout(() => {
       longPressed.current = true;
+      menuGuardUntil.current = Date.now() + 500;
       setMenuOpen(true);
       try {
         (navigator as { vibrate?: (p: number | number[]) => boolean }).vibrate?.(20);
@@ -356,6 +367,7 @@ function ImageViewer({
             onMouseLeave={cancelLongPress}
             onContextMenu={(e) => {
               e.preventDefault();
+              menuGuardUntil.current = Date.now() + 500;
               setMenuOpen(true);
             }}
           />
@@ -383,7 +395,7 @@ function ImageViewer({
         <>
           <div
             className="absolute inset-0 bg-black/20"
-            onClick={() => setMenuOpen(false)}
+            onClick={closeMenu}
           />
           <div className="absolute left-1/2 -translate-x-1/2 bottom-8 w-[260px] rounded-xl bg-background border border-border shadow-xl overflow-hidden">
             <button

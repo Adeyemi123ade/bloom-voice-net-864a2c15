@@ -562,18 +562,32 @@ export default function ChatRoom() {
         toast({ title: "Copied" });
       } else if (m.content.startsWith(FILE_PREFIX)) {
         const meta = parseFileMessage(m.content);
-        const url = meta ? await getSignedChatMediaUrl(meta.url) : null;
         let copiedImage = false;
-        if (meta?.mime.startsWith("image/") && url && "ClipboardItem" in window) {
+        if (meta?.mime.startsWith("image/") && "ClipboardItem" in window) {
           try {
-            const blob = await (await fetch(url)).blob();
-            await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
+            // Pass a pending Blob promise, not an already-resolved one, so
+            // navigator.clipboard.write() itself is invoked synchronously
+            // within this click handler. Browsers (Chrome/Android especially)
+            // only allow clipboard-write inside the original tap's transient
+            // activation window — awaiting the signed-URL fetch *before*
+            // calling write() let that window lapse on the slower/higher-
+            // latency mobile network path, which is why image copy worked
+            // reliably on desktop but silently failed (or no-oped) on mobile.
+            const blobPromise = getSignedChatMediaUrl(meta.url).then((u) =>
+              fetch(u).then((res) => res.blob()),
+            );
+            await navigator.clipboard.write([
+              new ClipboardItem({ [meta.mime]: blobPromise as unknown as Promise<Blob> }),
+            ]);
             copiedImage = true;
           } catch {
             // Fall back to copying the link below.
           }
         }
-        if (!copiedImage) await navigator.clipboard.writeText(url ?? meta?.name ?? "");
+        if (!copiedImage) {
+          const url = meta ? await getSignedChatMediaUrl(meta.url) : null;
+          await navigator.clipboard.writeText(url ?? meta?.name ?? "");
+        }
         toast({ title: copiedImage ? "Image copied" : "Link copied" });
       } else {
         await navigator.clipboard.writeText(m.content);
@@ -597,7 +611,16 @@ export default function ChatRoom() {
         await navigator.clipboard.writeText(txt);
         toast({ title: "Copied to clipboard (share unavailable)" });
       }
-    } catch {}
+    } catch (e) {
+      // AbortError just means the user closed the native share sheet without
+      // picking anything — not a failure worth surfacing. Everything else
+      // (e.g. a stricter mobile browser rejecting the call) was previously
+      // swallowed by an empty catch, which looked exactly like the Share
+      // button silently doing nothing on mobile.
+      if (e instanceof Error && e.name !== "AbortError") {
+        toast({ title: "Share failed", description: e.message, variant: "destructive" });
+      }
+    }
     clearSelection();
   };
   const replyMsg = (m: Message) => {

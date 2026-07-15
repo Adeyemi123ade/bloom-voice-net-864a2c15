@@ -48,13 +48,15 @@ export function CallRow({
   };
   const onTouchEnd = (e: React.TouchEvent) => {
     cancel();
-    // Suppress the synthetic mousedown/mouseup/click the browser would
-    // otherwise fire after this touch ends — belt-and-suspenders with the
-    // touchActive guard below: even if a synthetic click still landed, it
-    // could hit a different element after the header reflows into
-    // selection mode and fire clearSelection directly, bypassing this
-    // component's own guard entirely.
-    if (e.cancelable) e.preventDefault();
+    // Only swallow the browser's synthetic mousedown/mouseup/click when this
+    // touch actually fired the long-press — preventDefault() on touchend
+    // suppresses the click for a PLAIN tap too (confirmed via CDP touch
+    // dispatch: no click event follows), and onTap (tap-to-add-to-selection,
+    // tap-to-jump-in-search) has no other way to fire on a real touchscreen.
+    // Doing this unconditionally was silently killing that on every mobile
+    // browser while working fine on desktop, where clicks aren't synthesized
+    // from touch at all.
+    if (fired.current && e.cancelable) e.preventDefault();
     touchEndTimer.current = window.setTimeout(() => {
       touchActive.current = false;
     }, 700);
@@ -170,17 +172,21 @@ export function SwipeRow({
   };
   const onTouchEnd = (e: React.TouchEvent) => {
     cancelLongPress();
-    if (triggered.current && !longPressFired.current) onReply();
+    const wasSwipeReply = triggered.current && !longPressFired.current;
+    if (wasSwipeReply) onReply();
     setDx(0);
     startX.current = null;
     startY.current = null;
-    // Suppress the synthetic mousedown/mouseup/click the browser would
-    // otherwise fire after this touch ends — belt-and-suspenders with the
-    // touchActive guard below: even if a synthetic click still landed, it
-    // could hit a different element after the header reflows into
-    // selection mode and fire clearSelection directly, bypassing this
-    // component's own guard entirely.
-    if (e.cancelable) e.preventDefault();
+    // Only swallow the browser's synthetic mousedown/mouseup/click when this
+    // touch already did something itself (fired the long-press, or
+    // completed a swipe-to-reply) — preventDefault() on touchend suppresses
+    // the click for a PLAIN tap too (confirmed via CDP touch dispatch: no
+    // click event follows), and onTap (tap-to-add-to-selection,
+    // tap-to-jump-in-search) has no other way to fire on a real touchscreen.
+    // Doing this unconditionally was silently killing that on every mobile
+    // browser while working fine on desktop, where clicks aren't synthesized
+    // from touch at all.
+    if ((longPressFired.current || wasSwipeReply) && e.cancelable) e.preventDefault();
     // Keep ignoring mouse events for a beat after the real touch ends —
     // the synthetic compatibility events land shortly after touchend, not
     // during it.
