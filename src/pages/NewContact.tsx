@@ -4,7 +4,11 @@ import { ArrowLeft, Camera, User } from "lucide-react";
 import { addManualContact } from "@/lib/deviceContacts";
 import { saveDeviceContact } from "@/lib/saveDeviceContact";
 import { toast } from "@/hooks/use-toast";
-import { syncGoogleContacts, startGoogleContactsConnect } from "@/lib/googleContacts";
+import {
+  syncGoogleContacts,
+  startGoogleContactsConnect,
+  normalizeGoogleContactsError,
+} from "@/lib/googleContacts";
 import { supabase } from "@/integrations/supabase/client";
 import MobileFrame from "@/components/MobileFrame";
 import CountryPicker from "@/components/CountryPicker";
@@ -172,7 +176,7 @@ export default function NewContact() {
       const { error } = await supabase.functions.invoke("google-contacts-create", {
         body: { name: v.name, phone: v.e164 },
       });
-      if (error) throw error;
+      if (error) throw await normalizeGoogleContactsError(error);
       addManualContact(v.name, v.e164, avatar);
       await syncGoogleContacts().catch(() => null);
       toast({ title: "Saved to Google Contacts" });

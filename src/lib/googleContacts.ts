@@ -150,7 +150,7 @@ export async function isGoogleConnected(): Promise<boolean> {
   return !!data;
 }
 
-async function normalizeGoogleContactsError(error: unknown): Promise<Error> {
+export async function normalizeGoogleContactsError(error: unknown): Promise<Error> {
   const context = (error as { context?: Response })?.context;
   if (context) {
     try {

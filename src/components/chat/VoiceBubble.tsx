@@ -114,7 +114,7 @@ export function VoiceBubble({ id, url, mine }: { id: string; url: string; mine: 
       setShowTranscript((v) => !v);
       return;
     }
-    if (!signedUrl) return;
+    if (!signedUrl || !isVoiceTranscribeEnabled()) return;
     setTranscribing(true);
     try {
       const audioRes = await fetch(signedUrl);
