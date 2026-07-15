@@ -28,3 +28,16 @@ export function extensionForMimeType(mimeType: string): string {
   if (mimeType.includes("ogg")) return "ogg";
   return "webm";
 }
+
+/**
+ * Strip codec parameters (e.g. ";codecs=opus") down to the bare MIME type.
+ * MediaRecorder needs the full string (the codec parameter is how you ask
+ * for opus specifically), but that same string must never be what gets
+ * stored as the file's declared type — some storage/CDN layers and audio
+ * decoders don't handle a parameterized Content-Type the same way they
+ * handle a bare one, and there's no upside to keeping it once recording
+ * has already happened: the codec is baked into the bytes either way.
+ */
+export function baseMimeType(mimeType: string): string {
+  return mimeType.split(";")[0].trim();
+}

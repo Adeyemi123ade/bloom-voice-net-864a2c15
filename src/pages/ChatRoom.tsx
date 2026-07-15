@@ -23,7 +23,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { isReallyOnline } from "@/lib/presence";
 import { getSignedChatMediaUrl } from "@/lib/signedMedia";
-import { pickRecordingMimeType, extensionForMimeType } from "@/lib/audioMime";
+import { pickRecordingMimeType, extensionForMimeType, baseMimeType } from "@/lib/audioMime";
 import { checkMicPrerequisites, describeMicError } from "@/lib/micPermission";
 import { isVoiceTranscribeEnabled } from "@/lib/transcriptionPrefs";
 import { clearPreparedCallMedia, formatCallMediaError, prepareCallMedia } from "@/lib/callMedia";
@@ -208,8 +208,20 @@ export default function ChatRoom() {
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "messages", filter: `conversation_id=eq.${conversationId}` },
-        (payload) => {
-          const incoming = normalizeMessage(payload.new as Record<string, unknown>);
+        async (payload) => {
+          let incoming = normalizeMessage(payload.new as Record<string, unknown>);
+          // A realtime INSERT payload should always carry the real content —
+          // but if one ever arrives blank (a dropped/partial event), trust
+          // nothing and re-fetch that exact row by id rather than rendering
+          // a message with no content until the user manually refreshes.
+          if (!incoming.content) {
+            const { data } = await supabase
+              .from("messages")
+              .select("*")
+              .eq("id", incoming.id)
+              .maybeSingle();
+            if (data) incoming = normalizeMessage(data as Record<string, unknown>);
+          }
           setMessages((prev) => {
             // Replace matching optimistic message (same sender + content, temp id starts with "tmp-")
             const idx = prev.findIndex(
@@ -232,8 +244,17 @@ export default function ChatRoom() {
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "messages", filter: `conversation_id=eq.${conversationId}` },
-        (payload) => {
-          const updated = normalizeMessage(payload.new as Record<string, unknown>);
+        async (payload) => {
+          let updated = normalizeMessage(payload.new as Record<string, unknown>);
+          if (!updated.content) {
+            const { data } = await supabase
+              .from("messages")
+              .select("*")
+              .eq("id", updated.id)
+              .maybeSingle();
+            if (data) updated = normalizeMessage(data as Record<string, unknown>);
+            else return;
+          }
           setMessages((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
         },
       )
@@ -594,7 +615,10 @@ export default function ChatRoom() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mimeType = pickRecordingMimeType();
       const rec = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-      recMimeTypeRef.current = rec.mimeType || mimeType || "audio/webm";
+      // Store the bare type (no ";codecs=..." parameter) — that parameter is
+      // only meaningful to MediaRecorder for picking a codec, not to the
+      // Blob that gets uploaded and later played back/transcribed.
+      recMimeTypeRef.current = baseMimeType(rec.mimeType || mimeType || "audio/webm");
       recChunks.current = [];
       rec.ondataavailable = (e) => e.data.size > 0 && recChunks.current.push(e.data);
       // onstop is (re)assigned by stopRecording right before it's called, based
