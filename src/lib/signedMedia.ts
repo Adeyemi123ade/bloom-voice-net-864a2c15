@@ -74,6 +74,10 @@ export function useSignedMediaUrl(originalUrl: string | undefined | null): strin
     let timer: number | null = null;
 
     const refresh = async () => {
+      if (timer) {
+        window.clearTimeout(timer);
+        timer = null;
+      }
       const resolved = await getSignedChatMediaUrl(originalUrl);
       if (cancelled) return;
       setUrl(resolved);
@@ -89,9 +93,20 @@ export function useSignedMediaUrl(originalUrl: string | undefined | null): strin
     };
     refresh();
 
+    // Mobile browsers throttle/suspend setTimeout in backgrounded tabs, so
+    // the scheduled refresh above can miss its window while the app is
+    // switched away from — common on mobile, rare on desktop. Re-check as
+    // soon as the tab is visible again instead of waiting for a timer that
+    // may have been delayed past actual expiry.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
     return () => {
       cancelled = true;
       if (timer) window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [originalUrl]);
 

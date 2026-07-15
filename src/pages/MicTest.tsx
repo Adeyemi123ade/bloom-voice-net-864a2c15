@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Mic, MicOff, Play, Square, ArrowLeft, Volume2 } from "lucide-react";
+import { checkMicPrerequisites, describeMicError } from "@/lib/micPermission";
 
 export default function MicTest() {
   const navigate = useNavigate();
@@ -33,6 +34,11 @@ export default function MicTest() {
   // Start microphone and visualiser
   const startMic = async () => {
     setError(null);
+    const prereqError = checkMicPrerequisites();
+    if (prereqError) {
+      setError(prereqError);
+      return;
+    }
     try {
       const s = await navigator.mediaDevices.getUserMedia({ audio: true });
       setStream(s);
@@ -54,16 +60,11 @@ export default function MicTest() {
         animationRef.current = requestAnimationFrame(updateVolume);
       };
       updateVolume();
-    } catch (err: any) {
-      if (err.name === "NotAllowedError") {
-        setError("Microphone permission denied. Please allow mic access in your browser settings.");
+    } catch (err) {
+      const { description } = describeMicError(err);
+      setError(description);
+      if (err instanceof DOMException && err.name === "NotAllowedError") {
         setPermissionState("denied");
-      } else if (err.name === "NotFoundError") {
-        setError("No microphone found on this device.");
-      } else if (err.name === "NotReadableError") {
-        setError("Microphone is busy in another app. Close the other app and try again.");
-      } else {
-        setError(err.message || "Could not access microphone.");
       }
     }
   };

@@ -24,6 +24,7 @@ import { toast } from "@/hooks/use-toast";
 import { isReallyOnline } from "@/lib/presence";
 import { getSignedChatMediaUrl } from "@/lib/signedMedia";
 import { pickRecordingMimeType, extensionForMimeType } from "@/lib/audioMime";
+import { checkMicPrerequisites, describeMicError } from "@/lib/micPermission";
 import { isVoiceTranscribeEnabled } from "@/lib/transcriptionPrefs";
 import { clearPreparedCallMedia, formatCallMediaError, prepareCallMedia } from "@/lib/callMedia";
 import { requestIgnoreBatteryOptimizations } from "@/lib/nativeCalls";
@@ -584,6 +585,11 @@ export default function ChatRoom() {
 
   // Voice notes
   const startRecording = async () => {
+    const prereqError = checkMicPrerequisites();
+    if (prereqError) {
+      toast({ title: "Can't record voice", description: prereqError, variant: "destructive" });
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mimeType = pickRecordingMimeType();
@@ -600,8 +606,9 @@ export default function ChatRoom() {
       setRecording(true);
       setRecSec(0);
       recTimer.current = window.setInterval(() => setRecSec((s) => s + 1), 1000);
-    } catch (e: any) {
-      toast({ title: "Microphone blocked", description: e.message, variant: "destructive" });
+    } catch (e) {
+      const { title, description } = describeMicError(e);
+      toast({ title, description, variant: "destructive" });
     }
   };
   const stopRecording = (mode: "send" | "cancel" | "transcribe" = "send") => {
