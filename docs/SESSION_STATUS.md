@@ -35,6 +35,25 @@ Last updated: 2026-07-15.
 
 ## Recently shipped (this session), newest first
 
+- **#31 (same PR as #30, folded in mid-session)** Voice and video calls
+  disconnecting the instant the callee answers, saying "room completed."
+  Root cause: `twilio-room`'s room creation set `EmptyRoomTimeout` /
+  `UnusedRoomTimeout` to 1 minute — in place since May 1, not a new
+  regression. The room's expiry clock starts the moment it's created,
+  which happens *before* the callee even receives the incoming-call push
+  (`startCall` in `ChatRoom.tsx`: create room → insert `calls` row → fire
+  `send-call-push`, in that order). The caller's own ring timeout is 45s,
+  leaving only ~15s of slack on top of that for FCM delivery + Android
+  wake-up + the callee actually tapping Accept — any real-world push delay
+  (cold start, Doze mode, flaky network) blew through that margin, so
+  Twilio had already auto-completed the room by the time the callee's
+  client tried to join. Affects voice and video identically since both are
+  audio/video Twilio *Video* rooms here, not real telephony — same room
+  creation path. Fixed by bumping both timeouts to 5 minutes; normal call
+  teardown already explicitly closes the room via `completeRoom()`, so the
+  wider margin only matters for a crashed/disconnected client. **Not yet
+  confirmed live** — found and fixed from a live user report mid-session,
+  but this sandbox cannot place a real Twilio call to verify end to end.
 - **#30** Root-caused two separate long-standing complaints instead of
   patching their symptoms:
   - **Voice notes deliver as an empty placeholder bubble; Delete/Copy/
