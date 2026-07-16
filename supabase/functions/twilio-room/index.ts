@@ -82,13 +82,28 @@ Deno.serve(async (req) => {
     const auth = basicAuth(API_KEY_SID, API_KEY_SECRET);
 
     if (action === "create") {
-      // Twilio minimum for both timeouts is 1 minute. Use it to kill ghost rooms fast.
+      // This room is created and its timeout clock starts BEFORE the callee
+      // even receives the "incoming call" push, let alone answers it — the
+      // client (ChatRoom.tsx startCall) creates the room, then inserts the
+      // `calls` row, then fires send-call-push, in that order. The caller's
+      // own ring timeout (CallScreen.tsx) already gives the callee 45s to
+      // answer. A 1-minute UnusedRoomTimeout left only ~15s of slack on top
+      // of that for FCM delivery + Android wake-up + the callee actually
+      // tapping Accept — any real-world push delay (cold start, Doze mode,
+      // flaky network) blew straight through it, so Twilio had already
+      // auto-completed the room by the time the callee's client tried to
+      // join, surfacing as an immediate disconnect right as the call should
+      // have connected. Normal call teardown (accept/decline/45s timeout/
+      // hangup) already explicitly closes the room via completeRoom() in
+      // CallScreen.tsx — these Twilio-side timeouts only exist as a safety
+      // net for a client that crashes or loses network before it can call
+      // that, so there's no real cost to giving them a much wider margin.
       // Group room (SFU) so EmptyRoomTimeout / UnusedRoomTimeout apply.
       const params = new URLSearchParams({
         UniqueName: roomName,
         Type: "group",
-        EmptyRoomTimeout: "1",
-        UnusedRoomTimeout: "1",
+        EmptyRoomTimeout: "5",
+        UnusedRoomTimeout: "5",
       });
       const resp = await fetch("https://video.twilio.com/v1/Rooms", {
         method: "POST",
