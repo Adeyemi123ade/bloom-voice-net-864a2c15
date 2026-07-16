@@ -35,6 +35,39 @@ Last updated: 2026-07-15.
 
 ## Recently shipped (this session), newest first
 
+- **#32** #30's `adoptRealId` fix (real row id adopted synchronously right
+  after `insert()` resolves, instead of waiting on the realtime echo to
+  reconcile by content match) was merged and deployed, then user-tested in
+  a fresh incognito window — ruling out both the frozen-APK trap and
+  browser caching — and the exact same symptom was still 100% reproducible:
+  every sent message (not just voice) renders as a contentless timestamp-
+  only bubble, with delete/copy/share doing nothing on it.
+  Re-derived the fix from scratch and found a real gap in #30's own logic:
+  `adoptRealId` and the realtime INSERT handler each independently guard
+  against the *other* arriving first, but neither guarded against **both
+  landing for the same message** — which happens whenever the realtime
+  echo (an already-open WebSocket push) wins the race against the
+  `insert().select("id")` REST round trip and arrives with content that
+  doesn't textually match the local optimistic copy (the known blank-
+  payload race, or simply arriving before local state had adopted the real
+  id yet). In that case the *old* `adoptRealId` did a plain `.map()` over
+  the tmp id, landing a second row in state with the exact same real id as
+  the one the realtime handler had already appended — a React key
+  collision. One of the two colliding rows is the blank/broken one; which
+  one users actually end up looking at/tapping depends on render order,
+  which is why it looked total and consistent rather than occasional.
+  Fixed `adoptRealId` to detect this collision explicitly (a second entry
+  already present under the real id) and collapse to a single row,
+  preferring whichever copy actually has content. Added a
+  `console.warn("[msg-send] realtime echo beat the insert() response...")`
+  right on this path — if this keeps showing up in production, it confirms
+  the echo is winning the race routinely (not as a rare edge case), which
+  would be worth investigating on the Realtime/infra side directly rather
+  than continuing to harden the client against it. **Still not confirmed
+  live as of writing** — ask the user to retest with the browser console
+  open and share what `[msg-send]` / `[voice-send]` / `[realtime]` lines
+  appear if this still doesn't resolve it, since this sandbox has no way to
+  reproduce the race itself.
 - **#31 (same PR as #30, folded in mid-session)** Voice and video calls
   disconnecting the instant the callee answers, saying "room completed."
   Root cause: `twilio-room`'s room creation set `EmptyRoomTimeout` /

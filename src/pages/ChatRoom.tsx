@@ -433,7 +433,37 @@ export default function ChatRoom() {
   // matches anything in `messages`, making the just-selected message look
   // like it dropped out of the selection for no reason.
   const adoptRealId = (tmpId: string, realId: string) => {
-    setMessages((prev) => prev.map((m) => (m.id === tmpId ? { ...m, id: realId } : m)));
+    setMessages((prev) => {
+      const tmpIdx = prev.findIndex((m) => m.id === tmpId);
+      if (tmpIdx === -1) return prev; // already reconciled by the realtime echo's own content match
+      const echoIdx = prev.findIndex((m) => m.id === realId);
+      if (echoIdx === -1) {
+        const next = prev.slice();
+        next[tmpIdx] = { ...next[tmpIdx], id: realId };
+        return next;
+      }
+      // The realtime echo for this exact send already landed under the real
+      // id before insert()'s own REST response came back to us — these two
+      // network round trips race, and the echo (already an open WebSocket
+      // push) frequently wins over the REST round trip. Collapsing to a
+      // single map() over tmpId (the old logic) would leave both rows in
+      // state with the same id, a React key collision that renders as a
+      // duplicated / stuck bubble. Keep exactly one row: prefer whichever
+      // copy actually has content, since the echo can itself be the known
+      // blank-payload race (see fetchMessageRowWithRetry) that hasn't
+      // self-healed by the time we get here.
+      const echo = prev[echoIdx];
+      const tmp = prev[tmpIdx];
+      const merged = echo.content ? echo : { ...echo, content: tmp.content };
+      console.warn("[msg-send] realtime echo beat the insert() response, collapsed duplicate", {
+        realId,
+        echoHadContent: !!echo.content,
+      });
+      const keepAt = Math.min(tmpIdx, echoIdx);
+      const next = prev.filter((_, i) => i !== tmpIdx && i !== echoIdx);
+      next.splice(keepAt, 0, merged);
+      return next;
+    });
     setSelectedIds((prev) => {
       if (!prev.has(tmpId)) return prev;
       const next = new Set(prev);
