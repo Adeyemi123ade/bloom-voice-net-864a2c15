@@ -73,14 +73,21 @@ Deno.serve(async (req) => {
           expires_at: new Date(Date.now() + (t.expires_in ?? 3600) * 1000).toISOString(),
         }).eq("user_id", user.id);
       } else {
-        console.error("Token refresh failed", t);
-        // If refresh fails (e.g. revoked), we might need to reconnect.
-        if (t.error === "invalid_grant") {
-           return json({
-             error: "Google session expired. Please reconnect.",
-             reconnectRequired: true,
-           });
-        }
+        console.error("google-contacts-sync: token refresh failed", { userId: user.id, error: t });
+        // Any refresh failure — not just invalid_grant — means we cannot
+        // obtain a valid access token. Falling through and calling the
+        // People API with the known-expired token below is guaranteed to
+        // 401, and that 401 wasn't being distinguished from "this account
+        // really has zero contacts": it silently returned an empty contact
+        // list with a "No contacts found in this Google account" warning,
+        // which looked exactly like sync being fundamentally broken instead
+        // of prompting the user to reconnect.
+        return json({
+          error: t.error === "invalid_grant"
+            ? "Google session expired. Please reconnect."
+            : "Could not refresh your Google session. Please reconnect Google Contacts.",
+          reconnectRequired: true,
+        });
       }
     } else if (isExpired && !row.refresh_token) {
        return json({
@@ -107,6 +114,20 @@ Deno.serve(async (req) => {
         await admin.from("google_oauth_tokens").delete().eq("user_id", user.id);
         return json({
           error: "Google contacts permission is missing. Please reconnect Google Contacts.",
+          reconnectRequired: true,
+        });
+      }
+      if (result.authError) {
+        // The access token we just used (freshly refreshed, or not expired
+        // per our own clock) was rejected outright by Google — e.g. the
+        // user revoked access from their Google Account settings. Report
+        // this plainly instead of letting it fall through to "0 contacts
+        // found", which previously made a revoked connection look identical
+        // to an account that has no contacts.
+        console.error("google-contacts-sync: People API rejected access token", { userId: user.id, errorMessage: result.errorMessage });
+        await admin.from("google_oauth_tokens").delete().eq("user_id", user.id);
+        return json({
+          error: "Google session is no longer valid. Please reconnect Google Contacts.",
           reconnectRequired: true,
         });
       }
@@ -164,7 +185,7 @@ Deno.serve(async (req) => {
 
 async function fetchConnections(
   accessToken: string,
-): Promise<{ contacts: Contact[]; rawCount: number; errorMessage: string | null; scopeError?: boolean }> {
+): Promise<{ contacts: Contact[]; rawCount: number; errorMessage: string | null; scopeError?: boolean; authError?: boolean }> {
   const out: Contact[] = [];
   let rawCount = 0;
   let errorMessage: string | null = null;
@@ -179,6 +200,7 @@ async function fetchConnections(
     if (!res.ok) {
       errorMessage = errorSummary(data);
       if (isInsufficientScope(data)) return { contacts: [], rawCount, errorMessage, scopeError: true };
+      if (res.status === 401) return { contacts: [], rawCount, errorMessage, authError: true };
       break;
     }
     const people = data.connections ?? [];

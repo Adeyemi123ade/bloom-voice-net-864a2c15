@@ -16,6 +16,23 @@ const SCOPES = [
   "https://www.googleapis.com/auth/userinfo.email"
 ];
 const CANONICAL_REDIRECT_URI = "https://chichatapp.com/settings";
+// The client (resolveRedirectUri in src/lib/googleContacts.ts) picks between
+// the bare and www domains based on window.location.origin. Both must be
+// honored here and both must be registered as Authorized redirect URIs in
+// the Google Cloud OAuth client, or Google rejects the request outright with
+// redirect_uri_mismatch for whichever one doesn't match. Previously this
+// function unconditionally collapsed every non-localhost origin to the bare
+// domain regardless of what the client sent — if a user connected Google
+// Contacts from https://www.chichatapp.com, the auth_url step built Google's
+// authorization request with the bare domain, but the browser was already on
+// the www one, requiring a cross-domain hop to land back on /settings before
+// the app could finish the exchange. Echoing back a known-good value the
+// client actually asserted removes that hop instead of hoping a platform-
+// level domain redirect preserves the ?code=&state= query string intact.
+const ALLOWED_REDIRECT_URIS = new Set([
+  CANONICAL_REDIRECT_URI,
+  "https://www.chichatapp.com/settings",
+]);
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -146,5 +163,6 @@ function hasContactsScope(scope: string) {
 
 function normalizeRedirectUri(redirectUri?: string) {
   if (redirectUri?.startsWith("http://localhost")) return redirectUri;
+  if (redirectUri && ALLOWED_REDIRECT_URIS.has(redirectUri)) return redirectUri;
   return CANONICAL_REDIRECT_URI;
 }

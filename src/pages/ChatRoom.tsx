@@ -55,6 +55,30 @@ import {
 // has been observed null on some rows, and every render/handler below calls
 // string methods on it directly, which throws (blanking the whole app, no
 // error boundary) the instant such a row reaches state. Normalize on the way in.
+// A message row's `content` is never legitimately empty — every send path
+// (text/voice/attachment) always writes a non-empty, prefixed string before
+// insert. If a realtime payload — or an immediate re-fetch of the same row —
+// ever comes back with blank content, that's a transient read-after-write
+// race (the client observes the row before a lagging connection/replica has
+// caught up with the write it was just notified about), not a real state.
+// A single-shot re-fetch can still lose that race; retry with backoff so a
+// message doesn't get stuck rendering as an empty "timestamp only" bubble
+// with delete/copy/forward silently no-op'ing on it until a full reload.
+async function fetchMessageRowWithRetry(
+  id: string,
+  attempts = 5,
+): Promise<Record<string, unknown> | null> {
+  for (let i = 0; i < attempts; i++) {
+    const { data } = await supabase.from("messages").select("*").eq("id", id).maybeSingle();
+    const content = (data as Record<string, unknown> | null)?.content;
+    if (data && typeof content === "string" && content) {
+      return data as Record<string, unknown>;
+    }
+    if (i < attempts - 1) await new Promise((r) => setTimeout(r, 300 * (i + 1)));
+  }
+  return null;
+}
+
 function normalizeMessage(raw: Record<string, unknown>): Message {
   return {
     id: String(raw.id),
@@ -212,19 +236,25 @@ export default function ChatRoom() {
           let incoming = normalizeMessage(payload.new as Record<string, unknown>);
           // A realtime INSERT payload should always carry the real content —
           // but if one ever arrives blank (a dropped/partial event), trust
-          // nothing and re-fetch that exact row by id rather than rendering
-          // a message with no content until the user manually refreshes.
+          // nothing and re-fetch that exact row by id, retrying with backoff
+          // (see fetchMessageRowWithRetry) rather than rendering a message
+          // with no content until the user manually refreshes.
           if (!incoming.content) {
-            console.warn("[realtime] INSERT payload arrived with blank content, re-fetching", incoming.id);
-            const { data } = await supabase
-              .from("messages")
-              .select("*")
-              .eq("id", incoming.id)
-              .maybeSingle();
-            if (data) incoming = normalizeMessage(data as Record<string, unknown>);
+            console.warn("[realtime] INSERT payload arrived with blank content, retrying fetch", incoming.id);
+            const data = await fetchMessageRowWithRetry(incoming.id);
+            if (data) {
+              incoming = normalizeMessage(data);
+            } else {
+              console.error("[realtime] INSERT re-fetch still blank after retries", incoming.id);
+            }
           }
           setMessages((prev) => {
-            // Replace matching optimistic message (same sender + content, temp id starts with "tmp-")
+            // Own sends (text/voice/attachment) now adopt their real row id
+            // synchronously right after insert() resolves — see send() /
+            // uploadVoice() / sendPending() — so by the time this echo
+            // arrives, `prev.some(m => m.id === incoming.id)` below almost
+            // always already matches and this content-based match is only a
+            // fallback for the rare case this event wins that race.
             const idx = prev.findIndex(
               (m) =>
                 m.id.startsWith("tmp-") &&
@@ -248,14 +278,13 @@ export default function ChatRoom() {
         async (payload) => {
           let updated = normalizeMessage(payload.new as Record<string, unknown>);
           if (!updated.content) {
-            console.warn("[realtime] UPDATE payload arrived with blank content, re-fetching", updated.id);
-            const { data } = await supabase
-              .from("messages")
-              .select("*")
-              .eq("id", updated.id)
-              .maybeSingle();
-            if (data) updated = normalizeMessage(data as Record<string, unknown>);
-            else return;
+            console.warn("[realtime] UPDATE payload arrived with blank content, retrying fetch", updated.id);
+            const data = await fetchMessageRowWithRetry(updated.id);
+            if (data) updated = normalizeMessage(data);
+            else {
+              console.error("[realtime] UPDATE re-fetch still blank after retries", updated.id);
+              return;
+            }
           }
           setMessages((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
         },
@@ -397,6 +426,23 @@ export default function ChatRoom() {
     navigate(`/call/${conversationId}?type=${type}&callId=${data.id}&room=${encodeURIComponent(roomName)}&role=caller`, { replace: true });
   };
 
+  // Swap an optimistic tmp- id for the real row id once insert() resolves.
+  // Also carries over selection state — a message can in principle be
+  // long-pressed while its upload/insert round trip is still in flight, and
+  // without this the selection would silently point at an id that no longer
+  // matches anything in `messages`, making the just-selected message look
+  // like it dropped out of the selection for no reason.
+  const adoptRealId = (tmpId: string, realId: string) => {
+    setMessages((prev) => prev.map((m) => (m.id === tmpId ? { ...m, id: realId } : m)));
+    setSelectedIds((prev) => {
+      if (!prev.has(tmpId)) return prev;
+      const next = new Set(prev);
+      next.delete(tmpId);
+      next.add(realId);
+      return next;
+    });
+  };
+
   const send = async () => {
     if (!user || !conversationId) return;
     const content = text.trim();
@@ -443,17 +489,32 @@ export default function ChatRoom() {
     };
     setMessages((prev) => [...prev, optimistic]);
 
-    const { error } = await supabase.from("messages").insert({
-      conversation_id: conversationId,
-      sender_id: user.id,
-      content: finalContent,
-    });
-    if (error) {
+    console.debug("[msg-send] inserting", tmpId);
+    const { data: inserted, error } = await supabase
+      .from("messages")
+      .insert({
+        conversation_id: conversationId,
+        sender_id: user.id,
+        content: finalContent,
+      })
+      .select("id")
+      .single();
+    if (error || !inserted) {
       // Roll back optimistic message on failure
+      console.error("[msg-send] insert failed", error);
       setMessages((prev) => prev.filter((m) => m.id !== tmpId));
-      toast({ title: "Failed to send", description: error.message, variant: "destructive" });
+      toast({ title: "Failed to send", description: error?.message ?? "Please try again.", variant: "destructive" });
       return;
     }
+    // Adopt the real row id immediately instead of waiting for the realtime
+    // echo to reconcile this optimistic message by content-string match —
+    // that match silently fails if the echo's payload ever arrives blank (a
+    // replication-lag race — see fetchMessageRowWithRetry above), which used
+    // to leave the message stuck under its temporary id forever: every
+    // action on it (delete/copy/forward) targets an id no row has, so it
+    // quietly no-ops instead of doing anything.
+    adoptRealId(tmpId, inserted.id);
+    console.debug("[msg-send] persisted", inserted.id);
     await supabase.from("typing_indicators").delete().eq("conversation_id", conversationId).eq("user_id", user.id);
   };
 
@@ -703,6 +764,7 @@ export default function ChatRoom() {
   };
   const uploadVoice = async (blob: Blob) => {
     if (!user || !conversationId) return;
+    console.debug("[voice-send] start", { size: blob.size, type: blob.type });
     // Optimistic, same pattern send() already uses for text — without this,
     // voice notes only appeared once the realtime INSERT event echoed back,
     // which could lag or silently miss, leaving the sender staring at their
@@ -724,10 +786,12 @@ export default function ChatRoom() {
 
     const ext = extensionForMimeType(blob.type);
     const path = `${user.id}/${conversationId}/${Date.now()}.${ext}`;
+    console.debug("[voice-send] uploading to storage", path);
     const { error: upErr } = await supabase.storage
       .from("chat-media")
       .upload(path, blob, { contentType: blob.type || "audio/webm" });
     if (upErr) {
+      console.error("[voice-send] storage upload failed", upErr);
       setMessages((prev) => prev.filter((m) => m.id !== tmpId));
       URL.revokeObjectURL(localUrl);
       toast({ title: "Upload failed", description: upErr.message, variant: "destructive" });
@@ -735,21 +799,31 @@ export default function ChatRoom() {
     }
     const { data: pub } = supabase.storage.from("chat-media").getPublicUrl(path);
     const finalContent = `${VOICE_PREFIX}${pub.publicUrl}`;
-    // Swap the placeholder to the real URL now, still under the tmp- id — the
-    // realtime handler's existing "replace matching optimistic message"
-    // logic (tmp- id + sender + content) takes it from here once the row
-    // actually arrives, identical to how text messages reconcile.
+    // Swap the placeholder to the real URL now, still under the tmp- id.
     setMessages((prev) => prev.map((m) => (m.id === tmpId ? { ...m, content: finalContent } : m)));
     URL.revokeObjectURL(localUrl);
-    const { error } = await supabase.from("messages").insert({
-      conversation_id: conversationId,
-      sender_id: user.id,
-      content: finalContent,
-    });
-    if (error) {
+    console.debug("[voice-send] uploaded, inserting message row", finalContent);
+    const { data: inserted, error } = await supabase
+      .from("messages")
+      .insert({
+        conversation_id: conversationId,
+        sender_id: user.id,
+        content: finalContent,
+      })
+      .select("id")
+      .single();
+    if (error || !inserted) {
+      console.error("[voice-send] insert failed", error);
       setMessages((prev) => prev.filter((m) => m.id !== tmpId));
-      toast({ title: "Send failed", description: error.message, variant: "destructive" });
+      toast({ title: "Send failed", description: error?.message ?? "Please try again.", variant: "destructive" });
+      return;
     }
+    // Adopt the real row id immediately — see the matching comment in
+    // send() for why waiting on the realtime echo's content-match to
+    // reconcile this is what left voice notes stuck "sending" forever with
+    // delete/copy/forward silently doing nothing.
+    adoptRealId(tmpId, inserted.id);
+    console.debug("[voice-send] persisted", inserted.id);
   };
 
   // Attachment upload — stage the file and show caption preview, send on confirm.
@@ -816,15 +890,22 @@ export default function ChatRoom() {
         size: f.size,
         caption,
       });
-      // Swap to the real URL, still under the tmp- id, so the realtime
-      // handler's existing reconciliation logic can find and replace it.
+      // Swap to the real URL, still under the tmp- id.
       setMessages((prev) => prev.map((m) => (m.id === tmpId ? { ...m, content } : m)));
-      const { error } = await supabase.from("messages").insert({
-        conversation_id: conversationId,
-        sender_id: user.id,
-        content,
-      });
-      if (error) throw error;
+      const { data: inserted, error } = await supabase
+        .from("messages")
+        .insert({
+          conversation_id: conversationId,
+          sender_id: user.id,
+          content,
+        })
+        .select("id")
+        .single();
+      if (error || !inserted) throw error ?? new Error("Insert failed");
+      // Adopt the real row id immediately — see the matching comment in
+      // send() for why relying on the realtime echo's content-match to
+      // reconcile this is fragile.
+      adoptRealId(tmpId, inserted.id);
       URL.revokeObjectURL(pendingFile.previewUrl);
       setPendingFile(null);
       setText("");
