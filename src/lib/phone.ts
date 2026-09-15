@@ -1,5 +1,6 @@
 import { parsePhoneNumberFromString, validatePhoneNumberLength, CountryCode } from "libphonenumber-js";
 import examples from "libphonenumber-js/examples.mobile.json";
+import { supabase } from "@/integrations/supabase/client";
 
 /**
  * Normalize a raw phone string to E.164 (e.g. +2348012345678).
@@ -49,6 +50,25 @@ export function countryFromE164(raw: string | null | undefined): CountryCode | u
     if (!raw) return undefined;
     try {
         return parsePhoneNumberFromString(raw)?.country;
+    } catch {
+        return undefined;
+    }
+}
+
+/**
+ * The signed-in user's own country, derived from their registered E.164
+ * phone number — used as the `defaultCountry` hint for normalizing other
+ * people's phone numbers (device contacts, Google contacts) that were saved
+ * in local format with no country code. Without this hint, `toE164` falls
+ * back to guessing NG first for any such number, which is wrong for anyone
+ * outside Nigeria. Shared by every contact-import path so there is exactly
+ * one place this lookup happens.
+ */
+export async function getMyDefaultCountry(): Promise<CountryCode | undefined> {
+    try {
+        const { data } = await supabase.rpc("get_my_profile_private");
+        const row = Array.isArray(data) ? data[0] : data;
+        return countryFromE164((row as { phone?: string | null } | null)?.phone);
     } catch {
         return undefined;
     }

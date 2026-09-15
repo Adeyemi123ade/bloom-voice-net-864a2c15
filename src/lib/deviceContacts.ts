@@ -1,5 +1,6 @@
 import { Capacitor } from "@capacitor/core";
-import { toE164 } from "./phone";
+import { CountryCode } from "libphonenumber-js";
+import { getMyDefaultCountry, toE164 } from "./phone";
 
 export interface DeviceContact {
   name: string;
@@ -19,10 +20,14 @@ export function isNativePlatform(): boolean {
 /**
  * Normalize a phone number to E.164 if possible, otherwise return the raw
  * number stripped of formatting so it can still be stored and matched.
+ * `defaultCountry` (the signed-in user's own country, when known) is tried
+ * before the NG/locale/US fallback order inside toE164 — without it, any
+ * number saved in local format (no leading "+") is guessed as Nigerian
+ * first regardless of the user's actual country.
  */
-function normalizePhone(raw: string): string | null {
+function normalizePhone(raw: string, defaultCountry?: CountryCode): string | null {
   if (!raw) return null;
-  const e164 = toE164(raw);
+  const e164 = toE164(raw, defaultCountry);
   if (e164) return e164;
   // Fallback: strip everything except digits and leading +
   const stripped = raw.replace(/[^\d+]/g, "");
@@ -48,6 +53,7 @@ export async function loadNativeContacts(): Promise<DeviceContact[]> {
   const result = await Contacts.getContacts({
     projection: { name: true, phones: true },
   });
+  const defaultCountry = await getMyDefaultCountry();
 
   const list: DeviceContact[] = [];
   for (const c of result.contacts ?? []) {
@@ -57,7 +63,7 @@ export async function loadNativeContacts(): Promise<DeviceContact[]> {
       "";
     const phones: string[] = [];
     for (const p of c.phones ?? []) {
-      const normalized = normalizePhone(p.number ?? "");
+      const normalized = normalizePhone(p.number ?? "", defaultCountry);
       if (normalized && !phones.includes(normalized)) {
         phones.push(normalized);
       }
@@ -101,12 +107,13 @@ export async function pickWebContacts(): Promise<DeviceContact[]> {
     };
   };
   const picked = await nav.contacts.select(["name", "tel"], { multiple: true });
+  const defaultCountry = await getMyDefaultCountry();
   const list: DeviceContact[] = [];
   for (const c of picked ?? []) {
     const name = (c.name?.[0] ?? "").trim();
     const phones: string[] = [];
     for (const t of c.tel ?? []) {
-      const e = toE164(t);
+      const e = toE164(t, defaultCountry);
       if (e && !phones.includes(e)) phones.push(e);
     }
     if (phones.length) list.push({ name: name || phones[0], phones });

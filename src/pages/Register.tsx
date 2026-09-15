@@ -8,6 +8,7 @@ import BrandHero from "@/components/BrandHero";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -18,6 +19,7 @@ import PasswordStrengthBar from "@/components/PasswordStrengthBar";
 import { checkEmailExists } from "@/lib/checkEmail";
 import { isRecoveryPending } from "@/lib/recoveryPending";
 import { markVerifyEmailPending, getVerifyEmailPending } from "@/lib/verifyEmailPending";
+import { startGoogleAuth } from "@/lib/googleAuth";
 
 const baseSchema = z.object({
   name: z
@@ -104,6 +106,8 @@ export default function Register() {
   const [submitting, setSubmitting] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [emailChecking, setEmailChecking] = useState(false);
+  const [agreedToPolicy, setAgreedToPolicy] = useState(false);
+  const [agreeError, setAgreeError] = useState(false);
 
   // On blur: if the email is well-formed, ask the backend whether it's already
   // taken. We only set the inline error here — the form's own validation runs
@@ -134,11 +138,7 @@ export default function Register() {
 
   const handleGoogle = async () => {
     setGoogleLoading(true);
-    const CANONICAL_ORIGIN = "https://chichatapp.com";
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: `${CANONICAL_ORIGIN}/auth/google-return` },
-    });
+    const { error } = await startGoogleAuth();
     if (error) {
       setGoogleLoading(false);
       toast({
@@ -178,7 +178,17 @@ export default function Register() {
       setErrors(fieldErrors);
       return;
     }
+    if (!agreedToPolicy) {
+      setAgreeError(true);
+      toast({
+        title: "Please agree to continue",
+        description: "You need to agree to the Privacy Policy to create an account.",
+        variant: "destructive",
+      });
+      return;
+    }
     setErrors({});
+    setAgreeError(false);
     setSubmitting(true);
 
     // Google-completion path: an existing Google session is live. Just
@@ -560,13 +570,28 @@ export default function Register() {
                   Sign in
                 </Link>
               </p>
-              <p className="text-foreground text-center mt-2 font-semibold" style={{ fontSize: "0.9625rem" }}>
-                By continuing, you agree to our{" "}
-                <Link to="/terms" className="text-primary underline underline-offset-2">
-                  Terms &amp; Privacy Policy
-                </Link>
-                .
-              </p>
+              <div className={`flex items-start gap-2 mt-3 px-1 ${agreeError ? "text-destructive" : ""}`}>
+                <Checkbox
+                  id="agree-policy"
+                  checked={agreedToPolicy}
+                  onCheckedChange={(v) => {
+                    setAgreedToPolicy(v === true);
+                    if (v === true) setAgreeError(false);
+                  }}
+                  aria-invalid={agreeError}
+                  className={`mt-0.5 ${agreeError ? "border-destructive" : ""}`}
+                />
+                <Label
+                  htmlFor="agree-policy"
+                  className={`text-sm font-normal leading-snug cursor-pointer ${agreeError ? "text-destructive" : "text-foreground"}`}
+                >
+                  I agree to the{" "}
+                  <Link to="/terms" className="text-primary underline underline-offset-2">
+                    Privacy Policy
+                  </Link>
+                  .
+                </Label>
+              </div>
             </div>
           </form>
         </div>

@@ -60,6 +60,17 @@ export default function CallScreen() {
   const upgradeTimeoutRef = useRef<number | null>(null);
 
   const roomRef = useRef<Room | null>(null);
+  // Synchronous re-entrancy guard for joinRoom(). roomRef.current is only set
+  // after the async token/media/Twilio-connect sequence resolves, which left
+  // a window where the realtime "accepted" listener and the 400ms polling
+  // fallback could both call joinRoom() for the same call before either had
+  // set roomRef — Twilio Video disconnects an earlier connection when a
+  // second one arrives with the same participant identity, so the caller's
+  // own redundant join could silently kick its own successful one. This flag
+  // is set synchronously, before any await, and cleared once the attempt
+  // settles (success or failure) — roomRef.current itself is what prevents
+  // any further join attempts once actually connected.
+  const joiningRef = useRef(false);
   const localAudioRef = useRef<LocalAudioTrack | null>(null);
   const localVideoRef = useRef<LocalVideoTrack | null>(null);
   const remoteAudioEl = useRef<HTMLAudioElement>(null);
@@ -357,7 +368,8 @@ export default function CallScreen() {
   };
 
   const joinRoom = async () => {
-    if (roomRef.current) return;
+    if (roomRef.current || joiningRef.current) return;
+    joiningRef.current = true;
     setStatus("connecting");
     try {
       // On Android native, the voice audio route must be active before
@@ -418,6 +430,8 @@ export default function CallScreen() {
       const msg = formatCallMediaError(err, isVideo);
       toast({ title: "Call failed", description: msg, variant: "destructive" });
       cleanupAndExit();
+    } finally {
+      joiningRef.current = false;
     }
   };
 

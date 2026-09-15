@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Search, MessageSquarePlus, Phone, PhoneIncoming, PhoneOutgoing, PhoneMissed, Video, Mic, Paperclip } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
 import { Input } from "@/components/ui/input";
@@ -130,6 +130,7 @@ function initials(name?: string | null) {
 
 export default function Home() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, loading } = useAuth();
   const [chats, setChats] = useState<ChatRow[]>([]);
   const [query, setQuery] = useState("");
@@ -145,6 +146,19 @@ export default function Home() {
   useEffect(() => {
     if (!loading && !user) navigate("/login");
   }, [loading, user, navigate]);
+
+  // Contacts.tsx links here to open this same "Start a new chat" search
+  // (search_users) instead of duplicating it — see the "Search ChiChat"
+  // entry point on the Contacts screen.
+  useEffect(() => {
+    const state = location.state as { openNewChat?: boolean } | null;
+    if (!state?.openNewChat) return;
+    setOpenNew(true);
+    setPeopleQuery("");
+    void loadPeople();
+    navigate(location.pathname, { replace: true, state: {} });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state]);
 
   // Daily auto-backup on app open (once per day, silent)
   useEffect(() => {

@@ -36,6 +36,10 @@ const EXEMPT_ROUTES = new Set<string>([
   "/reset-password",
   "/verify-device",
   "/auth/google-return",
+  // Public documentation — must render for a signed-out visitor (the
+  // Register/Login page links here) and must never trigger the
+  // auth-loading/redirect logic below.
+  "/terms",
 ]);
 
 export default function DeviceGate({ children }: { children: ReactNode }) {
@@ -51,6 +55,11 @@ export default function DeviceGate({ children }: { children: ReactNode }) {
     if (isExempt) return;
     if (!user) {
       setVerified(false);
+      // No session and we're on a protected route (deep link, expired/lost
+      // session, etc.) — bounce to /login instead of stranding the user on
+      // the loading shell forever. isExempt guards against a redirect loop
+      // once location.pathname becomes "/login".
+      navigate("/login", { replace: true });
       return;
     }
     // A Supabase session existing does NOT mean the account is verified —
@@ -116,7 +125,8 @@ export default function DeviceGate({ children }: { children: ReactNode }) {
   // Still figuring out auth state — render nothing rather than the protected page.
   if (loading) return <LoadingShell label="Loading…" />;
 
-  // No user — let the underlying route's own guards handle redirect; render nothing.
+  // No user — the effect above is already navigating to /login; render nothing
+  // in the meantime rather than the protected page.
   if (!user) return <LoadingShell label="Signing you in…" />;
 
   // Session exists but the email OTP hasn't been confirmed yet — never render

@@ -4,6 +4,7 @@ import {
   ChevronDown,
   ChevronRight,
   Cloud,
+  Loader2,
   LogOut,
   Smartphone,
   Trash2,
@@ -206,9 +207,9 @@ export default function Settings() {
               <button
                 onClick={signOutWeb}
                 disabled={working}
-                className="w-full h-16 rounded-xl bg-secondary text-foreground text-lg font-bold flex items-center justify-center gap-3 border border-border hover:bg-secondary/80 active:scale-[0.99] transition disabled:opacity-60"
+                className="w-full h-16 rounded-xl bg-secondary text-foreground text-lg font-bold flex items-center justify-center gap-3 border border-border transition hover:bg-destructive/10 hover:text-destructive hover:border-destructive/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-secondary disabled:hover:text-foreground"
               >
-                <LogOut className="w-6 h-6" />
+                {working ? <Loader2 className="w-6 h-6 animate-spin" /> : <LogOut className="w-6 h-6" />}
                 {working ? "Signing out…" : "Sign out"}
               </button>
             </div>

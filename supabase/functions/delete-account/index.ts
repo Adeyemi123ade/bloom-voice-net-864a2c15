@@ -93,11 +93,30 @@ Deno.serve(async (req) => {
     }
 
     // ── Email-side records keyed by email address ─────────────────────────
+    // suppressed_emails / email_unsubscribe_tokens are tracked separately
+    // below (emailCleanupFailed) because a silent failure here is worse than
+    // the other best-effort steps: it doesn't just leave stale data, it can
+    // permanently and invisibly block every future transactional/OTP email
+    // to this address if the same person re-registers — surfacing from the
+    // outside as "registration doesn't work", not as an account-deletion bug.
+    const failuresBeforeEmailCleanup = failures.length;
     if (userEmail) {
       await safe("auth_otp_aliases", admin.from("auth_otp_aliases").delete().eq("email", userEmail));
       await safe("email_send_log", admin.from("email_send_log").delete().eq("recipient_email", userEmail));
       await safe("email_unsubscribe_tokens", admin.from("email_unsubscribe_tokens").delete().eq("email", userEmail));
       await safe("suppressed_emails", admin.from("suppressed_emails").delete().eq("email", userEmail));
+    }
+    const emailCleanupFailed = failures
+      .slice(failuresBeforeEmailCleanup)
+      .some((f) => f.startsWith("email_unsubscribe_tokens:") || f.startsWith("suppressed_emails:"));
+    if (emailCleanupFailed) {
+      // Deliberately a distinct, greppable log line (Dashboard -> Edge
+      // Functions -> Logs -> delete-account) rather than only relying on the
+      // generic partial_failures array below, so this specific class of
+      // failure doesn't blend in with lower-stakes cleanup misses.
+      console.error(
+        `[delete-account] email-suppression cleanup failed for a deleted account — future emails to this address may be silently blocked if it re-registers. userId=${userId}`,
+      );
     }
 
     // ── Profile last so app-side FKs / lookups are gone first ─────────────
@@ -130,8 +149,13 @@ Deno.serve(async (req) => {
       );
     }
 
+    // email_cleanup_incomplete surfaces the one class of partial failure that
+    // can silently break a future re-registration (see emailCleanupFailed
+    // above) as its own explicit field, rather than requiring a caller to
+    // string-match inside partial_failures to notice it. Not shown to the
+    // end user (see Settings.tsx) — this is for logs/future admin tooling.
     return new Response(
-      JSON.stringify({ ok: true, partial_failures: failures }),
+      JSON.stringify({ ok: true, partial_failures: failures, email_cleanup_incomplete: emailCleanupFailed }),
       {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

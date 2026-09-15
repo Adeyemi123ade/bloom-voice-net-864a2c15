@@ -192,7 +192,7 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
-          className="max-w-[420px] w-full h-[100dvh] sm:h-[92vh] p-0 gap-0 bg-background top-0 left-1/2 -translate-x-1/2 translate-y-0 rounded-none sm:rounded-2xl border-0 shadow-2xl flex flex-col overflow-hidden pb-[76px] [&>button.absolute]:hidden"
+          className="max-w-[420px] w-full h-[100dvh] sm:h-[92vh] p-0 gap-0 bg-background top-0 left-1/2 -translate-x-1/2 translate-y-0 rounded-none sm:rounded-2xl border-0 shadow-2xl flex flex-col overflow-hidden pb-[calc(96px+env(safe-area-inset-bottom))] [&>button.absolute]:hidden"
         >
         <DialogTitle className="sr-only">Call</DialogTitle>
 
@@ -213,6 +213,18 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
           </button>
         </header>
 
+        {/*
+          Search + contact list + keypad panel share one scroll region.
+          Previously the contact list had its own capped height while the
+          keypad panel was pinned with mt-auto inside an overflow-hidden
+          dialog — on a short viewport (or with several contacts) the
+          combined content could exceed the available height with no way
+          to reach the bottom keypad rows. Wrapping them together in a
+          single flex-1 + min-h-0 + overflow-y-auto container means the
+          keypad always renders at full size and, if there isn't enough
+          room, the whole region scrolls to reach it instead of clipping it.
+        */}
+        <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
         {/* Search */}
         <div className="px-5 pb-3 shrink-0">
           <div className="relative">
@@ -227,7 +239,9 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
           </div>
         </div>
 
-        {/* Contact list — capped height so keypad starts right below it (no big gap) */}
+        {/* Contact list — capped height so the keypad below isn't pushed too
+            far down when there are many contacts; the outer container above
+            handles scrolling if the total content still exceeds the viewport. */}
         <div className="px-5 pb-2 max-h-[28vh] overflow-y-auto space-y-2 shrink-0">
           {filteredContacts.length === 0 ? (
             <p className="text-xs text-muted-foreground/70 italic py-6 text-center">
@@ -270,10 +284,10 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
           )}
         </div>
 
-        {/* Compact keypad panel — pinned just above the bottom nav with a small gap */}
-        <div className="mx-4 mb-0 mt-auto rounded-2xl bg-secondary/30 border border-border/40 p-3 shrink-0">
-          {/* Number display */}
-          <div className="relative mb-2">
+        {/* Number display — own section above the keypad, real breathing
+            room instead of everything crammed into one tight card. */}
+        <div className="mx-4 mt-3 mb-3 shrink-0">
+          <div className="relative">
             <input
               ref={inputRef}
               type="tel"
@@ -287,34 +301,31 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
                 const cleaned = e.target.value.replace(/[^\d+*#]/g, "");
                 setValue(cleaned);
               }}
-              onFocus={(e) => {
-                // Belt-and-braces: blur immediately so iOS/Android don't
-                // ever spawn a soft keyboard, while still allowing taps to
-                // place a caret via setSelectionRange below.
-                e.currentTarget.blur();
-              }}
               placeholder="Enter number"
-              className="w-full h-9 text-xl font-light tracking-wide text-center bg-transparent border-0 focus:outline-none placeholder:text-muted-foreground/60"
+              className="w-full h-12 text-2xl font-light tracking-wide text-center bg-transparent border-0 focus:outline-none placeholder:text-muted-foreground/60"
             />
             <button
               aria-label="Backspace"
               onClick={backspace}
               disabled={!value}
-              className="absolute right-1 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full hover:bg-secondary flex items-center justify-center disabled:opacity-30"
+              className="absolute right-1 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full hover:bg-secondary flex items-center justify-center disabled:opacity-30"
             >
               <Delete className="w-4 h-4 text-muted-foreground" />
             </button>
           </div>
 
           {/* Live formatted preview */}
-          <div className="h-3 mb-1.5 text-[10px] text-muted-foreground text-center truncate">
+          <div className="h-4 text-xs text-muted-foreground text-center truncate">
             {e164Preview && formatDisplay(e164Preview) !== value
               ? formatDisplay(e164Preview)
               : "\u00A0"}
           </div>
 
-          {/* Keypad grid — high-contrast keys readable in both light and dark. */}
-          <div className="grid grid-cols-3 gap-1.5">
+        </div>
+
+        {/* Keypad — its own dedicated card, comfortably sized keys. */}
+        <div className="mx-4 mb-4 rounded-2xl bg-secondary/30 border border-border/40 p-4 shrink-0">
+          <div className="grid grid-cols-3 gap-2.5">
             {KEYS.map((k) => (
               <button
                 key={k.d}
@@ -325,35 +336,39 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
                     longZero();
                   }
                 }}
-                className="h-11 rounded-xl flex flex-col items-center justify-center transition-colors"
+                className="h-14 rounded-xl flex flex-col items-center justify-center transition-colors"
                 style={{ backgroundColor: "#0B5D3B", color: "#FFFFFF" }}
               >
-                <span className="text-lg font-semibold leading-none" style={{ color: "#FFFFFF" }}>
+                <span className="text-xl font-semibold leading-none" style={{ color: "#FFFFFF" }}>
                   {k.d}
                 </span>
                 {k.sub && (
-                  <span className="text-[8px] tracking-[0.2em] leading-none mt-0.5" style={{ color: "#FFFFFF" }}>
+                  <span className="text-[9px] tracking-[0.2em] leading-none mt-1" style={{ color: "#FFFFFF" }}>
                     {k.sub}
                   </span>
                 )}
               </button>
             ))}
           </div>
-
-          <div className="mt-1.5 grid grid-cols-3 gap-1.5">
-            <div />
-            <button
-              onClick={callTyped}
-              disabled={!value}
-              aria-label="Call"
-              className="h-11 rounded-xl flex items-center justify-center disabled:cursor-not-allowed transition-colors"
-              style={{ backgroundColor: "#0B5D3B", color: "#FFFFFF" }}
-            >
-              <Phone className="w-5 h-5" />
-            </button>
-            <div />
-          </div>
         </div>
+
+        {/* Actions — own section below the keypad, never shares the
+            keypad's container, so it can never sit visually on top of it. */}
+        <div className="mx-4 mb-4 shrink-0 grid grid-cols-3 gap-2.5">
+          <div />
+          <button
+            onClick={callTyped}
+            disabled={!value}
+            aria-label="Call"
+            className="h-14 rounded-xl flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-40 transition-colors"
+            style={{ backgroundColor: "#0B5D3B", color: "#FFFFFF" }}
+          >
+            <Phone className="w-6 h-6" />
+          </button>
+          <div />
+        </div>
+        </div>
+        {/* end shared scroll region */}
 
         {/* Bottom nav inside dialer — closes overlay on tap, then routes. */}
         <BottomNav active="calls" onBeforeNavigate={() => onOpenChange(false)} />

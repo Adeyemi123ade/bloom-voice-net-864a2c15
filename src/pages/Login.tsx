@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { z } from "zod";
-import { ArrowLeft, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Loader2 } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -10,10 +10,15 @@ import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { clearRecoveryPending, isRecoveryPending } from "@/lib/recoveryPending";
+import { startGoogleAuth } from "@/lib/googleAuth";
 
 
 const loginSchema = z.object({
-  identifier: z.string().trim().min(1, { message: "Enter your email or phone number" }).max(255),
+  // Phone-number sign-in removed from this form — email only, to avoid
+  // confusing users with two different identifier formats. The backend
+  // (sign-in-with-identifier) still supports phone lookups for anything
+  // else that might use it; this page just no longer offers it.
+  identifier: z.string().trim().min(1, { message: "Enter your email" }).max(255),
   password: z.string().min(1, { message: "Password is required" }).max(72),
 });
 
@@ -23,9 +28,7 @@ const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 function normalizeIdentifier(value: string) {
   const trimmed = value.trim();
-  if (EMAIL_RE.test(trimmed)) return trimmed.toLowerCase();
-  if (trimmed.replace(/\D/g, "").length >= 7) return trimmed;
-  return null;
+  return EMAIL_RE.test(trimmed) ? trimmed.toLowerCase() : null;
 }
 
 async function signInDirect(email: string, password: string) {
@@ -64,11 +67,7 @@ export default function Login() {
 
   const handleGoogle = async () => {
     setGoogleLoading(true);
-    const CANONICAL_ORIGIN = "https://chichatapp.com";
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: `${CANONICAL_ORIGIN}/auth/google-return` },
-    });
+    const { error } = await startGoogleAuth();
     if (error) {
       setGoogleLoading(false);
       toast({
@@ -77,7 +76,8 @@ export default function Login() {
         variant: "destructive",
       });
     }
-    // On success the browser redirects; nothing else to do here.
+    // On success: web redirects the page; native opens an external tab and
+    // GoogleOAuthReturnListener handles the return. Nothing else to do here.
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -94,7 +94,7 @@ export default function Login() {
     }
     const normalizedIdentifier = normalizeIdentifier(result.data.identifier);
     if (!normalizedIdentifier) {
-      setErrors({ identifier: "Enter a valid email or full phone number" });
+      setErrors({ identifier: "Enter a valid email address" });
       return;
     }
     setErrors({});
@@ -108,16 +108,10 @@ export default function Login() {
       ),
     );
     const signInPromise = (async () => {
-      if (EMAIL_RE.test(normalizedIdentifier)) {
-        const signedIn = await signInDirect(normalizedIdentifier, result.data.password);
-        return { data: signedIn.errorCode ? { error: signedIn.errorCode } : signedIn.data, error: null };
-      }
-
-      const invoked = await supabase.functions.invoke("sign-in-with-identifier", {
-        body: { identifier: normalizedIdentifier, password: result.data.password },
-      });
-      if (!invoked.error) return { data: invoked.data, error: null };
-      return { data: { error: "phone_signin_unavailable" }, error: null };
+      // normalizedIdentifier is always a valid email here (normalizeIdentifier
+      // rejects anything else) — this form no longer offers phone sign-in.
+      const signedIn = await signInDirect(normalizedIdentifier, result.data.password);
+      return { data: signedIn.errorCode ? { error: signedIn.errorCode } : signedIn.data, error: null };
     })();
     const { data, error } = (await Promise.race([signInPromise, timeoutPromise])) as { data?: any; error: Error | null };
     setSubmitting(false);
@@ -130,15 +124,6 @@ export default function Login() {
       if (raw.includes("email_not_registered")) {
         title = "Email not registered";
         description = "This email does not have a ChiChat account yet. Create a new account to continue.";
-      } else if (raw.includes("phone_not_registered")) {
-        title = "Phone number not registered";
-        description = "This phone number is not on ChiChat yet. Create a new account to continue.";
-      } else if (raw.includes("phone_signin_unavailable")) {
-        title = "Phone sign-in not ready";
-        description = "Sign in with your email for now. Your phone number can still be used after the backend update finishes.";
-      } else if (raw.includes("phone_ambiguous")) {
-        title = "Enter full phone number";
-        description = "Add the country code, for example +234…, so we can find the exact account.";
       } else if (raw.includes("wrong_password")) {
         // Supabase deliberately returns the same generic error for "wrong
         // password" and "no account with this email" (anti-enumeration —
@@ -150,7 +135,7 @@ export default function Login() {
         description = "Double-check your details and try again, or reset your password.";
       } else if (raw.includes("invalid_identifier") || raw.includes("missing_details")) {
         title = "Check your details";
-        description = "Enter a valid email or full phone number, then try again.";
+        description = "Enter a valid email, then try again.";
       } else if (raw.includes("not confirmed") || raw.includes("confirm")) {
         title = "Email not verified yet";
         description = "Please check your inbox for the verification code we sent you.";
@@ -204,15 +189,15 @@ export default function Login() {
           <div className="space-y-2.5">
             <div>
               <Label htmlFor="identifier" className="text-2xs text-muted-foreground">
-                Email or phone number
+                Email
               </Label>
               <Input
                 id="identifier"
-                type="text"
-                autoComplete="username"
+                type="email"
+                autoComplete="email"
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
-                placeholder="you@example.com or +2348012345678"
+                placeholder="you@example.com"
                 maxLength={255}
                 className="mt-1 h-9 text-xs bg-input border-border text-foreground placeholder:text-muted-foreground"
                 aria-invalid={!!errors.identifier}
@@ -262,8 +247,9 @@ export default function Login() {
             <Button
               type="submit"
               disabled={submitting}
-              className="w-full h-8 text-xs bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg"
+              className="w-full h-8 text-xs bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg gap-1.5 disabled:opacity-80"
             >
+              {submitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
               {submitting ? "Signing in…" : "Sign in"}
             </Button>
             <div className="flex items-center gap-2 my-2.5">

@@ -132,6 +132,11 @@ export default function ChatRoom() {
   // below for why that matters.
   const otherRef = useRef<Profile | null>(null);
   otherRef.current = other;
+  // Holds the current conversation's resync function so the visibility/
+  // network-regain effect below (which intentionally has no conversationId/
+  // user deps, so it doesn't get torn down and recreated per conversation)
+  // can always call the latest one. See the channel effect for what it does.
+  const resyncRef = useRef<() => void>(() => {});
   const [text, setText] = useState("");
   const [otherTyping, setOtherTyping] = useState(false);
   const [hidden, setHidden] = useState<Set<string>>(new Set());
@@ -227,6 +232,31 @@ export default function ChatRoom() {
 
   useEffect(() => {
     if (!user || !conversationId) return;
+
+    // Refetches the authoritative message list for this conversation and
+    // reconciles it into local state. Realtime is still the primary delivery
+    // path — this only backstops it for whatever it missed while the app was
+    // backgrounded or the socket was dropped (realtime has no such fallback
+    // for messages today, unlike the calling flow's polling safety net).
+    // In-flight optimistic sends (tmp- ids not yet echoed back by the
+    // server) are preserved as-is; everything else defers to server state.
+    const resync = async () => {
+      const { data } = await supabase
+        .from("messages")
+        .select("*")
+        .eq("conversation_id", conversationId)
+        .order("created_at", { ascending: true });
+      if (!data) return;
+      const fresh = data.map(normalizeMessage);
+      const freshIds = new Set(fresh.map((m) => m.id));
+      setMessages((prev) => {
+        const pending = prev.filter((m) => m.id.startsWith("tmp-") && !freshIds.has(m.id));
+        return [...fresh, ...pending];
+      });
+    };
+    resyncRef.current = resync;
+
+    let hasSubscribedBefore = false;
     const ch = supabase
       .channel(`room-${conversationId}`)
       .on(
@@ -321,8 +351,19 @@ export default function ChatRoom() {
           setOther((p) => (p ? ({ ...p, ...row } as Profile) : p));
         },
       )
-      .subscribe();
+      .subscribe((status) => {
+        // "SUBSCRIBED" fires on the initial join AND on every automatic
+        // rejoin after a dropped/reconnected realtime connection. The
+        // initial join's data is already covered by the message-load effect
+        // above, so only resync on a genuine rejoin, when something could
+        // have been missed while the socket was down.
+        if (status === "SUBSCRIBED") {
+          if (hasSubscribedBefore) void resync();
+          hasSubscribedBefore = true;
+        }
+      });
     return () => {
+      resyncRef.current = () => {};
       supabase.removeChannel(ch);
     };
     // Deliberately excludes `other?.id`: it starts null and flips to a real
@@ -332,6 +373,23 @@ export default function ChatRoom() {
     // silently unsubscribed from new messages until the page was reloaded.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, conversationId]);
+
+  // Backstop for the case realtime's own reconnect logic doesn't fire (or is
+  // slow to) after the app was backgrounded/offline: resync as soon as the
+  // tab/app becomes visible again or the network comes back.
+  useEffect(() => {
+    const onResync = () => {
+      if (document.visibilityState === "visible") resyncRef.current();
+    };
+    document.addEventListener("visibilitychange", onResync);
+    window.addEventListener("focus", onResync);
+    window.addEventListener("online", onResync);
+    return () => {
+      document.removeEventListener("visibilitychange", onResync);
+      window.removeEventListener("focus", onResync);
+      window.removeEventListener("online", onResync);
+    };
+  }, []);
 
   // Track whether the initial messages have been positioned at the bottom yet.
   // First load: instant jump to the last message (no animation).

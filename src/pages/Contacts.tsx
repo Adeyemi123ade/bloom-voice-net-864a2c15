@@ -554,8 +554,14 @@ export default function Contacts() {
             </div>
           </div>
 
-          {/* Top action card: New Group Call / New Contact / Invite a friend */}
+          {/* Top action card: Search ChiChat / New Group Call / New Contact / Invite a friend */}
           <div className="mx-4 mt-2 rounded-2xl bg-secondary/40 border border-border overflow-hidden">
+            <ActionRow
+              icon={Search}
+              label="Search ChiChat"
+              onClick={() => navigate("/home", { state: { openNewChat: true } })}
+            />
+            <Divider />
             <ActionRow
               icon={Users}
               label="New Group Call"
@@ -671,6 +677,10 @@ export default function Contacts() {
               <EmptyState
                 title="No contacts on Chichat yet"
                 hint="Invite friends below to start chatting and calling."
+                action={{
+                  label: "Can't find someone? Search ChiChat",
+                  onClick: () => navigate("/home", { state: { openNewChat: true } }),
+                }}
               />
             )}
           </div>
@@ -716,7 +726,14 @@ export default function Contacts() {
           {query &&
             filteredActive.length === 0 &&
             filteredInvite.length === 0 && (
-              <EmptyState title="No matches" hint="Try a different name or number." />
+              <EmptyState
+                title="No matches"
+                hint="Try a different name or number."
+                action={{
+                  label: "Search ChiChat directly",
+                  onClick: () => navigate("/home", { state: { openNewChat: true } }),
+                }}
+              />
             )}
         </div>
       </div>

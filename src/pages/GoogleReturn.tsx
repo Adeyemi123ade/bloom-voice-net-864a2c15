@@ -21,6 +21,13 @@ export default function GoogleReturn() {
     checked.current = true;
 
     (async () => {
+      // getSession() queues behind the client's own in-flight session
+      // hydration (URL-hash parsing on web, or the setSession() call
+      // GoogleOAuthReturnListener already awaited on native) rather than
+      // just reading whatever's in memory right now — awaiting it first
+      // closes the race where check-google-signup could otherwise fire
+      // with no session yet attached and get treated as a hard failure.
+      await supabase.auth.getSession();
       const { data, error } = await supabase.functions.invoke<GoogleSignupCheck>("check-google-signup");
 
       if (error) {

@@ -28,11 +28,13 @@ import OutboundCall from "./pages/OutboundCall.tsx";
 import NewContact from "./pages/NewContact.tsx";
 import InviteFriends from "./pages/InviteFriends.tsx";
 import MicTest from "./pages/MicTest.tsx";
+import PrivacyPolicy from "./pages/PrivacyPolicy.tsx";
 import MessageNotifier from "./components/MessageNotifier.tsx";
 import IncomingCallScreen from "./components/IncomingCallScreen.tsx";
 import DeviceGate from "./components/DeviceGate.tsx";
 import ErrorBoundary from "./components/ErrorBoundary.tsx";
 import BackButtonGuard from "./components/BackButtonGuard.tsx";
+import GoogleOAuthReturnListener from "./components/GoogleOAuthReturnListener.tsx";
 
 const queryClient = new QueryClient();
 
@@ -44,6 +46,7 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
+            <GoogleOAuthReturnListener />
             <DeviceGate>
               <BackButtonGuard />
               <MessageNotifier />
@@ -72,6 +75,7 @@ const App = () => (
                   <Route path="/verify-device" element={<VerifyDevice />} />
                   <Route path="/dial/:number" element={<OutboundCall />} />
                   <Route path="/mic-test" element={<MicTest />} />
+                  <Route path="/terms" element={<PrivacyPolicy />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>

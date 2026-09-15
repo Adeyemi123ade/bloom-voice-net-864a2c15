@@ -4,7 +4,7 @@ import {
   saveCachedContacts,
   type DeviceContact,
 } from "@/lib/deviceContacts";
-import { countryFromE164, toE164 } from "@/lib/phone";
+import { getMyDefaultCountry, toE164 } from "@/lib/phone";
 
 const PENDING_KEY = "chichat:google_oauth:pending";
 
@@ -123,13 +123,7 @@ export async function syncGoogleContacts(): Promise<{ contacts: DeviceContact[],
   return { contacts: merged, warning: data?.warning };
 }
 
-async function getMyDefaultCountry() {
-  const { data } = await supabase.rpc("get_my_profile_private");
-  const row = Array.isArray(data) ? data[0] : data;
-  return countryFromE164((row as { phone?: string | null } | null)?.phone);
-}
-
-function normalizeImportedPhone(raw: string, defaultCountry?: ReturnType<typeof countryFromE164>) {
+function normalizeImportedPhone(raw: string, defaultCountry?: Awaited<ReturnType<typeof getMyDefaultCountry>>) {
   const e164 = toE164(raw, defaultCountry);
   if (e164) return e164;
 

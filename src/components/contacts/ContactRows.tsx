@@ -5,11 +5,29 @@ import { Button } from "@/components/ui/button";
 import { useLongPress } from "@/hooks/useLongPress";
 import { ActiveContact, InviteContact, initials } from "./contactsHelpers";
 
-export function EmptyState({ title, hint }: { title: string; hint: string }) {
+export function EmptyState({
+  title,
+  hint,
+  action,
+}: {
+  title: string;
+  hint: string;
+  action?: { label: string; onClick: () => void };
+}) {
   return (
     <div className="text-center py-10 px-4">
       <p className="text-sm font-semibold text-foreground">{title}</p>
       <p className="text-xs text-muted-foreground mt-1">{hint}</p>
+      {action && (
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={action.onClick}
+          className="mt-3 h-8 text-xs"
+        >
+          {action.label}
+        </Button>
+      )}
     </div>
   );
 }

@@ -194,7 +194,7 @@ export default function NewContact() {
 
   return (
     <MobileFrame>
-      <div className="min-h-full bg-background text-foreground flex flex-col">
+      <div className="h-full bg-background text-foreground flex flex-col overflow-y-auto">
         {/* Header */}
         <header className="px-4 pt-4 pb-3 flex items-center gap-3">
           <button
@@ -302,13 +302,6 @@ export default function NewContact() {
                 <span aria-hidden>📱</span>
                 {busy === "phone" ? "Saving…" : "Save to Phone Book"}
               </button>
-
-              <div className="rounded-xl bg-secondary/30 border border-border/30 px-3 py-3 flex gap-2">
-                <span aria-hidden className="text-blue-400 mt-0.5">ℹ️</span>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  Contacts are saved directly to your phone — not stored inside the app.
-                </p>
-              </div>
             </div>
           </div>
 

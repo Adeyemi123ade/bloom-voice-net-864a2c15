@@ -87,6 +87,42 @@ public; access control is enforced by Postgres RLS policies, not by hiding
 this key. Do not add the service-role key or any other secret to frontend
 code.
 
+## Administrative credential (separate from all of the above)
+
+A Supabase **Management API Personal Access Token** (`SUPABASE_ACCESS_TOKEN`
+in `.env.example`) is a different kind of credential from everything above —
+it authenticates *you* to administer the whole project (query the database
+directly, read Auth config, list/manage Edge Function secrets), not
+something any deployed function or the frontend ever reads. Treat it as
+maximally sensitive: it is not scoped to one function or one table the way
+an anon key or a single Edge Function secret is. Generate one only when
+doing hands-on privileged inspection/administration, and revoke it
+immediately afterward (Supabase Dashboard → Account → Access Tokens) rather
+than leaving a long-lived one configured anywhere.
+
+## Known cleanup candidates (live secrets, not yet removed)
+
+Found via a live Management API inspection (2026-09-15). None of these are
+actively harmful, but they're worth removing once confirmed unused:
+
+| Secret | Status |
+|---|---|
+| `LOVABLE_API_KEY` | Dormant. Only ever consumed by `auth-email-hook`, which is itself retired (see "Email architecture" above) but still deployed. Safe to remove once `auth-email-hook` is confirmed to have zero remaining callers. |
+| `GOOGLE_OAUTH_CLIENT_SECRETE` | Typo'd duplicate of `GOOGLE_OAUTH_CLIENT_SECRET` (extra trailing "E"). Code reads the correctly-spelled name; the typo'd one is unused. Safe to delete. |
+| `SEND_EMAIL_HOOK_SECRETE` | Typo'd, tied to the retired `auth-email-hook`/Send Email Hook. Safe to delete once that hook is confirmed unused. |
+
+## Deployed functions with no matching source in this repo
+
+Also found live but not tracked under `supabase/functions/`:
+
+| Function | Assessment |
+|---|---|
+| `auth-email-hook` | Confirmed retired (see "Email architecture" above) — full email-template bundle still deployed but should be inert while custom SMTP is active. |
+| `get-twilio-voice-token` | Bundle imports the old `deno.land/std@0.168.0/http/server.ts` pattern, not the `Deno.serve()` style every current function uses — strong signal this is a stale predecessor of `twilio-voice-token`, not a duplicate in active use. |
+| `check-signup-email-status` | No corresponding source anywhere in this repo. Possibly what `checkEmailStatus` in `src/lib/checkEmail.ts` actually calls under a different deployed name than expected — needs a direct look at its Dashboard source to confirm before any decision is made. |
+
+None of the three were deleted or modified — decommissioning needs confirmation that nothing still calls them.
+
 ## Rotation checklist
 
 If any secret above is ever exposed (pasted in chat, committed, logged,
