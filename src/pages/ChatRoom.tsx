@@ -79,6 +79,33 @@ async function fetchMessageRowWithRetry(
   return null;
 }
 
+// The realtime INSERT/UPDATE handlers below retry a blank-content row via
+// fetchMessageRowWithRetry — but a plain bulk `select("*")` (the initial
+// conversation load, and resync() after a reconnect) reads the exact same
+// replication-lag-affected rows with no such protection, so a message that
+// hasn't finished replicating yet gets normalized straight into a
+// blank-content bubble with no retry at all. Apply the same per-row retry
+// here so every path that can observe a freshly-inserted row is protected,
+// not just the realtime echo. A message's content is never legitimately
+// empty (see normalizeMessage above), so this only ever fires for the rare
+// lagging row, not on every load.
+async function reconcileBlankRows(rows: Record<string, unknown>[]): Promise<Message[]> {
+  const fixed = await Promise.all(
+    rows.map(async (row) => {
+      if (typeof row.content === "string" && row.content && !row.deleted_for_everyone) {
+        return normalizeMessage(row);
+      }
+      if (row.deleted_for_everyone) return normalizeMessage(row);
+      console.warn("[realtime] bulk-fetched row arrived with blank content, retrying", row.id);
+      const retried = await fetchMessageRowWithRetry(String(row.id));
+      if (retried) return normalizeMessage(retried);
+      console.error("[realtime] bulk-fetched row still blank after retries", row.id);
+      return normalizeMessage(row);
+    }),
+  );
+  return fixed;
+}
+
 function normalizeMessage(raw: Record<string, unknown>): Message {
   return {
     id: String(raw.id),
@@ -205,7 +232,7 @@ export default function ChatRoom() {
         .select("*")
         .eq("conversation_id", conversationId)
         .order("created_at", { ascending: true });
-      setMessages((msgs ?? []).map(normalizeMessage));
+      setMessages(await reconcileBlankRows(msgs ?? []));
     })();
   }, [user, conversationId]);
 
@@ -247,7 +274,7 @@ export default function ChatRoom() {
         .eq("conversation_id", conversationId)
         .order("created_at", { ascending: true });
       if (!data) return;
-      const fresh = data.map(normalizeMessage);
+      const fresh = await reconcileBlankRows(data);
       const freshIds = new Set(fresh.map((m) => m.id));
       setMessages((prev) => {
         const pending = prev.filter((m) => m.id.startsWith("tmp-") && !freshIds.has(m.id));
@@ -263,7 +290,18 @@ export default function ChatRoom() {
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "messages", filter: `conversation_id=eq.${conversationId}` },
         async (payload) => {
-          let incoming = normalizeMessage(payload.new as Record<string, unknown>);
+          const raw = payload.new as Record<string, unknown>;
+          // An event can carry no usable record at all (payload.errors set,
+          // `new` empty). There is no id to look the row up by, so fall back
+          // to the authoritative list for this conversation rather than
+          // appending an empty bubble — still driven by this realtime event,
+          // not by a timer.
+          if (!raw?.id) {
+            console.error("[realtime] INSERT payload unusable, resyncing", payload.errors);
+            await resync();
+            return;
+          }
+          let incoming = normalizeMessage(raw);
           // A realtime INSERT payload should always carry the real content —
           // but if one ever arrives blank (a dropped/partial event), trust
           // nothing and re-fetch that exact row by id, retrying with backoff
