@@ -12,7 +12,7 @@ import Login from "./pages/Login.tsx";
 import Welcome from "./pages/Welcome.tsx";
 import Home from "./pages/Home.tsx";
 import ChatRoom from "./pages/ChatRoom.tsx";
-import CallScreen from "./pages/CallScreen.tsx";
+import CallRoute from "./pages/CallRoute.tsx";
 import Contacts from "./pages/Contacts.tsx";
 import Profile from "./pages/Profile.tsx";
 import Settings from "./pages/Settings.tsx";
@@ -35,6 +35,7 @@ import DeviceGate from "./components/DeviceGate.tsx";
 import ErrorBoundary from "./components/ErrorBoundary.tsx";
 import BackButtonGuard from "./components/BackButtonGuard.tsx";
 import GoogleOAuthReturnListener from "./components/GoogleOAuthReturnListener.tsx";
+import ActiveCallHost from "./components/call/ActiveCallHost.tsx";
 
 const queryClient = new QueryClient();
 
@@ -60,7 +61,7 @@ const App = () => (
                   <Route path="/welcome" element={<Welcome />} />
                   <Route path="/home" element={<Home />} />
                   <Route path="/chat/:id" element={<ChatRoom />} />
-                  <Route path="/call/:id" element={<CallScreen />} />
+                  <Route path="/call/:id" element={<CallRoute />} />
                   <Route path="/contacts" element={<Contacts />} />
                   <Route path="/contacts/new" element={<NewContact />} />
                   <Route path="/invite" element={<InviteFriends />} />
@@ -79,6 +80,10 @@ const App = () => (
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>
+              </ErrorBoundary>
+              {/* Outside <Routes> so an ongoing call survives navigation. */}
+              <ErrorBoundary>
+                <ActiveCallHost />
               </ErrorBoundary>
             </DeviceGate>
           </BrowserRouter>

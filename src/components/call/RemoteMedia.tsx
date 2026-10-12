@@ -9,7 +9,12 @@ type Props = {
   localVideoTrack: AttachableVideoTrack | null;
   /** Remote camera track (the other party). */
   remoteVideoTrack: AttachableVideoTrack | null;
-  remoteAudioRef: React.RefObject<HTMLAudioElement>;
+  /**
+   * Optional. When omitted the caller owns the remote <audio> element (the
+   * call session keeps it mounted for the whole call, so audio continues
+   * while the call screen is minimised).
+   */
+  remoteAudioRef?: React.RefObject<HTMLAudioElement>;
   /** When true, swap which video is shown big vs in the small PiP tile. */
   swapped?: boolean;
   onSwap?: () => void;
@@ -164,13 +169,15 @@ const RemoteMedia = forwardRef<HTMLDivElement, Props>(
         ) : (
           <div className="flex-1" />
         )}
-        <audio
-          ref={remoteAudioRef}
-          autoPlay
-          playsInline
-          {...({ "webkit-playsinline": "true" } as Record<string, string>)}
-          className="hidden"
-        />
+        {remoteAudioRef && (
+          <audio
+            ref={remoteAudioRef}
+            autoPlay
+            playsInline
+            {...({ "webkit-playsinline": "true" } as Record<string, string>)}
+            className="hidden"
+          />
+        )}
       </>
     );
   },
