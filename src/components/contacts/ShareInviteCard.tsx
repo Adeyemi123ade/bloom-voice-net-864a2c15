@@ -270,7 +270,7 @@ export function ShareInviteCard() {
       <div className="mx-4 rounded-2xl bg-card border border-border shadow-sm overflow-hidden">
         <div
           className="p-6 text-center"
-          style={{ backgroundColor: "#0B5D3B" }}
+          style={{ backgroundColor: "hsl(var(--brand-deep))" }}
         >
           <div className="mx-auto w-16 h-16 flex items-center justify-center">
             <img

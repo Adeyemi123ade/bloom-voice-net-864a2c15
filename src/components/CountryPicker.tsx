@@ -34,7 +34,7 @@ export default function CountryPicker({ value, onChange }: Props) {
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="h-12 px-3 rounded-xl bg-secondary/40 border border-border/40 text-sm flex items-center gap-1.5 hover:bg-secondary/60 transition-colors shrink-0"
+          className="min-h-11 self-stretch px-3 rounded-lg bg-input border-[1.5px] border-border text-sm text-foreground flex items-center gap-1.5 hover:bg-secondary transition-colors shrink-0"
         >
           <span className="text-base leading-none">{current?.flag ?? "🌐"}</span>
           <span className="font-medium">+{current?.dial ?? "—"}</span>

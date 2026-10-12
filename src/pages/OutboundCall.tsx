@@ -187,7 +187,7 @@ export default function OutboundCall() {
         <div className="flex-1 flex flex-col items-center justify-center px-6 text-center gap-4">
           <div
             className="w-24 h-24 rounded-full flex items-center justify-center"
-            style={{ backgroundColor: "#0B5D3B" }}
+            style={{ backgroundColor: "hsl(var(--brand-deep))" }}
           >
             <Phone className="w-10 h-10" style={{ color: "#FFFFFF" }} />
           </div>
@@ -223,7 +223,7 @@ export default function OutboundCall() {
               onClick={hangUp}
               aria-label="End call"
               className="w-16 h-16 rounded-full flex items-center justify-center"
-              style={{ backgroundColor: "#0B5D3B", color: "#FFFFFF" }}
+              style={{ backgroundColor: "hsl(var(--brand-deep))", color: "#FFFFFF" }}
             >
               <PhoneOff className="w-6 h-6" />
             </button>
