@@ -80,6 +80,17 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
   const [search, setSearch] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+  // On touch screens the on-screen dial pad is the only way to enter a
+  // number. inputMode="none" alone is not honoured by every Android
+  // keyboard: focusing the field (which every key press used to do, to keep
+  // the cursor position) popped the phone's own keyboard up over the dial
+  // pad. So on touch devices the field is read-only, never focused, and keys
+  // append at the end like a phone dialer. Mouse/keyboard devices keep the
+  // editable field with cursor editing and typing.
+  const touchOnly = useMemo(
+    () => typeof window !== "undefined" && !!window.matchMedia?.("(pointer: coarse)").matches,
+    [],
+  );
 
   // Load contacts once per open
   const allContacts = useMemo<DeviceContact[]>(() => {
@@ -110,7 +121,7 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
   /** Insert a string at the current cursor position (or append). */
   const insertAtCursor = (chunk: string) => {
     const el = inputRef.current;
-    if (!el) {
+    if (!el || touchOnly) {
       setValue((v) => v + chunk);
       return;
     }
@@ -129,7 +140,7 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
 
   const backspace = () => {
     const el = inputRef.current;
-    if (!el) {
+    if (!el || touchOnly) {
       setValue((v) => v.slice(0, -1));
       return;
     }
@@ -159,6 +170,10 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
   };
 
   const longZero = () => {
+    if (touchOnly) {
+      setValue((v) => (v.endsWith("0") ? v.slice(0, -1) + "+" : v + "+"));
+      return;
+    }
     const el = inputRef.current;
     const caret = el?.selectionStart ?? value.length;
     if (caret > 0 && value[caret - 1] === "0") {
@@ -192,7 +207,7 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
-          className="max-w-[420px] w-full h-[100dvh] sm:h-[92vh] p-0 gap-0 bg-background top-0 left-1/2 -translate-x-1/2 translate-y-0 rounded-none sm:rounded-2xl border-0 shadow-2xl flex flex-col overflow-hidden pb-[calc(96px+env(safe-area-inset-bottom))] [&>button.absolute]:hidden"
+          className="max-w-[420px] w-full top-0 bottom-0 h-auto max-h-none sm:bottom-auto sm:h-[92vh] sm:max-h-[85vh] p-0 gap-0 bg-background left-1/2 -translate-x-1/2 translate-y-0 rounded-none sm:rounded-2xl border-0 shadow-2xl flex flex-col overflow-hidden pb-[calc(96px+env(safe-area-inset-bottom))] [&>button.absolute]:hidden"
         >
         <DialogTitle className="sr-only">Call</DialogTitle>
 
@@ -295,6 +310,7 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
               // is the ONLY input mechanism. Without inputMode="none" the
               // OS keyboard pops up on focus and the dialpad jumps around.
               inputMode="none"
+              readOnly={touchOnly}
               autoComplete="off"
               value={value}
               onChange={(e) => {
