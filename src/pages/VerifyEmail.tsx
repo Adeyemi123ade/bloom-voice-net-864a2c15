@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
-import MobileFrame from "@/components/MobileFrame";
+import AuthScreen from "@/components/auth/AuthScreen";
+import { authStyles } from "@/components/auth/authStyles";
 import BrandHero from "@/components/BrandHero";
 import { Button } from "@/components/ui/button";
 import {
@@ -112,97 +112,83 @@ export default function VerifyEmail() {
   if (!email) return null;
 
   return (
-    <MobileFrame>
-      <div className="h-full w-full flex flex-col bg-background overflow-y-auto">
-        <div className="px-4 pt-4">
-          <button
-            onClick={() => { clearVerifyEmailPending(); navigate("/register"); }}
-            aria-label="Back"
-            className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-secondary transition-colors -ml-1"
+    <AuthScreen onBack={() => { clearVerifyEmailPending(); navigate("/register"); }}>
+      <div className="mt-1 flex flex-col items-center">
+        <BrandHero
+          className="mb-5"
+          message={`Enter the 6-digit code we sent to ${email} to finish setting up your account.`}
+        />
+
+        <h1 className={`${authStyles.title} text-center`}>Check your email</h1>
+        <p className={`${authStyles.subtitle} text-center max-w-xs`}>
+          Code sent to{" "}
+          <span className="text-foreground font-semibold">{email}</span>.
+          It expires in 5 minutes.
+        </p>
+
+        <div className="mt-6 w-full flex justify-center">
+          <InputOTP
+            maxLength={OTP_LENGTH}
+            value={code}
+            onChange={handleChange}
+            autoFocus
+            inputMode="numeric"
+            pattern="^[0-9]+$"
+            disabled={verifying}
+            containerClassName="gap-2"
           >
-            <ArrowLeft className="w-5 h-5 text-foreground" />
-          </button>
+            <InputOTPGroup className="gap-2">
+              {Array.from({ length: OTP_LENGTH }, (_, i) => (
+                <InputOTPSlot
+                  key={i}
+                  index={i}
+                  className="h-14 w-11 text-lg font-bold border-[1.5px] border-border first:border-l rounded-xl first:rounded-xl last:rounded-xl bg-input"
+                />
+              ))}
+            </InputOTPGroup>
+          </InputOTP>
         </div>
 
-        <div className="flex-1 flex flex-col px-4 pt-2 pb-6 items-center">
-          <BrandHero
-            className="mt-1 mb-5"
-            message={`Enter the 6-digit code we sent to ${email} to finish setting up your account.`}
-          />
+        <p className={`${authStyles.footnote} mt-4`}>
+          {verifying ? "Verifying…" : "We'll verify it automatically when you finish typing."}
+        </p>
 
-          <h1 className="text-xl font-bold text-foreground text-center">
-            Check your email
-          </h1>
-          <p className="text-base text-muted-foreground text-center mt-2 leading-relaxed max-w-xs">
-            Code sent to{" "}
-            <span className="text-foreground font-semibold">{email}</span>.
-            It expires in 5 minutes.
-          </p>
+        <Button
+          onClick={() => verify(code)}
+          disabled={verifying || code.length !== OTP_LENGTH}
+          className={`${authStyles.primaryButton} mt-6`}
+        >
+          {verifying ? "Verifying…" : "Verify"}
+        </Button>
 
-          <div className="mt-7 w-full flex justify-center">
-            <InputOTP
-              maxLength={OTP_LENGTH}
-              value={code}
-              onChange={handleChange}
-              autoFocus
-              inputMode="numeric"
-              pattern="^[0-9]+$"
-              disabled={verifying}
-              containerClassName="gap-1.5"
+        <div className="mt-5 text-center">
+          {secondsLeft > 0 ? (
+            <p className={authStyles.footnote}>
+              Didn't get it? Resend in <span className="font-semibold text-foreground">{secondsLeft}s</span>
+            </p>
+          ) : (
+            <button
+              type="button"
+              onClick={resend}
+              disabled={resending}
+              className={`text-[13px] ${authStyles.link} disabled:opacity-50`}
             >
-              <InputOTPGroup className="gap-1.5">
-                {Array.from({ length: OTP_LENGTH }, (_, i) => (
-                  <InputOTPSlot
-                    key={i}
-                    index={i}
-                    className="h-12 w-9 text-base font-bold border-r border-border first:border-l rounded-md bg-input"
-                  />
-                ))}
-              </InputOTPGroup>
-            </InputOTP>
-          </div>
-
-          <p className="text-sm text-muted-foreground mt-4 text-center">
-            {verifying ? "Verifying…" : "We'll verify it automatically when you finish typing."}
-          </p>
-
-          <div className="mt-8 text-center">
-            {secondsLeft > 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Didn't get it? Resend in <span className="font-semibold text-foreground">{secondsLeft}s</span>
-              </p>
-            ) : (
-              <button
-                type="button"
-                onClick={resend}
-                disabled={resending}
-                className="text-sm font-semibold text-accent hover:underline disabled:opacity-50"
-              >
-                {resending ? "Sending…" : "Resend code"}
-              </button>
-            )}
-          </div>
-
-          <p className="text-sm text-muted-foreground mt-3 text-center">
-            Wrong email?{" "}
-            <Link
-              to="/register"
-              onClick={() => clearVerifyEmailPending()}
-              className="text-accent font-semibold hover:underline"
-            >
-              Start over
-            </Link>
-          </p>
-
-          <Button
-            onClick={() => verify(code)}
-            disabled={verifying || code.length !== OTP_LENGTH}
-            className="w-full max-w-xs h-11 mt-8 text-base bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg"
-          >
-            {verifying ? "Verifying…" : "Verify"}
-          </Button>
+              {resending ? "Sending…" : "Resend code"}
+            </button>
+          )}
         </div>
+
+        <p className={`${authStyles.footnote} mt-2`}>
+          Wrong email?{" "}
+          <Link
+            to="/register"
+            onClick={() => clearVerifyEmailPending()}
+            className={authStyles.link}
+          >
+            Start over
+          </Link>
+        </p>
       </div>
-    </MobileFrame>
+    </AuthScreen>
   );
 }
