@@ -21,6 +21,7 @@ import ContactInfoSheet from "@/components/chat/ContactInfoSheet";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { activeCallPath, getActiveCall } from "@/lib/activeCall";
 import { isReallyOnline } from "@/lib/presence";
 import { getSignedChatMediaUrl } from "@/lib/signedMedia";
 import { pickRecordingMimeType, extensionForMimeType, baseMimeType } from "@/lib/audioMime";
@@ -462,6 +463,14 @@ export default function ChatRoom() {
 
   const startCall = async (type: "voice" | "video") => {
     if (!user || !conversationId || !other) return;
+    // One call at a time. If a call is already running (e.g. minimised),
+    // take the user back to it instead of ringing someone else.
+    const activeCall = getActiveCall();
+    if (activeCall) {
+      if (activeCall.conversationId !== conversationId) toast({ title: "You're already in a call" });
+      navigate(activeCallPath(activeCall));
+      return;
+    }
     // First-call hint: ask Android to exempt us from battery optimizations so
     // FCM pushes wake the device reliably. No-op on web/iOS.
     if (!localStorage.getItem("chichat:battery-prompt-shown")) {

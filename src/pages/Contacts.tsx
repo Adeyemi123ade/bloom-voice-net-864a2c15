@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { activeCallPath, getActiveCall } from "@/lib/activeCall";
 import { formatDisplay } from "@/lib/phone";
 import {
   DeviceContact,
@@ -372,6 +373,12 @@ export default function Contacts() {
 
   const callActive = async (c: ActiveContact) => {
     if (!user) return;
+    const activeCall = getActiveCall();
+    if (activeCall) {
+      toast({ title: "You're already in a call" });
+      navigate(activeCallPath(activeCall));
+      return;
+    }
     if (!localStorage.getItem("chichat:battery-prompt-shown")) {
       void requestIgnoreBatteryOptimizations();
       localStorage.setItem("chichat:battery-prompt-shown", "1");

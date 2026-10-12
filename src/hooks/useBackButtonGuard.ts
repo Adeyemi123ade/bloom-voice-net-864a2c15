@@ -3,6 +3,7 @@ import { App as CapacitorApp } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { minimizeTarget } from "@/lib/activeCall";
 
 // Nothing in this app previously listened for the Android hardware/gesture
 // back button. Capacitor's default behavior when a WebView has no more
@@ -38,7 +39,24 @@ export function useBackButtonGuard() {
         // Never exit the app while signed in — only step back within it.
         // The dashboard is the floor; staying there is correct, not a bug.
         if (path === AUTH_ROOT_ROUTE) return;
-        navigate(-1);
+        // A screen opened with no in-app history behind it (from a
+        // notification, or a fresh launch straight into a chat or call) has
+        // nothing for navigate(-1) to go back to, and back would silently do
+        // nothing. Fall back to a sensible parent instead. On the call
+        // screen, Back minimises the call: it keeps running and a floating
+        // bubble brings the user back to it.
+        if (path.startsWith("/call/")) {
+          const t = minimizeTarget(path.slice("/call/".length), locationRef.current.state);
+          if ("back" in t) navigate(-1);
+          else navigate(t.to, { replace: true });
+          return;
+        }
+        const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0;
+        if (idx > 0) {
+          navigate(-1);
+        } else {
+          navigate(AUTH_ROOT_ROUTE, { replace: true });
+        }
         return;
       }
 
