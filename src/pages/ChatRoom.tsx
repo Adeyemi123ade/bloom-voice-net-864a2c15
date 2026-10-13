@@ -2,9 +2,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft, Send, Check, CheckCheck, Mic, Trash2, Pencil, X,
-  Paperclip, Copy, Share2, Phone, Video, Smile, MoreVertical, Search, Info,
+  Paperclip, Copy, Share2, Forward, Phone, Video, Smile, MoreVertical, Search, Info,
   Type, Loader2,
 } from "lucide-react";
+import ForwardSheet, { type ForwardResult } from "@/components/chat/ForwardSheet";
 import EmojiPicker, { Theme as EmojiTheme } from "emoji-picker-react";
 import type { EmojiClickData } from "emoji-picker-react";
 import { useTheme } from "next-themes";
@@ -174,6 +175,7 @@ export default function ChatRoom() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [forwardOpen, setForwardOpen] = useState(false);
   const [contactInfoOpen, setContactInfoOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -699,9 +701,12 @@ export default function ChatRoom() {
       return next;
     });
   };
+  // Long-press only ever ADDS to the selection. Toggling here meant any
+  // second trigger for the same press (browser contextmenu + our timer)
+  // immediately unselected the message again. Tapping still toggles.
   const selectFromLongPress = (id: string) => {
     longPressGuardUntil.current = Date.now() + 500;
-    toggleSelect(id);
+    setSelectedIds((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
   };
 
   // Jump from a search result straight to that message in the full chat —
@@ -737,13 +742,33 @@ export default function ChatRoom() {
     clearSelection();
   };
   const deleteForEveryone = async (msgs: Message[]) => {
-    const ids = msgs.map((m) => m.id);
-    if (ids.length === 0) return;
-    const { error } = await supabase
+    const ids = msgs.map((m) => m.id).filter((id) => !id.startsWith("tmp-"));
+    if (ids.length === 0) {
+      if (msgs.length) toast({ title: "Message is still sending", description: "Try again in a moment.", variant: "destructive" });
+      return;
+    }
+    // Ask for the updated rows back: an update the database's access rules
+    // block returns no error, just zero rows, which used to look like
+    // success while the message stayed put for everyone else.
+    const { data, error } = await supabase
       .from("messages")
       .update({ deleted_for_everyone: true, content: "" })
-      .in("id", ids);
-    if (error) toast({ title: "Delete failed", description: error.message, variant: "destructive" });
+      .in("id", ids)
+      .select("id");
+    const done = new Set((data ?? []).map((r) => r.id));
+    if (done.size) {
+      setMessages((prev) =>
+        prev.map((m) => (done.has(m.id) ? { ...m, deleted_for_everyone: true, content: "" } : m)),
+      );
+    }
+    if (error || done.size < ids.length) {
+      const missed = ids.length - done.size;
+      toast({
+        title: "Delete failed",
+        description: error?.message ?? (missed === 1 ? "That message couldn't be deleted for everyone." : `${missed} messages couldn't be deleted for everyone.`),
+        variant: "destructive",
+      });
+    }
     clearSelection();
   };
   const bulkDelete = async () => {
@@ -820,6 +845,34 @@ export default function ChatRoom() {
       }
     }
     clearSelection();
+  };
+  // Text to send when forwarding: the message itself, without the quoted
+  // reply line it may carry (same as WhatsApp). Files and voice notes are
+  // forwarded as-is, pointing at the same stored file.
+  const forwardContents = useMemo(
+    () =>
+      selectedList
+        .filter((m) => !m.deleted_for_everyone && !m.content.startsWith(CALL_PREFIX))
+        .map((m) => {
+          const c = m.content;
+          if (c.startsWith(VOICE_PREFIX) || c.startsWith(FILE_PREFIX) || !c.startsWith("> ")) return c;
+          const nl = c.indexOf("\n");
+          return nl > -1 ? c.slice(nl + 1) : c;
+        })
+        .filter((c) => c.trim().length > 0),
+    [selectedList],
+  );
+  const finishForward = ({ sent, failed }: ForwardResult) => {
+    setForwardOpen(false);
+    clearSelection();
+    // Only one toast shows at a time, so a partial result goes in one message.
+    if (!failed.length) toast({ title: `Forwarded to ${sent.join(", ")}` });
+    else
+      toast({
+        title: "Forward failed",
+        description: `${sent.length ? `Sent to ${sent.join(", ")}. ` : ""}Couldn't forward to ${failed.join(", ")}. Please try again.`,
+        variant: "destructive",
+      });
   };
   const replyMsg = (m: Message) => {
     setReplyTo(m);
@@ -1134,6 +1187,15 @@ export default function ChatRoom() {
                 className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
               >
                 <Share2 className="w-4 h-4 text-foreground" />
+              </button>
+            )}
+            {!anyCall && forwardContents.length > 0 && (
+              <button
+                aria-label="Forward"
+                onClick={() => setForwardOpen(true)}
+                className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
+              >
+                <Forward className="w-4 h-4 text-foreground" />
               </button>
             )}
             {selectionCount === 1 && allMine && !isOnlyDeleted && !isUneditable && (
@@ -1641,6 +1703,14 @@ export default function ChatRoom() {
           </div>
         )}
       </div>
+      {forwardOpen && user && (
+        <ForwardSheet
+          userId={user.id}
+          contents={forwardContents}
+          onClose={() => setForwardOpen(false)}
+          onDone={finishForward}
+        />
+      )}
       {deleteOpen && (
         <>
           <div
