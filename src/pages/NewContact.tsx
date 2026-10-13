@@ -15,6 +15,7 @@ import CountryPicker from "@/components/CountryPicker";
 import { allCountries, findByDialPrefix, type CountryEntry } from "@/lib/countries";
 import { parsePhoneNumberFromString, type CountryCode } from "libphonenumber-js";
 import { isTooManyDigits } from "@/lib/phone";
+import { useBackNavigation } from "@/hooks/useBackNavigation";
 
 async function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -27,6 +28,7 @@ async function fileToDataUrl(file: File): Promise<string> {
 
 export default function NewContact() {
   const navigate = useNavigate();
+  const { showBackArrow, goBack } = useBackNavigation("/contacts");
   const [params] = useSearchParams();
   const [name, setName] = useState("");
   const initialPhone = params.get("phone") ?? "";
@@ -71,13 +73,9 @@ export default function NewContact() {
           }
         }
       } catch { /* ignore */ }
-      // 3. From browser locale
-      try {
-        const loc = (navigator.languages?.[0] ?? navigator.language ?? "").split("-")[1]?.toUpperCase();
-        const all = allCountries();
-        const hit = all.find((c) => c.code === loc) ?? all.find((c) => c.code === "US");
-        if (hit) setCountry(hit);
-      } catch { /* ignore */ }
+      // 3. User's own country unknown: default to Nigeria (+234).
+      const ng = allCountries().find((c) => c.code === "NG");
+      if (ng) setCountry(ng);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -197,18 +195,22 @@ export default function NewContact() {
       <div className="h-full bg-background text-foreground flex flex-col overflow-y-auto">
         {/* Header */}
         <header className="px-4 pt-4 pb-3 flex items-center gap-3">
-          <button
-            onClick={() => navigate(-1)}
-            aria-label="Back"
-            className="w-9 h-9 rounded-xl bg-secondary/60 hover:bg-secondary flex items-center justify-center"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </button>
+          {showBackArrow && (
+            <button
+              onClick={goBack}
+              aria-label="Back"
+              className="w-9 h-9 rounded-xl bg-secondary/60 hover:bg-secondary flex items-center justify-center"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+          )}
           <h1 className="text-lg font-semibold">New Contact</h1>
         </header>
 
-        {/* Centered form column */}
-        <div className="flex-1 w-full mx-auto max-w-md px-5">
+        {/* Centered form column. Fields sit at the top and the save actions
+            are anchored at the bottom, so tall screens don't leave a block
+            of empty space under the buttons; short screens just scroll. */}
+        <div className="flex-1 w-full mx-auto max-w-md px-5 flex flex-col">
           {/* Avatar uploader */}
           <div className="flex justify-center pt-2 pb-6">
             <button
@@ -275,12 +277,10 @@ export default function NewContact() {
                   className="flex-1 min-w-0 h-12 px-4 rounded-xl bg-secondary/40 border border-border/40 text-sm placeholder:text-muted-foreground/70 focus:outline-none focus:border-primary/50"
                 />
               </div>
-              {e164 && (
-                <p className="text-2xs text-muted-foreground pl-1">Will save as {e164}</p>
-              )}
             </div>
+          </div>
 
-            <div className="space-y-3 pt-2">
+          <div className="mt-auto pt-8 pb-[calc(env(safe-area-inset-bottom)+20px)] space-y-3">
               <p className="text-xs font-semibold tracking-[0.15em] text-muted-foreground">
                 SAVE TO
               </p>
@@ -302,10 +302,7 @@ export default function NewContact() {
                 <span aria-hidden>📱</span>
                 {busy === "phone" ? "Saving…" : "Save to Phone Book"}
               </button>
-            </div>
           </div>
-
-          <div className="h-6" />
         </div>
       </div>
     </MobileFrame>

@@ -11,6 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { toE164, formatDisplay } from "@/lib/phone";
+import { useBackNavigation } from "@/hooks/useBackNavigation";
 
 function initials(name?: string | null) {
   if (!name) return "?";
@@ -19,6 +20,7 @@ function initials(name?: string | null) {
 
 export default function Profile() {
   const navigate = useNavigate();
+  const { showBackArrow, goBack } = useBackNavigation("/settings");
   const { user, loading } = useAuth();
   const [displayName, setDisplayName] = useState("");
   const [about, setAbout] = useState("");
@@ -129,14 +131,16 @@ export default function Profile() {
     <MobileFrame>
       <div className="h-full w-full flex flex-col bg-background overflow-y-auto">
         <div className="px-2 pt-4 pb-3 flex items-center gap-2 border-b border-border sticky top-0 bg-background z-10">
-          <button
-            onClick={() => navigate(-1)}
-            className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-secondary"
-            aria-label="Back"
-          >
-            <ArrowLeft className="w-5 h-5 text-foreground" />
-          </button>
-          <h1 className="text-sm font-semibold text-foreground">Profile</h1>
+          {showBackArrow && (
+            <button
+              onClick={goBack}
+              className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-secondary"
+              aria-label="Back"
+            >
+              <ArrowLeft className="w-5 h-5 text-foreground" />
+            </button>
+          )}
+          <h1 className={`text-sm font-semibold text-foreground ${showBackArrow ? "" : "pl-2"}`}>Profile</h1>
         </div>
 
         <div className="flex-1 px-6 py-5 flex flex-col items-center">

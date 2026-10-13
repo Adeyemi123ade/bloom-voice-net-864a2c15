@@ -48,11 +48,13 @@ import {
   setCustomRingtone,
   CustomRingtone,
 } from "@/lib/ringtones";
+import { useBackNavigation } from "@/hooks/useBackNavigation";
 
 const MAX_CUSTOM_BYTES = 3 * 1024 * 1024; // 3MB cap (localStorage friendly)
 
 export default function PhoneSettings() {
   const navigate = useNavigate();
+  const { showBackArrow, goBack } = useBackNavigation("/settings");
   const { user } = useAuth();
   const { theme, setTheme } = useTheme();
   const [themeOpen, setThemeOpen] = useState(false);
@@ -254,14 +256,16 @@ export default function PhoneSettings() {
       <div className="h-full w-full flex flex-col bg-background overflow-y-auto">
         {/* Header */}
         <div className="px-2 pt-4 pb-3 flex items-center gap-2 border-b border-border sticky top-0 bg-background z-10">
-          <button
-            onClick={() => navigate(-1)}
-            className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-secondary"
-            aria-label="Back"
-          >
-            <ArrowLeft className="w-5 h-5 text-foreground" />
-          </button>
-          <h1 className="text-sm font-semibold text-foreground">Phone settings</h1>
+          {showBackArrow && (
+            <button
+              onClick={goBack}
+              className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-secondary"
+              aria-label="Back"
+            >
+              <ArrowLeft className="w-5 h-5 text-foreground" />
+            </button>
+          )}
+          <h1 className={`text-sm font-semibold text-foreground ${showBackArrow ? "" : "pl-2"}`}>Phone settings</h1>
         </div>
 
         <div className="flex-1 px-3 py-4">

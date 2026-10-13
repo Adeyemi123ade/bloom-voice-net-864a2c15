@@ -23,6 +23,7 @@ import {
   hasNewChangesSinceBackup,
   type BackupRow,
 } from "@/lib/chatBackup";
+import { useBackNavigation } from "@/hooks/useBackNavigation";
 
 function bytesLabel(n: number) {
   if (n < 1024) return `${n} B`;
@@ -42,6 +43,7 @@ function friendly(e: unknown): string {
 
 export default function ChatBackup() {
   const navigate = useNavigate();
+  const { showBackArrow, goBack } = useBackNavigation("/settings");
   const { user, loading } = useAuth();
   const [backup, setBackup] = useState<BackupRow | null>(null);
   const [backingUp, setBackingUp] = useState(false);
@@ -112,14 +114,16 @@ export default function ChatBackup() {
     <MobileFrame>
       <div className="h-full w-full flex flex-col bg-background overflow-y-auto">
         <div className="px-2 pt-4 pb-3 flex items-center gap-2 border-b border-border sticky top-0 bg-background z-10">
-          <button
-            onClick={() => navigate(-1)}
-            className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-secondary"
-            aria-label="Back"
-          >
-            <ArrowLeft className="w-5 h-5 text-foreground" />
-          </button>
-          <h1 className="text-lg font-bold text-foreground">Chat backup</h1>
+          {showBackArrow && (
+            <button
+              onClick={goBack}
+              className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-secondary"
+              aria-label="Back"
+            >
+              <ArrowLeft className="w-5 h-5 text-foreground" />
+            </button>
+          )}
+          <h1 className={`text-lg font-bold text-foreground ${showBackArrow ? "" : "pl-2"}`}>Chat backup</h1>
         </div>
 
         <div className="flex-1 px-4 py-4 flex flex-col gap-4">
