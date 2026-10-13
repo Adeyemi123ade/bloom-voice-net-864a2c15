@@ -129,7 +129,7 @@ Deno.serve(async (req) => {
         Deno.env.get("SUPABASE_URL")!,
         Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
       );
-      await admin.from("google_oauth_tokens").upsert({
+      const { error: saveErr } = await admin.from("google_oauth_tokens").upsert({
         user_id: user.id,
         access_token: tokens.access_token,
         refresh_token: tokens.refresh_token ?? null,
@@ -139,6 +139,14 @@ Deno.serve(async (req) => {
         google_email: email,
         updated_at: new Date().toISOString(),
       }, { onConflict: "user_id" });
+      // The save result was never checked, so a refused save (e.g. the live
+      // table missing its user_id primary key, which ON CONFLICT needs)
+      // still reported "Google connected" while nothing was stored, and the
+      // next sync then said "not connected".
+      if (saveErr) {
+        console.error("google-oauth-callback: failed to save Google tokens", { userId: user.id, code: saveErr.code, message: saveErr.message });
+        return json({ error: `Could not save the Google connection: ${saveErr.message}` }, 500);
+      }
 
       return json({ ok: true, email });
     }
