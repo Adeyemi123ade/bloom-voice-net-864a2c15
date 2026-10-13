@@ -1,5 +1,5 @@
 import { Check } from "lucide-react";
-import { scorePassword } from "@/lib/passwordStrength";
+import { PASSWORD_RULES, scorePassword } from "@/lib/passwordStrength";
 
 interface Props {
   password: string;
@@ -7,45 +7,51 @@ interface Props {
 }
 
 /**
- * Three-segment progress bar that shades segments based on password strength.
- *   Weak    → 1 red segment
- *   Average → 2 amber segments
- *   Strong  → 3 green segments + check mark
+ * Live password feedback under the password field:
+ *   - a three-segment meter (Weak / Average / Strong) once the user types
+ *   - ONE line of the rules ("8+ characters, a to z, A to Z, 0 to 9, ! @ # ?"),
+ *     shown from the start, each part turning green with a tick when met.
  */
 export default function PasswordStrengthBar({ password, className = "" }: Props) {
-  if (!password) return null;
   const { level, label } = scorePassword(password);
 
-  const colorClass =
-    level === 3
-      ? "bg-[hsl(var(--accent))]"
-      : level === 2
-      ? "bg-amber-400"
-      : "bg-destructive";
-
-  const labelColor =
-    level === 3
-      ? "text-[hsl(var(--accent))]"
-      : level === 2
-      ? "text-amber-400"
-      : "text-destructive";
+  const colorClass = level === 3 ? "bg-accent" : level === 2 ? "bg-warning" : "bg-destructive";
+  const labelColor = level === 3 ? "text-accent" : level === 2 ? "text-warning" : "text-destructive";
 
   return (
     <div className={`mt-2 ${className}`} aria-live="polite">
-      <div className="flex gap-1.5">
-        {[1, 2, 3].map((seg) => (
-          <div
-            key={seg}
-            className={`h-1.5 flex-1 rounded-full transition-colors ${
-              seg <= level ? colorClass : "bg-secondary"
-            }`}
-          />
-        ))}
-      </div>
-      <div className={`mt-1 flex items-center gap-1 text-xs font-medium ${labelColor}`}>
-        <span>{label} password</span>
-        {level === 3 && <Check className="w-3.5 h-3.5" />}
-      </div>
+      {password && (
+        <>
+          <div className="flex gap-1.5">
+            {[1, 2, 3].map((seg) => (
+              <div
+                key={seg}
+                className={`h-1.5 flex-1 rounded-full transition-colors ${seg <= level ? colorClass : "bg-secondary"}`}
+              />
+            ))}
+          </div>
+          <div className={`mt-1 flex items-center gap-1 text-xs font-semibold ${labelColor}`}>
+            <span>{label} password</span>
+            {level === 3 && <Check className="w-3.5 h-3.5" />}
+          </div>
+        </>
+      )}
+      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+        {PASSWORD_RULES.map((rule, i) => {
+          const met = rule.test(password);
+          return (
+            <span key={rule.key}>
+              <span
+                className={`inline-flex items-center gap-0.5 transition-colors ${met ? "text-accent font-semibold" : ""}`}
+              >
+                {met && <Check className="w-3 h-3" aria-hidden />}
+                {rule.hint}
+              </span>
+              {i < PASSWORD_RULES.length - 1 && ", "}
+            </span>
+          );
+        })}
+      </p>
     </div>
   );
 }
