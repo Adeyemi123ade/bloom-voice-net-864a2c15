@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "@/hooks/use-toast";
+import { getActiveCall } from "@/lib/activeCall";
 import { getSelectedRingtone, playRingtone } from "@/lib/ringtones";
 import { startNativeCallNotifications } from "@/lib/nativeCallNotifications";
 import { registerForCallPush } from "@/lib/fcmRegistration";
@@ -221,6 +222,13 @@ export default function IncomingCallScreen() {
 
   const accept = async () => {
     const c = incoming;
+    // Answering would mean dropping the call already in progress; ask the
+    // user to end that one first. The ringing call stays up so they can
+    // still decline it.
+    if (getActiveCall()) {
+      toast({ title: "End your current call to answer this one" });
+      return;
+    }
     try {
       await prepareCallMedia(c.call_type === "video");
     } catch (error) {
