@@ -24,17 +24,17 @@ const CSS = `
 }
 .chichat-splash .carousel { position: absolute; inset: 0; z-index: 0; }
 .chichat-splash .track {
-  display: flex; height: 100%; width: 600%;
-  animation: chichat-slide 24s linear infinite;
+  display: flex; height: 100%; width: 1200%;
+  animation: chichat-slide 48s linear infinite;
 }
 .chichat-splash .track img {
-  width: calc(100% / 6); height: 100%;
+  width: calc(100% / 12); height: 100%;
   object-fit: cover; object-position: center 8%;
   flex-shrink: 0; opacity: 0.42;
 }
 @keyframes chichat-slide {
   0% { transform: translateX(0); }
-  100% { transform: translateX(-83.3333%); }
+  100% { transform: translateX(-50%); }
 }
 .chichat-splash .tint {
   position: absolute; inset: 0; z-index: 1;
@@ -94,8 +94,8 @@ const CSS = `
   animation: chichat-rise 0.8s cubic-bezier(0.22,1,0.36,1) 1.2s both;
 }
 .chichat-splash .logo-icon img {
-  width: clamp(64px, 13vh, 104px);
-  height: clamp(64px, 13vh, 104px);
+  width: clamp(76px, 15vh, 124px);
+  height: clamp(76px, 15vh, 124px);
   object-fit: contain;
   filter: drop-shadow(0 4px 12px rgba(0,0,0,0.35));
 }
@@ -107,7 +107,7 @@ const CSS = `
   margin-bottom: 10px;
   animation: chichat-rise 0.8s cubic-bezier(0.22,1,0.36,1) 1.35s both;
 }
-.chichat-splash .wordmark em { color: #22C55E; font-style: normal; }
+.chichat-splash .wordmark em { color: hsl(var(--accent)); font-style: normal; }
 .chichat-splash .tagline {
   font-family: 'DM Sans', sans-serif;
   font-size: clamp(10px, 1.6vh, 12px);
@@ -138,12 +138,12 @@ const CSS = `
 }
 .chichat-splash .cta {
   width: 141px; height: 42px; border-radius: 21px; border: none;
-  background: linear-gradient(120deg, #22C55E 0%, #16A34A 100%);
+  background: linear-gradient(120deg, hsl(var(--accent)) 0%, hsl(var(--primary)) 100%);
   color: #fff;
   font-family: 'Syne', sans-serif;
   font-size: 13px; font-weight: 700; letter-spacing: 0.05em;
   cursor: pointer;
-  box-shadow: 0 6px 20px rgba(34,197,94,0.38), inset 0 1px 0 rgba(255,255,255,0.18);
+  box-shadow: 0 6px 20px hsl(var(--accent) / 0.38), inset 0 1px 0 rgba(255,255,255,0.18);
   position: relative; overflow: hidden;
   transition: transform 0.13s;
 }
@@ -161,7 +161,7 @@ const CSS = `
 }
 .chichat-splash .signin button {
   background: none; border: none; padding: 0; margin-left: 4px;
-  color: #22C55E; font-weight: 700; cursor: pointer;
+  color: hsl(var(--accent)); font-weight: 700; cursor: pointer;
   font-family: inherit; font-size: inherit;
   text-decoration: underline; text-underline-offset: 3px;
 }
@@ -170,37 +170,31 @@ const CSS = `
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Tablet: reorient as a centered portrait column instead of full-bleed landscape */
+/* Tablet and desktop: no decorative phone frame and no boxed column. The
+   frame is a phone-only touch (it echoes the device's own rounded screen);
+   on larger screens it just looks like a box drawn round the page, so the
+   photo backdrop runs full screen and only the content stays centred. */
 @media (min-width: 768px) {
-  .chichat-splash { background: #000; }
-  .chichat-splash .carousel,
-  .chichat-splash .tint,
-  .chichat-splash .frame-outer,
-  .chichat-splash .frame-inner,
-  .chichat-splash .content {
-    left: 50%;
-    right: auto;
-    transform: translateX(-50%);
-    width: min(460px, 100%);
-    max-width: 460px;
-  }
-  .chichat-splash .frame-outer,
-  .chichat-splash .frame-inner {
-    transform: translateX(-50%);
-  }
-}
-
-/* Desktop: drop the decorative phone frame entirely for a mature look */
-@media (min-width: 1024px) {
   .chichat-splash .frame-outer,
   .chichat-splash .frame-inner {
     display: none !important;
   }
-  .chichat-splash .carousel,
-  .chichat-splash .tint,
+  .chichat-splash .track img { object-position: center 22%; }
   .chichat-splash .content {
+    left: 50%; right: auto;
+    transform: translateX(-50%);
     width: min(520px, 100%);
-    max-width: 520px;
+  }
+}
+
+/* Desktop: a portrait photo stretched across a wide screen turns into one
+   huge, blurry, cropped face. Show the photos as a row of portrait tiles at
+   their natural proportions instead, drifting slowly across the screen. */
+@media (min-width: 1024px) {
+  .chichat-splash .track { width: max-content; animation-duration: 90s; }
+  .chichat-splash .track img {
+    width: calc(100vh * 0.62); object-position: center 12%;
+    border-right: 2px solid #07090C;
   }
 }
 `;
@@ -219,8 +213,9 @@ export default function SplashScreen({ onGetStarted, onSignIn }: Props) {
     document.head.appendChild(style);
   }, []);
 
-  // Duplicate first image at end so the loop is seamless (matches -83.3333% shift)
-  const trackImages = [...IMAGES, IMAGES[0]];
+  // Two copies of the set; the track slides by exactly one set (-50%), so
+  // the loop is seamless on every screen size.
+  const trackImages = [...IMAGES, ...IMAGES];
 
   return (
     <div className="chichat-splash">

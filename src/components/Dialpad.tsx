@@ -274,7 +274,7 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
                     onClick={() => placeCall(c.phones[0])}
                     aria-label={`Call ${c.name}`}
                     className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors"
-                    style={{ backgroundColor: "#0B5D3B", color: "#FFFFFF" }}
+                    style={{ backgroundColor: "hsl(var(--brand-deep))", color: "#FFFFFF" }}
                   >
                     <Phone className="w-4 h-4" />
                   </button>
@@ -337,7 +337,7 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
                   }
                 }}
                 className="h-14 rounded-xl flex flex-col items-center justify-center transition-colors"
-                style={{ backgroundColor: "#0B5D3B", color: "#FFFFFF" }}
+                style={{ backgroundColor: "hsl(var(--brand-deep))", color: "#FFFFFF" }}
               >
                 <span className="text-xl font-semibold leading-none" style={{ color: "#FFFFFF" }}>
                   {k.d}
@@ -361,7 +361,7 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
             disabled={!value}
             aria-label="Call"
             className="h-14 rounded-xl flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-40 transition-colors"
-            style={{ backgroundColor: "#0B5D3B", color: "#FFFFFF" }}
+            style={{ backgroundColor: "hsl(var(--brand-deep))", color: "#FFFFFF" }}
           >
             <Phone className="w-6 h-6" />
           </button>

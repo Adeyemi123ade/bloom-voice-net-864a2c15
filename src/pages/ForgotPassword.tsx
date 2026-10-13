@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { z } from "zod";
-import { ArrowLeft } from "lucide-react";
-import MobileFrame from "@/components/MobileFrame";
+import AuthScreen from "@/components/auth/AuthScreen";
+import { authStyles } from "@/components/auth/authStyles";
+import BrandHero from "@/components/BrandHero";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -47,62 +48,47 @@ export default function ForgotPassword() {
   };
 
   return (
-    <MobileFrame>
-      <div className="h-full w-full flex flex-col px-5 pt-5 pb-5 overflow-y-auto">
-        <button
-          onClick={() => navigate("/login")}
-          aria-label="Back"
-          className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-secondary transition-colors -ml-1"
-        >
-          <ArrowLeft className="w-5 h-5 text-foreground" />
-        </button>
+    <AuthScreen onBack={() => navigate("/login")}>
+      <div className="mt-1">
+        <BrandHero className="mb-5" />
+        <h1 className={authStyles.title}>Forgot your password?</h1>
+        <p className={authStyles.subtitle}>
+          Enter your email and we'll send you a 6-digit code to reset it.
+        </p>
+      </div>
 
-        <div className="mt-2">
-          <h1 className="text-xl font-bold text-foreground leading-tight">
-            Forgot your password?
-          </h1>
-          <p className="text-base text-muted-foreground mt-1">
-            Enter your email and we'll send you a 6-digit code to reset it.
-          </p>
+      <form onSubmit={handleSubmit} className="mt-4 flex flex-col">
+        <div>
+          <Label htmlFor="email" className={authStyles.label}>
+            Email address
+          </Label>
+          <Input
+            id="email"
+            type="email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            maxLength={255}
+            autoFocus
+            className="mt-1.5"
+            aria-invalid={!!error}
+          />
+          {error && <p className={authStyles.error}>{error}</p>}
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-5 flex-1 flex flex-col">
-          <div>
-            <Label htmlFor="email" className="text-sm text-muted-foreground">
-              Email address
-            </Label>
-            <Input
-              id="email"
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              maxLength={255}
-              autoFocus
-              className="mt-1 h-11 text-base bg-input border-border text-foreground placeholder:text-muted-foreground"
-              aria-invalid={!!error}
-            />
-            {error && <p className="text-sm text-destructive mt-1">{error}</p>}
-          </div>
-
-          <div className="mt-auto pt-4">
-            <Button
-              type="submit"
-              disabled={submitting}
-              className="w-full h-11 text-base bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg"
-            >
-              {submitting ? "Sending…" : "Send code"}
-            </Button>
-            <p className="text-sm text-muted-foreground text-center mt-3">
-              Remembered it?{" "}
-              <Link to="/login" className="text-accent font-semibold hover:underline">
-                Sign in
-              </Link>
-            </p>
-          </div>
-        </form>
-      </div>
-    </MobileFrame>
+        <div className="pt-5">
+          <Button type="submit" disabled={submitting} className={authStyles.primaryButton}>
+            {submitting ? "Sending…" : "Send code"}
+          </Button>
+          <p className={`${authStyles.footnote} mt-4`}>
+            Remembered it?{" "}
+            <Link to="/login" className={authStyles.link}>
+              Sign in
+            </Link>
+          </p>
+        </div>
+      </form>
+    </AuthScreen>
   );
 }

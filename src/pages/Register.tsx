@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { z } from "zod";
-import { ArrowLeft, Eye, EyeOff } from "lucide-react";
-import MobileFrame from "@/components/MobileFrame";
+import { Eye, EyeOff } from "lucide-react";
+import AuthScreen, { AuthDivider } from "@/components/auth/AuthScreen";
+import { authStyles } from "@/components/auth/authStyles";
 import BrandHero from "@/components/BrandHero";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -345,23 +346,14 @@ export default function Register() {
 
   // ---------- Registration form ----------
   return (
-    <MobileFrame>
-      <div className="h-full w-full overflow-y-auto flex justify-center bg-background">
-        <div className="w-full max-w-sm sm:max-w-md flex flex-col px-5 sm:px-6 pt-6 pb-6 min-h-full">
-          <button
-            onClick={() => navigate("/")}
-            aria-label="Back"
-            className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-secondary transition-colors -ml-1"
-          >
-            <ArrowLeft className="w-5 h-5 text-foreground" />
-          </button>
+    <AuthScreen onBack={() => navigate("/")}>
 
-          <div className="mt-2">
+          <div className="mt-1">
             <BrandHero
-              className="mb-3"
+              className="mb-5"
               message="Join Chichat and experience the possibilities."
             />
-            <h1 className="text-xl font-bold text-foreground leading-tight">
+            <h1 className={authStyles.title}>
               {googleVerified ? "Finish setting up" : "Create your account"}
             </h1>
             {googleVerified && (
@@ -372,10 +364,10 @@ export default function Register() {
           </div>
 
 
-          <form onSubmit={handleSubmit} className="mt-4 flex-1 flex flex-col">
-            <div className="space-y-3">
+          <form onSubmit={handleSubmit} className="mt-4 flex flex-col">
+            <div className={authStyles.fieldGap}>
               <div>
-                <Label htmlFor="name" className="text-sm text-muted-foreground">
+                <Label htmlFor="name" className={authStyles.label}>
                   Full name
                 </Label>
                 <Input
@@ -386,7 +378,7 @@ export default function Register() {
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Jane Doe"
                   maxLength={60}
-                  className="mt-1 h-11 text-base bg-input border-border text-foreground placeholder:text-muted-foreground"
+                  className="mt-1.5"
                   aria-invalid={!!errors.name}
                 />
                 {errors.name && (
@@ -395,7 +387,7 @@ export default function Register() {
               </div>
 
               <div>
-                <Label htmlFor="email" className="text-sm text-muted-foreground">
+                <Label htmlFor="email" className={authStyles.label}>
                   Email address
                 </Label>
                 <Input
@@ -418,7 +410,7 @@ export default function Register() {
                   placeholder="you@example.com"
                   maxLength={255}
                   readOnly={googleVerified}
-                  className={`mt-1 h-11 text-base bg-input border-border text-foreground placeholder:text-muted-foreground ${googleVerified ? "opacity-80" : ""}`}
+                  className={`mt-1.5 ${googleVerified ? "opacity-80" : ""}`}
                   aria-invalid={!!errors.email}
                 />
                 {googleVerified && (
@@ -435,10 +427,10 @@ export default function Register() {
               </div>
 
               <div>
-                <Label htmlFor="phone" className="text-sm text-muted-foreground">
+                <Label htmlFor="phone" className={authStyles.label}>
                   Phone number
                 </Label>
-                <div className="mt-1 flex gap-2">
+                <div className="mt-1.5 flex gap-2">
                   <CountryPicker
                     value={country.code}
                     onChange={(c) => setCountry(c)}
@@ -470,7 +462,7 @@ export default function Register() {
                     }}
                     placeholder="801 234 5678"
                     maxLength={20}
-                    className="flex-1 h-12 text-base bg-input border-border text-foreground placeholder:text-muted-foreground"
+                    className="flex-1"
                     aria-invalid={!!errors.phone}
                   />
                 </div>
@@ -481,10 +473,10 @@ export default function Register() {
               </div>
 
               <div>
-                <Label htmlFor="password" className="text-sm text-muted-foreground">
+                <Label htmlFor="password" className={authStyles.label}>
                   Password
                 </Label>
-                <div className="relative mt-1">
+                <div className="relative mt-1.5">
                   <Input
                     id="password"
                     type={showPwd ? "text" : "password"}
@@ -493,16 +485,16 @@ export default function Register() {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="At least 8 characters"
                     maxLength={72}
-                    className="h-11 text-base bg-input border-border text-foreground placeholder:text-muted-foreground pr-10"
+                    className="pr-11"
                     aria-invalid={!!errors.password}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPwd((s) => !s)}
                     aria-label={showPwd ? "Hide password" : "Show password"}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                   >
-                    {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    {showPwd ? <EyeOff className="w-[18px] h-[18px]" /> : <Eye className="w-[18px] h-[18px]" />}
                   </button>
                 </div>
                 <PasswordStrengthBar password={password} />
@@ -512,7 +504,7 @@ export default function Register() {
               </div>
 
               <div>
-                <Label htmlFor="confirmPassword" className="text-sm text-muted-foreground">
+                <Label htmlFor="confirmPassword" className={authStyles.label}>
                   Confirm password
                 </Label>
                 <Input
@@ -523,7 +515,7 @@ export default function Register() {
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Re-enter password"
                   maxLength={72}
-                  className="mt-1 h-11 text-base bg-input border-border text-foreground placeholder:text-muted-foreground"
+                  className="mt-1.5"
                   aria-invalid={!!errors.confirmPassword}
                 />
                 {errors.confirmPassword && (
@@ -532,27 +524,23 @@ export default function Register() {
               </div>
             </div>
 
-            <div className="mt-auto pt-4">
+            <div className="pt-5">
               <Button
                 type="submit"
                 disabled={submitting}
-                className="w-full h-11 text-base bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg"
+                className={authStyles.primaryButton}
               >
                 {submitting ? (googleVerified ? "Finishing…" : "Creating account…") : (googleVerified ? "Finish & continue" : "Continue")}
               </Button>
               {!googleVerified && (
                 <>
-                  <div className="flex items-center gap-2 my-3">
-                    <div className="flex-1 h-px bg-border" />
-                    <span className="text-xs text-muted-foreground uppercase tracking-wider">or</span>
-                    <div className="flex-1 h-px bg-border" />
-                  </div>
+                  <AuthDivider />
                   <Button
                     type="button"
                     onClick={handleGoogle}
                     disabled={googleLoading}
                     variant="outline"
-                    className="w-full h-11 text-base font-semibold rounded-lg gap-2"
+                    className={authStyles.secondaryButton}
                   >
                     <svg className="w-4 h-4" viewBox="0 0 24 24" aria-hidden="true">
                       <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -564,13 +552,13 @@ export default function Register() {
                   </Button>
                 </>
               )}
-              <p className="text-sm text-muted-foreground text-center mt-3">
+              <p className={`${authStyles.footnote} mt-4`}>
                 Already have an account?{" "}
-                <Link to="/login" className="text-accent font-semibold hover:underline">
+                <Link to="/login" className={authStyles.link}>
                   Sign in
                 </Link>
               </p>
-              <div className={`flex items-start gap-2 mt-3 px-1 ${agreeError ? "text-destructive" : ""}`}>
+              <div className={`flex items-center gap-2.5 mt-4 px-1 ${agreeError ? "text-destructive" : ""}`}>
                 <Checkbox
                   id="agree-policy"
                   checked={agreedToPolicy}
@@ -579,11 +567,11 @@ export default function Register() {
                     if (v === true) setAgreeError(false);
                   }}
                   aria-invalid={agreeError}
-                  className={`mt-0.5 ${agreeError ? "border-destructive" : ""}`}
+                  className={agreeError ? "border-destructive" : ""}
                 />
                 <Label
                   htmlFor="agree-policy"
-                  className={`text-sm font-normal leading-snug cursor-pointer ${agreeError ? "text-destructive" : "text-foreground"}`}
+                  className={`text-[13px] font-normal leading-snug cursor-pointer ${agreeError ? "text-destructive" : "text-foreground"}`}
                 >
                   I agree to the{" "}
                   <Link to="/terms" className="text-primary underline underline-offset-2">
@@ -594,8 +582,6 @@ export default function Register() {
               </div>
             </div>
           </form>
-        </div>
-      </div>
-    </MobileFrame>
+    </AuthScreen>
   );
 }

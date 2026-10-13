@@ -29,6 +29,8 @@ export default {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
+        // Deep ChiChat green for header cards and solid brand surfaces.
+        "brand-deep": "hsl(var(--brand-deep))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         primary: {
