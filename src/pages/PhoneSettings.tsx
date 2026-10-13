@@ -119,10 +119,13 @@ export default function PhoneSettings() {
         setSyncing(true);
         const { contacts: list, warning } = await syncGoogleContacts();
         toast({
-          title: list.length === 0 ? (warning || "No contacts found") : "Contacts synced",
+          title: list.length === 0 ? "No contacts imported" : "Contacts synced",
+          // The server's warning names the real reason (API disabled, request
+          // refused, contacts without numbers, or an empty account); show it
+          // instead of always claiming the account has no contacts.
           description:
             list.length === 0
-              ? "This Google account has no saved contacts with phone numbers."
+              ? (warning || "This Google account has no saved contacts with phone numbers.")
               : `${list.length} contacts loaded.`,
         });
       } catch (e) {
@@ -158,10 +161,13 @@ export default function PhoneSettings() {
     try {
       const { contacts: list, warning } = await syncGoogleContacts();
       toast({
-        title: list.length === 0 ? (warning || "No contacts found") : "Contacts synced",
+        title: list.length === 0 ? "No contacts imported" : "Contacts synced",
+        // The server's warning names the real reason (API disabled, request
+        // refused, contacts without numbers, or an empty account); show it
+        // instead of always claiming the account has no contacts.
         description:
           list.length === 0
-            ? "This Google account has no saved contacts with phone numbers."
+            ? (warning || "This Google account has no saved contacts with phone numbers.")
             : `${list.length} contacts loaded.`,
       });
     } catch (e) {
