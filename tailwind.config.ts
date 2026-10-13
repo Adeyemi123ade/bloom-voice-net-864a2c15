@@ -31,6 +31,7 @@ export default {
         ring: "hsl(var(--ring))",
         // Deep ChiChat green for header cards and solid brand surfaces.
         "brand-deep": "hsl(var(--brand-deep))",
+        warning: "hsl(var(--warning))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         primary: {

@@ -9,16 +9,20 @@ import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import PasswordStrengthBar from "@/components/PasswordStrengthBar";
+import PasswordMatchHint from "@/components/PasswordMatchHint";
+import { firstUnmetPasswordRule } from "@/lib/passwordStrength";
 import { clearRecoveryPending } from "@/lib/recoveryPending";
 
 const schema = z
   .object({
     password: z
       .string()
-      .min(8, { message: "Password must be at least 8 characters" })
       .max(72)
-      .regex(/[A-Z]/, { message: "Include at least one uppercase letter" })
-      .regex(/[0-9]/, { message: "Include at least one number" }),
+      // Same rules the live hint under the field shows (src/lib/passwordStrength).
+      .superRefine((p, ctx) => {
+        const unmet = firstUnmetPasswordRule(p);
+        if (unmet) ctx.addIssue({ code: "custom", message: unmet.message });
+      }),
     confirm: z.string(),
   })
   .refine((d) => d.password === d.confirm, {
@@ -149,8 +153,10 @@ export default function ResetPassword() {
                 className="mt-1 h-11 text-base bg-input border-border text-foreground placeholder:text-muted-foreground"
                 aria-invalid={!!errors.confirm}
               />
-              {errors.confirm && (
+              {errors.confirm ? (
                 <p className="text-sm text-destructive mt-1">{errors.confirm}</p>
+              ) : (
+                <PasswordMatchHint password={password} confirm={confirm} />
               )}
             </div>
           </div>
