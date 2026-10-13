@@ -165,6 +165,15 @@ const CSS = `
   font-family: inherit; font-size: inherit;
   text-decoration: underline; text-underline-offset: 3px;
 }
+.chichat-splash .legal {
+  margin-top: 12px;
+  display: flex; gap: 8px; justify-content: center;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 10px; color: rgba(255,255,255,0.55);
+}
+.chichat-splash .legal a {
+  color: rgba(255,255,255,0.75); text-decoration: underline; text-underline-offset: 3px;
+}
 @keyframes chichat-rise {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
@@ -253,6 +262,13 @@ export default function SplashScreen({ onGetStarted, onSignIn }: Props) {
               Already have an account?
               <button type="button" onClick={onSignIn}>Sign in</button>
             </div>
+            {/* Required for app-store / Google OAuth review: the home page
+                must link to the Terms of Service and Privacy Policy. */}
+            <nav className="legal" aria-label="Legal">
+              <a href="/terms">Terms of Service</a>
+              <span aria-hidden>·</span>
+              <a href="/privacy">Privacy Policy</a>
+            </nav>
           </div>
         </div>
       </div>

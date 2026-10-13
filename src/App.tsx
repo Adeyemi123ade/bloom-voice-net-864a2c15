@@ -29,6 +29,7 @@ import NewContact from "./pages/NewContact.tsx";
 import InviteFriends from "./pages/InviteFriends.tsx";
 import MicTest from "./pages/MicTest.tsx";
 import PrivacyPolicy from "./pages/PrivacyPolicy.tsx";
+import TermsOfService from "./pages/TermsOfService.tsx";
 import MessageNotifier from "./components/MessageNotifier.tsx";
 import IncomingCallScreen from "./components/IncomingCallScreen.tsx";
 import DeviceGate from "./components/DeviceGate.tsx";
@@ -76,7 +77,8 @@ const App = () => (
                   <Route path="/verify-device" element={<VerifyDevice />} />
                   <Route path="/dial/:number" element={<OutboundCall />} />
                   <Route path="/mic-test" element={<MicTest />} />
-                  <Route path="/terms" element={<PrivacyPolicy />} />
+                  <Route path="/privacy" element={<PrivacyPolicy />} />
+                  <Route path="/terms" element={<TermsOfService />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>

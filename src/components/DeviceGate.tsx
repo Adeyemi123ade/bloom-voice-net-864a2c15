@@ -40,6 +40,7 @@ const EXEMPT_ROUTES = new Set<string>([
   // Register/Login page links here) and must never trigger the
   // auth-loading/redirect logic below.
   "/terms",
+  "/privacy",
 ]);
 
 export default function DeviceGate({ children }: { children: ReactNode }) {

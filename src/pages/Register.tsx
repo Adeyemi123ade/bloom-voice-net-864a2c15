@@ -187,7 +187,7 @@ export default function Register() {
       setAgreeError(true);
       toast({
         title: "Please agree to continue",
-        description: "You need to agree to the Privacy Policy to create an account.",
+        description: "You need to agree to the Terms of Service and Privacy Policy to create an account.",
         variant: "destructive",
       });
       return;
@@ -581,6 +581,10 @@ export default function Register() {
                 >
                   I agree to the{" "}
                   <Link to="/terms" className="text-primary underline underline-offset-2">
+                    Terms of Service
+                  </Link>{" "}
+                  and{" "}
+                  <Link to="/privacy" className="text-primary underline underline-offset-2">
                     Privacy Policy
                   </Link>
                   .
