@@ -1,12 +1,12 @@
-// Password strength scoring used by Register and ResetPassword.
-// Levels: 0 = none (empty), 1 = weak, 2 = average, 3 = strong.
+// Password rules and strength scoring used by Register and ResetPassword.
 //
-// Rules (per project decision):
-//   • Weak    — fewer than 8 characters
-//   • Average — 8+ characters with at least 2 of: lower, upper, number, symbol
-//   • Strong  — 11+ characters with all 4 categories (lower, upper, number, symbol)
-//
-// Anything that doesn't meet "average" but is 8+ stays weak.
+// ONE rule set drives everything the user sees and what the app accepts:
+//   at least 8 characters, a small letter, a capital letter, a number and a
+//   special character.
+// Strength = how many of the 5 rules are met:
+//   • Weak    — 0 to 2
+//   • Average — 3 or 4
+//   • Strong  — all 5 (the only level that can create an account)
 
 export type StrengthLevel = 0 | 1 | 2 | 3;
 
@@ -15,17 +15,32 @@ export interface StrengthResult {
   label: "" | "Weak" | "Average" | "Strong";
 }
 
+export interface PasswordRule {
+  key: "length" | "lower" | "upper" | "number" | "special";
+  /** Short label shown in the one-line hint under the password field. */
+  hint: string;
+  /** Message shown if the form is submitted without meeting this rule. */
+  message: string;
+  test: (pwd: string) => boolean;
+}
+
+export const PASSWORD_RULES: PasswordRule[] = [
+  { key: "length", hint: "8+ characters", message: "Password must be at least 8 characters", test: (p) => p.length >= 8 },
+  { key: "lower", hint: "a to z", message: "Include at least one small letter", test: (p) => /[a-z]/.test(p) },
+  { key: "upper", hint: "A to Z", message: "Include at least one capital letter", test: (p) => /[A-Z]/.test(p) },
+  { key: "number", hint: "0 to 9", message: "Include at least one number", test: (p) => /[0-9]/.test(p) },
+  { key: "special", hint: "! @ # ?", message: "Include at least one special character, such as ! @ # ?", test: (p) => /[^A-Za-z0-9]/.test(p) },
+];
+
+/** First rule the password doesn't meet, or null when it meets them all. */
+export function firstUnmetPasswordRule(pwd: string): PasswordRule | null {
+  return PASSWORD_RULES.find((r) => !r.test(pwd)) ?? null;
+}
+
 export function scorePassword(pwd: string): StrengthResult {
   if (!pwd) return { level: 0, label: "" };
-
-  const hasLower = /[a-z]/.test(pwd);
-  const hasUpper = /[A-Z]/.test(pwd);
-  const hasNumber = /[0-9]/.test(pwd);
-  const hasSymbol = /[^A-Za-z0-9]/.test(pwd);
-  const categories = [hasLower, hasUpper, hasNumber, hasSymbol].filter(Boolean).length;
-
-  if (pwd.length < 8) return { level: 1, label: "Weak" };
-  if (pwd.length >= 11 && categories === 4) return { level: 3, label: "Strong" };
-  if (categories >= 2) return { level: 2, label: "Average" };
+  const met = PASSWORD_RULES.filter((r) => r.test(pwd)).length;
+  if (met === PASSWORD_RULES.length) return { level: 3, label: "Strong" };
+  if (met >= 3) return { level: 2, label: "Average" };
   return { level: 1, label: "Weak" };
 }

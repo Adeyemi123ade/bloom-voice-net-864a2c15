@@ -64,6 +64,14 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
+  // Live email check: starts once the user leaves the field (so it doesn't
+  // nag mid-typing), then updates on every keystroke until it's valid.
+  const [emailTouched, setEmailTouched] = useState(false);
+  const liveEmailError =
+    emailTouched && identifier.trim() && !EMAIL_RE.test(identifier.trim())
+      ? "Enter a valid email address"
+      : null;
+  const emailError = liveEmailError ?? errors.identifier;
   const [submitting, setSubmitting] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
@@ -186,13 +194,17 @@ export default function Login() {
               type="email"
               autoComplete="email"
               value={identifier}
-              onChange={(e) => setIdentifier(e.target.value)}
+              onChange={(e) => {
+                setIdentifier(e.target.value);
+                if (errors.identifier) setErrors((prev) => ({ ...prev, identifier: undefined }));
+              }}
+              onBlur={() => setEmailTouched(true)}
               placeholder="you@example.com"
               maxLength={255}
               className="mt-1.5"
-              aria-invalid={!!errors.identifier}
+              aria-invalid={!!emailError}
             />
-            {errors.identifier && <p className={authStyles.error}>{errors.identifier}</p>}
+            {emailError && <p className={authStyles.error}>{emailError}</p>}
           </div>
 
           <div>
@@ -232,8 +244,10 @@ export default function Login() {
         <div className="pt-5">
           <Button
             type="submit"
-            disabled={submitting}
-            className={`${authStyles.primaryButton} gap-1.5 disabled:opacity-80`}
+            // Enabled once both fields have something in them. Whether the
+            // password is right can only be checked by the server on submit.
+            disabled={submitting || !identifier.trim() || !password}
+            className={`${authStyles.primaryButton} gap-1.5 disabled:opacity-60`}
           >
             {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
             {submitting ? "Signing in…" : "Sign in"}

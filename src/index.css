@@ -29,6 +29,8 @@
     --muted-foreground: 177 8% 45%;
 
     --destructive: 5 68% 54%;
+    /* Caution state, e.g. an "Average" password. */
+    --warning: 36 80% 44%;
     --destructive-foreground: 0 0% 100%;
 
     --border: 163 14% 88%;
@@ -64,6 +66,7 @@
     --accent: 158 70% 45%;
     --accent-foreground: 0 0% 7%;
     --destructive: 0 84% 60%;
+    --warning: 38 92% 55%;
     --destructive-foreground: 0 0% 100%;
     --border: 0 0% 18%;
     --input: 0 0% 13%;

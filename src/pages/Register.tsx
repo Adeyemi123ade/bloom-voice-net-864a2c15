@@ -17,6 +17,8 @@ import { toE164, isTooManyDigits } from "@/lib/phone";
 import CountryPicker from "@/components/CountryPicker";
 import { allCountries, type CountryEntry } from "@/lib/countries";
 import PasswordStrengthBar from "@/components/PasswordStrengthBar";
+import PasswordMatchHint from "@/components/PasswordMatchHint";
+import { firstUnmetPasswordRule } from "@/lib/passwordStrength";
 import { checkEmailExists } from "@/lib/checkEmail";
 import { isRecoveryPending } from "@/lib/recoveryPending";
 import { markVerifyEmailPending, getVerifyEmailPending } from "@/lib/verifyEmailPending";
@@ -33,12 +35,14 @@ const baseSchema = z.object({
     .trim()
     .email({ message: "Enter a valid email address" })
     .max(255, { message: "Email must be less than 255 characters" }),
+  // Same rules the live hint under the field shows (src/lib/passwordStrength).
   password: z
     .string()
-    .min(8, { message: "Password must be at least 8 characters" })
     .max(72, { message: "Password must be less than 72 characters" })
-    .regex(/[A-Z]/, { message: "Include at least one uppercase letter" })
-    .regex(/[0-9]/, { message: "Include at least one number" }),
+    .superRefine((p, ctx) => {
+        const unmet = firstUnmetPasswordRule(p);
+        if (unmet) ctx.addIssue({ code: "custom", message: unmet.message });
+      }),
 });
 
 type FormErrors = Partial<
@@ -518,8 +522,10 @@ export default function Register() {
                   className="mt-1.5"
                   aria-invalid={!!errors.confirmPassword}
                 />
-                {errors.confirmPassword && (
+                {errors.confirmPassword ? (
                   <p className="text-sm text-destructive mt-1">{errors.confirmPassword}</p>
+                ) : (
+                  <PasswordMatchHint password={password} confirm={confirmPassword} />
                 )}
               </div>
             </div>
