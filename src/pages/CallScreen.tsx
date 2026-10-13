@@ -683,6 +683,11 @@ export default function CallSession({ params }: { params: ActiveCallParams }) {
           status={status}
           seconds={seconds}
           remoteVideoTrack={remoteVideoTrack}
+          localVideoTrack={localVideoTrack}
+          localVideoEnabled={videoEnabled}
+          muted={muted}
+          onToggleMute={toggleMute}
+          onEndCall={endCall}
           onOpen={() =>
             navigate(
               `/call/${conversationId}?type=${initialIsVideo ? "video" : "voice"}&callId=${callId}&room=${encodeURIComponent(roomName)}&role=${role}`,
