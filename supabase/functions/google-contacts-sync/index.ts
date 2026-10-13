@@ -38,12 +38,15 @@ Deno.serve(async (req) => {
       .eq("user_id", user.id)
       .maybeSingle();
     if (!row) {
+      console.warn("google-contacts-sync: no google_oauth_tokens row", { userId: user.id });
       return json({
         error: "Google Contacts isn't connected yet. Tap Connect Google to link your account.",
         reconnectRequired: true,
       });
     }
     if (!hasContactsScope(row.scope)) {
+      // Log what Google actually granted (scope names only, no tokens).
+      console.warn("google-contacts-sync: stored scope lacks contacts", { userId: user.id, scope: row.scope });
       await admin.from("google_oauth_tokens").delete().eq("user_id", user.id);
       return json({
         error: "Google contacts permission is missing. Please reconnect Google Contacts.",
@@ -90,6 +93,7 @@ Deno.serve(async (req) => {
         });
       }
     } else if (isExpired && !row.refresh_token) {
+       console.warn("google-contacts-sync: token expired and no refresh token", { userId: user.id });
        return json({
          error: "Google session expired and no refresh token available. Please reconnect.",
          reconnectRequired: true,
@@ -111,6 +115,7 @@ Deno.serve(async (req) => {
     {
       const result = await fetchConnections(accessToken);
       if (result.scopeError) {
+        console.warn("google-contacts-sync: People API says scope insufficient", { userId: user.id, errorMessage: result.errorMessage });
         await admin.from("google_oauth_tokens").delete().eq("user_id", user.id);
         return json({
           error: "Google contacts permission is missing. Please reconnect Google Contacts.",

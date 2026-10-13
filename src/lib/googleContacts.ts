@@ -9,8 +9,12 @@ import { getMyDefaultCountry, toE164 } from "@/lib/phone";
 const PENDING_KEY = "chichat:google_oauth:pending";
 
 export class GoogleContactsReconnectRequired extends Error {
-  constructor() {
-    super("Reconnect Google Contacts and allow contact access.");
+  // The server sends one of several specific reasons (not connected,
+  // permission missing, session expired, refresh failed, token rejected).
+  // Show that reason; the generic sentence is only a fallback, otherwise every
+  // failure looks identical and can't be diagnosed from the screen.
+  constructor(reason?: string) {
+    super(reason?.trim() || "Reconnect Google Contacts and allow contact access.");
     this.name = "GoogleContactsReconnectRequired";
   }
 }
@@ -90,7 +94,7 @@ export async function completeGoogleContactsConnect(
     { body: { action: "exchange", code, redirect_uri, state } },
   );
   if (error) throw await normalizeGoogleContactsError(error);
-  if (data?.reconnectRequired) throw new GoogleContactsReconnectRequired();
+  if (data?.reconnectRequired) throw new GoogleContactsReconnectRequired(data?.error);
   if (!data?.ok) throw new Error("Token exchange failed");
   return { email: data.email ?? null };
 }
@@ -99,7 +103,7 @@ export async function completeGoogleContactsConnect(
 export async function syncGoogleContacts(): Promise<{ contacts: DeviceContact[], warning?: string }> {
   const { data, error } = await supabase.functions.invoke("google-contacts-sync", {});
   if (error) throw await normalizeGoogleContactsError(error);
-  if (data?.reconnectRequired) throw new GoogleContactsReconnectRequired();
+  if (data?.reconnectRequired) throw new GoogleContactsReconnectRequired(data?.error);
   
   const defaultCountry = await getMyDefaultCountry();
   const incoming: DeviceContact[] = ((data?.contacts ?? []) as { name: string; phones: string[] }[])
@@ -151,7 +155,7 @@ export async function normalizeGoogleContactsError(error: unknown): Promise<Erro
       const body = await context.clone().json();
       const message = extractErrorMessage(body);
       if (body?.reconnectRequired || /scope|permission|contacts access/i.test(message)) {
-        return new GoogleContactsReconnectRequired();
+        return new GoogleContactsReconnectRequired(message);
       }
       return new Error(message || "Could not sync Google Contacts.");
     } catch { /* fall through */ }
@@ -159,7 +163,7 @@ export async function normalizeGoogleContactsError(error: unknown): Promise<Erro
 
   const message = error instanceof Error ? error.message : String(error ?? "");
   if (/insufficient authentication scopes|ACCESS_TOKEN_SCOPE_INSUFFICIENT|permission/i.test(message)) {
-    return new GoogleContactsReconnectRequired();
+    return new GoogleContactsReconnectRequired(message);
   }
   return error instanceof Error ? error : new Error(message || "Could not sync Google Contacts.");
 }
