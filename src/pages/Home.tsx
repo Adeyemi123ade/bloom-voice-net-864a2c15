@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Search, MessageSquarePlus, Phone, PhoneIncoming, PhoneOutgoing, PhoneMissed, Video, Mic, Paperclip } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
@@ -16,68 +16,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { FILE_PREFIX, parseFileMessage } from "@/components/chat/AttachmentBubble";
+import { buildPreview } from "@/lib/chat/messageKinds";
+import { CALL_PREFIX } from "@/lib/chat/format";
 import Dialpad from "@/components/Dialpad";
-
-const VOICE_PREFIX = "[voice]";
-const CALL_PREFIX = "[call]";
-
-type PreviewKind = "text" | "voice" | "file" | "call";
-type Preview = {
-  kind: PreviewKind;
-  text: string;
-  // call-specific
-  callType?: "voice" | "video";
-  callKind?: string;
-  missed?: boolean;
-  outgoing?: boolean;
-};
-
-function callDurationLabel(seconds?: number) {
-  if (!seconds || seconds <= 0) return null;
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return `${mins}:${secs.toString().padStart(2, "0")}`;
-}
-
-function buildPreview(content: string | null, senderId: string | null, myId: string): Preview {
-  if (!content) return { kind: "text", text: "" };
-  if (content.startsWith(CALL_PREFIX)) {
-    const [, body] = content.split(CALL_PREFIX);
-    const [type, kind, durationRaw] = (body ?? "").split("|");
-    const isVideo = type === "video";
-    const outgoing = senderId === myId;
-    const durationText = callDurationLabel(Number(durationRaw ?? 0));
-    const missed = (kind === "missed" || kind === "no_answer") && !outgoing;
-    const declined = kind === "declined" || kind === "rejected";
-    let label: string;
-    if (missed) {
-      label = isVideo ? "Missed video call" : "Missed call";
-    } else if (durationText) {
-      label = durationText;
-    } else if (declined) {
-      label = outgoing ? "Call declined" : "Declined call";
-    } else {
-      label = isVideo ? "Video call" : "Voice call";
-    }
-    return { kind: "call", text: label, callType: isVideo ? "video" : "voice", callKind: kind, missed, outgoing };
-  }
-  if (content.startsWith(VOICE_PREFIX)) return { kind: "voice", text: "Voice note" };
-  if (content.startsWith(FILE_PREFIX)) {
-    const meta = parseFileMessage(content);
-    if (meta) {
-      if (meta.mime.startsWith("image/")) return { kind: "file", text: meta.caption || "Photo" };
-      if (meta.mime.startsWith("video/")) return { kind: "file", text: meta.caption || "Video" };
-      return { kind: "file", text: meta.name || "File" };
-    }
-    return { kind: "file", text: "Attachment" };
-  }
-  // strip reply-quote prefix "> ...\n"
-  const cleaned = content.startsWith("> ")
-    ? content.split("\n").slice(1).join("\n").trim() || content
-    : content;
-  return { kind: "text", text: cleaned };
-}
 
 type Profile = {
   id: string;
@@ -94,6 +35,8 @@ type ChatRow = {
   last_message: string | null;
   last_sender_id: string | null;
   last_message_at: string;
+  /** Messages from the other person you haven't read yet (call records excluded). */
+  unread: number;
 };
 
 function timeAgo(iso: string) {
@@ -187,8 +130,12 @@ export default function Home() {
     };
   }, [user]);
 
+  // Realtime can fire several reloads back to back; only the newest one may
+  // write state, so a slower earlier reload can't bring back a cleared badge.
+  const loadSeq = useRef(0);
   const loadChats = async () => {
     if (!user) return;
+    const seq = ++loadSeq.current;
     setFetching(true);
     const { data: parts } = await supabase
       .from("conversation_participants")
@@ -230,6 +177,23 @@ export default function Home() {
         lastByConv.set(m.conversation_id, { content: m.content, created_at: m.created_at, sender_id: m.sender_id });
     });
 
+    // Unread = messages from the other person with no read_at yet. read_at
+    // is the same field the read ticks use, set by ChatRoom when the chat is
+    // opened, so counts survive refreshes and are per user. Call records
+    // aren't counted: they're call history, not messages.
+    const { data: unreadRows } = await supabase
+      .from("messages")
+      .select("conversation_id")
+      .in("conversation_id", convIds)
+      .neq("sender_id", user.id)
+      .is("read_at", null)
+      .not("deleted_for_everyone", "is", true)
+      .not("content", "like", `${CALL_PREFIX}%`);
+    const unreadByConv = new Map<string, number>();
+    (unreadRows ?? []).forEach((r) =>
+      unreadByConv.set(r.conversation_id, (unreadByConv.get(r.conversation_id) ?? 0) + 1),
+    );
+
     const profById = new Map((profiles ?? []).map((p) => [p.id, p as Profile]));
     const otherByConv = new Map<string, string>();
     (others ?? []).forEach((o) => otherByConv.set(o.conversation_id, o.user_id));
@@ -246,10 +210,12 @@ export default function Home() {
           last_message: lm?.content ?? null,
           last_sender_id: lm?.sender_id ?? null,
           last_message_at: lm?.created_at ?? c.last_message_at,
+          unread: unreadByConv.get(c.id) ?? 0,
         };
       })
       .filter(Boolean) as ChatRow[];
 
+    if (seq !== loadSeq.current) return;
     setChats(rows);
     setFetching(false);
   };
@@ -264,6 +230,10 @@ export default function Home() {
     const channel = supabase
       .channel("home-realtime")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, () =>
+        loadChats(),
+      )
+      // read_at being set (on this or another device) clears a badge.
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "messages" }, () =>
         loadChats(),
       )
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "profiles" }, () =>
@@ -464,17 +434,26 @@ export default function Home() {
                   <p className="text-xs font-semibold text-foreground truncate">
                     {c.other.display_name ?? "Unknown"}
                   </p>
-                  <span className="text-2xs text-muted-foreground shrink-0">
+                  <span className={`text-2xs shrink-0 ${c.unread > 0 ? "text-primary font-semibold" : "text-muted-foreground"}`}>
                     {timeAgo(c.last_message_at)}
                   </span>
                 </div>
-                <div className="flex items-center gap-1 mt-0.5 min-w-0 pr-10">
+                <div className="flex items-center gap-1 mt-0.5 min-w-0">
                   {PreviewIcon && (
                     <PreviewIcon className={`w-3 h-3 shrink-0 ${iconClass}`} />
                   )}
-                  <p className={`text-xs truncate ${preview.kind === "call" && preview.missed ? "text-destructive" : "text-muted-foreground"}`}>
+                  <p className={`text-xs truncate min-w-0 ${preview.kind === "call" && preview.missed ? "text-destructive" : "text-muted-foreground"}`}>
                     {preview.text || (isReallyOnline(c.other) ? "online" : "")}
                   </p>
+                  <span className="flex-1" />
+                  {c.unread > 0 && (
+                    <span
+                      aria-label={`${c.unread} unread message${c.unread === 1 ? "" : "s"}`}
+                      className="ml-2 shrink-0 min-w-5 h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-[11px] font-semibold leading-5 text-center tabular-nums"
+                    >
+                      {c.unread > 99 ? "99+" : c.unread}
+                    </span>
+                  )}
                 </div>
               </div>
             </button>

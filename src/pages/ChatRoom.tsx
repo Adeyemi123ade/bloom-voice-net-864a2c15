@@ -24,7 +24,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { activeCallPath, getActiveCall } from "@/lib/activeCall";
 import { isReallyOnline } from "@/lib/presence";
-import { getSignedChatMediaUrl } from "@/lib/signedMedia";
 import { pickRecordingMimeType, extensionForMimeType, baseMimeType } from "@/lib/audioMime";
 import { checkMicPrerequisites, describeMicError } from "@/lib/micPermission";
 import { isVoiceTranscribeEnabled } from "@/lib/transcriptionPrefs";
@@ -52,6 +51,9 @@ import {
   saveHidden,
 } from "@/lib/chat/format";
 import { useBackNavigation } from "@/hooks/useBackNavigation";
+import { messageKind, mediaLabel, parseCallLog, selectionActions, stripQuotedReply } from "@/lib/chat/messageKinds";
+import { checkClipAvailable, copyMessages, matchPastedClip, mediaUrlOf } from "@/lib/chat/clipboard";
+import { useSignedMediaUrl } from "@/lib/signedMedia";
 
 // A row coming from Supabase (initial fetch or realtime payload) is only
 // guaranteed to match the DB schema, not this shape — content in particular
@@ -208,6 +210,9 @@ export default function ChatRoom() {
     previewUrl: string;
   } | null>(null);
   const [uploading, setUploading] = useState(false);
+  // A voice note / photo / video / document pasted from an in-app copy. It
+  // points at the already-stored file, so sending it uploads nothing.
+  const [pendingClip, setPendingClip] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loading && !user) navigate("/login");
@@ -623,9 +628,12 @@ export default function ChatRoom() {
 
     let finalContent = content;
     if (replyTo) {
+      // Quote a label for media, never the stored "[file]…" string.
       const preview = replyTo.content.startsWith(VOICE_PREFIX)
         ? "🎤 Voice note"
-        : replyTo.content.length > 80 ? replyTo.content.slice(0, 80) + "…" : replyTo.content;
+        : messageKind(replyTo.content) !== "text"
+          ? `📎 ${mediaLabel(replyTo.content)}`
+          : replyTo.content.length > 80 ? replyTo.content.slice(0, 80) + "…" : replyTo.content;
       finalContent = `> ${preview}\n${content}`;
       setReplyTo(null);
     }
@@ -795,44 +803,14 @@ export default function ChatRoom() {
     if (mine.length) await deleteForEveryone(mine);
     if (others.length) deleteForMe(others);
   };
-  const copyMsg = async (m: Message) => {
+  // Copy keeps a reference to the original message (see lib/chat/clipboard),
+  // so pasting it in any chat recreates a real voice note / photo / video /
+  // document instead of a pasted link.
+  const copyMsgs = async (msgs: Message[]) => {
     try {
-      if (m.content.startsWith(VOICE_PREFIX)) {
-        await navigator.clipboard.writeText(m.content.slice(VOICE_PREFIX.length));
-        toast({ title: "Copied" });
-      } else if (m.content.startsWith(FILE_PREFIX)) {
-        const meta = parseFileMessage(m.content);
-        let copiedImage = false;
-        if (meta?.mime.startsWith("image/") && "ClipboardItem" in window) {
-          try {
-            // Pass a pending Blob promise, not an already-resolved one, so
-            // navigator.clipboard.write() itself is invoked synchronously
-            // within this click handler. Browsers (Chrome/Android especially)
-            // only allow clipboard-write inside the original tap's transient
-            // activation window — awaiting the signed-URL fetch *before*
-            // calling write() let that window lapse on the slower/higher-
-            // latency mobile network path, which is why image copy worked
-            // reliably on desktop but silently failed (or no-oped) on mobile.
-            const blobPromise = getSignedChatMediaUrl(meta.url).then((u) =>
-              fetch(u).then((res) => res.blob()),
-            );
-            await navigator.clipboard.write([
-              new ClipboardItem({ [meta.mime]: blobPromise as unknown as Promise<Blob> }),
-            ]);
-            copiedImage = true;
-          } catch {
-            // Fall back to copying the link below.
-          }
-        }
-        if (!copiedImage) {
-          const url = meta ? await getSignedChatMediaUrl(meta.url) : null;
-          await navigator.clipboard.writeText(url ?? meta?.name ?? "");
-        }
-        toast({ title: copiedImage ? "Image copied" : "Link copied" });
-      } else {
-        await navigator.clipboard.writeText(m.content);
-        toast({ title: "Copied" });
-      }
+      const result = await copyMessages(msgs.map((m) => m.content));
+      if (result.ok) toast({ title: result.label });
+      else toast({ title: "Can't copy", description: result.reason, variant: "destructive" });
     } catch {
       toast({ title: "Copy failed", variant: "destructive" });
     }
@@ -870,12 +848,7 @@ export default function ChatRoom() {
     () =>
       selectedList
         .filter((m) => !m.deleted_for_everyone && !m.content.startsWith(CALL_PREFIX))
-        .map((m) => {
-          const c = m.content;
-          if (c.startsWith(VOICE_PREFIX) || c.startsWith(FILE_PREFIX) || !c.startsWith("> ")) return c;
-          const nl = c.indexOf("\n");
-          return nl > -1 ? c.slice(nl + 1) : c;
-        })
+        .map((m) => stripQuotedReply(m.content))
         .filter((c) => c.trim().length > 0),
     [selectedList],
   );
@@ -1125,6 +1098,74 @@ export default function ChatRoom() {
     }
   };
 
+  // Paste in the message box. A paste of something copied in ChiChat (voice
+  // note, photo, video, document) becomes a staged attachment that reuses the
+  // original stored file; a pasted image file from another app is staged
+  // like a picked file; anything else pastes as text, as before.
+  const onComposerPaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    if (editing || pendingFile || pendingClip) return;
+    const pastedText = e.clipboardData.getData("text/plain");
+    const clip = pastedText ? matchPastedClip(pastedText) : null;
+    if (clip) {
+      e.preventDefault();
+      setEmojiOpen(false);
+      setPendingClip(clip.content);
+      return;
+    }
+    const file = Array.from(e.clipboardData.files ?? [])[0];
+    if (file && !pastedText) {
+      e.preventDefault();
+      const MAX = 25 * 1024 * 1024;
+      if (file.size > MAX) {
+        toast({ title: "File too large", description: "Max 25MB", variant: "destructive" });
+        return;
+      }
+      setPendingFile({ file, previewUrl: URL.createObjectURL(file) });
+    }
+  };
+
+  const cancelClip = () => {
+    setPendingClip(null);
+    setText("");
+  };
+
+  const sendClip = async () => {
+    if (!pendingClip || !user || !conversationId) return;
+    const caption = text.trim();
+    setUploading(true);
+    try {
+      const check = await checkClipAvailable(pendingClip);
+      if (!check.ok) {
+        toast({ title: "Can't paste this", description: check.reason, variant: "destructive" });
+        setPendingClip(null);
+        return;
+      }
+      // Files carry their caption inside the message; a voice note has none,
+      // so any typed text goes as a separate message after it.
+      const meta = parseFileMessage(pendingClip);
+      const content = meta ? encodeFileMessage({ ...meta, caption }) : pendingClip;
+      const rows = [{ conversation_id: conversationId, sender_id: user.id, content }];
+      if (!meta && caption) rows.push({ conversation_id: conversationId, sender_id: user.id, content: caption });
+      const { data: inserted, error } = await supabase.from("messages").insert(rows).select("*");
+      if (error || !inserted?.length) throw error ?? new Error("Send failed");
+      const fresh = inserted.map((r) => normalizeMessage(r as Record<string, unknown>));
+      setMessages((prev) => {
+        const have = new Set(prev.map((m) => m.id));
+        return [...prev, ...fresh.filter((m) => !have.has(m.id))];
+      });
+      setPendingClip(null);
+      setText("");
+    } catch (err) {
+      toast({
+        title: "Failed to send",
+        description: err instanceof Error ? err.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const visible = useMemo(() => messages.filter((m) => !hidden.has(m.id)), [messages, hidden]);
   const searchResults = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -1138,15 +1179,13 @@ export default function ChatRoom() {
     deleteForMe(messages);
   };
 
-  const allMine = onlySelected
-    ? onlySelected.sender_id === user?.id
-    : selectedList.length > 0 && selectedList.every((m) => m.sender_id === user?.id);
-  const isOnlyVoice = onlySelected?.content.startsWith(VOICE_PREFIX);
-  const isOnlyCall = onlySelected?.content.startsWith(CALL_PREFIX);
-  const isOnlyFile = onlySelected?.content.startsWith(FILE_PREFIX);
-  const isOnlyDeleted = onlySelected?.deleted_for_everyone;
-  const isUneditable = isOnlyVoice || isOnlyCall || isOnlyFile;
-  const anyCall = selectedList.some((m) => m.content.startsWith(CALL_PREFIX));
+  // Which actions to offer is worked out from the types of everything
+  // selected, and recalculated whenever an item is added or removed.
+  const actions = useMemo(() => selectionActions(selectedList, user?.id), [selectedList, user?.id]);
+  const actionable = actions.actionable as Message[];
+  // While selecting (or picking a search result), a tap on a bubble must
+  // only select it, never play a voice note or open a photo or file.
+  const bubbleTapsBlocked = selectionCount > 0 || searchOpen;
 
   return (
     <MobileFrame>
@@ -1188,25 +1227,25 @@ export default function ChatRoom() {
               {selectionCount}
             </span>
             <div className="flex-1" />
-            {selectionCount === 1 && !isOnlyDeleted && !isOnlyCall && (
+            {actions.canCopy && (
               <button
                 aria-label="Copy"
-                onClick={() => onlySelected && copyMsg(onlySelected)}
+                onClick={() => copyMsgs(actionable)}
                 className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
               >
                 <Copy className="w-4 h-4 text-foreground" />
               </button>
             )}
-            {!anyCall && (
+            {actions.canShare && (
               <button
                 aria-label="Share"
-                onClick={() => shareMsgs(selectedList.filter((m) => !m.deleted_for_everyone))}
+                onClick={() => shareMsgs(actionable)}
                 className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
               >
                 <Share2 className="w-4 h-4 text-foreground" />
               </button>
             )}
-            {!anyCall && forwardContents.length > 0 && (
+            {actions.canForward && forwardContents.length > 0 && (
               <button
                 aria-label="Forward"
                 onClick={() => setForwardOpen(true)}
@@ -1215,7 +1254,7 @@ export default function ChatRoom() {
                 <Forward className="w-4 h-4 text-foreground" />
               </button>
             )}
-            {selectionCount === 1 && allMine && !isOnlyDeleted && !isUneditable && (
+            {actions.canEdit && (
               <button
                 aria-label="Edit"
                 onClick={() => onlySelected && startEdit(onlySelected)}
@@ -1353,15 +1392,13 @@ export default function ChatRoom() {
                     onTap={() => {
                       if (searchOpen) jumpToMessage(m.id);
                       else if (selectionCount > 0) toggleSelect(m.id);
+                      // Outside selection mode a tap offers to call back,
+                      // always behind a confirmation (never calls directly).
+                      else setCallSheet(parseCallLog(m.content)?.callType ?? "voice");
                     }}
                     onLongPress={() => selectFromLongPress(m.id)}
                   >
-                    <CallSystemBubble
-                      m={m}
-                      mine={mine}
-                      otherName={other?.display_name}
-                      onCallBack={(t) => setCallSheet(t)}
-                    />
+                    <CallSystemBubble m={m} mine={mine} />
                   </CallRow>
                 </div>
               );
@@ -1406,6 +1443,8 @@ export default function ChatRoom() {
               >
                 <div
                   className={`max-w-[92%] select-none transition-shadow ${
+                    bubbleTapsBlocked ? "pointer-events-none" : ""
+                  } ${
                     bareAttachment
                       ? `rounded-2xl ${isSelected ? "ring-2 ring-accent" : ""}`
                       : `px-4 py-2.5 rounded-2xl shadow-sm ${
@@ -1582,6 +1621,24 @@ export default function ChatRoom() {
           </div>
         )}
 
+        {/* Pasted voice note / photo / video / document (from an in-app copy) */}
+        {pendingClip && !pendingFile && (
+          <div
+            className="px-3 py-2 bg-secondary/60 border-t border-border flex items-center gap-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <PastedClipPreview content={pendingClip} />
+            <button
+              onClick={cancelClip}
+              aria-label="Remove pasted item"
+              className="w-7 h-7 rounded-full hover:bg-background flex items-center justify-center text-muted-foreground"
+              disabled={uploading}
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         {/* Composer — lifted above bottom edge */}
         <div
           className="px-3 pt-2 pb-4 border-t border-border flex items-end gap-2 bg-background"
@@ -1633,7 +1690,7 @@ export default function ChatRoom() {
                 className="hidden"
                 onChange={onPickFile}
               />
-              {!pendingFile && (
+              {!pendingFile && !pendingClip && (
                 <button
                   onClick={() => fileRef.current?.click()}
                   aria-label="Attach file"
@@ -1646,7 +1703,8 @@ export default function ChatRoom() {
                 ref={composerInputRef}
                 rows={1}
                 value={text}
-                onChange={(e) => (pendingFile ? setText(e.target.value) : onType(e.target.value))}
+                onChange={(e) => (pendingFile || pendingClip ? setText(e.target.value) : onType(e.target.value))}
+                onPaste={onComposerPaste}
                 onFocus={() => setEmojiOpen(false)}
                 onKeyDown={(e) => {
                   if (e.key !== "Enter" || e.shiftKey || enterAddsNewLine) return;
@@ -1654,10 +1712,11 @@ export default function ChatRoom() {
                   if (e.nativeEvent.isComposing) return;
                   e.preventDefault();
                   if (pendingFile) sendPending();
+                  else if (pendingClip) void sendClip();
                   else send();
                 }}
                 placeholder={
-                  pendingFile
+                  pendingFile || (pendingClip && messageKind(pendingClip) !== "voice")
                     ? "Add a caption (optional)…"
                     : editing
                       ? "Edit message"
@@ -1679,9 +1738,9 @@ export default function ChatRoom() {
                   <Smile className="w-4 h-4 text-foreground" />
                 </button>
               )}
-              {pendingFile ? (
+              {pendingFile || pendingClip ? (
                 <button
-                  onClick={sendPending}
+                  onClick={() => (pendingFile ? sendPending() : void sendClip())}
                   aria-label="Send attachment"
                   disabled={uploading}
                   className="w-9 h-9 rounded-full bg-primary hover:bg-primary/90 flex items-center justify-center disabled:opacity-50"
@@ -1738,7 +1797,7 @@ export default function ChatRoom() {
             onClick={() => setDeleteOpen(false)}
           />
           <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[61] w-[260px] rounded-xl bg-background border border-border shadow-lg overflow-hidden">
-            {allMine && !isOnlyDeleted && (
+            {actions.canDeleteForEveryone && (
               <button
                 onClick={async () => {
                   setDeleteOpen(false);
@@ -1808,5 +1867,32 @@ export default function ChatRoom() {
         contact={other}
       />
     </MobileFrame>
+  );
+}
+
+function PastedClipPreview({ content }: { content: string }) {
+  const kind = messageKind(content);
+  const meta = parseFileMessage(content);
+  const url = useSignedMediaUrl(kind === "image" || kind === "video" ? mediaUrlOf(content) : null);
+  const title = kind === "voice" ? "Voice note" : meta?.name ?? mediaLabel(content);
+  const sub = kind === "voice" ? "Pasted voice note" : kind === "image" ? "Pasted photo" : kind === "video" ? "Pasted video" : "Pasted document";
+  return (
+    <>
+      <div className="w-12 h-12 rounded-lg overflow-hidden bg-background flex items-center justify-center flex-shrink-0">
+        {kind === "image" && url ? (
+          <img src={url} alt={title} className="w-full h-full object-cover" />
+        ) : kind === "video" && url ? (
+          <video src={url} className="w-full h-full object-cover" muted preload="metadata" />
+        ) : kind === "voice" ? (
+          <Mic className="w-5 h-5 text-primary" />
+        ) : (
+          <Paperclip className="w-5 h-5 text-muted-foreground" />
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-[12px] font-medium text-foreground truncate">{title}</p>
+        <p className="text-2xs text-muted-foreground">{sub}</p>
+      </div>
+    </>
   );
 }

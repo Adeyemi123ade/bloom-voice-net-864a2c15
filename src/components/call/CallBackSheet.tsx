@@ -1,5 +1,14 @@
 import { Phone, Video } from "lucide-react";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type Props = {
   open: boolean;
@@ -9,32 +18,39 @@ type Props = {
   onConfirm: () => void;
 };
 
+/**
+ * Confirmation before calling back from a call record in the chat. A call
+ * only starts on "Yes, call"; "No, cancel", tapping outside or Back just
+ * closes the dialog.
+ */
 export default function CallBackSheet({ open, onOpenChange, name, type, onConfirm }: Props) {
   const Icon = type === "video" ? Video : Phone;
-  const label = type === "video" ? "Video call" : "Call";
+  const kind = type === "video" ? "video call" : "voice call";
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="bottom"
-        className="rounded-t-3xl px-0 pb-6 pt-3 max-w-md mx-auto bg-background border-border"
-      >
-        <div className="mx-auto h-1 w-10 rounded-full bg-muted-foreground/30 mb-4" />
-        <div className="px-6">
-          <h3 className="text-center text-[17px] font-semibold text-foreground mb-5">
-            {name}
-          </h3>
-          <button
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent className="max-w-[320px] rounded-2xl bg-background border-border">
+        <AlertDialogHeader>
+          <div className="mx-auto mb-1 w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center">
+            <Icon className="w-5 h-5 text-primary" />
+          </div>
+          <AlertDialogTitle className="text-center text-[17px]">Call {name}?</AlertDialogTitle>
+          <AlertDialogDescription className="text-center">
+            Do you want to make a {kind} to {name}?
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter className="flex-col-reverse gap-2 sm:flex-col-reverse sm:space-x-0">
+          <AlertDialogCancel className="mt-0 w-full">No, cancel</AlertDialogCancel>
+          <AlertDialogAction
+            className="w-full"
             onClick={() => {
               onOpenChange(false);
               onConfirm();
             }}
-            className="w-full h-12 rounded-full bg-accent hover:bg-accent/90 text-accent-foreground font-semibold flex items-center justify-center gap-2 transition-colors"
           >
-            <Icon className="w-5 h-5" />
-            {label}
-          </button>
-        </div>
-      </SheetContent>
-    </Sheet>
+            Yes, call
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }

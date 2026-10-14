@@ -24,6 +24,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useRingback } from "@/hooks/useRingback";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { formatCallClock } from "@/lib/chat/messageKinds";
 import { clearPreparedCallMedia, consumePreparedCallMedia, formatCallMediaError } from "@/lib/callMedia";
 import { startCallForegroundService, stopCallForegroundService } from "@/lib/nativeCalls";
 import { FROM_CALL_BUBBLE, finishActiveCall, minimizeTarget, type ActiveCallParams } from "@/lib/activeCall";
@@ -84,6 +85,26 @@ export default function CallSession({ params }: { params: ActiveCallParams }) {
   const tickTimer = useRef<number | null>(null);
   const endedRef = useRef(false);
   const handledStatusesRef = useRef<Set<string>>(new Set());
+  // Short-lived call notices ("Call connected", "Call ended · 00:29"),
+  // shown through the app's normal toast and dismissed automatically.
+  const connectedRef = useRef(false);
+  const secondsRef = useRef(0);
+  secondsRef.current = seconds;
+  // Set once a more specific end notice (declined, no answer, failed) has
+  // been shown, so the generic "Call ended" doesn't replace it.
+  const endNoticeShownRef = useRef(false);
+  const callNotice = (title: string, opts: { destructive?: boolean; description?: string } = {}) => {
+    toast({
+      title,
+      description: opts.description,
+      duration: 3000,
+      ...(opts.destructive ? { variant: "destructive" as const } : {}),
+    });
+  };
+  const endNotice = (title: string, opts: { destructive?: boolean; description?: string } = {}) => {
+    endNoticeShownRef.current = true;
+    callNotice(title, opts);
+  };
 
   const handleCallStatus = (nextStatus: string) => {
     if (nextStatus === "accepted" && status === "ringing") {
@@ -94,13 +115,16 @@ export default function CallSession({ params }: { params: ActiveCallParams }) {
     handledStatusesRef.current.add(nextStatus);
 
     if (nextStatus === "declined") {
-      toast({ title: "Call declined" });
+      endNotice("Call declined");
       if (role === "caller") void logCallMessage("rejected", 0);
       cleanupAndExit();
       return;
     }
     if (nextStatus === "missed") {
-      if (role === "caller") void logCallMessage("no_answer", 0);
+      if (role === "caller") {
+        endNotice("No answer");
+        void logCallMessage("no_answer", 0);
+      }
       cleanupAndExit();
       return;
     }
@@ -204,6 +228,7 @@ export default function CallSession({ params }: { params: ActiveCallParams }) {
         .update({ status: "missed", ended_at: new Date().toISOString() })
         .eq("id", callId)
         .eq("status", "ringing");
+      endNotice("No answer");
       void logCallMessage("no_answer", 0);
       cleanupAndExit();
     }, 45_000);
@@ -227,7 +252,7 @@ export default function CallSession({ params }: { params: ActiveCallParams }) {
         .select("id")
         .maybeSingle();
       if (!data) {
-        toast({ title: "Call ended" });
+        endNotice("Call ended");
         cleanupAndExit();
         return;
       }
@@ -283,8 +308,12 @@ export default function CallSession({ params }: { params: ActiveCallParams }) {
       // they'd minimised it, leave them where they are and just say so.
       if (onCallScreenRef.current) {
         navigate(`/chat/${conversationId}`, { replace: true });
-      } else if (!handledStatusesRef.current.has("declined")) {
-        toast({ title: "Call ended" });
+      }
+      // Shown wherever the user is now (the chat, or the screen they'd
+      // minimised the call to), with the length when the call connected.
+      if (!endNoticeShownRef.current) {
+        endNoticeShownRef.current = true;
+        callNotice(connectedRef.current ? `Call ended · ${formatCallClock(secondsRef.current)}` : "Call ended");
       }
       finishActiveCall(callId);
     }, 500);
@@ -431,6 +460,8 @@ export default function CallSession({ params }: { params: ActiveCallParams }) {
       });
       roomRef.current = room;
       setStatus("connected");
+      connectedRef.current = true;
+      callNotice("Call connected");
       // Receiver logs that the call was received successfully (caller logs "ended" on hangup).
       if (role === "callee") void logCallMessage("received", 0);
 
@@ -454,7 +485,7 @@ export default function CallSession({ params }: { params: ActiveCallParams }) {
       void tryPlayRemoteAudio();
     } catch (err) {
       const msg = formatCallMediaError(err, isVideo);
-      toast({ title: "Call failed", description: msg, variant: "destructive" });
+      endNotice("Call failed", { description: msg, destructive: true });
       cleanupAndExit();
     } finally {
       joiningRef.current = false;
