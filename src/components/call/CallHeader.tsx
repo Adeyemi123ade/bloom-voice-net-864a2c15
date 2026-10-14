@@ -35,12 +35,21 @@ export default function CallHeader({ isVideo, other, status, seconds, role = "ca
         <span>{headerLabel}</span>
         <Icon className="w-3.5 h-3.5" />
       </div>
-      <Avatar className="w-24 h-24 ring-4 ring-primary/30">
-        <AvatarImage src={other?.avatar_url ?? undefined} />
-        <AvatarFallback className="bg-primary/20 text-foreground text-2xl font-semibold">
-          {initials(other?.display_name)}
-        </AvatarFallback>
-      </Avatar>
+      {/* While the other phone rings, rings pulse out from the avatar. Tied
+          to the real call status, so they stop the moment the call connects,
+          is declined, fails or ends. */}
+      <div
+        className={`my-6 ${status === "ringing" ? "call-ring" : ""}`}
+        data-testid="call-avatar"
+        data-ringing={status === "ringing" ? "true" : "false"}
+      >
+        <Avatar className="w-24 h-24 ring-4 ring-primary/30">
+          <AvatarImage src={other?.avatar_url ?? undefined} />
+          <AvatarFallback className="bg-primary/20 text-foreground text-2xl font-semibold">
+            {initials(other?.display_name)}
+          </AvatarFallback>
+        </Avatar>
+      </div>
       <h1 className="text-base font-semibold text-foreground">
         {other?.display_name ?? "Contact"}
       </h1>

@@ -101,3 +101,32 @@
   }
 }
 
+
+/* Outgoing call, other phone ringing: two soft rings ripple out from the
+   contact's avatar (same motion as the product demo). Only applied while
+   the call status is "ringing"; removing the class stops it. */
+.call-ring {
+  position: relative;
+  border-radius: 9999px;
+}
+.call-ring::before,
+.call-ring::after {
+  content: "";
+  position: absolute;
+  inset: -12px;
+  border-radius: 9999px;
+  border: 2px solid hsl(var(--primary) / 0.45);
+  pointer-events: none;
+  animation: call-ring 1.8s ease-out infinite backwards;
+}
+.call-ring::after {
+  animation-delay: 0.9s;
+}
+@keyframes call-ring {
+  from { transform: scale(0.9); opacity: 1; }
+  to { transform: scale(1.35); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .call-ring::before { animation: none; opacity: 0.6; }
+  .call-ring::after { display: none; }
+}
