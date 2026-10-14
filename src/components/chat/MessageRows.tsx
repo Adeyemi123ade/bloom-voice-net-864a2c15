@@ -75,7 +75,15 @@ export function CallRow({
       onMouseDown={() => { if (!touchActive.current) start(); }}
       onMouseUp={() => { if (!touchActive.current) cancel(); }}
       onMouseLeave={() => { if (!touchActive.current) cancel(); }}
-      onContextMenu={(e) => { e.preventDefault(); if (!fired.current) { fired.current = true; onLongPress(); } }}
+      onContextMenu={(e) => {
+        // Android Chrome sends contextmenu at ~400ms of holding, just before
+        // our own 450ms timer. Cancel that timer so one press selects once;
+        // letting both fire selected and then unselected the message (the
+        // "flash" on long-press).
+        e.preventDefault();
+        cancel();
+        if (!fired.current) { fired.current = true; onLongPress(); }
+      }}
     >
       <div className={isSelected ? "ring-2 ring-primary rounded-2xl" : ""}>
         {children}
@@ -223,7 +231,10 @@ export function SwipeRow({
         onMouseUp={() => { if (!touchActive.current) cancelLongPress(); }}
         onMouseLeave={() => { if (!touchActive.current) cancelLongPress(); }}
         onContextMenu={(e) => {
+          // See CallRow: cancel our own pending timer so the browser's
+          // contextmenu and the timer can't both fire for one press.
           e.preventDefault();
+          cancelLongPress();
           if (!longPressFired.current) fireLongPress();
         }}
         style={{
