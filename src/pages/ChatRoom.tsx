@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft, Send, Check, CheckCheck, Mic, Trash2, Pencil, X,
@@ -191,7 +191,13 @@ export default function ChatRoom() {
   const recTimer = useRef<number | null>(null);
   const recMimeTypeRef = useRef<string>("audio/webm");
   const fileRef = useRef<HTMLInputElement>(null);
-  const composerInputRef = useRef<HTMLInputElement>(null);
+  const composerInputRef = useRef<HTMLTextAreaElement>(null);
+  // Phones (coarse pointer): Enter adds a new line and the Send button sends,
+  // like WhatsApp. Keyboard/mouse devices: Enter sends, Shift+Enter = new line.
+  const enterAddsNewLine = useMemo(
+    () => typeof window !== "undefined" && !!window.matchMedia?.("(pointer: coarse)").matches,
+    [],
+  );
   const [emojiOpen, setEmojiOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const typingTimeout = useRef<number | null>(null);
@@ -579,6 +585,17 @@ export default function ChatRoom() {
       return next;
     });
   };
+
+  // Grow the message box with its text, up to ~6 lines (or 30% of the
+  // screen when the keyboard leaves little room), then scroll inside it.
+  useLayoutEffect(() => {
+    const el = composerInputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    const max = Math.min(160, Math.round(window.innerHeight * 0.3));
+    el.style.height = `${Math.min(el.scrollHeight, max)}px`;
+    el.style.overflowY = el.scrollHeight > max ? "auto" : "hidden";
+  }, [text, pendingFile, editing]);
 
   const send = async () => {
     if (!user || !conversationId) return;
@@ -1505,7 +1522,7 @@ export default function ChatRoom() {
 
         {/* Composer — lifted above bottom edge */}
         <div
-          className="px-3 pt-2 pb-4 border-t border-border flex items-center gap-2 bg-background"
+          className="px-3 pt-2 pb-4 border-t border-border flex items-end gap-2 bg-background"
           onClick={(e) => e.stopPropagation()}
         >
           {transcribing ? (
@@ -1563,17 +1580,19 @@ export default function ChatRoom() {
                   <Paperclip className="w-4 h-4 text-foreground" />
                 </button>
               )}
-              <Input
+              <textarea
                 ref={composerInputRef}
+                rows={1}
                 value={text}
                 onChange={(e) => (pendingFile ? setText(e.target.value) : onType(e.target.value))}
                 onFocus={() => setEmojiOpen(false)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    if (pendingFile) sendPending();
-                    else send();
-                  }
+                  if (e.key !== "Enter" || e.shiftKey || enterAddsNewLine) return;
+                  // Don't send while an input method (e.g. predictive text) is composing.
+                  if (e.nativeEvent.isComposing) return;
+                  e.preventDefault();
+                  if (pendingFile) sendPending();
+                  else send();
                 }}
                 placeholder={
                   pendingFile
@@ -1583,7 +1602,8 @@ export default function ChatRoom() {
                       : "Type a message"
                 }
                 disabled={uploading}
-                className="h-10 text-base md:text-base bg-input border-border"
+                aria-label="Message"
+                className="flex-1 min-w-0 min-h-10 resize-none rounded-lg border-[1.5px] border-border bg-input px-3.5 py-[7px] text-base leading-6 text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:border-primary disabled:opacity-50"
               />
               {!pendingFile && (
                 <button
