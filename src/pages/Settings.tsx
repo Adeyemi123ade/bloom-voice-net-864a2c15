@@ -13,6 +13,7 @@ import {
 import MobileFrame from "@/components/MobileFrame";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { unregisterCallPush } from "@/lib/fcmRegistration";
 import { toast } from "@/hooks/use-toast";
 import { isWebApp } from "@/lib/platform";
 import {
@@ -69,6 +70,7 @@ export default function Settings() {
   const signOutWeb = async () => {
     setWorking(true);
     try {
+      await unregisterCallPush();
       try { await supabase.auth.signOut(); } catch { /* ignore */ }
       toast({ title: "Signed out" });
       window.location.replace("/");

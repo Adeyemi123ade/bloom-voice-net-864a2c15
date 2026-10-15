@@ -14,9 +14,11 @@ import {
 } from "@/lib/activeCall";
 import { getSelectedRingtone, playRingtone } from "@/lib/ringtones";
 import { startNativeCallNotifications } from "@/lib/nativeCallNotifications";
-import { registerForCallPush } from "@/lib/fcmRegistration";
+import { isCallPushReady, registerForCallPush } from "@/lib/fcmRegistration";
+import { Capacitor } from "@capacitor/core";
 import { ensureFullScreenIntentPermission } from "@/lib/nativeCalls";
 import { formatCallMediaError, prepareCallMedia } from "@/lib/callMedia";
+import { pushCallCancelled } from "@/lib/pushNotify";
 import { CALL_RING_TIMEOUT_MS } from "@/lib/callTiming";
 
 type IncomingCall = {
@@ -118,6 +120,16 @@ function useCallWaitingTone(active: boolean) {
   }, [active]);
 }
 
+function useDocumentHidden(): boolean {
+  const [hidden, setHidden] = useState(() => document.visibilityState === "hidden");
+  useEffect(() => {
+    const on = () => setHidden(document.visibilityState === "hidden");
+    document.addEventListener("visibilitychange", on);
+    return () => document.removeEventListener("visibilitychange", on);
+  }, []);
+  return hidden;
+}
+
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export default function IncomingCallScreen() {
@@ -134,7 +146,12 @@ export default function IncomingCallScreen() {
   const { calls } = useCalls();
   const inCall = calls.length > 0;
   const [accepting, setAccepting] = useState(false);
-  useRingtone(!!incoming && !inCall);
+  // In the Android app, while it's in the background or the screen is off,
+  // the phone's own ringer (from the push) rings; ringing here as well would
+  // play two ringtones. On the website there's no such ringer, so ring here.
+  const hidden = useDocumentHidden();
+  const phoneRings = hidden && Capacitor.isNativePlatform() && isCallPushReady();
+  useRingtone(!!incoming && !inCall && !phoneRings);
   useCallWaitingTone(!!incoming && inCall);
   useEffect(() => {
     if (incoming && inCall) {
@@ -149,6 +166,12 @@ export default function IncomingCallScreen() {
     }
   }, [incoming, inCall, callerName, callerAvatar]);
   useEffect(() => () => setWaitingCall(null), []);
+  // A call can be answered from the phone's notification while this screen
+  // is still ringing for it: once it's a running call, stop ringing here.
+  const answeredElsewhere = !!incoming && calls.some((c) => c.callId === incoming.id);
+  useEffect(() => {
+    if (answeredElsewhere) setIncoming(null);
+  }, [answeredElsewhere]);
 
   const incomingRef = useRef<IncomingCall | null>(null);
   useEffect(() => { incomingRef.current = incoming; }, [incoming]);
@@ -217,6 +240,9 @@ export default function IncomingCallScreen() {
         .maybeSingle();
       if (!call) return;
       if (call.callee_id !== user.id) return;
+      // Already answered from the phone's own call screen (the app opened
+      // straight into the call): don't ring for it again here.
+      if (getCallsSnapshot().calls.some((c) => c.callId === call.id)) return;
       if (call.status !== "ringing") return;
       // If the call was created more than 45s ago, treat as already missed.
       const age = Date.now() - new Date(call.created_at as string).getTime();
@@ -331,6 +357,8 @@ export default function IncomingCallScreen() {
       .from("calls")
       .update({ status: "declined", ended_at: new Date().toISOString() })
       .eq("id", c.id);
+    // Stop any other phone of mine that's still ringing for this call.
+    pushCallCancelled(c.id, "declined");
   };
 
   const isVideo = incoming.call_type === "video";

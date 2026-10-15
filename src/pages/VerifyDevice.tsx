@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { unregisterCallPush } from "@/lib/fcmRegistration";
 import { getDeviceId, getDeviceLabel } from "@/lib/deviceId";
 import { getAppPlatform } from "@/lib/platform";
 import { markDeviceVerified } from "@/lib/deviceVerified";
@@ -136,6 +137,7 @@ export default function VerifyDevice() {
   };
 
   const cancelAndSignOut = async () => {
+    await unregisterCallPush();
     await supabase.auth.signOut();
     navigate("/", { replace: true });
   };

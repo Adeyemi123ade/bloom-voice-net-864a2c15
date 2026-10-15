@@ -11,6 +11,31 @@ import { supabase } from "@/integrations/supabase/client";
  */
 
 let registered = false;
+let pushReady = false;
+
+const TOKEN_KEY = "chichat:fcm-token";
+
+/**
+ * Before signing out: remove this phone's push token, so it stops receiving
+ * this account's calls and messages, and so the next account to sign in on
+ * the phone can register it (the token row belongs to one user at a time).
+ */
+export async function unregisterCallPush(): Promise<void> {
+  registered = false;
+  pushReady = false;
+  let token: string | null = null;
+  try { token = localStorage.getItem(TOKEN_KEY); } catch { /* ignore */ }
+  if (!token) return;
+  try {
+    await supabase.from("device_push_tokens").delete().eq("fcm_token", token);
+    localStorage.removeItem(TOKEN_KEY);
+  } catch { /* ignore */ }
+}
+
+/** True once this phone has a push token saved, so calls can wake it. */
+export function isCallPushReady(): boolean {
+  return pushReady;
+}
 
 export async function registerForCallPush(userId: string) {
   if (registered) return;
@@ -29,7 +54,7 @@ export async function registerForCallPush(userId: string) {
 
     PushNotifications.addListener("registration", async (token) => {
       try {
-        await supabase.from("device_push_tokens").upsert(
+        const { error } = await supabase.from("device_push_tokens").upsert(
           {
             user_id: userId,
             fcm_token: token.value,
@@ -38,6 +63,12 @@ export async function registerForCallPush(userId: string) {
           },
           { onConflict: "fcm_token" },
         );
+        // Supabase reports failures in `error` rather than throwing.
+        if (error) console.warn("[fcm] failed to store token", error);
+        else {
+          pushReady = true;
+          try { localStorage.setItem(TOKEN_KEY, token.value); } catch { /* ignore */ }
+        }
       } catch (e) {
         console.warn("[fcm] failed to store token", e);
       }

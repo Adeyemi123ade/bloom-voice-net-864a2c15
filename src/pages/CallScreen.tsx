@@ -26,6 +26,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { formatCallClock } from "@/lib/chat/messageKinds";
 import { CALL_RING_TIMEOUT_MS } from "@/lib/callTiming";
+import { pushCallCancelled } from "@/lib/pushNotify";
 import { clearPreparedCallMedia, consumePreparedCallMedia, formatCallMediaError } from "@/lib/callMedia";
 import { startCallForegroundService, stopCallForegroundService } from "@/lib/nativeCalls";
 import {
@@ -273,6 +274,8 @@ export default function CallSession({
         .eq("id", callId)
         .eq("status", "ringing");
       endNotice("No answer");
+      // Stop their phone ringing and leave a missed-call notice on it.
+      pushCallCancelled(callId, "missed");
       void logCallMessage("no_answer", 0);
       cleanupAndExit();
     }, CALL_RING_TIMEOUT_MS);
@@ -300,6 +303,8 @@ export default function CallSession({
         cleanupAndExit();
         return;
       }
+      // Answered here: stop any other phone of mine that's still ringing.
+      pushCallCancelled(callId, "answered");
       joinRoom();
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -423,7 +428,9 @@ export default function CallSession({
     if (wasConnected) {
       void logCallMessage("ended", dur);
     } else if (role === "caller") {
-      // Caller cancelled before pickup
+      // Caller cancelled before pickup: stop their phone ringing (it shows
+      // as a missed call there).
+      pushCallCancelled(callId, "cancelled");
       void logCallMessage("no_answer", 0);
     } else {
       // Receiver hung up before connecting (decline)
