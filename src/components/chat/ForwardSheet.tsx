@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Check, Loader2, Search, Send } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { pushNewMessage } from "@/lib/pushNotify";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 type Chat = {
@@ -101,6 +102,7 @@ export default function ForwardSheet({
     const failed: string[] = [];
     for (const conversationId of picked) {
       let ok = true;
+      let lastId: string | null = null;
       // One at a time so the messages arrive in their original order.
       for (const content of contents) {
         const { data, error } = await supabase
@@ -109,7 +111,10 @@ export default function ForwardSheet({
           .select("id")
           .single();
         if (error || !data) { ok = false; break; }
+        lastId = data.id;
       }
+      // One notification per chat, for the last forwarded message.
+      pushNewMessage(lastId);
       (ok ? sent : failed).push(nameOf(conversationId));
     }
     setSending(false);

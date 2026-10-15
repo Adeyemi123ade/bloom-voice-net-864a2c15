@@ -19,6 +19,7 @@ public class MainActivity extends BridgeActivity {
         FirebaseApp.initializeApp(this);
         registerPlugin(ChiChatCallsPlugin.class);
         openCallFromIntent(getIntent());
+        openChatFromIntent(getIntent());
     }
 
     @Override
@@ -26,6 +27,33 @@ public class MainActivity extends BridgeActivity {
         super.onNewIntent(intent);
         setIntent(intent);
         openCallFromIntent(intent);
+        openChatFromIntent(intent);
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        AppState.setForeground(true);
+        MessageNotificationHelper.clearAll(this);
+    }
+
+    @Override
+    public void onPause() {
+        AppState.setForeground(false);
+        super.onPause();
+    }
+
+    /** Tapped a message or missed-call notification: open that chat. */
+    private void openChatFromIntent(Intent intent) {
+        if (intent == null || bridge == null) return;
+        String conversationId = intent.getStringExtra("openChat");
+        if (conversationId == null || conversationId.isEmpty()) return;
+        intent.removeExtra("openChat");
+        String base = bridge.getServerUrl() != null
+                ? bridge.getServerUrl()
+                : bridge.getLocalUrl();
+        WebView webView = bridge.getWebView();
+        webView.post(() -> webView.loadUrl(base + "/chat/" + enc(conversationId)));
     }
 
     private void openCallFromIntent(Intent intent) {
@@ -39,6 +67,8 @@ public class MainActivity extends BridgeActivity {
 
         if (conversationId == null || callId == null || room == null)
             return;
+        // Handled once: don't re-open the call if the activity is recreated.
+        intent.removeExtra("openCall");
 
         String route = "/call/" + enc(conversationId)
                 + "?type=" + enc(type == null ? "voice" : type)

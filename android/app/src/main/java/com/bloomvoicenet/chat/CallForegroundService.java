@@ -1,7 +1,10 @@
 package com.bloomvoicenet.chat;
 
 import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.app.Service;
+import android.content.pm.ServiceInfo;
 import android.content.Context;
 import android.content.Intent;
 import android.media.AudioAttributes;
@@ -10,6 +13,7 @@ import android.media.AudioManager;
 import android.os.Build;
 import android.os.IBinder;
 import androidx.core.app.NotificationCompat;
+import androidx.core.app.ServiceCompat;
 
 /**
  * Foreground service that keeps the call alive AND — critically — switches
@@ -26,19 +30,48 @@ public class CallForegroundService extends Service {
 
     @Override public IBinder onBind(Intent intent) { return null; }
 
+    // Quiet channel for the "call in progress" notification. It used to share
+    // the incoming-call channel, whose ringtone sound played as the call began.
+    static final String ONGOING_CHANNEL_ID = "ongoing_call";
+
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        CallNotificationHelper.createChannel(this);
-        Notification n = new NotificationCompat.Builder(this, CallNotificationHelper.CHANNEL_ID)
+        createOngoingChannel();
+        Notification n = new NotificationCompat.Builder(this, ONGOING_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_call)
             .setContentTitle("ChiChat call in progress")
             .setContentText("Keeping your call connected")
             .setCategory(NotificationCompat.CATEGORY_CALL)
             .setOngoing(true)
             .build();
-        startForeground(44, n);
+        try {
+            // Android 14+ only allows a microphone foreground service while the
+            // app is in use and has the mic permission; otherwise it throws,
+            // which used to crash the whole app. Fail quietly instead.
+            int type = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+                ? ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                : 0;
+            ServiceCompat.startForeground(this, 44, n, type);
+        } catch (Throwable t) {
+            stopSelf();
+            return START_NOT_STICKY;
+        }
         configureAudioForCall();
-        return START_STICKY;
+        // Not sticky: if Android kills the app, don't restart a microphone
+        // service in the background with no call (that's not allowed and crashed).
+        return START_NOT_STICKY;
+    }
+
+    private void createOngoingChannel() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
+        NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        if (nm == null || nm.getNotificationChannel(ONGOING_CHANNEL_ID) != null) return;
+        NotificationChannel ch = new NotificationChannel(
+            ONGOING_CHANNEL_ID, "Ongoing calls", NotificationManager.IMPORTANCE_LOW);
+        ch.setDescription("Shown while a ChiChat call is in progress");
+        ch.setSound(null, null);
+        ch.enableVibration(false);
+        nm.createNotificationChannel(ch);
     }
 
     private void configureAudioForCall() {

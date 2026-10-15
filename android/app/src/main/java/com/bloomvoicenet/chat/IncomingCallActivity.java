@@ -6,6 +6,8 @@ import android.content.Intent;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.Gravity;
 import android.view.Window;
 import android.view.WindowManager;
@@ -13,9 +15,39 @@ import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
+import java.lang.ref.WeakReference;
 
 public class IncomingCallActivity extends AppCompatActivity {
     private Intent callIntent;
+    // The call screen currently showing, so a "call cancelled" push can close it.
+    private static WeakReference<IncomingCallActivity> current = new WeakReference<>(null);
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private final Runnable timeout = () -> {
+        CallNotificationHelper.cancel(this, callIntent.getStringExtra("callId"));
+        finishAndRemoveTask();
+    };
+
+    /** Close the full-screen ringer for this call if it's showing. */
+    static void dismiss(String callId) {
+        IncomingCallActivity a = current.get();
+        if (a == null || a.callIntent == null) return;
+        String showing = a.callIntent.getStringExtra("callId");
+        if (callId == null || callId.equals(showing)) {
+            a.runOnUiThread(a::finishAndRemoveTask);
+        }
+    }
+
+    private void armTimeout() {
+        handler.removeCallbacks(timeout);
+        handler.postDelayed(timeout, CallNotificationHelper.RING_TIMEOUT_MS);
+    }
+
+    @Override
+    protected void onDestroy() {
+        handler.removeCallbacks(timeout);
+        if (current.get() == this) current = new WeakReference<>(null);
+        super.onDestroy();
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -30,6 +62,8 @@ public class IncomingCallActivity extends AppCompatActivity {
             w.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
         }
         w.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON | WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        current = new WeakReference<>(this);
+        armTimeout();
         render();
     }
 
@@ -38,6 +72,8 @@ public class IncomingCallActivity extends AppCompatActivity {
         super.onNewIntent(intent);
         callIntent = intent;
         setIntent(intent);
+        current = new WeakReference<>(this);
+        armTimeout();
         render();
     }
 

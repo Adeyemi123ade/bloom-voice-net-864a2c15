@@ -22,14 +22,22 @@ public class ChiChatCallsPlugin extends Plugin {
     //           The SDK_INT branch is dropped entirely.
     @PluginMethod
     public void startForegroundCall(PluginCall call) {
-        Intent i = new Intent(getContext(), CallForegroundService.class);
-        getContext().startForegroundService(i);
-        call.resolve();
+        // Never let a refused foreground service crash the app; the call
+        // itself still works without it, only background audio is affected.
+        try {
+            Intent i = new Intent(getContext(), CallForegroundService.class);
+            getContext().startForegroundService(i);
+            call.resolve();
+        } catch (Throwable t) {
+            call.reject("Could not start call service: " + t.getMessage());
+        }
     }
 
     @PluginMethod
     public void stopForegroundCall(PluginCall call) {
-        getContext().stopService(new Intent(getContext(), CallForegroundService.class));
+        try {
+            getContext().stopService(new Intent(getContext(), CallForegroundService.class));
+        } catch (Throwable ignored) {}
         call.resolve();
     }
 

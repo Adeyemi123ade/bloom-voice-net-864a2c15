@@ -54,6 +54,7 @@ import { useBackNavigation } from "@/hooks/useBackNavigation";
 import { messageKind, mediaLabel, parseCallLog, selectionActions, stripQuotedReply } from "@/lib/chat/messageKinds";
 import { checkClipAvailable, copyMessages, matchPastedClip, mediaUrlOf } from "@/lib/chat/clipboard";
 import { useSignedMediaUrl } from "@/lib/signedMedia";
+import { pushNewMessage } from "@/lib/pushNotify";
 
 // A row coming from Supabase (initial fetch or realtime payload) is only
 // guaranteed to match the DB schema, not this shape — content in particular
@@ -677,6 +678,7 @@ export default function ChatRoom() {
     // action on it (delete/copy/forward) targets an id no row has, so it
     // quietly no-ops instead of doing anything.
     adoptRealId(tmpId, inserted.id);
+    pushNewMessage(inserted.id);
     console.debug("[msg-send] persisted", inserted.id);
     await supabase.from("typing_indicators").delete().eq("conversation_id", conversationId).eq("user_id", user.id);
   };
@@ -1002,6 +1004,7 @@ export default function ChatRoom() {
     // reconcile this is what left voice notes stuck "sending" forever with
     // delete/copy/forward silently doing nothing.
     adoptRealId(tmpId, inserted.id);
+    pushNewMessage(inserted.id);
     console.debug("[voice-send] persisted", inserted.id);
   };
 
@@ -1085,6 +1088,7 @@ export default function ChatRoom() {
       // send() for why relying on the realtime echo's content-match to
       // reconcile this is fragile.
       adoptRealId(tmpId, inserted.id);
+    pushNewMessage(inserted.id);
       URL.revokeObjectURL(pendingFile.previewUrl);
       setPendingFile(null);
       setText("");
@@ -1148,6 +1152,7 @@ export default function ChatRoom() {
       const { data: inserted, error } = await supabase.from("messages").insert(rows).select("*");
       if (error || !inserted?.length) throw error ?? new Error("Send failed");
       const fresh = inserted.map((r) => normalizeMessage(r as Record<string, unknown>));
+      fresh.forEach((m) => pushNewMessage(m.id));
       setMessages((prev) => {
         const have = new Set(prev.map((m) => m.id));
         return [...prev, ...fresh.filter((m) => !have.has(m.id))];

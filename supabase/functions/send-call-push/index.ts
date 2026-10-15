@@ -1,6 +1,10 @@
-// Send a high-priority FCM data push to wake the callee's device when an
-// app-to-app call starts. Caller invokes this right after inserting a row
-// into `calls`. Uses FCM v1 with a Firebase service-account JSON.
+// High-priority FCM data pushes to the ChiChat Android app (FCM v1, with a
+// Firebase service-account JSON). Three kinds, chosen by `action`:
+//  - "call" (default): wake the callee's phone to ring for a new call.
+//  - "cancel": stop that ringing (caller hung up, no answer, or answered /
+//    declined on another device); unanswered calls leave a missed-call notice.
+//  - "message": notify the other person in a chat about a new message.
+// Every action checks the signed-in user is entitled to send it.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
@@ -70,59 +74,183 @@ async function getAccessToken(sa: ServiceAccount): Promise<string> {
   return j.access_token as string;
 }
 
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+
+// The service-role client (untyped schema, so `any` is the honest type here).
+// deno-lint-ignore no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Admin = any;
+
+/** Send one data push to every device of a user; drop tokens FCM rejects. */
+async function pushToUser(
+  supabase: Admin,
+  userId: string,
+  data: Record<string, string>,
+  ttl: string,
+): Promise<{ sent: number; failed: number; reason?: string }> {
+  const { data: tokens } = await supabase
+    .from("device_push_tokens")
+    .select("fcm_token")
+    .eq("user_id", userId);
+  if (!tokens || tokens.length === 0) return { sent: 0, failed: 0, reason: "no tokens" };
+
+  const saRaw = Deno.env.get("FCM_SERVICE_ACCOUNT_JSON");
+  if (!saRaw) throw new Error("FCM_SERVICE_ACCOUNT_JSON not configured");
+  const sa: ServiceAccount = JSON.parse(saRaw);
+  const accessToken = await getAccessToken(sa);
+  const sendUrl = `https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`;
+
+  const results = await Promise.allSettled(
+    tokens.map(async (t: { fcm_token: string }) => {
+      const r = await fetch(sendUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+        // Data-only + high priority wakes Android even when the app is closed;
+        // the app's native push handler decides what to show.
+        body: JSON.stringify({
+          message: { token: t.fcm_token, data, android: { priority: "HIGH", ttl } },
+        }),
+      });
+      if (!r.ok) {
+        const txt = await r.text();
+        if (r.status === 404 || r.status === 400) {
+          await supabase.from("device_push_tokens").delete().eq("fcm_token", t.fcm_token);
+        }
+        throw new Error(`fcm ${r.status} ${txt}`);
+      }
+    }),
+  );
+  const sent = results.filter((r) => r.status === "fulfilled").length;
+  return { sent, failed: results.length - sent };
+}
+
+async function displayName(supabase: Admin, userId: string): Promise<string> {
+  const { data } = await supabase.from("profiles").select("display_name").eq("id", userId).maybeSingle();
+  return (data?.display_name as string | undefined) ?? "Someone";
+}
+
+/** Notification text for a stored message, never the raw "[voice]…" form. */
+function messagePreview(content: string): string {
+  if (content.startsWith("[voice]")) return "🎤 Voice note";
+  if (content.startsWith("[file]")) {
+    const [, mime = "", nameEnc = "", , captionEnc = ""] = content.slice(6).split("|");
+    const dec = (v: string) => {
+      try { return decodeURIComponent(v); } catch { return v; }
+    };
+    const caption = dec(captionEnc);
+    if (mime.startsWith("image/")) return `📷 ${caption || "Photo"}`;
+    if (mime.startsWith("video/")) return `🎥 ${caption || "Video"}`;
+    return `📄 ${dec(nameEnc) || "Document"}`;
+  }
+  let text = content;
+  if (text.startsWith("> ")) {
+    const nl = text.indexOf("\n");
+    if (nl > -1) text = text.slice(nl + 1);
+  }
+  text = text.trim();
+  return text.length > 100 ? `${text.slice(0, 100)}…` : text || "New message";
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    if (!authHeader) return json({ error: "unauthorized" }, 401);
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
-    const { data: userData } = await supabase.auth.getUser(
-      authHeader.replace("Bearer ", ""),
-    );
-    if (!userData?.user) {
-      return new Response(JSON.stringify({ error: "unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    const { data: userData } = await supabase.auth.getUser(authHeader.replace("Bearer ", ""));
+    const me = userData?.user?.id;
+    if (!me) return json({ error: "unauthorized" }, 401);
+
+    const body = await req.json();
+    const action = body.action ?? "call";
+
+    // This client uses the service role, so RLS doesn't apply here: every
+    // action verifies ownership explicitly, so nobody can push a spoofed call
+    // or message to another user's phone.
+
+    if (action === "cancel") {
+      const { callId, reason } = body;
+      if (!callId || !["missed", "cancelled", "answered", "declined"].includes(reason)) {
+        return json({ error: "missing fields" }, 400);
+      }
+      const { data: call } = await supabase
+        .from("calls")
+        .select("caller_id, callee_id, call_type, conversation_id")
+        .eq("id", callId)
+        .maybeSingle();
+      if (!call || (call.caller_id !== me && call.callee_id !== me)) return json({ error: "unauthorized" }, 403);
+      const result = await pushToUser(
+        supabase,
+        call.callee_id as string,
+        {
+          type: "call_cancelled",
+          callId: String(callId),
+          reason: String(reason),
+          callerName: await displayName(supabase, call.caller_id as string),
+          callType: String(call.call_type ?? "voice"),
+          conversationId: String(call.conversation_id ?? ""),
+        },
+        "60s",
+      );
+      return json({ ok: true, ...result });
     }
 
-    const { calleeId, callId, callType, callerName, conversationId, roomName } = await req.json();
-    if (!calleeId || !callId) {
-      return new Response(JSON.stringify({ error: "missing fields" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (action === "message") {
+      const { messageId } = body;
+      if (!messageId) return json({ error: "missing fields" }, 400);
+      const { data: msg } = await supabase
+        .from("messages")
+        .select("id, conversation_id, sender_id, content, deleted_for_everyone")
+        .eq("id", messageId)
+        .maybeSingle();
+      if (!msg || msg.sender_id !== me) return json({ error: "unauthorized" }, 403);
+      const content = (msg.content as string | null) ?? "";
+      // Call records are covered by the call pushes (missed-call notice).
+      if (msg.deleted_for_everyone || !content || content.startsWith("[call]")) return json({ ok: true, sent: 0 });
+      const { data: others } = await supabase
+        .from("conversation_participants")
+        .select("user_id")
+        .eq("conversation_id", msg.conversation_id)
+        .neq("user_id", me);
+      const senderName = await displayName(supabase, me);
+      let sent = 0;
+      for (const o of others ?? []) {
+        const r = await pushToUser(
+          supabase,
+          o.user_id as string,
+          {
+            type: "message",
+            conversationId: String(msg.conversation_id),
+            messageId: String(msg.id),
+            senderName,
+            preview: messagePreview(content),
+          },
+          "86400s",
+        );
+        sent += r.sent;
+      }
+      return json({ ok: true, sent });
     }
 
-    // This client uses the service role, so RLS doesn't apply here — verify
-    // ownership explicitly. Without this, any authenticated user could push
-    // a spoofed "incoming call" (arbitrary callerName/callType) to any other
-    // user's device just by knowing their user id.
+    // action "call"
+    const { calleeId, callId, callType, conversationId, roomName } = body;
+    if (!calleeId || !callId) return json({ error: "missing fields" }, 400);
     const { data: callRow, error: callErr } = await supabase
       .from("calls")
       .select("caller_id, callee_id")
       .eq("id", callId)
       .maybeSingle();
-    if (
-      callErr ||
-      !callRow ||
-      callRow.caller_id !== userData.user.id ||
-      callRow.callee_id !== calleeId
-    ) {
-      return new Response(JSON.stringify({ error: "unauthorized" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (callErr || !callRow || callRow.caller_id !== me || callRow.callee_id !== calleeId) {
+      return json({ error: "unauthorized" }, 403);
     }
 
     // Sign a short token so the native "Decline" button can call call-action
@@ -146,92 +274,27 @@ Deno.serve(async (req) => {
       .replace(/\//g, "_");
     const actionUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/call-action`;
 
-    const { data: tokens } = await supabase
-      .from("device_push_tokens")
-      .select("fcm_token")
-      .eq("user_id", calleeId);
-
-    if (!tokens || tokens.length === 0) {
-      return new Response(
-        JSON.stringify({ ok: true, sent: 0, reason: "no tokens" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
-    const saRaw = Deno.env.get("FCM_SERVICE_ACCOUNT_JSON");
-    if (!saRaw) {
-      return new Response(
-        JSON.stringify({ error: "FCM_SERVICE_ACCOUNT_JSON not configured" }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
-    }
-    const sa: ServiceAccount = JSON.parse(saRaw);
-    const accessToken = await getAccessToken(sa);
-
-    const sendUrl = `https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`;
-    const results = await Promise.allSettled(
-      tokens.map(async (t) => {
-        const body = {
-          message: {
-            token: t.fcm_token,
-            // Data-only payload + high priority → wakes Android even when
-            // the app is killed. The app's push listener / realtime
-            // subscription on `calls` then opens IncomingCallScreen.
-            data: {
-              type: "incoming_call",
-              callId: String(callId),
-              calleeId: String(calleeId),
-              callType: String(callType ?? "voice"),
-              callerName: String(callerName ?? "Someone"),
-              conversationId: String(conversationId ?? ""),
-              roomName: String(roomName ?? ""),
-              actionUrl,
-              actionToken,
-            },
-            android: {
-              priority: "HIGH",
-              ttl: "45s",
-            },
-          },
-        };
-        const r = await fetch(sendUrl, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(body),
-        });
-        if (!r.ok) {
-          const txt = await r.text();
-          // Stale token cleanup
-          if (r.status === 404 || r.status === 400) {
-            await supabase
-              .from("device_push_tokens")
-              .delete()
-              .eq("fcm_token", t.fcm_token);
-          }
-          throw new Error(`fcm ${r.status} ${txt}`);
-        }
-      }),
+    const result = await pushToUser(
+      supabase,
+      calleeId,
+      {
+        type: "incoming_call",
+        callId: String(callId),
+        calleeId: String(calleeId),
+        callType: String(callType ?? "voice"),
+        // The caller's own name, looked up here. The app used to send the
+        // other person's name, so phones showed the wrong caller.
+        callerName: await displayName(supabase, me),
+        conversationId: String(conversationId ?? ""),
+        roomName: String(roomName ?? ""),
+        actionUrl,
+        actionToken,
+      },
+      "45s",
     );
-
-    const sent = results.filter((r) => r.status === "fulfilled").length;
-    const failed = results.length - sent;
-    return new Response(JSON.stringify({ ok: true, sent, failed }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return json({ ok: true, ...result });
   } catch (e) {
     console.error("send-call-push error", e);
-    return new Response(
-      JSON.stringify({ error: e instanceof Error ? e.message : String(e) }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
-    );
+    return json({ error: e instanceof Error ? e.message : String(e) }, 500);
   }
 });

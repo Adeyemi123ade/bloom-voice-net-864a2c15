@@ -1,6 +1,7 @@
 import { Capacitor } from "@capacitor/core";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { supabase } from "@/integrations/supabase/client";
+import { isCallPushReady } from "@/lib/fcmRegistration";
 
 /**
  * Native heads-up incoming-call notifications for Android (Capacitor).
@@ -70,6 +71,11 @@ export async function startNativeCallNotifications(userId: string) {
           call_type: string;
         };
         if (row?.status !== "ringing") return;
+        // Fallback only. With push working, the phone's own full-screen
+        // ringer handles a call when the app is in the background, and the
+        // in-app call screen handles it when the app is open; ringing here
+        // as well played two ringtones at once.
+        if (isCallPushReady() || document.visibilityState === "visible") return;
 
         let callerName = "Someone";
         try {
