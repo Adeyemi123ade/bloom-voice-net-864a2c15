@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { openCallSettings } from "@/lib/nativeCalls";
 import { useNavigate } from "react-router-dom";
 import {
@@ -50,7 +50,7 @@ import {
 import { ActiveRow, EmptyState, InviteRow } from "@/components/contacts/ContactRows";
 import { SectionList, sectionLetter } from "@/components/contacts/ContactSectionList";
 import { shareChichatInvite } from "@/components/contacts/ShareInviteCard";
-import { clearPreparedCallMedia, formatCallMediaError, prepareCallMedia } from "@/lib/callMedia";
+import { beginOutgoingCall } from "@/lib/callStart";
 
 export default function Contacts() {
   const navigate = useNavigate();
@@ -65,6 +65,8 @@ export default function Contacts() {
   const [syncing, setSyncing] = useState(false);
   const [matching, setMatching] = useState(false);
   const [query, setQuery] = useState("");
+  // Ignores repeat taps while the call is being opened.
+  const startingCall = useRef(false);
   const [googleConnected, setGoogleConnected] = useState<boolean | null>(null);
   const [connectingGoogle, setConnectingGoogle] = useState(false);
   const [permissionDenied, setPermissionDenied] = useState(false);
@@ -413,71 +415,36 @@ export default function Contacts() {
   }, [invite, query]);
 
   const callActive = async (c: ActiveContact) => {
-    if (!user) return;
+    if (!user || startingCall.current) return;
     const activeCall = getActiveCall();
     if (activeCall) {
       // Quietly back to the call in progress.
       navigate(activeCallPath(activeCall));
       return;
     }
+    startingCall.current = true;
     try {
-      await prepareCallMedia(false);
-    } catch (error) {
-      toast({
-        title: "Call permission needed",
-        description: formatCallMediaError(error, false),
-        variant: "destructive",
-      });
-      return;
-    }
-    try {
+      // The conversation is needed for the call's address; usually instant.
       const conversationId = await supabase
         .rpc("start_direct_conversation", { _other_user: c.user_id })
         .then((r) => {
           if (r.error) throw r.error;
           return r.data as string;
         });
-
-      const roomName = `room-${conversationId}-${Date.now()}`;
-      const { error: roomErr } = await supabase.functions.invoke("twilio-room", {
-        body: { action: "create", roomName },
-      });
-      if (roomErr) {
-        clearPreparedCallMedia();
-        throw roomErr;
-      }
-
-      const { data: callRow, error: callErr } = await supabase
-        .from("calls")
-        .insert({
-          conversation_id: conversationId,
-          caller_id: user.id,
-          callee_id: c.user_id,
-          call_type: "voice",
-          room_name: roomName,
-          status: "ringing",
-        })
-        .select("id")
-        .single();
-      if (callErr) throw callErr;
-      void supabase.functions.invoke("send-call-push", {
-        body: {
-          calleeId: c.user_id,
-          callId: callRow.id,
-          callType: "voice",
-          callerName: c.display_name ?? "Someone",
+      beginOutgoingCall(
+        {
           conversationId,
-          roomName,
+          calleeId: c.user_id,
+          type: "voice",
+          peer: { name: c.display_name ?? "Contact", avatarUrl: c.avatar_url ?? null },
         },
-      }).catch((e) => console.warn("[call-push] failed", e));
-      navigate(
-        `/call/${conversationId}?type=voice&callId=${callRow.id}&room=${encodeURIComponent(roomName)}&role=caller`,
-        { replace: true, state: { peer: { name: c.display_name ?? "Contact", avatarUrl: c.avatar_url ?? null } } },
+        navigate,
       );
     } catch (err) {
-      clearPreparedCallMedia();
       const msg = err instanceof Error ? err.message : "Could not start call";
       toast({ title: "Call failed", description: msg, variant: "destructive" });
+    } finally {
+      startingCall.current = false;
     }
   };
 

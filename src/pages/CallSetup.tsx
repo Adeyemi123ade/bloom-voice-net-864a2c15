@@ -8,6 +8,50 @@ import { useBackNavigation } from "@/hooks/useBackNavigation";
 import { type CallReadiness, getCallReadiness, isAndroidNative } from "@/lib/nativeCalls";
 import { buildCallSetupItems } from "@/lib/callSetup";
 import { getPushProblem, isCallPushReady, retryCallPush } from "@/lib/fcmRegistration";
+import { type CallStage, lastCallTimeline } from "@/lib/callTimeline";
+
+const STAGE_LABELS: [CallStage, string][] = [
+  ["screen", "Call screen opened"],
+  ["media", "Microphone ready"],
+  ["saved", "Call saved"],
+  ["push", "Other phone alerted"],
+  ["room", "Call room ready"],
+  ["token", "Permission to join"],
+  ["joined", "Joined the call"],
+  ["connected", "Connected"],
+];
+
+/** Timings of this phone's last call, to see where any slowness comes from. */
+function LastCallSpeed() {
+  const t = lastCallTimeline();
+  const rows = STAGE_LABELS.filter(([k]) => t?.marks?.[k] !== undefined);
+  return (
+    <div className="mx-4 mb-6 rounded-xl bg-card border border-border p-4" data-testid="last-call-speed">
+      <p className="text-sm font-semibold text-foreground">Last call speed</p>
+      {!t || rows.length === 0 ? (
+        <p className="text-xs text-muted-foreground mt-1">Make or answer a call, then come back here.</p>
+      ) : (
+        <>
+          <p className="text-xs text-muted-foreground mt-1">
+            {t.role === "callee" ? "A call you answered" : "A call you made"}
+            {t.at ? `, ${new Date(t.at).toLocaleString()}` : ""}. Time after you tapped{" "}
+            {t.role === "callee" ? "Accept" : "Call"}:
+          </p>
+          <ul className="mt-2 flex flex-col gap-1">
+            {rows.map(([k, label]) => (
+              <li key={k} className="flex justify-between text-xs">
+                <span className="text-foreground">{label}</span>
+                <span className="text-muted-foreground tabular-nums">
+                  {((t.marks?.[k] ?? 0) / 1000).toFixed(1)} s
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
+  );
+}
 
 export default function CallSetup() {
   const { user } = useAuth();
@@ -201,6 +245,7 @@ export default function CallSetup() {
             )}
           </div>
         )}
+        <LastCallSpeed />
       </div>
     </MobileFrame>
   );

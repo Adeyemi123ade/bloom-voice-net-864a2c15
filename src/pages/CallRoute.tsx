@@ -45,8 +45,11 @@ export default function CallRoute() {
     }
     // The screen that started the call may pass who's on the other end, so
     // the call screen shows their name and photo straight away.
-    const peer = (location.state as { peer?: { name: string; avatarUrl?: string | null } } | null)?.peer;
-    startActiveCall({ conversationId, callId, roomName, role, initialIsVideo, peer });
+    const st = location.state as {
+      peer?: { name: string; avatarUrl?: string | null };
+      setup?: { calleeId: string };
+    } | null;
+    startActiveCall({ conversationId, callId, roomName, role, initialIsVideo, peer: st?.peer, setup: st?.setup });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId, callId]);
 

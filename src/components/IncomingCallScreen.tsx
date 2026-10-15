@@ -17,7 +17,10 @@ import { startNativeCallNotifications } from "@/lib/nativeCallNotifications";
 import { isCallPushReady, registerForCallPush } from "@/lib/fcmRegistration";
 import { Capacitor } from "@capacitor/core";
 import { ensureFullScreenIntentPermission } from "@/lib/nativeCalls";
-import { formatCallMediaError, prepareCallMedia } from "@/lib/callMedia";
+import { startPreparingCallMedia } from "@/lib/callMedia";
+import { prefetchCallToken } from "@/lib/callToken";
+import { startCallTimeline } from "@/lib/callTimeline";
+import { tapFeedback } from "@/lib/haptics";
 import { pushCallCancelled } from "@/lib/pushNotify";
 import { CALL_RING_TIMEOUT_MS } from "@/lib/callTiming";
 
@@ -146,6 +149,8 @@ export default function IncomingCallScreen() {
   const { calls } = useCalls();
   const inCall = calls.length > 0;
   const [accepting, setAccepting] = useState(false);
+  // The call last tapped Accept on: ignores repeat taps on Accept/Reject.
+  const acceptedRef = useRef<string | null>(null);
   // In the Android app, while it's in the background or the screen is off,
   // the phone's own ringer (from the push) rings; ringing here as well would
   // play two ringtones. On the website there's no such ringer, so ring here.
@@ -256,6 +261,9 @@ export default function IncomingCallScreen() {
         return;
       }
 
+      // Get permission to join now, while it rings, so Accept connects fast.
+      prefetchCallToken(call.room_name as string);
+
       const { data: prof } = await supabase
         .from("profiles")
         .select("display_name, avatar_url")
@@ -318,7 +326,9 @@ export default function IncomingCallScreen() {
 
   const accept = async () => {
     const c = incoming;
-    if (accepting) return;
+    if (accepting || acceptedRef.current === c.id) return;
+    acceptedRef.current = c.id;
+    tapFeedback();
     // Call waiting: answering while a call is live ends that call first
     // ("End & accept"). If the user put it on Hold first, it stays on hold
     // and this call is added next to it ("Hold & accept").
@@ -334,16 +344,10 @@ export default function IncomingCallScreen() {
     }
     // Any call left keeps (or goes back) on hold while this one is answered.
     getCallsSnapshot().calls.forEach((x) => setCallHeld(x.callId, true));
-    try {
-      await prepareCallMedia(c.call_type === "video");
-    } catch (error) {
-      toast({
-        title: "Call permission needed",
-        description: formatCallMediaError(error, c.call_type === "video"),
-        variant: "destructive",
-      });
-      return;
-    }
+    // Open the call at once; the microphone switches on alongside (the call
+    // screen waits for it and reports a refused permission itself).
+    startPreparingCallMedia(c.call_type === "video").catch(() => {});
+    startCallTimeline(c.id, "callee");
     setIncoming(null);
     navigate(
       `/call/${c.conversation_id}?type=${c.call_type}&callId=${c.id}&room=${encodeURIComponent(c.room_name)}&role=callee`,
@@ -353,6 +357,8 @@ export default function IncomingCallScreen() {
 
   const decline = async () => {
     const c = incoming;
+    if (acceptedRef.current === c.id) return;
+    tapFeedback();
     setIncoming(null);
     await supabase
       .from("calls")
@@ -394,7 +400,7 @@ export default function IncomingCallScreen() {
             onClick={decline}
             disabled={accepting}
             aria-label="Reject call"
-            className="flex-1 h-11 rounded-full bg-destructive text-destructive-foreground text-sm font-semibold inline-flex items-center justify-center gap-1.5 disabled:opacity-50"
+            className="flex-1 h-11 rounded-full bg-destructive text-destructive-foreground text-sm font-semibold inline-flex items-center justify-center gap-1.5 disabled:opacity-50 active:scale-95 transition-transform"
           >
             <PhoneOff className="w-4 h-4" /> Reject
           </button>
@@ -402,7 +408,7 @@ export default function IncomingCallScreen() {
             onClick={accept}
             disabled={accepting}
             aria-label="Accept call"
-            className="flex-1 h-11 rounded-full bg-primary text-primary-foreground text-sm font-semibold inline-flex items-center justify-center gap-1.5 disabled:opacity-50"
+            className="flex-1 h-11 rounded-full bg-primary text-primary-foreground text-sm font-semibold inline-flex items-center justify-center gap-1.5 disabled:opacity-50 active:scale-95 transition-transform"
           >
             {isVideo ? <Video className="w-4 h-4" /> : <Phone className="w-4 h-4" />} Accept
           </button>
@@ -432,13 +438,13 @@ export default function IncomingCallScreen() {
       </div>
 
       <div className="flex items-center justify-around w-full max-w-xs">
-        <button onClick={decline} aria-label="Decline call" className="flex flex-col items-center gap-2">
+        <button onClick={decline} aria-label="Decline call" className="flex flex-col items-center gap-2 active:scale-90 transition-transform">
           <span className="w-16 h-16 rounded-full bg-destructive hover:bg-destructive/90 flex items-center justify-center shadow-lg">
             <PhoneOff className="w-7 h-7 text-destructive-foreground" />
           </span>
           <span className="text-xs text-foreground">Decline</span>
         </button>
-        <button onClick={accept} aria-label="Accept call" className="flex flex-col items-center gap-2">
+        <button onClick={accept} aria-label="Accept call" className="flex flex-col items-center gap-2 active:scale-90 transition-transform">
           <span className="w-16 h-16 rounded-full bg-primary hover:bg-primary/90 flex items-center justify-center shadow-lg animate-pulse">
             {isVideo ? (
               <Video className="w-7 h-7 text-primary-foreground" />

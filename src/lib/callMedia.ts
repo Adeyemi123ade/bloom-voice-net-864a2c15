@@ -8,6 +8,29 @@ type PreparedCallMedia = {
 };
 
 let preparedCallMedia: PreparedCallMedia | null = null;
+// The microphone/camera request in progress, so the call screen can open
+// straight away and pick the result up when it's ready.
+let pendingPrepare: Promise<PreparedCallMedia> | null = null;
+
+/** Start getting the microphone (and camera) without waiting for it. */
+export function startPreparingCallMedia(isVideo: boolean): Promise<PreparedCallMedia> {
+  const p = prepareCallMedia(isVideo);
+  pendingPrepare = p;
+  p.catch(() => {}).finally(() => {
+    if (pendingPrepare === p) pendingPrepare = null;
+  });
+  return p;
+}
+
+/**
+ * The prepared microphone/camera, waiting for a request still in progress.
+ * Null if none was prepared (the caller then creates its own tracks).
+ * Throws if the request in progress failed (e.g. permission refused).
+ */
+export async function takePreparedCallMedia(): Promise<PreparedCallMedia | null> {
+  if (pendingPrepare) await pendingPrepare;
+  return consumePreparedCallMedia();
+}
 
 function stopStream(stream: MediaStream) {
   stream.getTracks().forEach((track) => track.stop());
