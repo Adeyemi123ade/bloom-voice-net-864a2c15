@@ -1,8 +1,8 @@
 import { useEffect } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { toast } from "@/hooks/use-toast";
 import {
   activeCallPath,
+  canAddHeldCall,
   getActiveCall,
   isCallFinished,
   startActiveCall,
@@ -31,9 +31,9 @@ export default function CallRoute() {
     }
     const active = getActiveCall();
     if (active?.callId === callId) return; // reopening the running call
-    if (active) {
-      // Never run two calls at once: send the user back to the one in progress.
-      toast({ title: "You're already in a call" });
+    // A second call is only taken when it's an answered waiting call and the
+    // first call is on hold. Otherwise go quietly back to the call in progress.
+    if (active && !(role === "callee" && canAddHeldCall())) {
       navigate(activeCallPath(active), { replace: true });
       return;
     }

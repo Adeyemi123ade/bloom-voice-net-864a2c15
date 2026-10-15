@@ -9,6 +9,8 @@ type Props = {
   status: "connecting" | "ringing" | "connected" | "ended";
   seconds: number;
   role?: "caller" | "callee";
+  /** You put this call on hold, or the other person did. */
+  onHold?: boolean;
 };
 
 function initials(name?: string | null) {
@@ -21,7 +23,7 @@ function fmt(s: number) {
   return `${m}:${ss}`;
 }
 
-export default function CallHeader({ isVideo, other, status, seconds, role = "caller" }: Props) {
+export default function CallHeader({ isVideo, other, status, seconds, role = "caller", onHold = false }: Props) {
   const Icon = isVideo ? Video : Phone;
   const headerLabel =
     status === "connected"
@@ -56,10 +58,10 @@ export default function CallHeader({ isVideo, other, status, seconds, role = "ca
       <p className="text-xs text-muted-foreground">
         {status === "ringing" && "Ringing…"}
         {status === "connecting" && "Connecting…"}
-        {status === "connected" && fmt(seconds)}
+        {status === "connected" && (onHold ? "On hold" : fmt(seconds))}
         {status === "ended" && "Call ended"}
       </p>
-      {status === "connected" && (
+      {status === "connected" && !onHold && (
         <span className="mt-1 inline-flex items-center gap-1.5 text-2xs text-accent">
           <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
           Connected

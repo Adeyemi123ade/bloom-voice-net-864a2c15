@@ -478,11 +478,10 @@ export default function ChatRoom() {
 
   const startCall = async (type: "voice" | "video") => {
     if (!user || !conversationId || !other) return;
-    // One call at a time. If a call is already running (e.g. minimised),
-    // take the user back to it instead of ringing someone else.
+    // One call at a time. If a call is already running (e.g. minimised or on
+    // hold), quietly take the user back to it instead of ringing someone else.
     const activeCall = getActiveCall();
     if (activeCall) {
-      if (activeCall.conversationId !== conversationId) toast({ title: "You're already in a call" });
       navigate(activeCallPath(activeCall));
       return;
     }

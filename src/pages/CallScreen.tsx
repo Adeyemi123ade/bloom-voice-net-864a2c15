@@ -27,7 +27,21 @@ import { toast } from "@/hooks/use-toast";
 import { formatCallClock } from "@/lib/chat/messageKinds";
 import { clearPreparedCallMedia, consumePreparedCallMedia, formatCallMediaError } from "@/lib/callMedia";
 import { startCallForegroundService, stopCallForegroundService } from "@/lib/nativeCalls";
-import { FROM_CALL_BUBBLE, finishActiveCall, minimizeTarget, type ActiveCallParams } from "@/lib/activeCall";
+import {
+  FROM_CALL_BUBBLE,
+  activeCallPath,
+  finishActiveCall,
+  getCallsSnapshot,
+  minimizeTarget,
+  registerEndHandler,
+  requestEndCall,
+  setCallHeld,
+  swapToCall,
+  setCallPeer,
+  useCalls,
+  type ActiveCallParams,
+} from "@/lib/activeCall";
+import HeldCallCard from "@/components/call/HeldCallCard";
 
 type Profile = { id: string; display_name: string | null; avatar_url: string | null };
 
@@ -37,7 +51,17 @@ type Profile = { id: string; display_name: string | null; avatar_url: string | n
  * the user moves around the app. Full screen on its own /call route, a
  * floating bubble everywhere else. Only unmounts once the call is over.
  */
-export default function CallSession({ params }: { params: ActiveCallParams }) {
+export default function CallSession({
+  params,
+  foreground = true,
+  held = false,
+}: {
+  params: ActiveCallParams;
+  /** The call on screen. A call in the background is on hold and draws nothing but its audio element. */
+  foreground?: boolean;
+  /** On hold: the other person can't hear or see you, and you don't hear them. */
+  held?: boolean;
+}) {
   const { conversationId, callId, roomName, role, initialIsVideo } = params;
   const navigate = useNavigate();
   const location = useLocation();
@@ -52,6 +76,14 @@ export default function CallSession({ params }: { params: ActiveCallParams }) {
   );
   const [isVideo, setIsVideo] = useState(initialIsVideo);
   const [muted, setMuted] = useState(false);
+  // The other person put this call on hold (they're on another call).
+  const [remoteHeld, setRemoteHeld] = useState(false);
+  const heldRef = useRef(held);
+  heldRef.current = held;
+  // Set when this call is being ended so another call can take the screen:
+  // don't navigate away to the chat.
+  const handoverRef = useRef(false);
+  const callsSnap = useCalls();
   const [videoEnabled, setVideoEnabled] = useState(initialIsVideo);
   const [speakerOn, setSpeakerOn] = useState(true);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
@@ -162,9 +194,12 @@ export default function CallSession({ params }: { params: ActiveCallParams }) {
         .select("id, display_name, avatar_url")
         .eq("id", otherId)
         .maybeSingle();
-      if (prof) setOther(prof as Profile);
+      if (prof) {
+        setOther(prof as Profile);
+        setCallPeer(callId, { name: prof.display_name ?? "Contact", avatarUrl: prof.avatar_url ?? null });
+      }
     })();
-  }, [user, conversationId]);
+  }, [user, conversationId, callId]);
 
   useEffect(() => {
     if (!callId) return;
@@ -192,10 +227,18 @@ export default function CallSession({ params }: { params: ActiveCallParams }) {
           toast({ title: "Video request declined" });
         }
       })
+      .on("broadcast", { event: "hold" }, ({ payload }) => {
+        setRemoteHeld(!!(payload as { held?: boolean })?.held);
+      })
       .on("broadcast", { event: "video-upgrade-cancel" }, () => {
         setUpgradeRequest((curr) => (curr === "incoming" ? null : curr));
       })
-      .subscribe();
+      .subscribe((st) => {
+        // A channel rebuilt mid-call re-announces that this call is on hold.
+        if (st === "SUBSCRIBED" && heldRef.current) {
+          void ch.send({ type: "broadcast", event: "hold", payload: { held: true } });
+        }
+      });
     callChannelRef.current = ch;
     return () => {
       callChannelRef.current = null;
@@ -302,12 +345,20 @@ export default function CallSession({ params }: { params: ActiveCallParams }) {
     }
     // Close the Twilio room so it can't keep billing as a ghost room.
     void completeRoom();
-    void stopCallForegroundService();
+    // Keep Android's call service running while another call is still on.
+    const others = getCallsSnapshot().calls.filter((c) => c.callId !== callId);
+    if (others.length === 0) void stopCallForegroundService();
     setTimeout(() => {
-      // Only take the user to the chat if they're looking at the call. If
-      // they'd minimised it, leave them where they are and just say so.
-      if (onCallScreenRef.current) {
-        navigate(`/chat/${conversationId}`, { replace: true });
+      const wasOnScreen = onCallScreenRef.current;
+      // Drop this call first, so a call on hold becomes the call on screen
+      // (and comes off hold) before anything navigates.
+      finishActiveCall(callId);
+      const next = getCallsSnapshot().calls.find((c) => c.callId !== callId);
+      // Only move the user if they're looking at this call. If another call
+      // is taking over the screen (answering a waiting call), it navigates.
+      if (wasOnScreen && !handoverRef.current) {
+        if (next) navigate(activeCallPath(next), { replace: true });
+        else navigate(`/chat/${conversationId}`, { replace: true });
       }
       // Shown wherever the user is now (the chat, or the screen they'd
       // minimised the call to), with the length when the call connected.
@@ -315,7 +366,6 @@ export default function CallSession({ params }: { params: ActiveCallParams }) {
         endNoticeShownRef.current = true;
         callNotice(connectedRef.current ? `Call ended · ${formatCallClock(secondsRef.current)}` : "Call ended");
       }
-      finishActiveCall(callId);
     }, 500);
   };
 
@@ -387,7 +437,8 @@ export default function CallSession({ params }: { params: ActiveCallParams }) {
     const el = remoteAudioEl.current;
     if (!el) return;
     try {
-      el.muted = false;
+      // A call on hold stays silent until it's resumed.
+      el.muted = heldRef.current;
       el.volume = 1;
       await el.play();
       setNeedsTapForSound(false);
@@ -461,7 +512,11 @@ export default function CallSession({ params }: { params: ActiveCallParams }) {
       roomRef.current = room;
       setStatus("connected");
       connectedRef.current = true;
-      callNotice("Call connected");
+      // Put on hold before it connected (e.g. a call came in while ringing).
+      if (heldRef.current) {
+        localAudioRef.current?.disable();
+        localVideoRef.current?.disable();
+      }
       // Receiver logs that the call was received successfully (caller logs "ended" on hangup).
       if (role === "callee") void logCallMessage("received", 0);
 
@@ -495,7 +550,8 @@ export default function CallSession({ params }: { params: ActiveCallParams }) {
   const toggleMute = () => {
     const t = localAudioRef.current;
     if (!t) return;
-    if (muted) t.enable();
+    // While on hold the mic stays off; the new setting applies on resume.
+    if (muted) { if (!heldRef.current) t.enable(); }
     else t.disable();
     setMuted(!muted);
   };
@@ -503,7 +559,7 @@ export default function CallSession({ params }: { params: ActiveCallParams }) {
     const t = localVideoRef.current;
     if (!t) return;
     if (videoEnabled) t.disable();
-    else t.enable();
+    else if (!heldRef.current) t.enable();
     setVideoEnabled(!videoEnabled);
   };
 
@@ -658,6 +714,46 @@ export default function CallSession({ params }: { params: ActiveCallParams }) {
   //    only unmounts after cleanupAndExit) ends the call for BOTH sides.
   const endCallRef = useRef(endCall);
   endCallRef.current = endCall;
+
+  // Hang up from outside this screen (the waiting-call card's Accept, or the
+  // held-call card's End). `handover`: another call takes the screen next.
+  useEffect(
+    () =>
+      registerEndHandler(callId, ({ handover }) => {
+        if (handover) handoverRef.current = true;
+        void endCallRef.current();
+      }),
+    [callId],
+  );
+
+  // Hold: stop sending our mic and camera, silence theirs, and tell them so
+  // their screen says "On hold". Resume restores whatever was on before.
+  const mutedRef = useRef(muted);
+  mutedRef.current = muted;
+  const videoEnabledRef = useRef(videoEnabled);
+  videoEnabledRef.current = videoEnabled;
+  const firstHoldRun = useRef(true);
+  useEffect(() => {
+    const first = firstHoldRun.current;
+    firstHoldRun.current = false;
+    if (first && !held) return;
+    const a = localAudioRef.current;
+    const v = localVideoRef.current;
+    const el = remoteAudioEl.current;
+    if (held) {
+      a?.disable();
+      v?.disable();
+      if (el) el.muted = true;
+    } else {
+      if (a && !mutedRef.current) a.enable();
+      if (v && videoEnabledRef.current) v.enable();
+      if (el) {
+        el.muted = false;
+        void el.play().catch(() => {});
+      }
+    }
+    void callChannelRef.current?.send({ type: "broadcast", event: "hold", payload: { held } });
+  }, [held]);
   useEffect(() => {
     return () => {
       if (!endedRef.current) void endCallRef.current();
@@ -700,6 +796,14 @@ export default function CallSession({ params }: { params: ActiveCallParams }) {
       className="hidden"
     />
   );
+
+  // A call on hold behind another call draws nothing but its audio element
+  // (kept first in every branch, so React reuses the same element).
+  if (!foreground) return <>{remoteAudio}</>;
+
+  const onHold = held || remoteHeld;
+  const otherCalls = callsSnap.calls.filter((c) => c.callId !== callId);
+  const showHold = !!callsSnap.waiting || otherCalls.length > 0 || held;
 
   if (!onCallScreen) {
     // Same tree shape as the full-screen branch below (audio first, then the
@@ -754,8 +858,30 @@ export default function CallSession({ params }: { params: ActiveCallParams }) {
               : ""
           }
         >
-          <CallHeader isVideo={isVideo} other={other} status={status} seconds={seconds} role={role} />
+          <CallHeader isVideo={isVideo} other={other} status={status} seconds={seconds} role={role} onHold={onHold} />
         </div>
+
+        {videoFullscreen && onHold && (
+          <div className="fixed inset-0 z-10 bg-black/60 flex items-center justify-center pointer-events-none">
+            <span className="px-4 py-2 rounded-full bg-white/15 text-white text-sm font-semibold">On hold</span>
+          </div>
+        )}
+
+        {otherCalls.map((c) => {
+          const peer = callsSnap.info[c.callId];
+          return (
+            <HeldCallCard
+              key={c.callId}
+              name={peer?.name ?? "Contact"}
+              avatarUrl={peer?.avatarUrl ?? null}
+              onSwap={() => {
+                swapToCall(c.callId);
+                navigate(activeCallPath(c), { replace: true });
+              }}
+              onEnd={() => requestEndCall(c.callId)}
+            />
+          );
+        })}
 
         {status !== "ended" && (
           <button
@@ -813,6 +939,9 @@ export default function CallSession({ params }: { params: ActiveCallParams }) {
           onSwitchCamera={switchCamera}
           onUpgradeToVideo={upgradeToVideo}
           onEndCall={endCall}
+          showHold={showHold && status !== "ended"}
+          held={held}
+          onToggleHold={() => setCallHeld(callId, !held)}
         />
         </div>
       </div>
