@@ -27,7 +27,7 @@ import { isReallyOnline } from "@/lib/presence";
 import { pickRecordingMimeType, extensionForMimeType, baseMimeType } from "@/lib/audioMime";
 import { checkMicPrerequisites, describeMicError } from "@/lib/micPermission";
 import { isVoiceTranscribeEnabled } from "@/lib/transcriptionPrefs";
-import { clearPreparedCallMedia, formatCallMediaError, prepareCallMedia } from "@/lib/callMedia";
+import { beginOutgoingCall } from "@/lib/callStart";
 import {
   AttachmentBubble,
   FILE_PREFIX,
@@ -477,70 +477,19 @@ export default function ChatRoom() {
     prevMsgCount.current = 0;
   }, [conversationId]);
 
-  const startCall = async (type: "voice" | "video") => {
+  const startCall = (type: "voice" | "video") => {
     if (!user || !conversationId || !other) return;
-    // One call at a time. If a call is already running (e.g. minimised or on
-    // hold), quietly take the user back to it instead of ringing someone else.
-    const activeCall = getActiveCall();
-    if (activeCall) {
-      navigate(activeCallPath(activeCall));
-      return;
-    }
-    try {
-      await prepareCallMedia(type === "video");
-    } catch (error) {
-      toast({
-        title: "Call permission needed",
-        description: formatCallMediaError(error, type === "video"),
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const roomName = `chichat-${conversationId}-${Date.now()}`;
-
-    // Pre-create room with short timeouts so it auto-closes if no one joins / both leave.
-    const { error: roomErr } = await supabase.functions.invoke("twilio-room", {
-      body: { action: "create", roomName },
-    });
-    if (roomErr) {
-      clearPreparedCallMedia();
-      toast({ title: "Could not start call", description: roomErr.message, variant: "destructive" });
-      return;
-    }
-
-    const { data, error } = await supabase
-      .from("calls")
-      .insert({
-        conversation_id: conversationId,
-        caller_id: user.id,
-        callee_id: other.id,
-        room_name: roomName,
-        call_type: type,
-      })
-      .select("id")
-      .single();
-    if (error) {
-      clearPreparedCallMedia();
-      toast({ title: "Could not start call", description: error.message, variant: "destructive" });
-      return;
-    }
-    // Fire-and-forget high-priority FCM push so the callee's Android device
-    // wakes up and rings even if the app is backgrounded or screen is off.
-    void supabase.functions.invoke("send-call-push", {
-      body: {
-        calleeId: other.id,
-        callId: data.id,
-        callType: type,
-        callerName: other.display_name ?? "Someone",
+    // Opens the call screen at once; the setup carries on behind it. If a
+    // call is already running it goes back to that call instead.
+    beginOutgoingCall(
+      {
         conversationId,
-        roomName,
+        calleeId: other.id,
+        type,
+        peer: { name: other.display_name ?? "Contact", avatarUrl: other.avatar_url },
       },
-    }).catch((e) => console.warn("[call-push] failed", e));
-    navigate(`/call/${conversationId}?type=${type}&callId=${data.id}&room=${encodeURIComponent(roomName)}&role=caller`, {
-      replace: true,
-      state: { peer: { name: other.display_name ?? "Contact", avatarUrl: other.avatar_url } },
-    });
+      navigate,
+    );
   };
 
   // Swap an optimistic tmp- id for the real row id once insert() resolves.
@@ -1344,14 +1293,14 @@ export default function ChatRoom() {
             <button
               aria-label="Voice call"
               onClick={(e) => { e.stopPropagation(); startCall("voice"); }}
-              className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-secondary"
+              className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-secondary active:bg-secondary active:scale-90 transition-transform"
             >
               <Phone className="w-5 h-5 text-foreground" />
             </button>
             <button
               aria-label="Video call"
               onClick={(e) => { e.stopPropagation(); startCall("video"); }}
-              className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-secondary"
+              className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-secondary active:bg-secondary active:scale-90 transition-transform"
             >
               <Video className="w-5 h-5 text-foreground" />
             </button>

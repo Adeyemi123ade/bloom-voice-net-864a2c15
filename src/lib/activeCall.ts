@@ -20,6 +20,11 @@ export type ActiveCallParams = {
   initialIsVideo: boolean;
   /** Who's on the other end, when the screen that started the call knew. */
   peer?: { name: string; avatarUrl?: string | null };
+  /**
+   * A call just started from this phone that isn't saved yet: the call
+   * session saves it, wakes the other phone and prepares the call room.
+   */
+  setup?: { calleeId: string };
 };
 
 // Calls this tab is in. Usually one; two when the user puts a call on hold to

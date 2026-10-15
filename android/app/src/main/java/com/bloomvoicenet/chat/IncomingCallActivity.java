@@ -16,6 +16,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.Gravity;
+import android.view.HapticFeedbackConstants;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
@@ -49,6 +50,8 @@ public class IncomingCallActivity extends AppCompatActivity {
     private static final int RED = Color.rgb(211, 84, 66);
 
     private Intent callIntent;
+    // Set once Accept or Decline is tapped, so repeat taps do nothing.
+    private boolean handled = false;
     // The call screen currently showing, so a "call cancelled" push can close it.
     private static WeakReference<IncomingCallActivity> current = new WeakReference<>(null);
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -280,12 +283,18 @@ public class IncomingCallActivity extends AppCompatActivity {
         actions.setGravity(Gravity.CENTER);
 
         LinearLayout decline = roundButton("Decline", RED, true, v -> {
+            if (handled) return;
+            handled = true;
+            v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
             if (!isTest()) CallActionReceiver.declineInBackground(callIntent);
             CallNotificationHelper.cancel(this, callIntent.getStringExtra("callId"));
             stopService(new Intent(this, CallForegroundService.class));
             finishAndRemoveTask();
         });
         LinearLayout accept = roundButton("Accept", GREEN, false, v -> {
+            if (handled) return;
+            handled = true;
+            v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
             CallNotificationHelper.cancel(this, callIntent.getStringExtra("callId"));
             if (isTest()) {
                 finishAndRemoveTask();
@@ -313,6 +322,17 @@ public class IncomingCallActivity extends AppCompatActivity {
                 public void onDismissSucceeded() {
                     openAcceptedCall(IncomingCallActivity.this, call);
                     finishAndRemoveTask();
+                }
+
+                // Unlock cancelled: let Accept be tapped again.
+                @Override
+                public void onDismissCancelled() {
+                    handled = false;
+                }
+
+                @Override
+                public void onDismissError() {
+                    handled = false;
                 }
             });
             return;

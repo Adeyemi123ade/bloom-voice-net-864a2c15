@@ -27,7 +27,14 @@ import { toast } from "@/hooks/use-toast";
 import { formatCallClock } from "@/lib/chat/messageKinds";
 import { CALL_RING_TIMEOUT_MS } from "@/lib/callTiming";
 import { pushCallCancelled } from "@/lib/pushNotify";
-import { clearPreparedCallMedia, consumePreparedCallMedia, formatCallMediaError } from "@/lib/callMedia";
+import {
+  clearPreparedCallMedia,
+  formatCallMediaError,
+  startPreparingCallMedia,
+  takePreparedCallMedia,
+} from "@/lib/callMedia";
+import { getCallToken, prefetchCallToken } from "@/lib/callToken";
+import { markCall } from "@/lib/callTimeline";
 import { startCallForegroundService, stopCallForegroundService } from "@/lib/nativeCalls";
 import {
   FROM_CALL_BUBBLE,
@@ -146,7 +153,10 @@ export default function CallSession({
 
   const handleCallStatus = (nextStatus: string) => {
     if (nextStatus === "accepted" && status === "ringing") {
-      joinRoom();
+      // Usually the caller is already in the call (joined while ringing):
+      // just wait for the other person to arrive. Otherwise join now.
+      if (roomRef.current) setStatus("connecting");
+      else void joinRoom();
       return;
     }
     if (handledStatusesRef.current.has(nextStatus)) return;
@@ -316,8 +326,97 @@ export default function CallSession({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [role, status, callId]);
 
+  // ── Outgoing setup ───────────────────────────────────────────────────
+  // The call screen opened the moment Call was tapped (lib/callStart). Here,
+  // behind it: microphone, saving the call, waking the other phone, the call
+  // room and the permission to join all start together, and this phone
+  // joins the call while it rings, so answering connects at once.
+  const setupStarted = useRef(false);
+  useEffect(() => {
+    if (role !== "caller" || !params.setup || !user || setupStarted.current) return;
+    setupStarted.current = true;
+    markCall(callId, "screen");
+    const calleeId = params.setup.calleeId;
+    let failed = false;
+    let saved = false;
+    const fail = (title: string, description?: string) => {
+      if (failed || endedRef.current) return;
+      failed = true;
+      endNotice(title, { description, destructive: true });
+      if (saved) {
+        void supabase
+          .from("calls")
+          .update({ status: "ended", ended_at: new Date().toISOString() })
+          .eq("id", callId)
+          .then(() => {});
+        pushCallCancelled(callId, "cancelled");
+      }
+      cleanupAndExit();
+    };
+    const media = startPreparingCallMedia(initialIsVideo);
+    media.then(
+      () => markCall(callId, "media"),
+      (e) => fail("Call permission needed", formatCallMediaError(e, initialIsVideo)),
+    );
+    (async () => {
+      const { error } = await supabase.from("calls").insert({
+        id: callId,
+        conversation_id: conversationId,
+        caller_id: user.id,
+        callee_id: calleeId,
+        room_name: roomName,
+        call_type: initialIsVideo ? "video" : "voice",
+      });
+      if (error) {
+        fail("Could not start call", error.message);
+        return;
+      }
+      saved = true;
+      markCall(callId, "saved");
+      // Hung up (or the microphone was refused) while it was saving.
+      if (failed || endedRef.current) {
+        await supabase
+          .from("calls")
+          .update({ status: "ended", ended_at: new Date().toISOString() })
+          .eq("id", callId);
+        return;
+      }
+      // Wake the other phone (rings even if ChiChat is closed there).
+      void supabase.functions
+        .invoke("send-call-push", {
+          body: { calleeId, callId, callType: initialIsVideo ? "video" : "voice", conversationId, roomName },
+        })
+        .then(() => markCall(callId, "push"), (e) => console.warn("[call-push] failed", e));
+      prefetchCallToken(roomName);
+      const room = supabase.functions
+        .invoke("twilio-room", { body: { action: "create", roomName } })
+        .then(({ error: roomErr }) => {
+          if (roomErr) throw roomErr;
+          markCall(callId, "room");
+        });
+      try {
+        await media;
+      } catch {
+        return; // already reported by fail()
+      }
+      try {
+        await room;
+      } catch (e) {
+        // Joining creates the room anyway on most Twilio setups; try it.
+        console.warn("[call] room pre-create failed", e);
+      }
+      if (!failed && !endedRef.current) void joinRoom({ early: true });
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
   useEffect(() => {
     if (role !== "callee" || !callId) return;
+    markCall(callId, "screen");
+    // Start joining straight away, alongside saving "accepted" (it used to
+    // wait for that round trip first). If the call turns out to be over,
+    // the check below ends it and leaves the room.
+    void joinRoom();
     (async () => {
       // Guard on status="ringing" like the caller's timeout does — if the
       // caller's 45s timeout (or a decline/end from elsewhere) already fired
@@ -338,7 +437,6 @@ export default function CallSession({
       }
       // Answered here: stop any other phone of mine that's still ringing.
       pushCallCancelled(callId, "answered");
-      joinRoom();
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [role, callId]);
@@ -514,24 +612,34 @@ export default function CallSession({
     participant.on("trackUnsubscribed", (track: RemoteTrack) => detachRemoteTrack(track));
   };
 
-  const joinRoom = async () => {
-    if (roomRef.current || joiningRef.current) return;
+  /**
+   * Join the call room. `early`: the caller joining while it still rings, so
+   * the screen keeps ringing and a failure here isn't the end of the call
+   * (joining is tried again when the other person answers).
+   */
+  const joinRoom = async (opts: { early?: boolean } = {}) => {
+    if (roomRef.current || joiningRef.current || endedRef.current) return;
     joiningRef.current = true;
-    setStatus("connecting");
+    if (!opts.early) setStatus("connecting");
     try {
       // On Android native, the voice audio route must be active before
       // Twilio starts capturing/publishing WebRTC tracks. Starting this only
       // after "connected" can leave both sides with silent call media.
       await startCallForegroundService();
 
-      const { data: tokenData, error: tokenErr } = await supabase.functions.invoke(
-        "twilio-token",
-        { body: { roomName } },
-      );
-      if (tokenErr) throw tokenErr;
-      if (!tokenData?.token) throw new Error("No token returned");
-
-      const preparedMedia = consumePreparedCallMedia();
+      // Both usually already in hand: the token was fetched while it rang
+      // and the microphone was switched on when Call/Accept was tapped.
+      const [token, preparedMedia] = await Promise.all([
+        getCallToken(roomName).then((t) => {
+          markCall(callId, "token");
+          return t;
+        }),
+        takePreparedCallMedia(),
+      ]);
+      if (endedRef.current) {
+        try { preparedMedia?.audioTrack.stop(); preparedMedia?.videoTrack?.stop(); } catch { /* ignore */ }
+        return;
+      }
       const audio = preparedMedia?.audioTrack ?? await createLocalAudioTrack();
       localAudioRef.current = audio;
       const tracks: (LocalAudioTrack | LocalVideoTrack)[] = [audio];
@@ -545,14 +653,21 @@ export default function CallSession({
         try { preparedMedia.videoTrack.stop(); } catch { /* ignore */ }
       }
 
-      const room = await connect(tokenData.token, {
+      const room = await connect(token, {
         name: roomName,
         tracks,
         dominantSpeaker: false,
       });
+      if (endedRef.current) {
+        room.disconnect();
+        return;
+      }
       roomRef.current = room;
-      setStatus("connected");
-      connectedRef.current = true;
+      markCall(callId, "joined");
+      // The caller joined while ringing: "connected" only once the other
+      // person arrives (participantConnected below).
+      const otherHere = room.participants.size > 0;
+      if (role === "callee" || otherHere) markConnected();
       // Put on hold before it connected (e.g. a call came in while ringing).
       if (heldRef.current) {
         localAudioRef.current?.disable();
@@ -562,7 +677,10 @@ export default function CallSession({
       if (role === "callee") void logCallMessage("received", 0);
 
       room.participants.forEach(handleParticipant);
-      room.on("participantConnected", handleParticipant);
+      room.on("participantConnected", (p: RemoteParticipant) => {
+        handleParticipant(p);
+        markConnected();
+      });
       room.on("participantDisconnected", () => {
         // Twilio fires this on transient network blips during ICE/DTLS renegotiation.
         // Wait briefly and only end the call if the remote really stayed gone.
@@ -580,12 +698,31 @@ export default function CallSession({
       // Make sure audio element is unmuted + ready.
       void tryPlayRemoteAudio();
     } catch (err) {
+      if (opts.early) {
+        // Not fatal while it's still ringing: joining is tried again on answer.
+        console.warn("[call] early join failed", err);
+        return;
+      }
       const msg = formatCallMediaError(err, isVideo);
       endNotice("Call failed", { description: msg, destructive: true });
+      // Tell the other side too, so they aren't left waiting on "Connecting".
+      void supabase
+        .from("calls")
+        .update({ status: "ended", ended_at: new Date().toISOString() })
+        .eq("id", callId)
+        .in("status", ["ringing", "accepted"])
+        .then(() => {});
       cleanupAndExit();
     } finally {
       joiningRef.current = false;
     }
+  };
+
+  const markConnected = () => {
+    if (connectedRef.current || endedRef.current) return;
+    connectedRef.current = true;
+    setStatus("connected");
+    markCall(callId, "connected");
   };
 
   const toggleMute = () => {
