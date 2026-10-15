@@ -17,6 +17,7 @@ import { startNativeCallNotifications } from "@/lib/nativeCallNotifications";
 import { registerForCallPush } from "@/lib/fcmRegistration";
 import { ensureFullScreenIntentPermission } from "@/lib/nativeCalls";
 import { formatCallMediaError, prepareCallMedia } from "@/lib/callMedia";
+import { CALL_RING_TIMEOUT_MS } from "@/lib/callTiming";
 
 type IncomingCall = {
   id: string;
@@ -26,7 +27,6 @@ type IncomingCall = {
   call_type: "voice" | "video";
 };
 
-const RING_TIMEOUT_MS = 10_000;
 
 function initials(name?: string | null) {
   if (!name) return "?";
@@ -175,7 +175,7 @@ export default function IncomingCallScreen() {
           .eq("id", c.id)
           .eq("status", "ringing");
       } catch { /* ignore */ }
-    }, RING_TIMEOUT_MS);
+    }, CALL_RING_TIMEOUT_MS);
 
     const pollId = window.setInterval(async () => {
       const c = incomingRef.current;
@@ -220,7 +220,7 @@ export default function IncomingCallScreen() {
       if (call.status !== "ringing") return;
       // If the call was created more than 45s ago, treat as already missed.
       const age = Date.now() - new Date(call.created_at as string).getTime();
-      if (age > RING_TIMEOUT_MS) {
+      if (age > CALL_RING_TIMEOUT_MS) {
         await supabase
           .from("calls")
           .update({ status: "missed", ended_at: new Date().toISOString() })

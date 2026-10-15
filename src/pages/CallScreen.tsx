@@ -25,6 +25,7 @@ import { useRingback } from "@/hooks/useRingback";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { formatCallClock } from "@/lib/chat/messageKinds";
+import { CALL_RING_TIMEOUT_MS } from "@/lib/callTiming";
 import { clearPreparedCallMedia, consumePreparedCallMedia, formatCallMediaError } from "@/lib/callMedia";
 import { startCallForegroundService, stopCallForegroundService } from "@/lib/nativeCalls";
 import {
@@ -274,7 +275,7 @@ export default function CallSession({
       endNotice("No answer");
       void logCallMessage("no_answer", 0);
       cleanupAndExit();
-    }, 45_000);
+    }, CALL_RING_TIMEOUT_MS);
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [role, status, callId]);

@@ -193,7 +193,7 @@ Deno.serve(async (req) => {
             },
             android: {
               priority: "HIGH",
-              ttl: "30s",
+              ttl: "45s",
             },
           },
         };
