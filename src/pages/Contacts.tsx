@@ -375,7 +375,7 @@ export default function Contacts() {
     if (!user) return;
     const activeCall = getActiveCall();
     if (activeCall) {
-      toast({ title: "You're already in a call" });
+      // Quietly back to the call in progress.
       navigate(activeCallPath(activeCall));
       return;
     }

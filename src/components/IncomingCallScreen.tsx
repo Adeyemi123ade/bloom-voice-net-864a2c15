@@ -5,12 +5,19 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "@/hooks/use-toast";
-import { getActiveCall } from "@/lib/activeCall";
+import {
+  getCallsSnapshot,
+  requestEndCall,
+  setCallHeld,
+  setWaitingCall,
+  useCalls,
+} from "@/lib/activeCall";
 import { getSelectedRingtone, playRingtone } from "@/lib/ringtones";
 import { startNativeCallNotifications } from "@/lib/nativeCallNotifications";
 import { registerForCallPush } from "@/lib/fcmRegistration";
 import { ensureFullScreenIntentPermission } from "@/lib/nativeCalls";
 import { formatCallMediaError, prepareCallMedia } from "@/lib/callMedia";
+import { CALL_RING_TIMEOUT_MS } from "@/lib/callTiming";
 
 type IncomingCall = {
   id: string;
@@ -20,7 +27,6 @@ type IncomingCall = {
   call_type: "voice" | "video";
 };
 
-const RING_TIMEOUT_MS = 10_000;
 
 function initials(name?: string | null) {
   if (!name) return "?";
@@ -70,6 +76,50 @@ function useRingtone(active: boolean) {
   }, [active]);
 }
 
+/**
+ * Call-waiting tone: two short soft beeps every few seconds, played instead
+ * of the ringtone when a call comes in while you're already on a call.
+ */
+function useCallWaitingTone(active: boolean) {
+  useEffect(() => {
+    if (!active) return;
+    const AC =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AC) return;
+    let ctx: AudioContext | null = null;
+    try { ctx = new AC(); } catch { return; }
+    const beep = (at: number) => {
+      if (!ctx) return;
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.frequency.value = 440;
+      g.gain.setValueAtTime(0, at);
+      g.gain.linearRampToValueAtTime(0.08, at + 0.02);
+      g.gain.setValueAtTime(0.08, at + 0.18);
+      g.gain.linearRampToValueAtTime(0, at + 0.2);
+      o.connect(g);
+      g.connect(ctx.destination);
+      o.start(at);
+      o.stop(at + 0.22);
+    };
+    const pattern = () => {
+      if (!ctx) return;
+      const t = ctx.currentTime + 0.05;
+      beep(t);
+      beep(t + 0.35);
+    };
+    pattern();
+    const id = window.setInterval(pattern, 3000);
+    return () => {
+      window.clearInterval(id);
+      void ctx?.close().catch(() => {});
+    };
+  }, [active]);
+}
+
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 export default function IncomingCallScreen() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -79,7 +129,26 @@ export default function IncomingCallScreen() {
   const handled = useRef<Set<string>>(new Set());
   const timeoutRef = useRef<number | null>(null);
 
-  useRingtone(!!incoming);
+  // Already on a call: the new one shows as a small "call waiting" card over
+  // the current call (which keeps going), with a soft beep, not the ringtone.
+  const { calls } = useCalls();
+  const inCall = calls.length > 0;
+  const [accepting, setAccepting] = useState(false);
+  useRingtone(!!incoming && !inCall);
+  useCallWaitingTone(!!incoming && inCall);
+  useEffect(() => {
+    if (incoming && inCall) {
+      setWaitingCall({
+        callId: incoming.id,
+        name: callerName ?? "Unknown",
+        avatarUrl: callerAvatar,
+        isVideo: incoming.call_type === "video",
+      });
+    } else {
+      setWaitingCall(null);
+    }
+  }, [incoming, inCall, callerName, callerAvatar]);
+  useEffect(() => () => setWaitingCall(null), []);
 
   const incomingRef = useRef<IncomingCall | null>(null);
   useEffect(() => { incomingRef.current = incoming; }, [incoming]);
@@ -106,7 +175,7 @@ export default function IncomingCallScreen() {
           .eq("id", c.id)
           .eq("status", "ringing");
       } catch { /* ignore */ }
-    }, RING_TIMEOUT_MS);
+    }, CALL_RING_TIMEOUT_MS);
 
     const pollId = window.setInterval(async () => {
       const c = incomingRef.current;
@@ -151,7 +220,7 @@ export default function IncomingCallScreen() {
       if (call.status !== "ringing") return;
       // If the call was created more than 45s ago, treat as already missed.
       const age = Date.now() - new Date(call.created_at as string).getTime();
-      if (age > RING_TIMEOUT_MS) {
+      if (age > CALL_RING_TIMEOUT_MS) {
         await supabase
           .from("calls")
           .update({ status: "missed", ended_at: new Date().toISOString() })
@@ -222,13 +291,22 @@ export default function IncomingCallScreen() {
 
   const accept = async () => {
     const c = incoming;
-    // Answering would mean dropping the call already in progress; ask the
-    // user to end that one first. The ringing call stays up so they can
-    // still decline it.
-    if (getActiveCall()) {
-      toast({ title: "End your current call to answer this one" });
-      return;
+    if (accepting) return;
+    // Call waiting: answering while a call is live ends that call first
+    // ("End & accept"). If the user put it on Hold first, it stays on hold
+    // and this call is added next to it ("Hold & accept").
+    const live = getCallsSnapshot().calls.find((x) => !x.held);
+    if (live) {
+      setAccepting(true);
+      requestEndCall(live.callId, { handover: true });
+      for (let i = 0; i < 40 && getCallsSnapshot().calls.some((x) => x.callId === live.callId); i++) {
+        await wait(100);
+      }
+      setAccepting(false);
+      if (incomingRef.current?.id !== c.id) return; // caller gave up meanwhile
     }
+    // Any call left keeps (or goes back) on hold while this one is answered.
+    getCallsSnapshot().calls.forEach((x) => setCallHeld(x.callId, true));
     try {
       await prepareCallMedia(c.call_type === "video");
     } catch (error) {
@@ -256,6 +334,47 @@ export default function IncomingCallScreen() {
   };
 
   const isVideo = incoming.call_type === "video";
+
+  if (inCall) {
+    // Quarter-screen card over the ongoing call (which stays full screen).
+    return (
+      <div
+        data-testid="call-waiting-card"
+        className="fixed z-[100] left-3 top-[calc(env(safe-area-inset-top)+64px)] w-[46%] max-w-[220px] rounded-2xl bg-card/95 backdrop-blur border border-border shadow-xl p-3 flex flex-col items-center gap-2 text-center"
+      >
+        <span className="text-2xs uppercase tracking-widest text-muted-foreground inline-flex items-center gap-1">
+          Incoming {isVideo ? <Video className="w-3 h-3" /> : <Phone className="w-3 h-3" />}
+        </span>
+        <div className="call-ring my-2">
+          <Avatar className="w-14 h-14 ring-2 ring-primary/30">
+            <AvatarImage src={callerAvatar ?? undefined} />
+            <AvatarFallback className="bg-primary/20 text-foreground font-semibold">
+              {initials(callerName)}
+            </AvatarFallback>
+          </Avatar>
+        </div>
+        <p className="text-sm font-semibold text-foreground truncate w-full">{callerName ?? "Unknown"}</p>
+        <div className="flex w-full gap-2">
+          <button
+            onClick={decline}
+            disabled={accepting}
+            aria-label="Reject call"
+            className="flex-1 h-9 rounded-full bg-destructive text-destructive-foreground text-xs font-semibold inline-flex items-center justify-center gap-1 disabled:opacity-50"
+          >
+            <PhoneOff className="w-3.5 h-3.5" /> Reject
+          </button>
+          <button
+            onClick={accept}
+            disabled={accepting}
+            aria-label="Accept call"
+            className="flex-1 h-9 rounded-full bg-primary text-primary-foreground text-xs font-semibold inline-flex items-center justify-center gap-1 disabled:opacity-50"
+          >
+            {isVideo ? <Video className="w-3.5 h-3.5" /> : <Phone className="w-3.5 h-3.5" />} Accept
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-[100] bg-gradient-to-b from-secondary to-background flex flex-col items-center justify-between py-16 px-6">

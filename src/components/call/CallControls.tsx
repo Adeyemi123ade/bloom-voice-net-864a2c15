@@ -1,4 +1,4 @@
-import { Mic, MicOff, Volume2, VolumeX, Video, VideoOff, PhoneOff, SwitchCamera, VideoIcon } from "lucide-react";
+import { Mic, MicOff, Volume2, VolumeX, Video, VideoOff, PhoneOff, SwitchCamera, VideoIcon, Pause, Play } from "lucide-react";
 
 type Props = {
   muted: boolean;
@@ -12,6 +12,10 @@ type Props = {
   onSwitchCamera: () => void;
   onUpgradeToVideo: () => void;
   onEndCall: () => void;
+  /** Shown when another call is waiting or on hold, or this call is on hold. */
+  showHold?: boolean;
+  held?: boolean;
+  onToggleHold?: () => void;
 };
 
 export default function CallControls({
@@ -26,6 +30,9 @@ export default function CallControls({
   onSwitchCamera,
   onUpgradeToVideo,
   onEndCall,
+  showHold = false,
+  held = false,
+  onToggleHold,
 }: Props) {
   return (
     <div className="px-6 pb-6">
@@ -91,13 +98,29 @@ export default function CallControls({
         </button>
       </div>
 
-      <button
-        onClick={onEndCall}
-        className="mt-5 w-full h-12 rounded-full bg-destructive hover:bg-destructive/90 text-destructive-foreground flex items-center justify-center gap-2 font-medium text-base"
-      >
-        <PhoneOff className="w-5 h-5" />
-        End call
-      </button>
+      <div className="mt-5 flex gap-3">
+        {showHold && (
+          <button
+            onClick={onToggleHold}
+            aria-label={held ? "Resume call" : "Hold call"}
+            className={`flex-1 h-12 rounded-full flex items-center justify-center gap-2 font-medium text-base ${
+              held
+                ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                : "bg-secondary text-foreground hover:bg-secondary/80"
+            }`}
+          >
+            {held ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
+            {held ? "Resume" : "Hold"}
+          </button>
+        )}
+        <button
+          onClick={onEndCall}
+          className="flex-1 h-12 rounded-full bg-destructive hover:bg-destructive/90 text-destructive-foreground flex items-center justify-center gap-2 font-medium text-base"
+        >
+          <PhoneOff className="w-5 h-5" />
+          End call
+        </button>
+      </div>
     </div>
   );
 }

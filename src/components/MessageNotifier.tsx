@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
+import { notificationText } from "@/lib/chat/messageKinds";
 
 /**
  * Subscribes globally to new messages and shows an in-app toast
@@ -49,6 +50,12 @@ export default function MessageNotifier() {
           }
           // Skip if already in that chat
           if (currentRoute.current === `/chat/${m.conversation_id}`) return;
+          // Never show the stored form of a message ("[call]voice|ended|29",
+          // "[voice]https://…"): call records the other person logged while
+          // you were on that call are skipped (the call screen shows its own
+          // notices), media gets a plain label.
+          const text = notificationText(m.content);
+          if (!text) return;
 
           const { data: prof } = await supabase
             .from("profiles")
@@ -58,8 +65,7 @@ export default function MessageNotifier() {
 
           toast({
             title: prof?.display_name ?? "New message",
-            description:
-              m.content?.length > 60 ? `${m.content.slice(0, 60)}…` : m.content,
+            description: text,
             onClick: () => navigate(`/chat/${m.conversation_id}`),
           } as any);
         },

@@ -9,6 +9,8 @@ type Props = {
   status: "connecting" | "ringing" | "connected" | "ended";
   seconds: number;
   role?: "caller" | "callee";
+  /** You put this call on hold, or the other person did. */
+  onHold?: boolean;
 };
 
 function initials(name?: string | null) {
@@ -21,7 +23,7 @@ function fmt(s: number) {
   return `${m}:${ss}`;
 }
 
-export default function CallHeader({ isVideo, other, status, seconds, role = "caller" }: Props) {
+export default function CallHeader({ isVideo, other, status, seconds, role = "caller", onHold = false }: Props) {
   const Icon = isVideo ? Video : Phone;
   const headerLabel =
     status === "connected"
@@ -35,22 +37,31 @@ export default function CallHeader({ isVideo, other, status, seconds, role = "ca
         <span>{headerLabel}</span>
         <Icon className="w-3.5 h-3.5" />
       </div>
-      <Avatar className="w-24 h-24 ring-4 ring-primary/30">
-        <AvatarImage src={other?.avatar_url ?? undefined} />
-        <AvatarFallback className="bg-primary/20 text-foreground text-2xl font-semibold">
-          {initials(other?.display_name)}
-        </AvatarFallback>
-      </Avatar>
+      {/* While the other phone rings, rings pulse out from the avatar. Tied
+          to the real call status, so they stop the moment the call connects,
+          is declined, fails or ends. */}
+      <div
+        className={`my-6 ${status === "ringing" ? "call-ring" : ""}`}
+        data-testid="call-avatar"
+        data-ringing={status === "ringing" ? "true" : "false"}
+      >
+        <Avatar className="w-24 h-24 ring-4 ring-primary/30">
+          <AvatarImage src={other?.avatar_url ?? undefined} />
+          <AvatarFallback className="bg-primary/20 text-foreground text-2xl font-semibold">
+            {initials(other?.display_name)}
+          </AvatarFallback>
+        </Avatar>
+      </div>
       <h1 className="text-base font-semibold text-foreground">
         {other?.display_name ?? "Contact"}
       </h1>
       <p className="text-xs text-muted-foreground">
         {status === "ringing" && "Ringing…"}
         {status === "connecting" && "Connecting…"}
-        {status === "connected" && fmt(seconds)}
+        {status === "connected" && (onHold ? "On hold" : fmt(seconds))}
         {status === "ended" && "Call ended"}
       </p>
-      {status === "connected" && (
+      {status === "connected" && !onHold && (
         <span className="mt-1 inline-flex items-center gap-1.5 text-2xs text-accent">
           <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
           Connected

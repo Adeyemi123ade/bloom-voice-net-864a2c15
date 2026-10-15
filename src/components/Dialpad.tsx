@@ -8,6 +8,7 @@ import {
 import { toE164, formatDisplay } from "@/lib/phone";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
+import { activeCallPath, getActiveCall } from "@/lib/activeCall";
 import {
   loadCachedContacts,
   loadManualContacts,
@@ -189,6 +190,13 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
   };
 
   const placeCall = (raw: string) => {
+    // Already on a ChiChat call: go back to it instead of dialling out.
+    const active = getActiveCall();
+    if (active) {
+      onOpenChange(false);
+      navigate(activeCallPath(active));
+      return;
+    }
     const e164 = toE164(raw.trim());
     if (!e164) {
       toast({
