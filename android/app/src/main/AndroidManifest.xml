@@ -100,4 +100,10 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <!-- The contacts plugin asks for read AND write as one "contacts"
+         permission. Without WRITE_CONTACTS declared here, Capacitor rejects
+         that request ("Missing the following permissions in
+         AndroidManifest.xml"), so phone contacts never loaded even with
+         Contacts allowed in Android settings. Also used by "Save contact". -->
+    <uses-permission android:name="android.permission.WRITE_CONTACTS" />
 </manifest>

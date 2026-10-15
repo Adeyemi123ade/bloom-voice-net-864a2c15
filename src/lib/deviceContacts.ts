@@ -45,14 +45,26 @@ export async function loadNativeContacts(): Promise<DeviceContact[]> {
   const mod = await import("@capacitor-community/contacts");
   const Contacts = mod.Contacts;
 
-  const perm = await Contacts.requestPermissions();
+  let perm;
+  try {
+    perm = await Contacts.requestPermissions();
+  } catch (e) {
+    // e.g. "Missing the following permissions in AndroidManifest.xml" in an
+    // app built before WRITE_CONTACTS was declared: rebuild needed.
+    throw new Error(`CONTACTS_UNAVAILABLE: ${e instanceof Error ? e.message : String(e)}`);
+  }
   if (perm.contacts !== "granted") {
     throw new Error("PERMISSION_DENIED");
   }
 
-  const result = await Contacts.getContacts({
-    projection: { name: true, phones: true },
-  });
+  let result;
+  try {
+    result = await Contacts.getContacts({
+      projection: { name: true, phones: true },
+    });
+  } catch (e) {
+    throw new Error(`CONTACTS_READ_FAILED: ${e instanceof Error ? e.message : String(e)}`);
+  }
   const defaultCountry = await getMyDefaultCountry();
 
   const list: DeviceContact[] = [];

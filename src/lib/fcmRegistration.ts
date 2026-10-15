@@ -12,6 +12,18 @@ import { supabase } from "@/integrations/supabase/client";
 
 let registered = false;
 let pushReady = false;
+let lastProblem: string | null = null;
+
+/** For the Call setup check: why push isn't ready on this phone, if known. */
+export function getPushProblem(): string | null {
+  return lastProblem;
+}
+
+/** Ask again (e.g. after the user allowed notifications in Settings). */
+export async function retryCallPush(userId: string): Promise<void> {
+  registered = false;
+  await registerForCallPush(userId);
+}
 
 const TOKEN_KEY = "chichat:fcm-token";
 
@@ -49,6 +61,8 @@ export async function registerForCallPush(userId: string) {
     }
     if (perm.receive !== "granted") {
       console.warn("[fcm] push permission denied");
+      lastProblem = "Notifications are turned off for ChiChat.";
+      registered = false;
       return;
     }
 
@@ -64,9 +78,13 @@ export async function registerForCallPush(userId: string) {
           { onConflict: "fcm_token" },
         );
         // Supabase reports failures in `error` rather than throwing.
-        if (error) console.warn("[fcm] failed to store token", error);
+        if (error) {
+          console.warn("[fcm] failed to store token", error);
+          lastProblem = `Couldn't save this phone for calls (${error.message}).`;
+        }
         else {
           pushReady = true;
+          lastProblem = null;
           try { localStorage.setItem(TOKEN_KEY, token.value); } catch { /* ignore */ }
         }
       } catch (e) {
@@ -76,6 +94,7 @@ export async function registerForCallPush(userId: string) {
 
     PushNotifications.addListener("registrationError", (e) => {
       console.warn("[fcm] registration error", e);
+      lastProblem = `Firebase couldn't register this phone (${e?.error ?? "unknown error"}).`;
     });
 
     // Incoming data-only call push → app foregrounds, IncomingCallScreen

@@ -4,6 +4,7 @@
 //  - "cancel": stop that ringing (caller hung up, no answer, or answered /
 //    declined on another device); unanswered calls leave a missed-call notice.
 //  - "message": notify the other person in a chat about a new message.
+//  - "test": ring the signed-in user's own phone (Call setup check).
 // Every action checks the signed-in user is entitled to send it.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
@@ -91,7 +92,7 @@ async function pushToUser(
   userId: string,
   data: Record<string, string>,
   ttl: string,
-): Promise<{ sent: number; failed: number; reason?: string }> {
+): Promise<{ sent: number; failed: number; reason?: string; error?: string }> {
   const { data: tokens } = await supabase
     .from("device_push_tokens")
     .select("fcm_token")
@@ -125,12 +126,28 @@ async function pushToUser(
     }),
   );
   const sent = results.filter((r) => r.status === "fulfilled").length;
-  return { sent, failed: results.length - sent };
+  const firstError = results.find((r): r is PromiseRejectedResult => r.status === "rejected");
+  return {
+    sent,
+    failed: results.length - sent,
+    ...(firstError ? { error: String(firstError.reason?.message ?? firstError.reason).slice(0, 300) } : {}),
+  };
 }
 
 async function displayName(supabase: Admin, userId: string): Promise<string> {
-  const { data } = await supabase.from("profiles").select("display_name").eq("id", userId).maybeSingle();
-  return (data?.display_name as string | undefined) ?? "Someone";
+  return (await profileOf(supabase, userId)).name;
+}
+
+async function profileOf(supabase: Admin, userId: string): Promise<{ name: string; avatarUrl: string }> {
+  const { data } = await supabase
+    .from("profiles")
+    .select("display_name, avatar_url")
+    .eq("id", userId)
+    .maybeSingle();
+  return {
+    name: (data?.display_name as string | undefined) ?? "Someone",
+    avatarUrl: (data?.avatar_url as string | undefined) ?? "",
+  };
 }
 
 /** Notification text for a stored message, never the raw "[voice]…" form. */
@@ -176,6 +193,32 @@ Deno.serve(async (req) => {
     // This client uses the service role, so RLS doesn't apply here: every
     // action verifies ownership explicitly, so nobody can push a spoofed call
     // or message to another user's phone.
+
+    if (action === "test") {
+      // "Send test call" in the app's Call setup check: after a short delay
+      // (time to lock the phone), ring the user's OWN phones the way a real
+      // call would. Reports exactly what happened, so the app can say why a
+      // phone isn't ringing (no push token, FCM not configured, ...).
+      const delay = Math.min(Math.max(Number(body.delaySeconds ?? 10), 0), 20);
+      await new Promise((r) => setTimeout(r, delay * 1000));
+      const me_ = await profileOf(supabase, me);
+      const result = await pushToUser(
+        supabase,
+        me,
+        {
+          type: "test_call",
+          test: "1",
+          callId: `test-${Date.now()}`,
+          callType: "voice",
+          callerName: "ChiChat test call",
+          avatarUrl: me_.avatarUrl,
+          conversationId: "",
+          roomName: "",
+        },
+        "45s",
+      );
+      return json({ ok: true, ...result });
+    }
 
     if (action === "cancel") {
       const { callId, reason } = body;
@@ -274,6 +317,7 @@ Deno.serve(async (req) => {
       .replace(/\//g, "_");
     const actionUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/call-action`;
 
+    const caller = await profileOf(supabase, me);
     const result = await pushToUser(
       supabase,
       calleeId,
@@ -282,9 +326,10 @@ Deno.serve(async (req) => {
         callId: String(callId),
         calleeId: String(calleeId),
         callType: String(callType ?? "voice"),
-        // The caller's own name, looked up here. The app used to send the
-        // other person's name, so phones showed the wrong caller.
-        callerName: await displayName(supabase, me),
+        // The caller's own name and photo, looked up here. The app used to
+        // send the other person's name, so phones showed the wrong caller.
+        callerName: caller.name,
+        avatarUrl: caller.avatarUrl,
         conversationId: String(conversationId ?? ""),
         roomName: String(roomName ?? ""),
         actionUrl,

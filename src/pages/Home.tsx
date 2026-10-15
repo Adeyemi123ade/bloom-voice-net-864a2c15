@@ -19,6 +19,7 @@ import {
 import { buildPreview } from "@/lib/chat/messageKinds";
 import { CALL_PREFIX } from "@/lib/chat/format";
 import Dialpad from "@/components/Dialpad";
+import CallSetupBanner from "@/components/CallSetupBanner";
 
 type Profile = {
   id: string;
@@ -372,6 +373,8 @@ export default function Home() {
             />
           </div>
         </div>
+
+        <CallSetupBanner />
 
         {/* List */}
         <div className="flex-1 overflow-y-auto px-2 pb-4">

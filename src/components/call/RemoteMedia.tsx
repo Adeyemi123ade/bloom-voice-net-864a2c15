@@ -166,9 +166,7 @@ const RemoteMedia = forwardRef<HTMLDivElement, Props>(
               <div ref={pipRef} className="absolute inset-0 pointer-events-none" />
             </div>
           </>
-        ) : (
-          <div className="flex-1" />
-        )}
+        ) : null}
         {remoteAudioRef && (
           <audio
             ref={remoteAudioRef}

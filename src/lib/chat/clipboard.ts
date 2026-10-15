@@ -64,6 +64,21 @@ export function matchPastedClip(pastedText: string): ChatClip | null {
   return norm(pastedText) === norm(clip.text) ? clip : null;
 }
 
+/**
+ * Android keyboards (Gboard's clipboard chip, long-press Paste on some
+ * phones) insert clipboard text as if it were typed, with no paste event.
+ * So also check each edit of the message box: if it just gained the label of
+ * a voice note / photo / video / document copied in ChiChat, take the label
+ * back out and return that copy, so the box can stage the real message.
+ */
+export function extractTypedClip(nextText: string, prevText: string): { clip: ChatClip; rest: string } | null {
+  const clip = loadClip();
+  if (!clip || clip.kind === "text") return null;
+  const label = norm(clip.text);
+  if (!label || !nextText.includes(label) || prevText.includes(label)) return null;
+  return { clip, rest: nextText.replace(label, "").replace(/\s{2,}/g, " ").trim() };
+}
+
 /** Label put on the clipboard for a media message. */
 export function clipLabel(content: string): string {
   const kind = messageKind(content);

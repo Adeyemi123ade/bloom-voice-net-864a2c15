@@ -55,7 +55,10 @@ export default function BottomNav({
     <>
       <nav
         aria-label="Primary"
-        className="fixed bottom-0 inset-x-0 z-30 border-t border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80 pb-[env(safe-area-inset-bottom)]"
+        // Deep ChiChat green, matching the phone's own navigation strip
+        // below it (painted the same green by the Android app).
+        className="fixed bottom-0 inset-x-0 z-30 pb-[env(safe-area-inset-bottom)]"
+        style={{ backgroundColor: "hsl(var(--brand-deep))" }}
       >
         <ul className="mx-auto max-w-[520px] flex items-center justify-around px-2 py-2">
           {tabs.map((t) => {
@@ -66,7 +69,7 @@ export default function BottomNav({
                   type="button"
                   aria-label={t.label}
                   onClick={() => onTap(t)}
-                  className="flex flex-col items-center gap-1 px-3 py-1.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-colors"
+                  className="flex flex-col items-center gap-1 px-3 py-1.5 rounded-xl text-white/85 hover:text-white hover:bg-white/10 active:bg-white/15 transition-colors"
                 >
                   <Icon className="w-5 h-5" />
                   <span className="text-2xs font-medium">{t.label}</span>

@@ -1,4 +1,4 @@
-import { Download, Eye, FileText, FileSpreadsheet, Presentation, FileArchive, FileCode, FileAudio, FileVideo, File as FileIcon, Trash2 } from "lucide-react";
+import { Download, Eye, Play, X, FileText, FileSpreadsheet, Presentation, FileArchive, FileCode, FileAudio, FileVideo, File as FileIcon, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
@@ -115,6 +115,7 @@ export function AttachmentBubble({
   onDelete?: () => void;
 }) {
   const [imgOpen, setImgOpen] = useState(false);
+  const [videoOpen, setVideoOpen] = useState(false);
   const isImage = meta.mime.startsWith("image/") && meta.mime !== "image/svg+xml";
   const isVideo = meta.mime.startsWith("video/");
   const isAudio = meta.mime.startsWith("audio/");
@@ -167,13 +168,28 @@ export function AttachmentBubble({
   if (isVideo) {
     return (
       <>
-        <div className="relative w-[200px]">
+        {/* A preview in the chat; tapping it opens the full-screen player. */}
+        <button
+          type="button"
+          aria-label="Play video"
+          onClick={(e) => {
+            e.stopPropagation();
+            setVideoOpen(true);
+          }}
+          className="relative w-[200px] block rounded-2xl overflow-hidden bg-black"
+        >
           <video
             src={mediaUrl}
-            controls
+            muted
             playsInline
-            className="w-full max-h-[260px] rounded-2xl bg-black block"
+            preload="metadata"
+            className="w-full max-h-[260px] block object-cover pointer-events-none"
           />
+          <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <span className="w-14 h-14 rounded-full bg-black/55 flex items-center justify-center">
+              <Play className="w-7 h-7 text-white fill-white ml-1" />
+            </span>
+          </span>
           {meta.size > 0 && (
             <span className="absolute top-1.5 right-1.5 text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-black/55 text-white pointer-events-none">
               {fmtSize(meta.size)}
@@ -184,10 +200,11 @@ export function AttachmentBubble({
               {timeText}
             </span>
           )}
-        </div>
+        </button>
         {meta.caption && (
           <p className="text-base whitespace-pre-wrap break-words mt-1">{meta.caption}</p>
         )}
+        {videoOpen && <VideoViewer url={mediaUrl} name={meta.name} onClose={() => setVideoOpen(false)} />}
       </>
     );
   }
@@ -240,6 +257,59 @@ export function AttachmentBubble({
         </span>
       )}
     </div>
+  );
+}
+
+/**
+ * Full-screen video player: black background, the whole video visible at
+ * its own shape (portrait or landscape, never stretched or cropped), the
+ * phone's normal playback controls, a close button, and Back closes it.
+ */
+function VideoViewer({ url, name, onClose }: { url: string; name: string; onClose: () => void }) {
+  useEffect(() => {
+    window.history.pushState({ chichatVideoViewer: true }, "");
+    const onPop = () => onClose();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("popstate", onPop);
+    window.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("popstate", onPop);
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+      if (window.history.state?.chichatVideoViewer) window.history.back();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return createPortal(
+    <div
+      data-testid="video-viewer"
+      className="fixed inset-0 bg-black flex items-center justify-center"
+      style={{ zIndex: 2147483647 }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <video
+        src={url}
+        controls
+        autoPlay
+        playsInline
+        aria-label={name}
+        className="w-full h-full object-contain bg-black"
+      />
+      <button
+        type="button"
+        aria-label="Close video"
+        onClick={onClose}
+        className="absolute left-3 top-[calc(env(safe-area-inset-top)+12px)] w-10 h-10 rounded-full bg-black/55 text-white flex items-center justify-center"
+      >
+        <X className="w-5 h-5" />
+      </button>
+    </div>,
+    document.body,
   );
 }
 
