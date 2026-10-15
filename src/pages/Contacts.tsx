@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { openCallSettings } from "@/lib/nativeCalls";
 import { useNavigate } from "react-router-dom";
 import {
   Edit3,
@@ -50,7 +51,6 @@ import { ActiveRow, EmptyState, InviteRow } from "@/components/contacts/ContactR
 import { SectionList, sectionLetter } from "@/components/contacts/ContactSectionList";
 import { shareChichatInvite } from "@/components/contacts/ShareInviteCard";
 import { clearPreparedCallMedia, formatCallMediaError, prepareCallMedia } from "@/lib/callMedia";
-import { requestIgnoreBatteryOptimizations } from "@/lib/nativeCalls";
 
 export default function Contacts() {
   const navigate = useNavigate();
@@ -68,6 +68,56 @@ export default function Contacts() {
   const [googleConnected, setGoogleConnected] = useState<boolean | null>(null);
   const [connectingGoogle, setConnectingGoogle] = useState(false);
   const [permissionDenied, setPermissionDenied] = useState(false);
+  // Asked once and refused again: Android won't show the prompt any more,
+  // so the button opens ChiChat's app settings instead.
+  const [deniedTwice, setDeniedTwice] = useState(false);
+  const [phoneContactsError, setPhoneContactsError] = useState<string | null>(null);
+
+  /**
+   * Phone contacts (the address book on this phone), read through Android's
+   * contacts provider. Independent of Google and of who uses ChiChat:
+   * everyone with a phone number is listed; the ones on ChiChat are matched
+   * after, the rest can be invited. Errors are shown instead of swallowed.
+   */
+  const loadPhoneContacts = async (): Promise<"ok" | "denied" | "error"> => {
+    setSyncing(true);
+    setPhoneContactsError(null);
+    try {
+      const list = await loadNativeContacts();
+      setPermissionDenied(false);
+      saveCachedContacts(list);
+      const fresh = mergeContacts(list, loadManualContacts());
+      setContacts(fresh);
+      if (fresh.length) await runMatch(fresh);
+      return "ok";
+    } catch (err) {
+      const code = err instanceof Error ? err.message : String(err);
+      if (code === "PERMISSION_DENIED") {
+        setPermissionDenied(true);
+        return "denied";
+      }
+      setPhoneContactsError(
+        code.startsWith("CONTACTS_UNAVAILABLE")
+          ? "This version of the app can't read phone contacts. Install the latest build."
+          : "Couldn't read your phone contacts. Pull down or tap refresh to try again.",
+      );
+      console.warn("[contacts] load failed", code);
+      return "error";
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  // Back from Android settings after allowing Contacts: load them now.
+  useEffect(() => {
+    if (!isNativePlatform() || !permissionDenied) return;
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void loadPhoneContacts();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [permissionDenied]);
   const [actionSheet, setActionSheet] = useState<{
     title: string;
     subtitle?: string;
@@ -95,23 +145,8 @@ export default function Contacts() {
 
       // On native Android: load device contacts directly.
       if (isNativePlatform()) {
-        setSyncing(true);
-        try {
-          const list = await loadNativeContacts();
-          saveCachedContacts(list);
-          const fresh = mergeContacts(list, loadManualContacts());
-          setContacts(fresh);
-          setGoogleConnected(true);
-          if (fresh.length) await runMatch(fresh);
-        } catch (err) {
-          const code = err instanceof Error ? err.message : "";
-          if (code === "PERMISSION_DENIED") {
-            setPermissionDenied(true);
-            setGoogleConnected(true);
-          }
-        } finally {
-          setSyncing(false);
-        }
+        setGoogleConnected(true);
+        await loadPhoneContacts();
         return;
       }
 
@@ -236,6 +271,12 @@ export default function Contacts() {
   };
 
   const refreshContacts = async () => {
+    if (isNativePlatform()) {
+      if ((await loadPhoneContacts()) === "ok") {
+        toast({ title: `Loaded ${loadCachedContacts()?.length ?? 0} contacts` });
+      }
+      return;
+    }
     setSyncing(true);
     try {
       const list = isNativePlatform()
@@ -379,10 +420,6 @@ export default function Contacts() {
       navigate(activeCallPath(activeCall));
       return;
     }
-    if (!localStorage.getItem("chichat:battery-prompt-shown")) {
-      void requestIgnoreBatteryOptimizations();
-      localStorage.setItem("chichat:battery-prompt-shown", "1");
-    }
     try {
       await prepareCallMedia(false);
     } catch (error) {
@@ -435,7 +472,7 @@ export default function Contacts() {
       }).catch((e) => console.warn("[call-push] failed", e));
       navigate(
         `/call/${conversationId}?type=voice&callId=${callRow.id}&room=${encodeURIComponent(roomName)}&role=caller`,
-        { replace: true },
+        { replace: true, state: { peer: { name: c.display_name ?? "Contact", avatarUrl: c.avatar_url ?? null } } },
       );
     } catch (err) {
       clearPreparedCallMedia();
@@ -614,24 +651,23 @@ export default function Contacts() {
               </p>
               <Button
                 onClick={async () => {
-                  setPermissionDenied(false);
-                  setSyncing(true);
-                  try {
-                    const list = await loadNativeContacts();
-                    saveCachedContacts(list);
-                    const fresh = mergeContacts(list, loadManualContacts());
-                    setContacts(fresh);
-                    if (fresh.length) await runMatch(fresh);
-                  } catch {
-                    setPermissionDenied(true);
-                  } finally {
-                    setSyncing(false);
+                  if (deniedTwice) {
+                    void openCallSettings("app");
+                    return;
                   }
+                  const r = await loadPhoneContacts();
+                  if (r === "denied") setDeniedTwice(true);
                 }}
                 className="mt-3 w-full h-10 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-sm font-semibold"
               >
-                Allow contacts access
+                {deniedTwice ? "Open settings → Permissions → Contacts" : "Allow contacts access"}
               </Button>
+            </div>
+          )}
+
+          {phoneContactsError && (
+            <div className="mx-4 mt-3 p-3 rounded-xl bg-destructive/10 border border-destructive/30 text-xs text-foreground">
+              {phoneContactsError}
             </div>
           )}
 

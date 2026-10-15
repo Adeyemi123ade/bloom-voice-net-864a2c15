@@ -18,6 +18,8 @@ export type ActiveCallParams = {
   roomName: string;
   role: "caller" | "callee";
   initialIsVideo: boolean;
+  /** Who's on the other end, when the screen that started the call knew. */
+  peer?: { name: string; avatarUrl?: string | null };
 };
 
 // Calls this tab is in. Usually one; two when the user puts a call on hold to

@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   activeCallPath,
   canAddHeldCall,
@@ -16,6 +16,7 @@ import {
 export default function CallRoute() {
   const { id: conversationId } = useParams();
   const [params] = useSearchParams();
+  const location = useLocation();
   const navigate = useNavigate();
 
   const callId = params.get("callId");
@@ -42,7 +43,10 @@ export default function CallRoute() {
       navigate(`/chat/${conversationId}`, { replace: true });
       return;
     }
-    startActiveCall({ conversationId, callId, roomName, role, initialIsVideo });
+    // The screen that started the call may pass who's on the other end, so
+    // the call screen shows their name and photo straight away.
+    const peer = (location.state as { peer?: { name: string; avatarUrl?: string | null } } | null)?.peer;
+    startActiveCall({ conversationId, callId, roomName, role, initialIsVideo, peer });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId, callId]);
 

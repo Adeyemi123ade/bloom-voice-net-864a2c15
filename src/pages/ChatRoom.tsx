@@ -28,7 +28,6 @@ import { pickRecordingMimeType, extensionForMimeType, baseMimeType } from "@/lib
 import { checkMicPrerequisites, describeMicError } from "@/lib/micPermission";
 import { isVoiceTranscribeEnabled } from "@/lib/transcriptionPrefs";
 import { clearPreparedCallMedia, formatCallMediaError, prepareCallMedia } from "@/lib/callMedia";
-import { requestIgnoreBatteryOptimizations } from "@/lib/nativeCalls";
 import {
   AttachmentBubble,
   FILE_PREFIX,
@@ -52,8 +51,9 @@ import {
 } from "@/lib/chat/format";
 import { useBackNavigation } from "@/hooks/useBackNavigation";
 import { messageKind, mediaLabel, parseCallLog, selectionActions, stripQuotedReply } from "@/lib/chat/messageKinds";
-import { checkClipAvailable, copyMessages, matchPastedClip, mediaUrlOf } from "@/lib/chat/clipboard";
-import { useSignedMediaUrl } from "@/lib/signedMedia";
+import { checkClipAvailable, copyMessages, extractTypedClip, matchPastedClip, mediaUrlOf } from "@/lib/chat/clipboard";
+import { getSignedChatMediaUrl, useSignedMediaUrl } from "@/lib/signedMedia";
+import { Capacitor } from "@capacitor/core";
 import { pushNewMessage } from "@/lib/pushNotify";
 
 // A row coming from Supabase (initial fetch or realtime payload) is only
@@ -486,12 +486,6 @@ export default function ChatRoom() {
       navigate(activeCallPath(activeCall));
       return;
     }
-    // First-call hint: ask Android to exempt us from battery optimizations so
-    // FCM pushes wake the device reliably. No-op on web/iOS.
-    if (!localStorage.getItem("chichat:battery-prompt-shown")) {
-      void requestIgnoreBatteryOptimizations();
-      localStorage.setItem("chichat:battery-prompt-shown", "1");
-    }
     try {
       await prepareCallMedia(type === "video");
     } catch (error) {
@@ -543,7 +537,10 @@ export default function ChatRoom() {
         roomName,
       },
     }).catch((e) => console.warn("[call-push] failed", e));
-    navigate(`/call/${conversationId}?type=${type}&callId=${data.id}&room=${encodeURIComponent(roomName)}&role=caller`, { replace: true });
+    navigate(`/call/${conversationId}?type=${type}&callId=${data.id}&room=${encodeURIComponent(roomName)}&role=caller`, {
+      replace: true,
+      state: { peer: { name: other.display_name ?? "Contact", avatarUrl: other.avatar_url } },
+    });
   };
 
   // Swap an optimistic tmp- id for the real row id once insert() resolves.
@@ -817,27 +814,37 @@ export default function ChatRoom() {
     }
     clearSelection();
   };
+  // Share to other apps (WhatsApp, email, ...). Another app can't receive a
+  // playable ChiChat message, so text goes as text and a voice note, photo,
+  // video or document goes as its name plus a download link. Uses the
+  // phone's share sheet in the Android app, the browser's elsewhere.
   const shareMsgs = async (msgs: Message[]) => {
-    const txt = msgs
-      .map((m) =>
-        m.content.startsWith(VOICE_PREFIX) ? m.content.slice(VOICE_PREFIX.length) : m.content,
-      )
-      .join("\n\n");
+    const parts = await Promise.all(
+      msgs.map(async (m) => {
+        if (messageKind(m.content) === "text") return stripQuotedReply(m.content);
+        const url = mediaUrlOf(m.content);
+        const link = url ? await getSignedChatMediaUrl(url).catch(() => url) : "";
+        const meta = parseFileMessage(m.content);
+        const name = messageKind(m.content) === "voice" ? "Voice note" : meta?.name ?? mediaLabel(m.content);
+        return link ? `${name}: ${link}` : name;
+      }),
+    );
+    const txt = parts.join("\n\n");
     try {
-      if ((navigator as any).share) {
-        await (navigator as any).share({ text: txt });
+      if (Capacitor.isNativePlatform()) {
+        const { Share } = await import("@capacitor/share");
+        await Share.share({ text: txt, dialogTitle: "Share" });
+      } else if ((navigator as Navigator & { share?: (d: ShareData) => Promise<void> }).share) {
+        await navigator.share({ text: txt });
       } else {
         await navigator.clipboard.writeText(txt);
         toast({ title: "Copied to clipboard (share unavailable)" });
       }
     } catch (e) {
-      // AbortError just means the user closed the native share sheet without
-      // picking anything — not a failure worth surfacing. Everything else
-      // (e.g. a stricter mobile browser rejecting the call) was previously
-      // swallowed by an empty catch, which looked exactly like the Share
-      // button silently doing nothing on mobile.
-      if (e instanceof Error && e.name !== "AbortError") {
-        toast({ title: "Share failed", description: e.message, variant: "destructive" });
+      // Closing the share sheet without picking anything isn't a failure.
+      const msg = e instanceof Error ? e.message : String(e);
+      if (!(e instanceof Error && e.name === "AbortError") && !/cancel/i.test(msg)) {
+        toast({ title: "Share failed", description: msg, variant: "destructive" });
       }
     }
     clearSelection();
@@ -1125,6 +1132,20 @@ export default function ChatRoom() {
       }
       setPendingFile({ file, previewUrl: URL.createObjectURL(file) });
     }
+  };
+
+  const onComposerChange = (value: string) => {
+    if (!editing && !pendingFile && !pendingClip) {
+      const typed = extractTypedClip(value, text);
+      if (typed) {
+        setEmojiOpen(false);
+        setPendingClip(typed.clip.content);
+        setText(typed.rest);
+        return;
+      }
+    }
+    if (pendingFile || pendingClip) setText(value);
+    else onType(value);
   };
 
   const cancelClip = () => {
@@ -1707,7 +1728,7 @@ export default function ChatRoom() {
                 ref={composerInputRef}
                 rows={1}
                 value={text}
-                onChange={(e) => (pendingFile || pendingClip ? setText(e.target.value) : onType(e.target.value))}
+                onChange={(e) => onComposerChange(e.target.value)}
                 onPaste={onComposerPaste}
                 onFocus={() => setEmojiOpen(false)}
                 onKeyDown={(e) => {

@@ -24,6 +24,10 @@ public class ChiChatMessagingService extends FirebaseMessagingService {
                 } else {
                     CallNotificationHelper.callCancelled(this, data);
                 }
+            } else if ("test_call".equals(type)) {
+                // "Send test call" from the app's Call setup check: ring the
+                // same way a real call would, even if ChiChat is open.
+                CallNotificationHelper.showIncomingCall(this, data);
             } else if ("message".equals(type)) {
                 if (!AppState.isForeground()) MessageNotificationHelper.show(this, data);
             }

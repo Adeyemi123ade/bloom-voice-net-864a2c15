@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  BellRing,
   ChevronDown,
   ChevronRight,
   Cloud,
@@ -131,6 +132,23 @@ export default function Settings() {
               <p className="text-base font-semibold text-foreground">Phone settings</p>
               <p className="text-sm text-muted-foreground truncate">
                 Theme, ringtone, Google account
+              </p>
+            </div>
+            <ChevronRight className="w-5 h-5 text-muted-foreground" />
+          </button>
+
+          {/* Calls when ChiChat is closed: setup check and test ring. */}
+          <button
+            onClick={() => navigate("/settings/calls")}
+            className="w-full flex items-center gap-3 px-3 py-3.5 rounded-lg hover:bg-secondary text-left"
+          >
+            <span className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center">
+              <BellRing className="w-5 h-5 text-primary" />
+            </span>
+            <div className="flex-1 min-w-0">
+              <p className="text-base font-semibold text-foreground">Calls when ChiChat is closed</p>
+              <p className="text-sm text-muted-foreground truncate">
+                Check your phone's settings and send a test call
               </p>
             </div>
             <ChevronRight className="w-5 h-5 text-muted-foreground" />

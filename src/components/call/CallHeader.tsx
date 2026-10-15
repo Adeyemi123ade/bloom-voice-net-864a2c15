@@ -11,6 +11,10 @@ type Props = {
   role?: "caller" | "callee";
   /** You put this call on hold, or the other person did. */
   onHold?: boolean;
+  /** A call-waiting / held-call card occupies the top: sit below it, smaller. */
+  belowCard?: boolean;
+  /** Shown over a live video: keep it small at the very top. */
+  overlay?: boolean;
 };
 
 function initials(name?: string | null) {
@@ -23,7 +27,17 @@ function fmt(s: number) {
   return `${m}:${ss}`;
 }
 
-export default function CallHeader({ isVideo, other, status, seconds, role = "caller", onHold = false }: Props) {
+export default function CallHeader({
+  isVideo,
+  other,
+  status,
+  seconds,
+  role = "caller",
+  onHold = false,
+  belowCard = false,
+  overlay = false,
+}: Props) {
+  const size = overlay ? "small" : belowCard ? "medium" : "large";
   const Icon = isVideo ? Video : Phone;
   const headerLabel =
     status === "connected"
@@ -32,7 +46,15 @@ export default function CallHeader({ isVideo, other, status, seconds, role = "ca
         ? "Incoming call"
         : "Calling";
   return (
-    <div className="pt-8 pb-4 flex flex-col items-center gap-3">
+    <div
+      className={`pb-2 flex flex-col items-center gap-3 ${
+        overlay
+          ? "pt-8"
+          : belowCard
+            ? "pt-[calc(env(safe-area-inset-top)+min(40vh,340px)+72px)]"
+            : "pt-[calc(env(safe-area-inset-top)+12vh)]"
+      }`}
+    >
       <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-muted-foreground">
         <span>{headerLabel}</span>
         <Icon className="w-3.5 h-3.5" />
@@ -41,21 +63,27 @@ export default function CallHeader({ isVideo, other, status, seconds, role = "ca
           to the real call status, so they stop the moment the call connects,
           is declined, fails or ends. */}
       <div
-        className={`my-6 ${status === "ringing" ? "call-ring" : ""}`}
+        className={`${size === "large" ? "my-6" : "my-2"} rounded-full ${status === "ringing" ? "call-ring" : ""}`}
         data-testid="call-avatar"
         data-ringing={status === "ringing" ? "true" : "false"}
       >
-        <Avatar className="w-24 h-24 ring-4 ring-primary/30">
+        <Avatar
+          className={`${size === "large" ? "w-32 h-32" : size === "medium" ? "w-20 h-20" : "w-14 h-14"} ring-4 ring-primary/30`}
+        >
           <AvatarImage src={other?.avatar_url ?? undefined} />
-          <AvatarFallback className="bg-primary/20 text-foreground text-2xl font-semibold">
+          <AvatarFallback
+          className={`bg-primary/20 text-foreground font-semibold ${size === "large" ? "text-4xl" : "text-xl"}`}
+        >
             {initials(other?.display_name)}
           </AvatarFallback>
         </Avatar>
       </div>
-      <h1 className="text-base font-semibold text-foreground">
+      <h1
+        className={`${size === "large" ? "text-2xl" : "text-lg"} font-bold text-center px-4 ${overlay ? "" : "text-foreground"}`}
+      >
         {other?.display_name ?? "Contact"}
       </h1>
-      <p className="text-xs text-muted-foreground">
+      <p className="text-sm text-muted-foreground">
         {status === "ringing" && "Ringing…"}
         {status === "connecting" && "Connecting…"}
         {status === "connected" && (onHold ? "On hold" : fmt(seconds))}

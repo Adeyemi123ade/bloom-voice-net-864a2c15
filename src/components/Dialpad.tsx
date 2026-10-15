@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Phone, Delete, Search, UserPlus } from "lucide-react";
 import {
   Dialog,
@@ -78,20 +78,15 @@ function playKeyTone() {
 
 export default function Dialpad({ open, onOpenChange, initial: init = "" }: Props) {
   const [value, setValue] = useState(init);
+  // Where the next digit goes. The number is drawn as separate characters
+  // (not a text field), so tapping a digit moves this cursor there without
+  // the phone's keyboard popping up over the dial pad; keys then insert and
+  // backspace deletes at the cursor, so a wrong digit in the middle can be
+  // fixed without clearing the number.
+  const [caret, setCaret] = useState(init.length);
   const [search, setSearch] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
+  const displayRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
-  // On touch screens the on-screen dial pad is the only way to enter a
-  // number. inputMode="none" alone is not honoured by every Android
-  // keyboard: focusing the field (which every key press used to do, to keep
-  // the cursor position) popped the phone's own keyboard up over the dial
-  // pad. So on touch devices the field is read-only, never focused, and keys
-  // append at the end like a phone dialer. Mouse/keyboard devices keep the
-  // editable field with cursor editing and typing.
-  const touchOnly = useMemo(
-    () => typeof window !== "undefined" && !!window.matchMedia?.("(pointer: coarse)").matches,
-    [],
-  );
 
   // Load contacts once per open
   const allContacts = useMemo<DeviceContact[]>(() => {
@@ -119,50 +114,19 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
 
   const e164Preview = value ? toE164(value) : null;
 
-  /** Insert a string at the current cursor position (or append). */
+  const at = Math.min(caret, value.length);
+
+  /** Insert at the cursor and move the cursor after the insert. */
   const insertAtCursor = (chunk: string) => {
-    const el = inputRef.current;
-    if (!el || touchOnly) {
-      setValue((v) => v + chunk);
-      return;
-    }
-    const start = el.selectionStart ?? value.length;
-    const end = el.selectionEnd ?? value.length;
-    const next = value.slice(0, start) + chunk + value.slice(end);
-    setValue(next);
-    requestAnimationFrame(() => {
-      const pos = start + chunk.length;
-      el.focus();
-      try {
-        el.setSelectionRange(pos, pos);
-      } catch { /* ignore */ }
-    });
+    setValue(value.slice(0, at) + chunk + value.slice(at));
+    setCaret(at + chunk.length);
   };
 
+  /** Delete the digit just before the cursor (never the whole number). */
   const backspace = () => {
-    const el = inputRef.current;
-    if (!el || touchOnly) {
-      setValue((v) => v.slice(0, -1));
-      return;
-    }
-    const start = el.selectionStart ?? value.length;
-    const end = el.selectionEnd ?? value.length;
-    if (start !== end) {
-      const next = value.slice(0, start) + value.slice(end);
-      setValue(next);
-      requestAnimationFrame(() => {
-        el.focus();
-        try { el.setSelectionRange(start, start); } catch { /* ignore */ }
-      });
-      return;
-    }
-    if (start === 0) return;
-    const next = value.slice(0, start - 1) + value.slice(start);
-    setValue(next);
-    requestAnimationFrame(() => {
-      el.focus();
-      try { el.setSelectionRange(start - 1, start - 1); } catch { /* ignore */ }
-    });
+    if (at === 0) return;
+    setValue(value.slice(0, at - 1) + value.slice(at));
+    setCaret(at - 1);
   };
 
   const press = (k: string) => {
@@ -170,24 +134,57 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
     insertAtCursor(k);
   };
 
+  // Hold 0 for "+": replaces the 0 that the press just typed.
   const longZero = () => {
-    if (touchOnly) {
-      setValue((v) => (v.endsWith("0") ? v.slice(0, -1) + "+" : v + "+"));
-      return;
-    }
-    const el = inputRef.current;
-    const caret = el?.selectionStart ?? value.length;
-    if (caret > 0 && value[caret - 1] === "0") {
-      const next = value.slice(0, caret - 1) + "+" + value.slice(caret);
-      setValue(next);
-      requestAnimationFrame(() => {
-        el?.focus();
-        try { el?.setSelectionRange(caret, caret); } catch { /* ignore */ }
-      });
+    if (at > 0 && value[at - 1] === "0") {
+      setValue(value.slice(0, at - 1) + "+" + value.slice(at));
     } else {
       insertAtCursor("+");
     }
   };
+
+  /** Tap on a digit: cursor goes before or after it, whichever side was tapped. */
+  const placeCaret = (index: number, e: React.MouseEvent<HTMLSpanElement>) => {
+    e.stopPropagation();
+    const r = e.currentTarget.getBoundingClientRect();
+    setCaret(e.clientX < r.left + r.width / 2 ? index : index + 1);
+  };
+
+  // Keep the cursor in view on long numbers.
+  useEffect(() => {
+    displayRef.current?.querySelector("[data-caret]")?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [at, value]);
+
+  // Physical keyboards (laptops): type digits, Backspace/Delete, arrows.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
+      if (/^[\d*#+]$/.test(e.key)) {
+        e.preventDefault();
+        insertAtCursor(e.key);
+      } else if (e.key === "Backspace") {
+        e.preventDefault();
+        backspace();
+      } else if (e.key === "Delete") {
+        e.preventDefault();
+        if (at < value.length) setValue(value.slice(0, at) + value.slice(at + 1));
+      } else if (e.key === "ArrowLeft") {
+        setCaret(Math.max(0, at - 1));
+      } else if (e.key === "ArrowRight") {
+        setCaret(Math.min(value.length, at + 1));
+      } else if (e.key === "Home") {
+        setCaret(0);
+      } else if (e.key === "End") {
+        setCaret(value.length);
+      } else if (e.key === "Enter" && value) {
+        placeCall(value);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
 
   const placeCall = (raw: string) => {
     // Already on a ChiChat call: go back to it instead of dialling out.
@@ -215,7 +212,7 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
-          className="max-w-[420px] w-full top-0 bottom-0 h-auto max-h-none sm:bottom-auto sm:h-[92vh] sm:max-h-[85vh] p-0 gap-0 bg-background left-1/2 -translate-x-1/2 translate-y-0 rounded-none sm:rounded-2xl border-0 shadow-2xl flex flex-col overflow-hidden pb-[calc(96px+env(safe-area-inset-bottom))] [&>button.absolute]:hidden"
+          className="max-w-[420px] w-full top-0 bottom-0 h-auto max-h-none sm:bottom-auto sm:h-[92vh] sm:max-h-[85vh] p-0 gap-0 bg-background left-1/2 -translate-x-1/2 translate-y-0 rounded-none sm:rounded-2xl border-0 shadow-2xl flex flex-col overflow-hidden pb-[calc(70px+env(safe-area-inset-bottom))] [&>button.absolute]:hidden"
         >
         <DialogTitle className="sr-only">Call</DialogTitle>
 
@@ -265,7 +262,7 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
         {/* Contact list — capped height so the keypad below isn't pushed too
             far down when there are many contacts; the outer container above
             handles scrolling if the total content still exceeds the viewport. */}
-        <div className="px-5 pb-2 max-h-[28vh] overflow-y-auto space-y-2 shrink-0">
+        <div className="px-5 pb-2 flex-1 min-h-[88px] overflow-y-auto space-y-2">
           {filteredContacts.length === 0 ? (
             <p className="text-xs text-muted-foreground/70 italic py-6 text-center">
               {search ? "No matching contact" : "Your contacts will appear here"}
@@ -307,35 +304,30 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
           )}
         </div>
 
-        {/* Number display — own section above the keypad, real breathing
-            room instead of everything crammed into one tight card. */}
-        <div className="mx-4 mt-3 mb-3 shrink-0">
-          <div className="relative">
-            <input
-              ref={inputRef}
-              type="tel"
-              // Suppress the native mobile keyboard — the on-screen dialpad
-              // is the ONLY input mechanism. Without inputMode="none" the
-              // OS keyboard pops up on focus and the dialpad jumps around.
-              inputMode="none"
-              readOnly={touchOnly}
-              autoComplete="off"
-              value={value}
-              onChange={(e) => {
-                const cleaned = e.target.value.replace(/[^\d+*#]/g, "");
-                setValue(cleaned);
-              }}
-              placeholder="Enter number"
-              className="w-full h-12 text-2xl font-light tracking-wide text-center bg-transparent border-0 focus:outline-none placeholder:text-muted-foreground/60"
-            />
-            <button
-              aria-label="Backspace"
-              onClick={backspace}
-              disabled={!value}
-              className="absolute right-1 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full hover:bg-secondary flex items-center justify-center disabled:opacity-30"
-            >
-              <Delete className="w-4 h-4 text-muted-foreground" />
-            </button>
+        {/* Number: tap a digit to put the cursor there. */}
+        <div className="mx-4 mt-2 shrink-0">
+          <div
+            ref={displayRef}
+            role="textbox"
+            aria-label="Phone number"
+            aria-readonly="true"
+            data-testid="dial-number"
+            onClick={() => setCaret(value.length)}
+            className="h-12 px-2 flex items-center justify-center overflow-x-auto whitespace-nowrap text-[28px] font-light tracking-wide text-foreground cursor-text select-none [scrollbar-width:none]"
+          >
+            {value.length === 0 && <DialCaret />}
+            {value.length === 0 && (
+              <span className="text-muted-foreground/60 text-2xl">Enter number</span>
+            )}
+            {value.split("").map((ch, i) => (
+              <span key={i} className="inline-flex items-center">
+                {i === at && <DialCaret />}
+                <span onClick={(e) => placeCaret(i, e)} className="px-[1px]">
+                  {ch}
+                </span>
+              </span>
+            ))}
+            {value.length > 0 && at === value.length && <DialCaret />}
           </div>
 
           {/* Live formatted preview */}
@@ -344,11 +336,11 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
               ? formatDisplay(e164Preview)
               : "\u00A0"}
           </div>
-
         </div>
 
-        {/* Keypad — its own dedicated card, comfortably sized keys. */}
-        <div className="mx-4 mb-4 rounded-2xl bg-secondary/30 border border-border/40 p-4 shrink-0">
+        {/* Keypad, with Call and Backspace as its last row (same spacing as
+            the digits, instead of a separate block further down). */}
+        <div className="mx-4 mt-2 mb-2 rounded-2xl bg-secondary/30 border border-border/40 p-3 shrink-0">
           <div className="grid grid-cols-3 gap-2.5">
             {KEYS.map((k) => (
               <button
@@ -360,7 +352,7 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
                     longZero();
                   }
                 }}
-                className="h-14 rounded-xl flex flex-col items-center justify-center transition-colors"
+                className="h-14 rounded-xl flex flex-col items-center justify-center transition-colors active:opacity-80"
                 style={{ backgroundColor: "hsl(var(--brand-deep))", color: "#FFFFFF" }}
               >
                 <span className="text-xl font-semibold leading-none" style={{ color: "#FFFFFF" }}>
@@ -373,23 +365,24 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
                 )}
               </button>
             ))}
+            <div />
+            <button
+              onClick={callTyped}
+              disabled={!value}
+              aria-label="Call"
+              className="h-14 rounded-xl flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-40 transition-colors bg-primary text-primary-foreground active:opacity-80"
+            >
+              <Phone className="w-6 h-6" />
+            </button>
+            <button
+              aria-label="Backspace"
+              onClick={backspace}
+              disabled={at === 0}
+              className="h-14 rounded-xl flex items-center justify-center text-foreground hover:bg-secondary active:bg-secondary disabled:opacity-30"
+            >
+              <Delete className="w-6 h-6" />
+            </button>
           </div>
-        </div>
-
-        {/* Actions — own section below the keypad, never shares the
-            keypad's container, so it can never sit visually on top of it. */}
-        <div className="mx-4 mb-4 shrink-0 grid grid-cols-3 gap-2.5">
-          <div />
-          <button
-            onClick={callTyped}
-            disabled={!value}
-            aria-label="Call"
-            className="h-14 rounded-xl flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-40 transition-colors"
-            style={{ backgroundColor: "hsl(var(--brand-deep))", color: "#FFFFFF" }}
-          >
-            <Phone className="w-6 h-6" />
-          </button>
-          <div />
         </div>
         </div>
         {/* end shared scroll region */}
@@ -398,5 +391,16 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
         <BottomNav active="calls" onBeforeNavigate={() => onOpenChange(false)} />
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** Blinking cursor in the dialled number. */
+function DialCaret() {
+  return (
+    <span
+      data-caret
+      aria-hidden
+      className="inline-block w-[2px] h-7 mx-[1px] bg-primary rounded-full animate-[dial-caret_1s_steps(1)_infinite]"
+    />
   );
 }

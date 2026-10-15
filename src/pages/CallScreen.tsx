@@ -72,7 +72,11 @@ export default function CallSession({
   onCallScreenRef.current = onCallScreen;
   const { user, loading } = useAuth();
 
-  const [other, setOther] = useState<Profile | null>(null);
+  const [other, setOther] = useState<Profile | null>(() =>
+    params.peer
+      ? { id: "", display_name: params.peer.name, avatar_url: params.peer.avatarUrl ?? null }
+      : null,
+  );
   const [status, setStatus] = useState<"connecting" | "ringing" | "connected" | "ended">(
     role === "caller" ? "ringing" : "connecting",
   );
@@ -181,26 +185,55 @@ export default function CallSession({
     document.title = `${isVideo ? "Video" : "Voice"} call — Chichat`;
   }, [isVideo]);
 
+  // Who's on the other end. The screen that started the call passes their
+  // name and photo (params.peer) so they show instantly; this lookup fills
+  // in or confirms them. It retries, because a single failed or slow lookup
+  // used to leave the call screen saying "Contact" with a "?" avatar.
   useEffect(() => {
+    if (params.peer) {
+      setCallPeer(callId, { name: params.peer.name, avatarUrl: params.peer.avatarUrl ?? null });
+    }
     if (!user || !conversationId) return;
+    let cancelled = false;
     (async () => {
-      const { data: parts } = await supabase
-        .from("conversation_participants")
-        .select("user_id")
-        .eq("conversation_id", conversationId)
-        .neq("user_id", user.id);
-      const otherId = parts?.[0]?.user_id;
-      if (!otherId) return;
-      const { data: prof } = await supabase
-        .from("profiles")
-        .select("id, display_name, avatar_url")
-        .eq("id", otherId)
-        .maybeSingle();
-      if (prof) {
-        setOther(prof as Profile);
-        setCallPeer(callId, { name: prof.display_name ?? "Contact", avatarUrl: prof.avatar_url ?? null });
+      for (let attempt = 0; attempt < 5 && !cancelled; attempt++) {
+        let otherId: string | null = null;
+        // The call row names both people directly.
+        if (callId) {
+          const { data: call } = await supabase
+            .from("calls")
+            .select("caller_id, callee_id")
+            .eq("id", callId)
+            .maybeSingle();
+          if (call) otherId = call.caller_id === user.id ? call.callee_id : call.caller_id;
+        }
+        if (!otherId) {
+          const { data: parts } = await supabase
+            .from("conversation_participants")
+            .select("user_id")
+            .eq("conversation_id", conversationId)
+            .neq("user_id", user.id);
+          otherId = parts?.[0]?.user_id ?? null;
+        }
+        if (otherId) {
+          const { data: prof } = await supabase
+            .from("profiles")
+            .select("id, display_name, avatar_url")
+            .eq("id", otherId)
+            .maybeSingle();
+          if (prof && !cancelled) {
+            setOther(prof as Profile);
+            setCallPeer(callId, { name: prof.display_name ?? "Contact", avatarUrl: prof.avatar_url ?? null });
+            return;
+          }
+        }
+        await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
       }
     })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, conversationId, callId]);
 
   useEffect(() => {
@@ -866,8 +899,23 @@ export default function CallSession({
               : ""
           }
         >
-          <CallHeader isVideo={isVideo} other={other} status={status} seconds={seconds} role={role} onHold={onHold} />
+          <CallHeader
+            isVideo={isVideo}
+            other={other}
+            status={status}
+            seconds={seconds}
+            role={role}
+            onHold={onHold}
+            // A call-waiting or held-call card sits in the top part of the
+            // screen: start this call's details just below it.
+            belowCard={!videoFullscreen && (!!callsSnap.waiting || otherCalls.length > 0)}
+            overlay={videoFullscreen}
+          />
         </div>
+        {/* Caller details stay in the upper part; the space goes here,
+            above the controls (it used to sit above the details and push
+            them down to the middle of the screen). */}
+        {!videoFullscreen && <div className="flex-1 min-h-4" />}
 
         {videoFullscreen && onHold && (
           <div className="fixed inset-0 z-10 bg-black/60 flex items-center justify-center pointer-events-none">

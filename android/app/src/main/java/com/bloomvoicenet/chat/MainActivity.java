@@ -1,9 +1,19 @@
 package com.bloomvoicenet.chat;
 
 import android.content.Intent;
+import android.graphics.Color;
 import android.os.Bundle;
+import android.graphics.Canvas;
+import android.graphics.ColorFilter;
+import android.graphics.Paint;
+import android.graphics.PixelFormat;
+import android.graphics.drawable.Drawable;
+import android.view.View;
+import android.view.Window;
 import android.webkit.WebView;
 
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 import com.getcapacitor.BridgeActivity;
 import com.google.firebase.FirebaseApp;
 
@@ -11,13 +21,20 @@ import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 
 public class MainActivity extends BridgeActivity {
+    private static final int DEEP_GREEN = Color.rgb(14, 88, 62);        // hsl(var(--brand-deep)) as the browser renders it
+    private static final int APP_BACKGROUND = Color.rgb(243, 247, 246); // --background
 
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // Must come BEFORE super.onCreate(): that's where Capacitor builds the
+        // bridge with the registered plugins. Registered afterwards (as it
+        // was), ChiChatCalls never loaded, so the full-screen-call permission
+        // prompt, the battery prompt and the call foreground service never ran.
+        registerPlugin(ChiChatCallsPlugin.class);
         super.onCreate(savedInstanceState);
         FirebaseApp.initializeApp(this);
-        registerPlugin(ChiChatCallsPlugin.class);
+        applySystemBarColors();
         openCallFromIntent(getIntent());
         openChatFromIntent(getIntent());
     }
@@ -28,6 +45,57 @@ public class MainActivity extends BridgeActivity {
         setIntent(intent);
         openCallFromIntent(intent);
         openChatFromIntent(intent);
+    }
+
+    /**
+     * Deep ChiChat green behind the phone's own navigation buttons, with
+     * light buttons, instead of the default white strip.
+     *
+     * Up to Android 14 that's the navigation bar colour. On Android 15+ the
+     * app is drawn edge to edge and the bar colour is ignored: Capacitor pads
+     * the web view away from the bars, and those padded strips show the
+     * background of the web view's parent. So that background is painted
+     * too: the app's light background up top (behind the status bar, so the
+     * top looks unchanged) and deep green along the bottom padding.
+     */
+    private void applySystemBarColors() {
+        try {
+            Window w = getWindow();
+            w.setNavigationBarColor(DEEP_GREEN);
+            WindowInsetsControllerCompat c = WindowCompat.getInsetsController(w, w.getDecorView());
+            c.setAppearanceLightNavigationBars(false);
+        } catch (Throwable ignored) {}
+        try {
+            if (bridge == null || bridge.getWebView() == null) return;
+            final View parent = (View) bridge.getWebView().getParent();
+            parent.setBackground(new Drawable() {
+                private final Paint paint = new Paint();
+
+                @Override
+                public void draw(Canvas canvas) {
+                    android.graphics.Rect b = getBounds();
+                    canvas.drawColor(APP_BACKGROUND);
+                    int bottom = parent.getPaddingBottom();
+                    if (bottom > 0) {
+                        paint.setColor(DEEP_GREEN);
+                        canvas.drawRect(b.left, b.bottom - bottom, b.right, b.bottom, paint);
+                    }
+                }
+
+                @Override
+                public void setAlpha(int alpha) {}
+
+                @Override
+                public void setColorFilter(ColorFilter colorFilter) {}
+
+                @Override
+                public int getOpacity() {
+                    return PixelFormat.OPAQUE;
+                }
+            });
+            // Padding follows the keyboard and bars; repaint when it changes.
+            parent.addOnLayoutChangeListener((v, l, t, r, bt, ol, ot, or, ob) -> v.invalidate());
+        } catch (Throwable ignored) {}
     }
 
     @Override
@@ -59,6 +127,11 @@ public class MainActivity extends BridgeActivity {
     private void openCallFromIntent(Intent intent) {
         if (intent == null || !intent.getBooleanExtra("openCall", false) || bridge == null)
             return;
+        // A test ring from the Call setup check has no real call to open.
+        if ("1".equals(intent.getStringExtra("test"))) {
+            intent.removeExtra("openCall");
+            return;
+        }
 
         String conversationId = intent.getStringExtra("conversationId");
         String callId = intent.getStringExtra("callId");
