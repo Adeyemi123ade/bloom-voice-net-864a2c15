@@ -51,7 +51,8 @@ import {
 } from "@/lib/chat/format";
 import { useBackNavigation } from "@/hooks/useBackNavigation";
 import chatWallpaper from "@/assets/chat-wallpaper.png";
-import { messageKind, mediaLabel, parseCallLog, selectionActions, stripQuotedReply } from "@/lib/chat/messageKinds";
+import { loadChatCache, saveChatCache } from "@/lib/chat/chatCache";
+import { duplicateCallRecordIds, messageKind, mediaLabel, parseCallLog, selectionActions, stripQuotedReply } from "@/lib/chat/messageKinds";
 import { checkClipAvailable, copyMessages, extractTypedClip, matchPastedClip, mediaUrlOf } from "@/lib/chat/clipboard";
 import { getSignedChatMediaUrl, useSignedMediaUrl } from "@/lib/signedMedia";
 import { Capacitor } from "@capacitor/core";
@@ -97,6 +98,19 @@ async function fetchMessageRowWithRetry(
 // not just the realtime echo. A message's content is never legitimately
 // empty (see normalizeMessage above), so this only ever fires for the rare
 // lagging row, not on every load.
+/**
+ * Rows ready to show now, and the rare blank ones that need re-fetching.
+ * Showing the list only after those retries (up to about 3 s, more on a
+ * slow network) made a chat take seconds to open whenever its latest page
+ * held one such message; now they are fixed in the background.
+ */
+function splitBlankRows(rows: Record<string, unknown>[]): { ready: Message[]; blank: Record<string, unknown>[] } {
+  const blank = rows.filter(
+    (r) => !r.deleted_for_everyone && !(typeof r.content === "string" && r.content),
+  );
+  return { ready: rows.map(normalizeMessage), blank };
+}
+
 async function reconcileBlankRows(rows: Record<string, unknown>[]): Promise<Message[]> {
   const fixed = await Promise.all(
     rows.map(async (row) => {
@@ -248,6 +262,21 @@ export default function ChatRoom() {
     hasOlderRef.current = v;
     setHasOlder(v);
   };
+  /** Swap in repaired copies of messages already on screen. */
+  const patchMessages = (fixed: Message[]) => {
+    const byId = new Map(fixed.map((m) => [m.id, m]));
+    setMessages((prev) => prev.map((m) => byId.get(m.id) ?? m));
+  };
+  // Save the latest page for next time, once the real list has loaded
+  // (never the saved copy itself), shortly after changes settle.
+  const cacheReady = useRef(false);
+  useEffect(() => {
+    if (!conversationId || !cacheReady.current) return;
+    const own = messages.filter((m) => m.conversation_id === conversationId);
+    const t = window.setTimeout(() => saveChatCache(conversationId, otherRef.current, own), 600);
+    return () => window.clearTimeout(t);
+  }, [messages, other, conversationId]);
+
   /** Oldest loaded message's time (server rows only, not unsent ones). */
   const oldestLoadedAt = () => messagesRef.current.find((m) => !m.id.startsWith("tmp-"))?.created_at ?? null;
 
@@ -255,6 +284,11 @@ export default function ChatRoom() {
     if (!user || !conversationId) return;
     let cancelled = false;
     setOlder(false);
+    cacheReady.current = false;
+    // What was there last time, shown at once while the latest loads.
+    const cached = loadChatCache<Message, Profile>(conversationId);
+    setMessages(cached?.messages ?? []);
+    if (cached?.other) setOther(cached.other);
     // The other person's profile and the messages load at the same time.
     void (async () => {
       const { data: parts } = await supabase
@@ -279,10 +313,16 @@ export default function ChatRoom() {
         .order("created_at", { ascending: false })
         .limit(PAGE_SIZE);
       const rows = (msgs ?? []).slice().reverse();
-      const fixed = await reconcileBlankRows(rows);
       if (cancelled) return;
+      const { ready, blank } = splitBlankRows(rows);
       setOlder(rows.length === PAGE_SIZE);
-      setMessages(fixed);
+      setMessages((prev) => {
+        // Keep anything sent while this was loading.
+        const ids = new Set(ready.map((m) => m.id));
+        return [...ready, ...prev.filter((m) => m.id.startsWith("tmp-") && !ids.has(m.id))];
+      });
+      cacheReady.current = true;
+      if (blank.length) void reconcileBlankRows(blank).then((fixed) => !cancelled && patchMessages(fixed));
     })();
     // Opening the chat reads all of it, including messages older than the
     // page shown, so the chat list badge clears completely.
@@ -307,7 +347,9 @@ export default function ChatRoom() {
     const have = new Set(messagesRef.current.map((m) => m.id));
     const fresh = rows.filter((r) => !have.has(String(r.id)));
     if (all || rows.length <= PAGE_SIZE) setOlder(false);
-    return reconcileBlankRows(fresh);
+    const { ready, blank } = splitBlankRows(fresh);
+    if (blank.length) void reconcileBlankRows(blank).then(patchMessages);
+    return ready;
   };
 
   const prepend = (older: Message[]) => {
@@ -418,7 +460,8 @@ export default function ChatRoom() {
       const { data } = oldest ? await q.order("created_at", { ascending: true }) : await q;
       if (!data) return;
       if (!oldest) data.reverse();
-      const fresh = await reconcileBlankRows(data);
+      const { ready: fresh, blank } = splitBlankRows(data);
+      if (blank.length) void reconcileBlankRows(blank).then(patchMessages);
       const freshIds = new Set(fresh.map((m) => m.id));
       setMessages((prev) => {
         const pending = prev.filter((m) => m.id.startsWith("tmp-") && !freshIds.has(m.id));
@@ -1270,7 +1313,12 @@ export default function ChatRoom() {
     }
   };
 
-  const visible = useMemo(() => messages.filter((m) => !hidden.has(m.id)), [messages, hidden]);
+  // Older chats hold two or three records per call: show each call once.
+  const duplicateCalls = useMemo(() => duplicateCallRecordIds(messages), [messages]);
+  const visible = useMemo(
+    () => messages.filter((m) => !hidden.has(m.id) && !duplicateCalls.has(m.id)),
+    [messages, hidden, duplicateCalls],
+  );
   const searchResults = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return visible;

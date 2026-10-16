@@ -340,7 +340,8 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
 
         {/* Keypad, with Call and Backspace as its last row (same spacing as
             the digits, instead of a separate block further down). */}
-        <div className="mx-4 mt-2 mb-2 rounded-2xl bg-secondary/30 border border-border/40 p-3 shrink-0">
+        {/* The keypad sits in its own card: thin green line, soft shadow (approved option A). */}
+        <div className="mx-4 mt-2 mb-2.5 rounded-3xl bg-card border border-primary/20 shadow-[0_2px_10px_rgba(14,88,62,0.08)] p-3.5 shrink-0" data-testid="dial-keypad-card">
           <div className="grid grid-cols-3 gap-2.5">
             {KEYS.map((k) => (
               <button
@@ -352,7 +353,7 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
                     longZero();
                   }
                 }}
-                className="h-14 rounded-xl flex flex-col items-center justify-center transition-colors active:opacity-80"
+                className="h-14 rounded-[14px] flex flex-col items-center justify-center transition-colors active:opacity-80"
                 style={{ backgroundColor: "hsl(var(--brand-deep))", color: "#FFFFFF" }}
               >
                 <span className="text-xl font-semibold leading-none" style={{ color: "#FFFFFF" }}>
@@ -370,7 +371,7 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
               onClick={callTyped}
               disabled={!value}
               aria-label="Call"
-              className="h-14 rounded-xl flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-40 transition-colors bg-primary text-primary-foreground active:opacity-80"
+              className="h-14 rounded-[14px] flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-40 transition-colors bg-primary text-primary-foreground active:opacity-80"
             >
               <Phone className="w-6 h-6" />
             </button>
@@ -378,7 +379,7 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
               aria-label="Backspace"
               onClick={backspace}
               disabled={at === 0}
-              className="h-14 rounded-xl flex items-center justify-center text-foreground hover:bg-secondary active:bg-secondary disabled:opacity-30"
+              className="h-14 rounded-[14px] flex items-center justify-center text-foreground hover:bg-secondary active:bg-secondary disabled:opacity-30"
             >
               <Delete className="w-6 h-6" />
             </button>

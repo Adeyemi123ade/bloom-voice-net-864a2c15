@@ -1,5 +1,6 @@
-import { PhoneIncoming, PhoneMissed, PhoneOutgoing } from "lucide-react";
-import { CALL_PREFIX, fmtDuration, formatTime } from "@/lib/chat/format";
+import { PhoneIncoming, PhoneMissed, PhoneOutgoing, Video } from "lucide-react";
+import { formatTime } from "@/lib/chat/format";
+import { describeCall } from "@/lib/chat/messageKinds";
 
 type Message = {
   id: string;
@@ -13,6 +14,12 @@ type Message = {
   deleted_for_everyone: boolean;
 };
 
+/**
+ * A call in the chat, WhatsApp style: what happened on top ("Voice call",
+ * "Missed voice call", "Call failed"), the detail and time below ("3 mins",
+ * "No answer", "Declined", "Tap to call back"). No "0 secs": a call with no
+ * length shows just its title. Sized to its text, so it never wraps.
+ */
 export function CallSystemBubble({
   m,
   mine,
@@ -20,35 +27,19 @@ export function CallSystemBubble({
   m: Message;
   mine: boolean;
 }) {
-  // [call]video|<kind>|<duration>
-  // kind ∈ ended | no_answer | missed | rejected | declined | received
-  const [, body] = m.content.split(CALL_PREFIX);
-  const [type, kind, durStr] = (body ?? "").split("|");
-  const isVideo = type === "video";
-  const dur = parseInt(durStr || "0", 10);
-  const isMissed = kind === "missed" || kind === "no_answer";
-  const Icon = isMissed ? PhoneMissed : mine ? PhoneOutgoing : PhoneIncoming;
-
-  // Per-side wording (sender-of-the-log perspective).
-  let label = "";
-  if (kind === "ended") label = isVideo ? "Video call ended" : "Voice call ended";
-  else if (mine && kind === "no_answer") label = "No answer";
-  else if (mine && kind === "rejected") label = "Call rejected";
-  // The caller logs "no_answer" when you didn't pick up, so on your side
-  // it's a missed call (it used to read just "Voice call").
-  else if (!mine && isMissed) label = isVideo ? "Missed video call" : "Missed voice call";
-  else if (!mine && kind === "received") label = "Received call";
-  else if (!mine && kind === "declined") label = "Call ended";
-  else label = isVideo ? "Video call" : "Voice call";
-
-  // Line 2: duration in "X secs" / "M:SS" form, or hint for missed.
-  const subtitle = isMissed
-    ? "Tap to call back"
-    : dur > 0
-      ? dur < 60
-        ? `${dur} sec${dur === 1 ? "" : "s"}`
-        : fmtDuration(dur)
-      : "0 secs";
+  const v = describeCall(m.content, mine);
+  if (!v) return null;
+  const alert = v.tone !== "normal";
+  const Icon = v.tone === "missed"
+    ? PhoneMissed
+    : v.callType === "video"
+      ? Video
+      : v.outgoing
+        ? PhoneOutgoing
+        : PhoneIncoming;
+  const time = (
+    <span className="text-2xs text-muted-foreground whitespace-nowrap">{formatTime(m.created_at)}</span>
+  );
 
   return (
     // Not a button: taps are handled by the row around it (CallRow), which
@@ -58,28 +49,32 @@ export function CallSystemBubble({
     // selection by tapping it.
     <div
       role="button"
-      className={`w-fit max-w-[85%] flex items-center gap-3 pl-2 pr-3 py-2 rounded-2xl text-left bg-card text-foreground shadow-sm ${
+      data-testid="call-record"
+      className={`inline-flex items-center gap-3 pl-2.5 pr-3 py-2.5 rounded-2xl text-left bg-card text-foreground shadow-sm whitespace-nowrap ${
         mine ? "rounded-br-sm" : "rounded-bl-sm"
       } hover:opacity-90 transition cursor-pointer`}
     >
-      {/* Left: circular icon */}
       <div className={`w-9 h-9 shrink-0 rounded-full flex items-center justify-center ${
-        isMissed ? "bg-destructive/15" : "bg-background/60"
+        alert ? "bg-destructive/15" : "bg-primary/10"
       }`}>
-        <Icon className={`w-4 h-4 ${isMissed ? "text-destructive" : "text-primary"}`} />
+        <Icon className={`w-[18px] h-[18px] ${alert ? "text-destructive" : "text-primary"}`} />
       </div>
-      {/* Right: 2 lines — label + subtitle, with time bottom-right */}
-      <div className="flex-1 min-w-0">
-        <div className={`text-[13px] font-semibold leading-snug break-words ${isMissed ? "text-destructive" : ""}`}>
-          {label}
-        </div>
-        <div className="flex items-end justify-between gap-2 mt-0.5">
-          <span className="text-xs text-muted-foreground break-words">{subtitle}</span>
-          <span className="text-2xs text-muted-foreground shrink-0 whitespace-nowrap">
-            {formatTime(m.created_at)}
+      {v.detail ? (
+        <div className="flex flex-col gap-0.5">
+          <span className={`text-[15px] font-semibold leading-tight ${v.tone === "missed" ? "text-destructive" : ""}`}>
+            {v.title}
+          </span>
+          <span className="flex items-baseline gap-3.5">
+            <span className="text-[13px] text-muted-foreground">{v.detail}</span>
+            {time}
           </span>
         </div>
-      </div>
+      ) : (
+        <span className="flex items-baseline gap-3.5">
+          <span className="text-[15px] font-semibold leading-tight">{v.title}</span>
+          {time}
+        </span>
+      )}
     </div>
   );
 }
