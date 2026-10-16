@@ -7,7 +7,8 @@ export type CallSetupItem = {
   title: string;
   detail: string;
   status: Status;
-  action?: { label: string; run: () => void };
+  /** run resolves false when the button couldn't do its job. */
+  action?: { label: string; run: () => Promise<boolean> };
 };
 
 /**
@@ -18,7 +19,7 @@ export function buildCallSetupItems(
   r: CallReadiness | null,
   pushReady: boolean,
   pushProblem: string | null,
-  onRetryPush: () => void,
+  onRetryPush: () => Promise<boolean>,
 ): CallSetupItem[] {
   const items: CallSetupItem[] = [];
   const s = (v: boolean | undefined): Status => (v === undefined ? "check" : v ? "ok" : "missing");
@@ -28,7 +29,7 @@ export function buildCallSetupItems(
     title: "Notifications allowed",
     detail: "Calls and messages arrive as notifications.",
     status: r?.notifications === false ? "missing" : s(r?.notifications),
-    action: { label: "Open", run: () => void openCallSettings("notifications") },
+    action: { label: "Open", run: () => openCallSettings("notifications") },
   });
   items.push({
     key: "push",
@@ -45,7 +46,7 @@ export function buildCallSetupItems(
       title: "Incoming call notifications on",
       detail: "The \"Incoming calls\" notification category is switched off.",
       status: "missing",
-      action: { label: "Open", run: () => void openCallSettings("notifications") },
+      action: { label: "Open", run: () => openCallSettings("notifications") },
     });
   }
   if ((r?.sdk ?? 0) >= 34) {
@@ -54,7 +55,7 @@ export function buildCallSetupItems(
       title: "Full-screen calls",
       detail: "Lets an incoming call light up the screen, like a phone call.",
       status: s(r?.fullScreen),
-      action: { label: "Allow", run: () => void openCallSettings("fullScreen") },
+      action: { label: "Allow", run: () => openCallSettings("fullScreen") },
     });
   }
   if (r?.xiaomi) {
@@ -63,21 +64,21 @@ export function buildCallSetupItems(
       title: "Show on lock screen",
       detail: "Xiaomi: Other permissions → Show on Lock screen → Allow.",
       status: s(r.lockScreen),
-      action: { label: "Open", run: () => void openCallSettings("lockScreen") },
+      action: { label: "Open", run: () => openCallSettings("lockScreen") },
     });
     items.push({
       key: "popups",
       title: "Pop-up windows in background",
       detail: "Xiaomi: Other permissions → Display pop-up windows while running in the background → Allow.",
       status: s(r.backgroundPopups),
-      action: { label: "Open", run: () => void openCallSettings("lockScreen") },
+      action: { label: "Open", run: () => openCallSettings("lockScreen") },
     });
     items.push({
       key: "autostart",
       title: "Autostart",
       detail: "Xiaomi: turn on Autostart for ChiChat, or calls can't reach it after you swipe it away. The phone doesn't let apps read this one, so check it yourself.",
       status: "check",
-      action: { label: "Open", run: () => void openCallSettings("autostart") },
+      action: { label: "Open", run: () => openCallSettings("autostart") },
     });
   }
   items.push({
@@ -87,7 +88,7 @@ export function buildCallSetupItems(
       ? "Xiaomi: App info → Battery saver → No restrictions."
       : "App info → Battery → Unrestricted.",
     status: s(r?.battery),
-    action: { label: "Open", run: () => void openCallSettings("app") },
+    action: { label: "Open", run: () => openCallSettings("app") },
   });
   return items;
 }

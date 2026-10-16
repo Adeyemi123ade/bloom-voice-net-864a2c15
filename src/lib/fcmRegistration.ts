@@ -20,9 +20,20 @@ export function getPushProblem(): string | null {
 }
 
 /** Ask again (e.g. after the user allowed notifications in Settings). */
-export async function retryCallPush(userId: string): Promise<void> {
+export async function retryCallPush(userId: string): Promise<boolean> {
   registered = false;
+  pushReady = false;
+  lastProblem = null;
   await registerForCallPush(userId);
+  // Firebase answers through a listener: wait for it, up to 15 s.
+  for (let i = 0; i < 30 && !pushReady && !lastProblem; i++) {
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  if (!pushReady && !lastProblem) {
+    lastProblem =
+      "No answer from Firebase. Check the phone is online. If it keeps happening, this app build may be missing its Firebase settings file (google-services.json): rebuild the app.";
+  }
+  return pushReady;
 }
 
 const TOKEN_KEY = "chichat:fcm-token";
@@ -55,6 +66,8 @@ export async function registerForCallPush(userId: string) {
   registered = true;
 
   try {
+    // A retry must not stack a second set of listeners on top of the first.
+    await PushNotifications.removeAllListeners();
     let perm = await PushNotifications.checkPermissions();
     if (perm.receive !== "granted") {
       perm = await PushNotifications.requestPermissions();
@@ -89,6 +102,7 @@ export async function registerForCallPush(userId: string) {
         }
       } catch (e) {
         console.warn("[fcm] failed to store token", e);
+        lastProblem = `Couldn't save this phone for calls (${e instanceof Error ? e.message : "network error"}).`;
       }
     });
 
@@ -110,6 +124,7 @@ export async function registerForCallPush(userId: string) {
     await PushNotifications.register();
   } catch (e) {
     console.warn("[fcm] setup failed", e);
+    lastProblem = `Couldn't start push registration (${e instanceof Error ? e.message : String(e)}).`;
     registered = false;
   }
 }

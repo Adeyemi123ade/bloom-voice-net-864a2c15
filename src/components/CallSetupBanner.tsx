@@ -25,7 +25,7 @@ export default function CallSetupBanner() {
       const r = await getCallReadiness();
       if (cancelled) return;
       // Give push registration a moment on app start before judging it.
-      const items = buildCallSetupItems(r, isCallPushReady(), getPushProblem(), () => {});
+      const items = buildCallSetupItems(r, isCallPushReady(), getPushProblem(), async () => false);
       setShow(items.some((i) => i.status === "missing"));
     };
     const t = window.setTimeout(check, 4000);

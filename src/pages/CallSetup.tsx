@@ -84,8 +84,37 @@ export default function CallSetup() {
     };
   }, [refresh]);
 
-  const retryPush = () => {
-    if (user) void retryCallPush(user.id).then(refresh);
+  const retryPush = async () => {
+    if (!user) return false;
+    const ok = await retryCallPush(user.id);
+    await refresh();
+    return ok;
+  };
+
+  // Which button is working, and what the last tap did, so no tap is silent.
+  const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const runAction = async (key: string, run: () => Promise<boolean>) => {
+    if (busyKey) return;
+    setBusyKey(key);
+    setNotes((n) => ({ ...n, [key]: "" }));
+    try {
+      const ok = await run();
+      // A failed Retry already shows its reason in the item's own text.
+      if (!ok && !(key === "push" && getPushProblem())) {
+        setNotes((n) => ({
+          ...n,
+          [key]:
+            key === "push"
+              ? getPushProblem() ?? "Still not registered."
+              : readiness === null
+                ? "Couldn't open this setting: the ChiChat app on this phone is an old version. Install the latest build, then try again."
+                : "Couldn't open this setting automatically. Open it from the phone's Settings app instead.",
+        }));
+      }
+    } finally {
+      setBusyKey(null);
+    }
   };
 
   const sendTest = async () => {
@@ -159,8 +188,9 @@ export default function CallSetup() {
             </p>
             {readiness === null && checked && (
               <p className="text-xs rounded-lg bg-secondary p-3 text-muted-foreground">
-                This app build can't check the phone's settings. Rebuild the app from the latest
-                code to get the full check.
+                <span className="font-semibold text-foreground">The ChiChat app on this phone is an old version.</span>{" "}
+                It can't check or open these settings, so the buttons below can't work yet. Install
+                the latest build, then come back here.
               </p>
             )}
             <ul className="flex flex-col gap-2" data-testid="call-setup-items">
@@ -191,15 +221,21 @@ export default function CallSetup() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-foreground">{i.title}</p>
                     <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{i.detail}</p>
+                    {notes[i.key] && (
+                      <p className="text-xs text-destructive mt-1 leading-relaxed" role="alert" data-testid={`note-${i.key}`}>
+                        {notes[i.key]}
+                      </p>
+                    )}
                   </div>
                   {i.action && i.status !== "ok" && (
                     <Button
                       size="sm"
                       variant={i.status === "missing" ? "default" : "outline"}
                       className="h-8 shrink-0"
-                      onClick={i.action.run}
+                      disabled={busyKey !== null}
+                      onClick={() => i.action && void runAction(i.key, i.action.run)}
                     >
-                      {i.action.label}
+                      {busyKey === i.key ? <Loader2 className="w-4 h-4 animate-spin" aria-label="Working" /> : i.action.label}
                     </Button>
                   )}
                 </li>
