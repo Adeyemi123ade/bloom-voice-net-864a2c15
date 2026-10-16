@@ -23,6 +23,7 @@ import android.view.WindowManager;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.Toast;
 import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.drawable.RoundedBitmapDrawable;
@@ -286,10 +287,25 @@ public class IncomingCallActivity extends AppCompatActivity {
             if (handled) return;
             handled = true;
             v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
-            if (!isTest()) CallActionReceiver.declineInBackground(callIntent);
+            // Stop ringing here at once.
             CallNotificationHelper.cancel(this, callIntent.getStringExtra("callId"));
-            stopService(new Intent(this, CallForegroundService.class));
-            finishAndRemoveTask();
+            if (isTest()) {
+                stopService(new Intent(this, CallForegroundService.class));
+                finishAndRemoveTask();
+                return;
+            }
+            // Stay on screen until the server has the decline: closing first
+            // let the phone (Xiaomi especially) cut the app off before the
+            // request went out, so the caller kept ringing.
+            v.setAlpha(0.5f);
+            CallActionReceiver.decline(callIntent, ok -> runOnUiThread(() -> {
+                if (!ok) {
+                    Toast.makeText(this, "Couldn't decline the call. Check your internet connection.",
+                            Toast.LENGTH_LONG).show();
+                }
+                stopService(new Intent(this, CallForegroundService.class));
+                finishAndRemoveTask();
+            }));
         });
         LinearLayout accept = roundButton("Accept", GREEN, false, v -> {
             if (handled) return;
