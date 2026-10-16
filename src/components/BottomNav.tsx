@@ -57,7 +57,10 @@ export default function BottomNav({
         aria-label="Primary"
         // Deep ChiChat green, matching the phone's own navigation strip
         // below it (painted the same green by the Android app).
-        className="fixed bottom-0 inset-x-0 z-30 pb-[env(safe-area-inset-bottom)]"
+        // Anchored to the app column it sits in (MobileFrame, or the dial
+        // pad sheet), not the browser window: on a phone that's the whole
+        // screen, on desktop it stays inside the centred card.
+        className="absolute bottom-0 inset-x-0 z-30 pb-[env(safe-area-inset-bottom)]"
         style={{ backgroundColor: "hsl(var(--brand-deep))" }}
       >
         <ul className="mx-auto max-w-[520px] flex items-center justify-around px-2 py-2">
