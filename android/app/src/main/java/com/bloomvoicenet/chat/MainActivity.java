@@ -1,6 +1,11 @@
 package com.bloomvoicenet.chat;
 
+import android.app.KeyguardManager;
+import android.content.Context;
 import android.content.Intent;
+import android.os.Build;
+import android.view.WindowManager;
+import androidx.activity.OnBackPressedCallback;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.graphics.Canvas;
@@ -24,6 +29,19 @@ public class MainActivity extends BridgeActivity {
     private static final int DEEP_GREEN = Color.rgb(14, 88, 62);        // hsl(var(--brand-deep)) as the browser renders it
     private static final int APP_BACKGROUND = Color.rgb(243, 247, 246); // --background
 
+    /**
+     * A call answered while the phone was locked shows on top of the lock
+     * screen. Back then hides the app (back to the lock screen) instead of
+     * opening chats, and when the call ends the lock screen comes back.
+     */
+    private boolean overLock = false;
+    private final OnBackPressedCallback lockedBack = new OnBackPressedCallback(false) {
+        @Override
+        public void handleOnBackPressed() {
+            moveTaskToBack(true);
+        }
+    };
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -35,6 +53,7 @@ public class MainActivity extends BridgeActivity {
         super.onCreate(savedInstanceState);
         FirebaseApp.initializeApp(this);
         applySystemBarColors();
+        getOnBackPressedDispatcher().addCallback(this, lockedBack);
         openCallFromIntent(getIntent());
         openChatFromIntent(getIntent());
     }
@@ -149,12 +168,53 @@ public class MainActivity extends BridgeActivity {
                 + "&room=" + enc(room)
                 + "&role=callee";
 
+        // Answered from the lock screen: show the call on top of it, no
+        // unlock needed (the web app hides "minimise" for such a call).
+        if (isPhoneLocked()) {
+            showOverLockScreen(true);
+            route += "&locked=1";
+        }
+
         String base = bridge.getServerUrl() != null
                 ? bridge.getServerUrl()
                 : bridge.getLocalUrl();
+        final String target = route;
 
+        // If the app is already running, move to the call inside it (fast)
+        // instead of reloading the whole app; reload only if that fails.
         WebView webView = bridge.getWebView();
-        webView.post(() -> webView.loadUrl(base + route));
+        webView.post(() -> webView.evaluateJavascript(
+                "(function(){if(window.__chichatNavigate){window.__chichatNavigate('"
+                        + target.replace("'", "%27") + "');return 'ok';}return 'no';})()",
+                result -> {
+                    if (result == null || !result.contains("ok")) webView.loadUrl(base + target);
+                }));
+    }
+
+    private boolean isPhoneLocked() {
+        KeyguardManager km = (KeyguardManager) getSystemService(Context.KEYGUARD_SERVICE);
+        return km != null && km.isKeyguardLocked();
+    }
+
+    private void showOverLockScreen(boolean on) {
+        overLock = on;
+        lockedBack.setEnabled(on);
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                setShowWhenLocked(on);
+                setTurnScreenOn(on);
+            } else {
+                int flags = WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+                        | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON;
+                if (on) getWindow().addFlags(flags);
+                else getWindow().clearFlags(flags);
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    /** The call ended (foreground service stopped): give the lock screen back. */
+    void releaseLockScreen() {
+        if (overLock) showOverLockScreen(false);
     }
 
     private static String enc(String value) {

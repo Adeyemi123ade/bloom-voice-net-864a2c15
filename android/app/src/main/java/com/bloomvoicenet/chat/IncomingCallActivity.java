@@ -310,34 +310,18 @@ public class IncomingCallActivity extends AppCompatActivity {
     }
 
     /**
-     * The call opens in the app, which can't show over a secure lock screen:
-     * ask to unlock first (PIN, fingerprint or face), then open the call.
+     * Answer at once, even with the phone locked: the call opens in the app
+     * on top of the lock screen (like WhatsApp), with no unlock needed. It
+     * used to ask for an unlock first and only answered after it; on some
+     * phones (Xiaomi) that unlock request never showed, so Accept seemed to
+     * do nothing and the caller kept ringing.
      */
     private void acceptAfterUnlock() {
         KeyguardManager km = (KeyguardManager) getSystemService(Context.KEYGUARD_SERVICE);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && km != null && km.isKeyguardLocked()) {
-            final Intent call = callIntent;
-            km.requestDismissKeyguard(this, new KeyguardManager.KeyguardDismissCallback() {
-                @Override
-                public void onDismissSucceeded() {
-                    openAcceptedCall(IncomingCallActivity.this, call);
-                    finishAndRemoveTask();
-                }
-
-                // Unlock cancelled: let Accept be tapped again.
-                @Override
-                public void onDismissCancelled() {
-                    handled = false;
-                }
-
-                @Override
-                public void onDismissError() {
-                    handled = false;
-                }
-            });
-            return;
-        }
-        openAcceptedCall(this, callIntent);
+        boolean locked = km != null && km.isKeyguardLocked();
+        Intent open = new Intent(callIntent);
+        open.putExtra("overLock", locked);
+        openAcceptedCall(this, open);
         finishAndRemoveTask();
     }
 
@@ -376,6 +360,7 @@ public class IncomingCallActivity extends AppCompatActivity {
         i.putExtra("callId", src.getStringExtra("callId"));
         i.putExtra("roomName", src.getStringExtra("roomName"));
         i.putExtra("callType", src.getStringExtra("callType"));
+        i.putExtra("overLock", src.getBooleanExtra("overLock", false));
         context.startActivity(i);
     }
 }

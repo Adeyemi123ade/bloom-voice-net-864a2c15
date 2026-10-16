@@ -36,6 +36,7 @@ import {
 import { getCallToken, prefetchCallToken } from "@/lib/callToken";
 import { markCall } from "@/lib/callTimeline";
 import { startCallForegroundService, stopCallForegroundService } from "@/lib/nativeCalls";
+import { isLockedCall } from "@/lib/lockedCall";
 import {
   FROM_CALL_BUBBLE,
   activeCallPath,
@@ -1090,7 +1091,7 @@ export default function CallSession({
           );
         })}
 
-        {status !== "ended" && (
+        {status !== "ended" && !isLockedCall(callId) && (
           <button
             type="button"
             onClick={minimize}

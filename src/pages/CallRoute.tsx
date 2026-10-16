@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { markLockedCall } from "@/lib/lockedCall";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   activeCallPath,
@@ -23,6 +24,7 @@ export default function CallRoute() {
   const roomName = params.get("room") ?? "";
   const role = (params.get("role") as "caller" | "callee") ?? "caller";
   const initialIsVideo = params.get("type") === "video";
+  if (callId && params.get("locked") === "1") markLockedCall(callId);
 
   useEffect(() => {
     if (!conversationId) return;
