@@ -286,7 +286,42 @@ const CSS = `
   .chichat-splash .legal { margin-top: 0; font-size: 13px; }
   .chichat-splash .signin button { min-height: 36px; }
   .chichat-splash .legal a { min-height: 32px; }
-}`;
+}
+/* Desktop: kept exactly as it was before the welcome page refresh, until
+   a new desktop design is decided. Everything above still applies to phones
+   and tablets; this block puts every desktop value back. */
+@media (min-width: 1024px) {
+  .chichat-splash { --tile: calc(100vh * 0.62); --overlap: 0px; }
+  .chichat-splash .track { margin-left: 0; }
+  .chichat-splash .track img {
+    margin-right: 0;
+    -webkit-mask-image: none; mask-image: none;
+    border-right: 2px solid #07090C;
+  }
+  .chichat-splash .content { width: min(520px, 100%); padding: 24px 16px; }
+  .chichat-splash .logo-icon { margin-bottom: 14px; }
+  .chichat-splash .logo-icon img {
+    width: clamp(76px, 15vh, 124px); height: clamp(76px, 15vh, 124px);
+  }
+  .chichat-splash .wordmark { font-size: clamp(28px, 6vh, 44px); margin-bottom: 10px; letter-spacing: 2.5px; }
+  .chichat-splash .tagline { font-size: clamp(10px, 1.6vh, 12px); }
+  .chichat-splash .cta-wrap { margin-bottom: 38px; }
+  .chichat-splash .cta { width: 141px; height: 42px; border-radius: 21px; font-size: 13px; }
+  .chichat-splash .signin {
+    display: block; margin-top: 10px;
+    font-size: 10px; line-height: inherit;
+    color: rgba(255,255,255,0.65); text-shadow: none;
+  }
+  .chichat-splash .signin button { min-height: 0; padding: 0; margin-left: 4px; border-radius: 0; }
+  .chichat-splash .legal {
+    margin-top: 12px; gap: 8px; column-gap: 8px;
+    font-size: 10px; line-height: inherit;
+    color: rgba(255,255,255,0.55); text-shadow: none;
+  }
+  .chichat-splash .legal a { display: inline; min-height: 0; padding: 0; color: rgba(255,255,255,0.75); border-radius: 0; }
+  .chichat-splash .legal a:hover { color: rgba(255,255,255,0.75); }
+}
+`;
 
 interface Props {
   onGetStarted?: () => void;
