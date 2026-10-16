@@ -23,3 +23,5 @@ project_id = "pnpabtxvsrkrldpfmtaz"
     verify_jwt = false
   [functions.check-google-signup]
     verify_jwt = false
+  [functions.call-action]
+    verify_jwt = false
