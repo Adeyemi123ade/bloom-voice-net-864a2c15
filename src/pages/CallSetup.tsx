@@ -10,14 +10,11 @@ import { buildCallSetupItems } from "@/lib/callSetup";
 import { getPushProblem, isCallPushReady, retryCallPush } from "@/lib/fcmRegistration";
 import { type CallStage, lastCallTimeline } from "@/lib/callTimeline";
 
+// Only the steps a person recognises; the full timings are in the log.
 const STAGE_LABELS: [CallStage, string][] = [
   ["screen", "Call screen opened"],
   ["media", "Microphone ready"],
-  ["saved", "Call saved"],
-  ["push", "Other phone alerted"],
-  ["room", "Call room ready"],
-  ["token", "Permission to join"],
-  ["joined", "Joined the call"],
+  ["push", "Their phone started ringing"],
   ["connected", "Connected"],
 ];
 
@@ -84,8 +81,37 @@ export default function CallSetup() {
     };
   }, [refresh]);
 
-  const retryPush = () => {
-    if (user) void retryCallPush(user.id).then(refresh);
+  const retryPush = async () => {
+    if (!user) return false;
+    const ok = await retryCallPush(user.id);
+    await refresh();
+    return ok;
+  };
+
+  // Which button is working, and what the last tap did, so no tap is silent.
+  const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const runAction = async (key: string, run: () => Promise<boolean>) => {
+    if (busyKey) return;
+    setBusyKey(key);
+    setNotes((n) => ({ ...n, [key]: "" }));
+    try {
+      const ok = await run();
+      // A failed Retry already shows its reason in the item's own text.
+      if (!ok && !(key === "push" && getPushProblem())) {
+        setNotes((n) => ({
+          ...n,
+          [key]:
+            key === "push"
+              ? getPushProblem() ?? "Not ready yet. Tap Try again."
+              : readiness === null
+                ? "This needs the latest version of ChiChat. Update the app, then try again."
+                : "We couldn't open this for you. Open your phone's Settings, find ChiChat, and change it there.",
+        }));
+      }
+    } finally {
+      setBusyKey(null);
+    }
   };
 
   const sendTest = async () => {
@@ -96,35 +122,25 @@ export default function CallSetup() {
     });
     setTestState("done");
     const d = data as { sent?: number; reason?: string; error?: string } | null;
+    // Server-side causes (an old send-call-push, missing FCM secret) are
+    // for us, not the person testing: they go to the log, and the page
+    // says something they can act on.
+    const unavailable = "We couldn't send a test call right now. Please try again in a few minutes.";
     if (error || !d) {
-      // An old version of the function answers "missing fields" (400).
-      const msg = error?.message ?? "";
-      setTestResult(
-        /400|non-2xx/i.test(msg)
-          ? "The send-call-push function on Supabase is an older version. Redeploy it from the repo, then try again."
-          : `The test couldn't be sent: ${msg || "unknown error"}.`,
-      );
-      return;
-    }
-    if (d.error && !d.sent) {
-      setTestResult(
-        /FCM_SERVICE_ACCOUNT_JSON/.test(d.error)
-          ? "Firebase isn't set up on the server: add the FCM_SERVICE_ACCOUNT_JSON secret in Supabase."
-          : `Firebase refused the test: ${d.error}`,
-      );
+      console.warn("[call-test] send failed", error);
+      setTestResult(unavailable);
       return;
     }
     if (!d.sent) {
+      console.warn("[call-test] nothing sent", d);
       setTestResult(
         d.reason === "no tokens"
-          ? "This phone isn't registered for calls yet (see \"Phone registered for calls\" above)."
-          : "Nothing was sent.",
+          ? "This phone isn't ready for calls yet. Fix \"Ready to receive calls\" above, then try again."
+          : unavailable,
       );
       return;
     }
-    setTestResult(
-      `Sent to ${d.sent} phone${d.sent === 1 ? "" : "s"}. If yours didn't ring, fix anything above that isn't green and test again.`,
-    );
+    setTestResult("Test call sent. If your phone didn't ring, fix anything above that isn't green, then try again.");
   };
 
   const items = native ? buildCallSetupItems(readiness, pushReady, getPushProblem(), retryPush) : [];
@@ -159,8 +175,9 @@ export default function CallSetup() {
             </p>
             {readiness === null && checked && (
               <p className="text-xs rounded-lg bg-secondary p-3 text-muted-foreground">
-                This app build can't check the phone's settings. Rebuild the app from the latest
-                code to get the full check.
+                <span className="font-semibold text-foreground">Update ChiChat to use this page.</span>{" "}
+                This version of the app can't check or change these settings. Install the latest
+                version, then come back here.
               </p>
             )}
             <ul className="flex flex-col gap-2" data-testid="call-setup-items">
@@ -191,15 +208,21 @@ export default function CallSetup() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-foreground">{i.title}</p>
                     <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{i.detail}</p>
+                    {notes[i.key] && (
+                      <p className="text-xs text-destructive mt-1 leading-relaxed" role="alert" data-testid={`note-${i.key}`}>
+                        {notes[i.key]}
+                      </p>
+                    )}
                   </div>
                   {i.action && i.status !== "ok" && (
                     <Button
                       size="sm"
                       variant={i.status === "missing" ? "default" : "outline"}
                       className="h-8 shrink-0"
-                      onClick={i.action.run}
+                      disabled={busyKey !== null}
+                      onClick={() => i.action && void runAction(i.key, i.action.run)}
                     >
-                      {i.action.label}
+                      {busyKey === i.key ? <Loader2 className="w-4 h-4 animate-spin" aria-label="Working" /> : i.action.label}
                     </Button>
                   )}
                 </li>

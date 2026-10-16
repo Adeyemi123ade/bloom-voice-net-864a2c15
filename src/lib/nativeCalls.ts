@@ -96,15 +96,18 @@ export async function getCallReadiness(): Promise<CallReadiness | null> {
 
 type SettingsPage = "lockScreen" | "autostart" | "notifications" | "fullScreen" | "app";
 
-export async function openCallSettings(page: SettingsPage): Promise<void> {
-  if (!isAndroidNative()) return;
+/** Opens that system settings page. False if it couldn't (e.g. an old app build). */
+export async function openCallSettings(page: SettingsPage): Promise<boolean> {
+  if (!isAndroidNative()) return false;
   try {
     if (page === "lockScreen") await ChiChatCalls.openLockScreenSettings();
     else if (page === "autostart") await ChiChatCalls.openAutostartSettings();
     else if (page === "notifications") await ChiChatCalls.openNotificationSettings();
     else if (page === "fullScreen") await ChiChatCalls.requestFullScreenIntentPermission();
     else await ChiChatCalls.openAppSettings();
+    return true;
   } catch (e) {
     console.warn("[chichat-calls] open settings failed", e);
+    return false;
   }
 }

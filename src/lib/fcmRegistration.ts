@@ -20,9 +20,22 @@ export function getPushProblem(): string | null {
 }
 
 /** Ask again (e.g. after the user allowed notifications in Settings). */
-export async function retryCallPush(userId: string): Promise<void> {
+export async function retryCallPush(userId: string): Promise<boolean> {
   registered = false;
+  pushReady = false;
+  lastProblem = null;
   await registerForCallPush(userId);
+  // Firebase answers through a listener: wait for it, up to 15 s.
+  for (let i = 0; i < 30 && !pushReady && !lastProblem; i++) {
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  if (!pushReady && !lastProblem) {
+    // Usually offline. If it never answers, the app was likely built
+    // without android/app/google-services.json (shown in the log only).
+    console.warn("[fcm] no registration answer within 15 s");
+    lastProblem = "We couldn't connect this phone for calls. Check you're online, then tap Try again. If it still doesn't work, update ChiChat to the latest version.";
+  }
+  return pushReady;
 }
 
 const TOKEN_KEY = "chichat:fcm-token";
@@ -55,13 +68,15 @@ export async function registerForCallPush(userId: string) {
   registered = true;
 
   try {
+    // A retry must not stack a second set of listeners on top of the first.
+    await PushNotifications.removeAllListeners();
     let perm = await PushNotifications.checkPermissions();
     if (perm.receive !== "granted") {
       perm = await PushNotifications.requestPermissions();
     }
     if (perm.receive !== "granted") {
       console.warn("[fcm] push permission denied");
-      lastProblem = "Notifications are turned off for ChiChat.";
+      lastProblem = "Notifications are off for ChiChat. Turn them on, then tap Try again.";
       registered = false;
       return;
     }
@@ -80,7 +95,7 @@ export async function registerForCallPush(userId: string) {
         // Supabase reports failures in `error` rather than throwing.
         if (error) {
           console.warn("[fcm] failed to store token", error);
-          lastProblem = `Couldn't save this phone for calls (${error.message}).`;
+          lastProblem = "We couldn't connect this phone for calls. Check you're online, then tap Try again.";
         }
         else {
           pushReady = true;
@@ -89,12 +104,13 @@ export async function registerForCallPush(userId: string) {
         }
       } catch (e) {
         console.warn("[fcm] failed to store token", e);
+        lastProblem = "We couldn't connect this phone for calls. Check you're online, then tap Try again.";
       }
     });
 
     PushNotifications.addListener("registrationError", (e) => {
       console.warn("[fcm] registration error", e);
-      lastProblem = `Firebase couldn't register this phone (${e?.error ?? "unknown error"}).`;
+      lastProblem = "We couldn't connect this phone for calls. Check you're online, then tap Try again.";
     });
 
     // Incoming data-only call push → app foregrounds, IncomingCallScreen
@@ -110,6 +126,7 @@ export async function registerForCallPush(userId: string) {
     await PushNotifications.register();
   } catch (e) {
     console.warn("[fcm] setup failed", e);
+    lastProblem = "We couldn't connect this phone for calls. Check you're online, then tap Try again.";
     registered = false;
   }
 }
