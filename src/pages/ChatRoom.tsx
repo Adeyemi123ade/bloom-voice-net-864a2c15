@@ -50,6 +50,7 @@ import {
   saveHidden,
 } from "@/lib/chat/format";
 import { useBackNavigation } from "@/hooks/useBackNavigation";
+import chatWallpaper from "@/assets/chat-wallpaper.png";
 import { messageKind, mediaLabel, parseCallLog, selectionActions, stripQuotedReply } from "@/lib/chat/messageKinds";
 import { checkClipAvailable, copyMessages, extractTypedClip, matchPastedClip, mediaUrlOf } from "@/lib/chat/clipboard";
 import { getSignedChatMediaUrl, useSignedMediaUrl } from "@/lib/signedMedia";
@@ -1464,7 +1465,16 @@ export default function ChatRoom() {
         )}
 
         {/* Messages */}
-        <div ref={scrollRef} onScroll={onMessagesScroll} className="flex-1 overflow-y-auto px-3 py-3 space-y-2">
+        {/* Faint repeating ChiChat logos behind the messages (the approved
+            wallpaper preview: 7%, 26 px logos, 88 px staggered grid). One
+            small tile; it stays put while the messages scroll over it. */}
+        <div
+          ref={scrollRef}
+          onScroll={onMessagesScroll}
+          data-testid="chat-wallpaper"
+          className="flex-1 overflow-y-auto px-3 py-3 space-y-2"
+          style={{ backgroundImage: `url(${chatWallpaper})`, backgroundSize: "176px 176px", backgroundRepeat: "repeat" }}
+        >
           {loadingOlder && !searchOpen && (
             <p className="text-2xs text-muted-foreground text-center py-1" role="status">
               Loading earlier messages…
