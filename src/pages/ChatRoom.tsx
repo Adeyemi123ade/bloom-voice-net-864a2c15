@@ -78,7 +78,8 @@ async function fetchMessageRowWithRetry(
   for (let i = 0; i < attempts; i++) {
     const { data } = await supabase.from("messages").select("*").eq("id", id).maybeSingle();
     const content = (data as Record<string, unknown> | null)?.content;
-    if (data && typeof content === "string" && content) {
+    // A message deleted for everyone is empty on purpose: that's final.
+    if (data && ((typeof content === "string" && content) || (data as Record<string, unknown>).deleted_for_everyone)) {
       return data as Record<string, unknown>;
     }
     if (i < attempts - 1) await new Promise((r) => setTimeout(r, 300 * (i + 1)));
@@ -488,7 +489,10 @@ export default function ChatRoom() {
         { event: "UPDATE", schema: "public", table: "messages", filter: `conversation_id=eq.${conversationId}` },
         async (payload) => {
           let updated = normalizeMessage(payload.new as Record<string, unknown>);
-          if (!updated.content) {
+          // Deleted for everyone: its content is emptied on purpose, so apply
+          // it straight away. (Treating that as a half-arrived update made
+          // the other person keep seeing the message until a refresh.)
+          if (!updated.content && !updated.deleted_for_everyone) {
             console.warn("[realtime] UPDATE payload arrived with blank content, retrying fetch", updated.id);
             const data = await fetchMessageRowWithRetry(updated.id);
             if (data) updated = normalizeMessage(data);

@@ -197,8 +197,9 @@ const TARGETS: Target[] = [
     icon: IconTelegram,
     open: (text, url) =>
       openWithFallback(
-        `tg://msg_url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`,
-        `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`,
+        // Telegram adds the link itself: leave it out of the text.
+        `tg://msg_url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(withoutLink(text, url))}`,
+        `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(withoutLink(text, url))}`,
       ),
   },
   {
@@ -261,7 +262,7 @@ export function ShareInviteCard() {
 
   /** Try native chooser first; if unavailable, open our in-app chooser sheet. */
   const share = async () => {
-    const shared = await openNativeShare(SHARE_TEXT, link);
+    const shared = await openNativeShare(SHARE_TEXT);
     if (!shared) setChooserOpen(true);
   };
 
@@ -336,15 +337,22 @@ export function ShareInviteCard() {
  *  Returns true when the OS share sheet was shown; false to let the caller
  *  navigate to the dedicated /invite screen (which has the in-app chooser). */
 export async function shareChichatInvite(personalNote?: string) {
-  const text = personalNote ? `${personalNote}\n\n${SHARE_TEXT}` : SHARE_TEXT;
-  return openNativeShare(text, APP_INVITE_LINK);
+  // One message with the link once: the personal note already has it, so it
+  // replaces the standard text rather than being added on top of it.
+  return openNativeShare(personalNote ?? SHARE_TEXT);
 }
 
-async function openNativeShare(text: string, url: string) {
+// The text already contains the link. Passing it again as `url` made apps
+// (WhatsApp, SMS) show it twice, so only the text is shared.
+function withoutLink(text: string, url: string) {
+  return text.split(url).join("").replace(/\s+(Download here:|here:)?\s*$/i, "").replace(/\s{2,}/g, " ").trim();
+}
+
+async function openNativeShare(text: string) {
   if (isNativePlatform()) {
     try {
       const { Share } = await import("@capacitor/share");
-      await Share.share({ title: "Chichat", text, url, dialogTitle: "Send invite with" });
+      await Share.share({ title: "Chichat", text, dialogTitle: "Send invite with" });
       return true;
     } catch {
       return false;
@@ -356,7 +364,7 @@ async function openNativeShare(text: string, url: string) {
   };
   if (nav.share) {
     try {
-      const data = { title: "Chichat", text, url };
+      const data = { title: "Chichat", text };
       if (nav.canShare && !nav.canShare(data)) return false;
       await nav.share(data);
       return true;
