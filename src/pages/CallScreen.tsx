@@ -177,6 +177,11 @@ export default function CallSession({
       return;
     }
     if (nextStatus === "ended") {
+      // The other person hung up: the caller records how the call went.
+      if (role === "caller") {
+        if (connectedRef.current) void logCallMessage("ended", secondsRef.current);
+        else void logCallMessage("rejected", 0);
+      }
       cleanupAndExit();
     }
   };
@@ -515,11 +520,21 @@ export default function CallSession({
    *  - declined    → receiver side, callee declined
    *  - received    → receiver side, callee picked up
    */
+  /**
+   * One call record per call, written by the caller only (both people see
+   * it, each from their own side: "Voice call · 3 mins" / "Missed voice
+   * call"). Calls used to leave two or three records: "Received call"
+   * from the person answering, "Call ended" from whoever hung up, and both
+   * a "rejected" and a "declined" for one rejected call.
+   */
+  const callLogged = useRef(false);
   const logCallMessage = async (
     kind: "ended" | "missed" | "no_answer" | "declined" | "rejected" | "received",
     duration: number,
   ) => {
     if (!user || !conversationId) return;
+    if (role !== "caller" || callLogged.current) return;
+    callLogged.current = true;
     try {
       await supabase.from("messages").insert({
         conversation_id: conversationId,
@@ -530,8 +545,10 @@ export default function CallSession({
   };
 
   const endCall = async () => {
-    const wasConnected = status === "connected";
-    const dur = seconds;
+    // Refs, not state: endCall also runs from event handlers set up when the
+    // call connected, where `status` and `seconds` are old copies.
+    const wasConnected = connectedRef.current || status === "connected";
+    const dur = secondsRef.current;
     setStatus("ended");
     try {
       localAudioRef.current?.stop();
@@ -563,10 +580,9 @@ export default function CallSession({
       // as a missed call there).
       pushCallCancelled(callId, "cancelled");
       void logCallMessage("no_answer", 0);
-    } else {
-      // Receiver hung up before connecting (decline)
-      void logCallMessage("declined", 0);
     }
+    // (The person called hanging up before it connected: the caller sees
+    // the call ended and records it as declined.)
     cleanupAndExit();
   };
 
@@ -673,8 +689,6 @@ export default function CallSession({
         localAudioRef.current?.disable();
         localVideoRef.current?.disable();
       }
-      // Receiver logs that the call was received successfully (caller logs "ended" on hangup).
-      if (role === "callee") void logCallMessage("received", 0);
 
       room.participants.forEach(handleParticipant);
       room.on("participantConnected", (p: RemoteParticipant) => {

@@ -63,6 +63,103 @@ export function mediaLabel(content: string): string {
   return "";
 }
 
+/** 40 → "40 secs", 75 → "1 min", 190 → "3 mins", 3900 → "1 hr 5 mins". */
+export function callDuration(seconds: number): string {
+  const s = Math.max(0, Math.round(seconds));
+  if (s < 60) return `${s} sec${s === 1 ? "" : "s"}`;
+  const totalMin = Math.round(s / 60);
+  if (totalMin < 60) return `${totalMin} min${totalMin === 1 ? "" : "s"}`;
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return m ? `${h} hr ${m} min${m === 1 ? "" : "s"}` : `${h} hr`;
+}
+
+export type CallView = {
+  callType: "voice" | "video";
+  /** "Voice call", "Video call", "Missed voice call", "Call failed". */
+  title: string;
+  /** "3 mins", "No answer", "Declined", "Tap to call back"; null shows nothing. */
+  detail: string | null;
+  tone: "normal" | "missed" | "failed";
+  /** This person made the call. */
+  outgoing: boolean;
+};
+
+/**
+ * How a call record reads for the person looking at it. `mine` = they
+ * wrote the record. Records are written by the caller (one per call);
+ * older chats also hold records from the person called ("received",
+ * "declined"), which read from that side.
+ */
+export function describeCall(content: string, mine: boolean): CallView | null {
+  const call = parseCallLog(content);
+  if (!call) return null;
+  const isVideo = call.callType === "video";
+  const type = isVideo ? "Video call" : "Voice call";
+  // A "declined" record was written by the person called.
+  const outgoing = call.kind === "declined" || call.kind === "received" ? !mine : mine;
+  const base = { callType: call.callType, outgoing };
+  switch (call.kind) {
+    case "no_answer":
+    case "missed":
+      return outgoing
+        ? { ...base, title: type, detail: "No answer", tone: "normal" }
+        : { ...base, title: isVideo ? "Missed video call" : "Missed voice call", detail: "Tap to call back", tone: "missed" };
+    case "rejected":
+    case "declined":
+      return { ...base, title: type, detail: "Declined", tone: "normal" };
+    case "failed":
+      return { ...base, title: "Call failed", detail: "Try again", tone: "failed" };
+    default:
+      // "ended" (and anything older): the length, or nothing when it never really started.
+      return { ...base, title: type, detail: call.duration > 0 ? callDuration(call.duration) : null, tone: "normal" };
+  }
+}
+
+type CallRecordLike = { id: string; content: string; created_at: string; sender_id: string };
+
+/**
+ * Older chats hold two or three records per call. These ids repeat a call
+ * already shown and are hidden: "Received call" records, a "declined"
+ * written next to the caller's "rejected", and the second "ended" when both
+ * people logged the end of the same call. A duplicate is always the OTHER
+ * person's record of the same moment, so two real calls in a row stay.
+ */
+export function duplicateCallRecordIds(messages: CallRecordLike[]): Set<string> {
+  const hide = new Set<string>();
+  const calls = messages
+    .map((m) => ({ m, call: parseCallLog(m.content), t: Date.parse(m.created_at) || 0 }))
+    .filter((x) => x.call);
+  calls.forEach((x, i) => {
+    const kind = x.call!.kind;
+    if (kind === "received") {
+      hide.add(x.m.id);
+      return;
+    }
+    if (kind === "declined") {
+      if (calls.some((y) => y.call!.kind === "rejected" && y.m.sender_id !== x.m.sender_id && Math.abs(y.t - x.t) <= 60_000)) hide.add(x.m.id);
+      return;
+    }
+    if (kind === "ended") {
+      for (let j = i - 1; j >= 0; j--) {
+        const y = calls[j];
+        if (x.t - y.t > 15_000) break;
+        if (hide.has(y.m.id)) continue;
+        if (
+          y.call!.kind === "ended" &&
+          y.m.sender_id !== x.m.sender_id &&
+          y.call!.callType === x.call!.callType &&
+          Math.abs(y.call!.duration - x.call!.duration) <= 5
+        ) {
+          hide.add(x.m.id);
+          break;
+        }
+      }
+    }
+  });
+  return hide;
+}
+
 export type Preview = {
   kind: "text" | "voice" | "file" | "call";
   text: string;
@@ -77,18 +174,11 @@ export function buildPreview(content: string | null, senderId: string | null, my
   if (!content) return { kind: "text", text: "" };
   const call = parseCallLog(content);
   if (call) {
-    const isVideo = call.callType === "video";
-    const outgoing = senderId === myId;
-    const missed = (call.kind === "missed" || call.kind === "no_answer") && !outgoing;
-    const declined = call.kind === "declined" || call.kind === "rejected";
-    let label: string;
-    if (missed) label = isVideo ? "Missed video call" : "Missed call";
-    else if (call.duration > 0) {
-      const m = Math.floor(call.duration / 60);
-      label = `${m}:${String(call.duration % 60).padStart(2, "0")}`;
-    } else if (declined) label = outgoing ? "Call declined" : "Declined call";
-    else label = isVideo ? "Video call" : "Voice call";
-    return { kind: "call", text: label, callType: call.callType, callKind: call.kind, missed, outgoing };
+    // Same wording as the call record in the chat.
+    const v = describeCall(content, senderId === myId)!;
+    const missed = v.tone === "missed";
+    const text = missed || v.tone === "failed" ? v.title : v.detail ?? v.title;
+    return { kind: "call", text, callType: call.callType, callKind: call.kind, missed, outgoing: v.outgoing };
   }
   const kind = messageKind(content);
   if (kind === "voice") return { kind: "voice", text: "Voice note" };

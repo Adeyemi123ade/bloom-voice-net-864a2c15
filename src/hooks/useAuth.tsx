@@ -1,6 +1,7 @@
 import { createContext, ReactNode, useContext, useEffect, useState } from "react";
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { clearChatCaches } from "@/lib/chat/chatCache";
 
 interface AuthState {
   session: Session | null;
@@ -29,6 +30,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       resolved = true;
       setState({ session, user: session?.user ?? null, loading: false });
       if (event === "SIGNED_OUT") {
+        // Saved chats on this device go with the account.
+        clearChatCaches();
         // Wipe per-user device-verified / recovery-pending flags so next
         // sign-in re-checks the gate instead of inheriting stale state.
         try {
