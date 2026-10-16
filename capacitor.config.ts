@@ -9,7 +9,12 @@ const config: CapacitorConfig = {
   // changes to the Android code itself (android/) need a new APK. Remove this
   // block to go back to a frozen copy of the web app inside the APK.
   server: {
-    url: "https://chichatapp.com",
+    // Must be the address the site is really served from. Vercel redirects
+    // chichatapp.com to www.chichatapp.com (308), and Capacitor connects the
+    // Android side (plugins: calls, push, settings, system bars) only to the
+    // exact address set here, so with the bare domain every native feature
+    // silently failed after the redirect.
+    url: "https://www.chichatapp.com",
     cleartext: false,
     // Keep both addresses inside the app (if one redirects to the other,
     // the app must not jump out to the phone's browser).
