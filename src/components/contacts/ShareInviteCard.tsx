@@ -2,10 +2,9 @@ import { useState } from "react";
 import { Copy, Share2, X, Mail, MessageSquare, Link as LinkIcon } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import chichatLogo from "@/assets/chichat-logo.png";
-import { APP_INVITE_LINK } from "./contactsHelpers";
 import { isNativePlatform } from "@/lib/deviceContacts";
-
-const SHARE_TEXT = `Hi! I'm inviting you to use Chichat — high-quality voice & video calls and messaging. Download here: ${APP_INVITE_LINK}`;
+import { useInviteLink } from "@/hooks/useInviteLink";
+import { inviteShareText } from "@/lib/invite";
 
 /* -------------------------------------------------------------------------- */
 /* Brand icons (inline SVGs so they render without external assets)            */
@@ -248,7 +247,8 @@ const TARGETS: Target[] = [
 /* -------------------------------------------------------------------------- */
 
 export function ShareInviteCard() {
-  const link = APP_INVITE_LINK;
+  const link = useInviteLink();
+  const SHARE_TEXT = inviteShareText(link);
   const [chooserOpen, setChooserOpen] = useState(false);
 
   const copy = async () => {
@@ -331,10 +331,10 @@ export function ShareInviteCard() {
 /** Programmatic invite trigger — used by the Contacts list "Invite" button.
  *  Returns true when the OS share sheet was shown; false to let the caller
  *  navigate to the dedicated /invite screen (which has the in-app chooser). */
-export async function shareChichatInvite(personalNote?: string) {
+export async function shareChichatInvite(message: string) {
   // One message with the link once: the personal note already has it, so it
   // replaces the standard text rather than being added on top of it.
-  return openNativeShare(personalNote ?? SHARE_TEXT);
+  return openNativeShare(message);
 }
 
 // The text already contains the link. Passing it again as `url` made apps

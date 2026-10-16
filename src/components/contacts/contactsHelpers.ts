@@ -37,8 +37,8 @@ export function initials(name?: string | null) {
     .toUpperCase();
 }
 
-export function inviteMessage(name: string) {
-  return `Hey ${name}, I've been using Chichat for high-quality calls and messages. Join me here so we can call for free: ${APP_INVITE_LINK} Download now!`;
+export function inviteMessage(name: string, link: string = APP_INVITE_LINK) {
+  return `Hey ${name}, I've been using Chichat for high-quality calls and messages. Join me here so we can call for free: ${link} Download now!`;
 }
 
 export function mergeContacts(a: DeviceContact[], b: DeviceContact[]): DeviceContact[] {
