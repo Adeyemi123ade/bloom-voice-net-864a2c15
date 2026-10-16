@@ -10,14 +10,11 @@ import { buildCallSetupItems } from "@/lib/callSetup";
 import { getPushProblem, isCallPushReady, retryCallPush } from "@/lib/fcmRegistration";
 import { type CallStage, lastCallTimeline } from "@/lib/callTimeline";
 
+// Only the steps a person recognises; the full timings are in the log.
 const STAGE_LABELS: [CallStage, string][] = [
   ["screen", "Call screen opened"],
   ["media", "Microphone ready"],
-  ["saved", "Call saved"],
-  ["push", "Other phone alerted"],
-  ["room", "Call room ready"],
-  ["token", "Permission to join"],
-  ["joined", "Joined the call"],
+  ["push", "Their phone started ringing"],
   ["connected", "Connected"],
 ];
 
@@ -106,10 +103,10 @@ export default function CallSetup() {
           ...n,
           [key]:
             key === "push"
-              ? getPushProblem() ?? "Still not registered."
+              ? getPushProblem() ?? "Not ready yet. Tap Try again."
               : readiness === null
-                ? "Couldn't open this setting: the ChiChat app on this phone is an old version. Install the latest build, then try again."
-                : "Couldn't open this setting automatically. Open it from the phone's Settings app instead.",
+                ? "This needs the latest version of ChiChat. Update the app, then try again."
+                : "We couldn't open this for you. Open your phone's Settings, find ChiChat, and change it there.",
         }));
       }
     } finally {
@@ -125,35 +122,25 @@ export default function CallSetup() {
     });
     setTestState("done");
     const d = data as { sent?: number; reason?: string; error?: string } | null;
+    // Server-side causes (an old send-call-push, missing FCM secret) are
+    // for us, not the person testing: they go to the log, and the page
+    // says something they can act on.
+    const unavailable = "We couldn't send a test call right now. Please try again in a few minutes.";
     if (error || !d) {
-      // An old version of the function answers "missing fields" (400).
-      const msg = error?.message ?? "";
-      setTestResult(
-        /400|non-2xx/i.test(msg)
-          ? "The send-call-push function on Supabase is an older version. Redeploy it from the repo, then try again."
-          : `The test couldn't be sent: ${msg || "unknown error"}.`,
-      );
-      return;
-    }
-    if (d.error && !d.sent) {
-      setTestResult(
-        /FCM_SERVICE_ACCOUNT_JSON/.test(d.error)
-          ? "Firebase isn't set up on the server: add the FCM_SERVICE_ACCOUNT_JSON secret in Supabase."
-          : `Firebase refused the test: ${d.error}`,
-      );
+      console.warn("[call-test] send failed", error);
+      setTestResult(unavailable);
       return;
     }
     if (!d.sent) {
+      console.warn("[call-test] nothing sent", d);
       setTestResult(
         d.reason === "no tokens"
-          ? "This phone isn't registered for calls yet (see \"Phone registered for calls\" above)."
-          : "Nothing was sent.",
+          ? "This phone isn't ready for calls yet. Fix \"Ready to receive calls\" above, then try again."
+          : unavailable,
       );
       return;
     }
-    setTestResult(
-      `Sent to ${d.sent} phone${d.sent === 1 ? "" : "s"}. If yours didn't ring, fix anything above that isn't green and test again.`,
-    );
+    setTestResult("Test call sent. If your phone didn't ring, fix anything above that isn't green, then try again.");
   };
 
   const items = native ? buildCallSetupItems(readiness, pushReady, getPushProblem(), retryPush) : [];
@@ -188,9 +175,9 @@ export default function CallSetup() {
             </p>
             {readiness === null && checked && (
               <p className="text-xs rounded-lg bg-secondary p-3 text-muted-foreground">
-                <span className="font-semibold text-foreground">The ChiChat app on this phone is an old version.</span>{" "}
-                It can't check or open these settings, so the buttons below can't work yet. Install
-                the latest build, then come back here.
+                <span className="font-semibold text-foreground">Update ChiChat to use this page.</span>{" "}
+                This version of the app can't check or change these settings. Install the latest
+                version, then come back here.
               </p>
             )}
             <ul className="flex flex-col gap-2" data-testid="call-setup-items">

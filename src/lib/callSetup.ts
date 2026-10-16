@@ -33,18 +33,18 @@ export function buildCallSetupItems(
   });
   items.push({
     key: "push",
-    title: "Phone registered for calls",
+    title: "Ready to receive calls",
     detail: pushReady
-      ? "ChiChat can wake this phone when someone calls."
-      : pushProblem ?? "Still registering. Tap Retry if this doesn't turn green.",
+      ? "ChiChat can ring this phone even when the app is closed."
+      : pushProblem ?? "Setting up. If this doesn't turn green, tap Try again.",
     status: pushReady ? "ok" : "missing",
-    action: pushReady ? undefined : { label: "Retry", run: onRetryPush },
+    action: pushReady ? undefined : { label: "Try again", run: onRetryPush },
   });
   if (r?.callChannel === false) {
     items.push({
       key: "channel",
-      title: "Incoming call notifications on",
-      detail: "The \"Incoming calls\" notification category is switched off.",
+      title: "Call notifications on",
+      detail: "Call notifications are switched off. Tap Open and turn on \"Incoming calls\".",
       status: "missing",
       action: { label: "Open", run: () => openCallSettings("notifications") },
     });
@@ -53,7 +53,7 @@ export function buildCallSetupItems(
     items.push({
       key: "fullScreen",
       title: "Full-screen calls",
-      detail: "Lets an incoming call light up the screen, like a phone call.",
+      detail: "Lets a call fill the screen, like a normal phone call.",
       status: s(r?.fullScreen),
       action: { label: "Allow", run: () => openCallSettings("fullScreen") },
     });
@@ -62,21 +62,21 @@ export function buildCallSetupItems(
     items.push({
       key: "lockScreen",
       title: "Show on lock screen",
-      detail: "Xiaomi: Other permissions → Show on Lock screen → Allow.",
+      detail: "Tap Open, then Other permissions → Show on Lock screen → Allow.",
       status: s(r.lockScreen),
       action: { label: "Open", run: () => openCallSettings("lockScreen") },
     });
     items.push({
       key: "popups",
-      title: "Pop-up windows in background",
-      detail: "Xiaomi: Other permissions → Display pop-up windows while running in the background → Allow.",
+      title: "Show calls over other apps",
+      detail: "Tap Open, then Other permissions → Display pop-up windows while running in the background → Allow.",
       status: s(r.backgroundPopups),
       action: { label: "Open", run: () => openCallSettings("lockScreen") },
     });
     items.push({
       key: "autostart",
       title: "Autostart",
-      detail: "Xiaomi: turn on Autostart for ChiChat, or calls can't reach it after you swipe it away. The phone doesn't let apps read this one, so check it yourself.",
+      detail: "Turn on Autostart for ChiChat so calls still reach you after you close the app. Your phone doesn't show us this one, so please check it.",
       status: "check",
       action: { label: "Open", run: () => openCallSettings("autostart") },
     });
@@ -85,8 +85,8 @@ export function buildCallSetupItems(
     key: "battery",
     title: "Battery: No restrictions",
     detail: r?.xiaomi
-      ? "Xiaomi: App info → Battery saver → No restrictions."
-      : "App info → Battery → Unrestricted.",
+      ? "So your phone doesn't pause ChiChat. Tap Open, then Battery saver → No restrictions."
+      : "So your phone doesn't pause ChiChat. Tap Open, then Battery → Unrestricted.",
     status: s(r?.battery),
     action: { label: "Open", run: () => openCallSettings("app") },
   });
