@@ -34,7 +34,7 @@ public class CallActionReceiver extends BroadcastReceiver {
 
     /**
      * Decline from the lock screen or the notification: tell the server, so
-     * the caller's phone stops ringing at once. Tries twice, carries
+     * the caller's phone stops ringing at once. Tries three times, carries
      * Supabase's public key (actionKey), and reports back when finished so
      * the caller of this method can keep the app alive until then.
      */
@@ -51,7 +51,7 @@ public class CallActionReceiver extends BroadcastReceiver {
             "\",\"token\":\"" + esc(intent.getStringExtra("actionToken")) + "\"}";
         new Thread(() -> {
             boolean ok = false;
-            for (int attempt = 0; attempt < 2 && !ok; attempt++) {
+            for (int attempt = 0; attempt < 3 && !ok; attempt++) {
                 try {
                     HttpURLConnection c = (HttpURLConnection) new URL(actionUrl).openConnection();
                     c.setConnectTimeout(4000);
@@ -71,7 +71,7 @@ public class CallActionReceiver extends BroadcastReceiver {
                 } catch (Exception e) {
                     Log.w("ChiChatCalls", "decline failed", e);
                 }
-                if (!ok && attempt == 0) {
+                if (!ok && attempt < 2) {
                     try { Thread.sleep(1000); } catch (InterruptedException ignored) { break; }
                 }
             }

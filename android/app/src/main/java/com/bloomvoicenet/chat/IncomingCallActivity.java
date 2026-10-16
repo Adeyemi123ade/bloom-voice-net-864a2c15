@@ -23,7 +23,6 @@ import android.view.WindowManager;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.Toast;
 import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.drawable.RoundedBitmapDrawable;
@@ -298,11 +297,9 @@ public class IncomingCallActivity extends AppCompatActivity {
             // let the phone (Xiaomi especially) cut the app off before the
             // request went out, so the caller kept ringing.
             v.setAlpha(0.5f);
+            // No message either way: if the server can't be reached, the
+            // caller's own 45-second limit ends the call on their side.
             CallActionReceiver.decline(callIntent, ok -> runOnUiThread(() -> {
-                if (!ok) {
-                    Toast.makeText(this, "Couldn't decline the call. Check your internet connection.",
-                            Toast.LENGTH_LONG).show();
-                }
                 stopService(new Intent(this, CallForegroundService.class));
                 finishAndRemoveTask();
             }));
