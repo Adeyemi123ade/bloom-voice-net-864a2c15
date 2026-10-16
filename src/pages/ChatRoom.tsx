@@ -112,6 +112,9 @@ async function reconcileBlankRows(rows: Record<string, unknown>[]): Promise<Mess
   return fixed;
 }
 
+/** Messages loaded at a time: the latest page on open, older pages on scroll up. */
+const PAGE_SIZE = 50;
+
 function normalizeMessage(raw: Record<string, unknown>): Message {
   return {
     id: String(raw.id),
@@ -227,51 +230,167 @@ export default function ChatRoom() {
     if (conversationId) setHidden(loadHidden(conversationId));
   }, [conversationId]);
 
+  // ── Message history, a page at a time ──────────────────────────────────
+  // Opening a chat loads only its latest PAGE_SIZE messages; scrolling to
+  // the top loads the next older page. Search and Clear chat need the whole
+  // history, so they load the rest first (loadAllMessages).
+  const [hasOlder, setHasOlder] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const hasOlderRef = useRef(false);
+  const loadingOlderRef = useRef(false);
+  const messagesRef = useRef<Message[]>([]);
+  messagesRef.current = messages;
+  // Distance from the bottom to restore after older messages are added above.
+  const keepBottomOffset = useRef<number | null>(null);
+  const setOlder = (v: boolean) => {
+    hasOlderRef.current = v;
+    setHasOlder(v);
+  };
+  /** Oldest loaded message's time (server rows only, not unsent ones). */
+  const oldestLoadedAt = () => messagesRef.current.find((m) => !m.id.startsWith("tmp-"))?.created_at ?? null;
+
   useEffect(() => {
     if (!user || !conversationId) return;
-    (async () => {
+    let cancelled = false;
+    setOlder(false);
+    // The other person's profile and the messages load at the same time.
+    void (async () => {
       const { data: parts } = await supabase
         .from("conversation_participants")
         .select("user_id")
         .eq("conversation_id", conversationId)
         .neq("user_id", user.id);
       const otherId = parts?.[0]?.user_id;
-      if (otherId) {
-        const { data: prof } = await supabase
-          .from("profiles")
-          .select("id, display_name, avatar_url, is_online, last_seen_at, show_last_seen")
-          .eq("id", otherId)
-          .maybeSingle();
-        if (prof) setOther(prof as Profile);
-      }
+      if (!otherId) return;
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("id, display_name, avatar_url, is_online, last_seen_at, show_last_seen")
+        .eq("id", otherId)
+        .maybeSingle();
+      if (prof && !cancelled) setOther(prof as Profile);
+    })();
+    void (async () => {
       const { data: msgs } = await supabase
         .from("messages")
         .select("*")
         .eq("conversation_id", conversationId)
-        .order("created_at", { ascending: true });
-      setMessages(await reconcileBlankRows(msgs ?? []));
+        .order("created_at", { ascending: false })
+        .limit(PAGE_SIZE);
+      const rows = (msgs ?? []).slice().reverse();
+      const fixed = await reconcileBlankRows(rows);
+      if (cancelled) return;
+      setOlder(rows.length === PAGE_SIZE);
+      setMessages(fixed);
     })();
+    // Opening the chat reads all of it, including messages older than the
+    // page shown, so the chat list badge clears completely.
+    void markConversationRead();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, conversationId]);
+
+  /** Older messages than those loaded: one page, or all of them. */
+  const fetchOlder = async (all: boolean): Promise<Message[]> => {
+    const oldest = oldestLoadedAt();
+    let q = supabase.from("messages").select("*").eq("conversation_id", conversationId!);
+    if (oldest) q = q.lte("created_at", oldest);
+    const { data } = all
+      ? await q.order("created_at", { ascending: true })
+      : await q.order("created_at", { ascending: false }).limit(PAGE_SIZE + 1);
+    const rows = all ? data ?? [] : (data ?? []).slice().reverse();
+    // lte so messages sharing the oldest time aren't skipped; drop the ones
+    // already shown.
+    const have = new Set(messagesRef.current.map((m) => m.id));
+    const fresh = rows.filter((r) => !have.has(String(r.id)));
+    if (all || rows.length <= PAGE_SIZE) setOlder(false);
+    return reconcileBlankRows(fresh);
+  };
+
+  const prepend = (older: Message[]) => {
+    if (older.length === 0) return;
+    const el = scrollRef.current;
+    if (el) keepBottomOffset.current = el.scrollHeight - el.scrollTop;
+    setMessages((prev) => {
+      const have = new Set(prev.map((m) => m.id));
+      return [...older.filter((m) => !have.has(m.id)), ...prev];
+    });
+  };
+
+  const loadOlderMessages = async () => {
+    if (!conversationId || !hasOlderRef.current || loadingOlderRef.current) return;
+    loadingOlderRef.current = true;
+    setLoadingOlder(true);
+    try {
+      prepend(await fetchOlder(false));
+    } finally {
+      loadingOlderRef.current = false;
+      setLoadingOlder(false);
+    }
+  };
+
+  /** The whole history (for search and Clear chat). Returns every message. */
+  const loadAllMessages = async (): Promise<Message[]> => {
+    if (!conversationId) return messagesRef.current;
+    if (hasOlderRef.current) {
+      const older = await fetchOlder(true);
+      const have = new Set(messagesRef.current.map((m) => m.id));
+      const all = [...older.filter((m) => !have.has(m.id)), ...messagesRef.current];
+      prepend(older);
+      return all;
+    }
+    return messagesRef.current;
+  };
+
+  // Keep the same messages in view when older ones are added above them.
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (!el || keepBottomOffset.current === null) return;
+    el.scrollTop = el.scrollHeight - keepBottomOffset.current;
+    keepBottomOffset.current = null;
+  }, [messages]);
+
+  // Near the top: load the previous page. Also when the first page is too
+  // short to scroll at all.
+  const onMessagesScroll = () => {
+    const el = scrollRef.current;
+    if (el && el.scrollTop < 160) void loadOlderMessages();
+  };
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el && hasOlder && el.scrollHeight <= el.clientHeight + 40) void loadOlderMessages();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasOlder, messages.length]);
+
+  /** Delivered + read for every incoming message of this chat, in one request each. */
+  const markConversationRead = async () => {
+    if (!user || !conversationId) return;
+    const now = new Date().toISOString();
+    await Promise.all([
+      supabase
+        .from("messages")
+        .update({ delivered_at: now })
+        .eq("conversation_id", conversationId)
+        .neq("sender_id", user.id)
+        .is("delivered_at", null),
+      supabase
+        .from("messages")
+        .update({ read_at: now })
+        .eq("conversation_id", conversationId)
+        .neq("sender_id", user.id)
+        .is("read_at", null),
+    ]);
+  };
 
   useEffect(() => {
     if (!user || !conversationId) return;
-    // Mark incoming messages as delivered as soon as we receive them on this device.
-    const undelivered = messages.filter((m) => m.sender_id !== user.id && !m.delivered_at);
-    if (undelivered.length > 0) {
-      supabase
-        .from("messages")
-        .update({ delivered_at: new Date().toISOString() })
-        .in("id", undelivered.map((m) => m.id))
-        .then(() => {});
-    }
-    // Mark them read while the chat is open.
-    const unread = messages.filter((m) => m.sender_id !== user.id && !m.read_at);
-    if (unread.length === 0) return;
-    supabase
-      .from("messages")
-      .update({ read_at: new Date().toISOString() })
-      .in("id", unread.map((m) => m.id))
-      .then(() => {});
+    // New incoming messages while the chat is open: mark delivered and read.
+    const pending = messages.some(
+      (m) => m.sender_id !== user.id && !m.id.startsWith("tmp-") && (!m.delivered_at || !m.read_at),
+    );
+    if (pending) void markConversationRead();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages, user, conversationId]);
 
   useEffect(() => {
@@ -284,13 +403,19 @@ export default function ChatRoom() {
     // for messages today, unlike the calling flow's polling safety net).
     // In-flight optimistic sends (tmp- ids not yet echoed back by the
     // server) are preserved as-is; everything else defers to server state.
+    // Only the range already on screen is fetched again (not the whole
+    // history), and focus + visibility firing together count once.
+    let lastResync = 0;
     const resync = async () => {
-      const { data } = await supabase
-        .from("messages")
-        .select("*")
-        .eq("conversation_id", conversationId)
-        .order("created_at", { ascending: true });
+      if (Date.now() - lastResync < 2000) return;
+      lastResync = Date.now();
+      const oldest = oldestLoadedAt();
+      let q = supabase.from("messages").select("*").eq("conversation_id", conversationId);
+      if (oldest) q = q.gte("created_at", oldest);
+      else q = q.order("created_at", { ascending: false }).limit(PAGE_SIZE);
+      const { data } = oldest ? await q.order("created_at", { ascending: true }) : await q;
       if (!data) return;
+      if (!oldest) data.reverse();
       const fresh = await reconcileBlankRows(data);
       const freshIds = new Set(fresh.map((m) => m.id));
       setMessages((prev) => {
@@ -1148,10 +1273,16 @@ export default function ChatRoom() {
       (m) => !m.deleted_for_everyone && m.content.toLowerCase().includes(q),
     );
   }, [visible, searchQuery]);
-  const clearChat = () => {
+  const clearChat = async () => {
     setClearChatOpen(false);
-    deleteForMe(messages);
+    // Hide the whole history, including messages not loaded yet.
+    deleteForMe(await loadAllMessages());
   };
+  // Search looks through the whole chat, so load the rest of it.
+  useEffect(() => {
+    if (searchOpen) void loadAllMessages();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchOpen]);
 
   // Which actions to offer is worked out from the types of everything
   // selected, and recalculated whenever an item is added or removed.
@@ -1333,7 +1464,12 @@ export default function ChatRoom() {
         )}
 
         {/* Messages */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-3 space-y-2">
+        <div ref={scrollRef} onScroll={onMessagesScroll} className="flex-1 overflow-y-auto px-3 py-3 space-y-2">
+          {loadingOlder && !searchOpen && (
+            <p className="text-2xs text-muted-foreground text-center py-1" role="status">
+              Loading earlier messages…
+            </p>
+          )}
           {searchOpen && searchQuery.trim() && searchResults.length === 0 && (
             <p className="text-xs text-muted-foreground text-center mt-6">No matches</p>
           )}
