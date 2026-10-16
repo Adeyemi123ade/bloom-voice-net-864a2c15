@@ -334,6 +334,9 @@ Deno.serve(async (req) => {
         roomName: String(roomName ?? ""),
         actionUrl,
         actionToken,
+        // Public key Supabase asks for on every function request; without
+        // it the lock-screen Decline was refused before reaching call-action.
+        actionKey: Deno.env.get("SUPABASE_ANON_KEY") ?? "",
       },
       "45s",
     );
