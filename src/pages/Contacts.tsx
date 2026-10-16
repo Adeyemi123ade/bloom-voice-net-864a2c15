@@ -16,6 +16,7 @@ import MobileFrame from "@/components/MobileFrame";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
+import { useInviteLink } from "@/hooks/useInviteLink";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { activeCallPath, getActiveCall } from "@/lib/activeCall";
@@ -55,6 +56,7 @@ import { beginOutgoingCall } from "@/lib/callStart";
 export default function Contacts() {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
+  const myInviteLink = useInviteLink();
 
   const [contacts, setContacts] = useState<DeviceContact[]>([]);
   const [matched, setMatched] = useState<Map<string, MatchedUser>>(new Map());
@@ -477,7 +479,7 @@ export default function Contacts() {
    *  If the browser blocks/lacks share + popup, fall back to the /invite page. */
   const inviteContact = async (c: InviteContact) => {
     try {
-      const sent = await shareChichatInvite(inviteMessage(c.name));
+      const sent = await shareChichatInvite(inviteMessage(c.name, myInviteLink));
       if (sent) {
         await recordInvite(c);
         return;
