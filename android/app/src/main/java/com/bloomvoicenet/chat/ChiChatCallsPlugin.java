@@ -43,6 +43,13 @@ public class ChiChatCallsPlugin extends Plugin {
         try {
             getContext().stopService(new Intent(getContext(), CallForegroundService.class));
         } catch (Throwable ignored) {}
+        // A call answered on the lock screen: the lock screen comes back now.
+        try {
+            if (getActivity() instanceof MainActivity) {
+                MainActivity a = (MainActivity) getActivity();
+                a.runOnUiThread(a::releaseLockScreen);
+            }
+        } catch (Throwable ignored) {}
         call.resolve();
     }
 

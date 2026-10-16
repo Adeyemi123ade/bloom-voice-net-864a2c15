@@ -15,7 +15,8 @@ const PLAY_STORE_LIVE = false;
 const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.bloomvoicenet.chat";
 const SITE = "https://www.chichatapp.com";
 const LOGO = `${SITE}/chichat-logo.png`;
-const CARD_IMAGE = `${SITE}/invite-card.png`;
+// The link card in chat apps shows the big ChiChat logo (owner's choice).
+const CARD_IMAGE = `${SITE}/chichat-logo.png?v=20261013`;
 
 /** Letters only (any language), apostrophes, dots and hyphens, up to 30. */
 function cleanName(raw) {
@@ -47,7 +48,7 @@ const icon = (name, size) =>
 function page(name, path) {
   const who = name ? esc(name) : "A friend";
   const title = `${who} invited you to ChiChat`;
-  const description = "Free voice & video calls, messaging, and more. Tap to join.";
+  const description = "Chichat Connect is a mobile-first secondary telecommunication app for audio and video calls.";
   const findStep = name ? `Find ${who} and say hi` : "Find your friend and say hi";
   const mainButton = PLAY_STORE_LIVE
     ? `<a class="btn primary" href="${PLAY_STORE_URL}">${icon("download", 20)}Download for Android</a>
@@ -68,9 +69,9 @@ function page(name, path) {
 <meta property="og:description" content="${description}">
 <meta property="og:url" content="${SITE}${esc(path)}">
 <meta property="og:image" content="${CARD_IMAGE}">
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="ChiChat invite">
+<meta property="og:image:width" content="512">
+<meta property="og:image:height" content="512">
+<meta property="og:image:alt" content="ChiChat logo">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${title}">
 <meta name="twitter:description" content="${description}">

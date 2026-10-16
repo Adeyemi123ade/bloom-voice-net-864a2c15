@@ -38,6 +38,7 @@ import ErrorBoundary from "./components/ErrorBoundary.tsx";
 import BackButtonGuard from "./components/BackButtonGuard.tsx";
 import GoogleOAuthReturnListener from "./components/GoogleOAuthReturnListener.tsx";
 import ActiveCallHost from "./components/call/ActiveCallHost.tsx";
+import NativeNavigateBridge from "./components/NativeNavigateBridge.tsx";
 
 const queryClient = new QueryClient();
 
@@ -50,6 +51,7 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <GoogleOAuthReturnListener />
+            <NativeNavigateBridge />
             <DeviceGate>
               <BackButtonGuard />
               <MessageNotifier />
