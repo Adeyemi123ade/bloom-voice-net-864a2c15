@@ -31,11 +31,6 @@ export default function InviteFriends() {
 
         <div className="flex-1 overflow-y-auto pt-4">
           <ShareInviteCard />
-          <p className="px-5 mt-4 text-xs text-muted-foreground leading-relaxed">
-            Tap <span className="font-semibold text-foreground">Share</span> to choose any
-            app on your phone — WhatsApp, SMS, Gmail and more. Your friend gets the
-            invite message together with the link to download Chichat.
-          </p>
         </div>
       </div>
     </MobileFrame>

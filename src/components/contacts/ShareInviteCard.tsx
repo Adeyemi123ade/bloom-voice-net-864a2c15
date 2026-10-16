@@ -314,11 +314,6 @@ export function ShareInviteCard() {
             <Share2 className="w-4 h-4" />
             Send invite
           </button>
-
-          <p className="text-xs text-muted-foreground text-center leading-relaxed">
-            Pick any app — WhatsApp, Messenger, Instagram, Gmail and more. Your friend
-            gets the message along with the download link.
-          </p>
         </div>
       </div>
 
