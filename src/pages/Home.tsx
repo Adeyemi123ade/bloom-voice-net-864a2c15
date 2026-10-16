@@ -17,7 +17,16 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { buildPreview } from "@/lib/chat/messageKinds";
-import { CALL_PREFIX } from "@/lib/chat/format";
+import {
+  type ChatRow as ChatListRow,
+  type MessageLike,
+  applyNewMessage,
+  applyProfile,
+  loadChatList,
+  loadChatSummary,
+  sortChats,
+  updateMatters,
+} from "@/lib/chat/chatList";
 import Dialpad from "@/components/Dialpad";
 import CallSetupBanner from "@/components/CallSetupBanner";
 
@@ -30,15 +39,7 @@ type Profile = {
   show_last_seen?: boolean | null;
 };
 
-type ChatRow = {
-  conversation_id: string;
-  other: Profile;
-  last_message: string | null;
-  last_sender_id: string | null;
-  last_message_at: string;
-  /** Messages from the other person you haven't read yet (call records excluded). */
-  unread: number;
-};
+type ChatRow = ChatListRow;
 
 function timeAgo(iso: string) {
   const d = new Date(iso);
@@ -131,119 +132,113 @@ export default function Home() {
     };
   }, [user]);
 
-  // Realtime can fire several reloads back to back; only the newest one may
-  // write state, so a slower earlier reload can't bring back a cleared badge.
+  // Full reloads are rare now (first open, a new chat, coming back to the
+  // app); only the newest one may write state, so a slower earlier reload
+  // can't bring back a cleared badge.
   const loadSeq = useRef(0);
+  const chatsRef = useRef<ChatRow[]>([]);
+  chatsRef.current = chats;
   const loadChats = async () => {
     if (!user) return;
     const seq = ++loadSeq.current;
-    setFetching(true);
-    const { data: parts } = await supabase
-      .from("conversation_participants")
-      .select("conversation_id")
-      .eq("user_id", user.id);
-    const convIds = (parts ?? []).map((p) => p.conversation_id);
-    if (convIds.length === 0) {
-      setChats([]);
-      setFetching(false);
-      return;
-    }
-    const { data: convs } = await supabase
-      .from("conversations")
-      .select("id, last_message_at")
-      .in("id", convIds)
-      .order("last_message_at", { ascending: false });
-
-    const { data: others } = await supabase
-      .from("conversation_participants")
-      .select("conversation_id, user_id")
-      .in("conversation_id", convIds)
-      .neq("user_id", user.id);
-
-    const otherIds = Array.from(new Set((others ?? []).map((o) => o.user_id)));
-    const { data: profiles } = await supabase
-      .from("profiles")
-      .select("id, display_name, avatar_url, is_online, last_seen_at, show_last_seen")
-      .in("id", otherIds.length ? otherIds : ["00000000-0000-0000-0000-000000000000"]);
-
-    const { data: lastMsgs } = await supabase
-      .from("messages")
-      .select("conversation_id, content, created_at, sender_id")
-      .in("conversation_id", convIds)
-      .order("created_at", { ascending: false });
-
-    const lastByConv = new Map<string, { content: string; created_at: string; sender_id: string }>();
-    (lastMsgs ?? []).forEach((m) => {
-      if (!lastByConv.has(m.conversation_id))
-        lastByConv.set(m.conversation_id, { content: m.content, created_at: m.created_at, sender_id: m.sender_id });
-    });
-
-    // Unread = messages from the other person with no read_at yet. read_at
-    // is the same field the read ticks use, set by ChatRoom when the chat is
-    // opened, so counts survive refreshes and are per user. Call records
-    // aren't counted: they're call history, not messages.
-    const { data: unreadRows } = await supabase
-      .from("messages")
-      .select("conversation_id")
-      .in("conversation_id", convIds)
-      .neq("sender_id", user.id)
-      .is("read_at", null)
-      .not("deleted_for_everyone", "is", true)
-      .not("content", "like", `${CALL_PREFIX}%`);
-    const unreadByConv = new Map<string, number>();
-    (unreadRows ?? []).forEach((r) =>
-      unreadByConv.set(r.conversation_id, (unreadByConv.get(r.conversation_id) ?? 0) + 1),
-    );
-
-    const profById = new Map((profiles ?? []).map((p) => [p.id, p as Profile]));
-    const otherByConv = new Map<string, string>();
-    (others ?? []).forEach((o) => otherByConv.set(o.conversation_id, o.user_id));
-
-    const rows: ChatRow[] = (convs ?? [])
-      .map((c) => {
-        const otherId = otherByConv.get(c.id);
-        const other = otherId ? profById.get(otherId) : undefined;
-        if (!other) return null;
-        const lm = lastByConv.get(c.id);
-        return {
-          conversation_id: c.id,
-          other,
-          last_message: lm?.content ?? null,
-          last_sender_id: lm?.sender_id ?? null,
-          last_message_at: lm?.created_at ?? c.last_message_at,
-          unread: unreadByConv.get(c.id) ?? 0,
-        };
-      })
-      .filter(Boolean) as ChatRow[];
-
+    const rows = await loadChatList(user.id);
     if (seq !== loadSeq.current) return;
     setChats(rows);
     setFetching(false);
   };
+  // Bursts (several messages arriving together) collapse into one reload.
+  const reloadTimer = useRef<number | null>(null);
+  const scheduleReload = () => {
+    if (reloadTimer.current) window.clearTimeout(reloadTimer.current);
+    reloadTimer.current = window.setTimeout(() => {
+      reloadTimer.current = null;
+      void loadChats();
+    }, 300);
+  };
+  // One chat's preview and badge, refreshed after an edit, delete or read.
+  // Marking a chat read updates many messages at once: one refresh per chat.
+  const refreshTimers = useRef(new Map<string, number>());
+  const scheduleChatRefresh = (conversationId: string) => {
+    const timers = refreshTimers.current;
+    const t = timers.get(conversationId);
+    if (t) window.clearTimeout(t);
+    timers.set(
+      conversationId,
+      window.setTimeout(async () => {
+        timers.delete(conversationId);
+        if (!user) return;
+        const seq = loadSeq.current;
+        const summary = await loadChatSummary(conversationId, user.id);
+        if (seq !== loadSeq.current) return; // a full reload replaced the list meanwhile
+        setChats((prev) =>
+          sortChats(
+            prev.map((r) =>
+              r.conversation_id === conversationId
+                ? { ...r, ...summary, last_message_at: summary.last_message_at ?? r.last_message_at }
+                : r,
+            ),
+          ),
+        );
+      }, 250),
+    );
+  };
 
   useEffect(() => {
     if (user) loadChats();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  // Realtime: refresh on new messages or profile presence changes
+  // Realtime: each change updates only the chat it belongs to. A presence
+  // heartbeat (every contact, every 30 s) used to reload the whole list;
+  // now it just updates that person's online dot.
   useEffect(() => {
     if (!user) return;
+    let joinedBefore = false;
     const channel = supabase
       .channel("home-realtime")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, () =>
-        loadChats(),
-      )
-      // read_at being set (on this or another device) clears a badge.
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "messages" }, () =>
-        loadChats(),
-      )
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "profiles" }, () =>
-        loadChats(),
-      )
-      .subscribe();
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => {
+        const m = payload.new as MessageLike;
+        if (!m?.conversation_id) return scheduleReload();
+        const next = applyNewMessage(chatsRef.current, m, user.id);
+        if (next === null) scheduleReload(); // a chat that isn't listed yet
+        else setChats(next);
+      })
+      // Read (here or on another device), edited or deleted for everyone.
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "messages" }, (payload) => {
+        const m = payload.new as MessageLike;
+        if (!m?.conversation_id) return;
+        if (updateMatters(chatsRef.current, m, user.id)) scheduleChatRefresh(m.conversation_id);
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "profiles" }, (payload) => {
+        const p = payload.new as { id?: string };
+        if (p?.id) setChats((prev) => applyProfile(prev, p as { id: string }));
+      })
+      .subscribe((status) => {
+        // A rejoin after a dropped connection may have missed changes.
+        if (status === "SUBSCRIBED") {
+          if (joinedBefore) scheduleReload();
+          joinedBefore = true;
+        }
+      });
+    // Back from the background, or the network came back: catch up once.
+    let hiddenAt = 0;
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") hiddenAt = Date.now();
+      else if (hiddenAt && Date.now() - hiddenAt > 15000) scheduleReload();
+    };
+    const onOnline = () => scheduleReload();
+    const refreshes = refreshTimers.current;
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("online", onOnline);
     return () => {
       supabase.removeChannel(channel);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("online", onOnline);
+      if (reloadTimer.current) window.clearTimeout(reloadTimer.current);
+      refreshes.forEach((t) => window.clearTimeout(t));
+      refreshes.clear();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   const loadPeople = async (search?: string) => {
@@ -378,7 +373,7 @@ export default function Home() {
 
         {/* List */}
         <div className="flex-1 overflow-y-auto px-2 pb-4">
-          {fetching && (
+          {fetching && chats.length === 0 && (
             <p className="text-xs text-muted-foreground text-center mt-6">Loading…</p>
           )}
           {!fetching && filtered.length === 0 && (
