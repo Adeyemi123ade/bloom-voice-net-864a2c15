@@ -6,9 +6,6 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
-import android.media.AudioAttributes;
-import android.media.RingtoneManager;
-import android.net.Uri;
 import android.os.Build;
 import android.os.PowerManager;
 import androidx.core.app.NotificationCompat;
@@ -16,7 +13,11 @@ import androidx.core.app.Person;
 import java.util.Map;
 
 public class CallNotificationHelper {
-    static final String CHANNEL_ID = "incoming_calls_fullscreen_v2";
+    // Silent channel: CallRinger plays the tone chosen in ChiChat (the old
+    // channel played the phone's own ringtone, and a channel's sound can't
+    // be changed once created, so it's replaced).
+    static final String CHANNEL_ID = "incoming_calls_v3";
+    private static final String OLD_CHANNEL_ID = "incoming_calls_fullscreen_v2";
     static final String ACTION_ACCEPT = "com.bloomvoicenet.chat.ACCEPT_CALL";
     static final String ACTION_DECLINE = "com.bloomvoicenet.chat.DECLINE_CALL";
     static final String MISSED_CHANNEL_ID = "missed_calls";
@@ -92,18 +93,15 @@ public class CallNotificationHelper {
             // ringing call (correct ranking, screen-wake, lock-screen UI).
             .setStyle(NotificationCompat.CallStyle.forIncomingCall(caller, declinePi, acceptPi));
 
-        // On older Android (< 8) sound/vibration come from the notification itself.
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-            builder.setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE))
-                .setVibrate(new long[] {0, 700, 350, 700, 1000, 700});
-        }
-
         Notification notification = builder.build();
         // Keep ringing (like a phone) until answered, declined, cancelled by
         // the caller, or the 45 s timeout above, instead of playing once.
         notification.flags |= Notification.FLAG_INSISTENT;
         NotificationManager nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         nm.notify(id, notification);
+        // The ringtone chosen in ChiChat (or ChiChat's default), until the
+        // call is answered, declined, cancelled or times out.
+        RingService.ring(context, id, notification);
     }
 
     /**
@@ -155,6 +153,7 @@ public class CallNotificationHelper {
     }
 
     static void cancel(Context context, String callId) {
+        RingService.silence(context);
         NotificationManager nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         nm.cancel(notificationId(callId));
     }
@@ -162,6 +161,7 @@ public class CallNotificationHelper {
     static void createChannel(Context context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
         NotificationManager nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+        if (nm.getNotificationChannel(OLD_CHANNEL_ID) != null) nm.deleteNotificationChannel(OLD_CHANNEL_ID);
         if (nm.getNotificationChannel(CHANNEL_ID) != null) return;
         NotificationChannel ch = new NotificationChannel(
             CHANNEL_ID, "Incoming calls", NotificationManager.IMPORTANCE_HIGH);
@@ -171,12 +171,7 @@ public class CallNotificationHelper {
         ch.setVibrationPattern(new long[] {0, 700, 350, 700, 1000, 700});
         ch.setBypassDnd(true);
         ch.setShowBadge(true);
-        Uri sound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
-        AudioAttributes attrs = new AudioAttributes.Builder()
-            .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
-            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-            .build();
-        ch.setSound(sound, attrs);
+        ch.setSound(null, null);
         nm.createNotificationChannel(ch);
     }
 

@@ -614,3 +614,65 @@ export function playRingtone(id: RingtoneId, maxSeconds?: number): StopFn {
 
   return stop;
 }
+
+/** 16-bit mono WAV file from rendered samples. */
+function encodeWav(samples: Float32Array, sampleRate: number): Blob {
+  const buffer = new ArrayBuffer(44 + samples.length * 2);
+  const v = new DataView(buffer);
+  const text = (o: number, s: string) => [...s].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+  text(0, "RIFF");
+  v.setUint32(4, 36 + samples.length * 2, true);
+  text(8, "WAVE");
+  text(12, "fmt ");
+  v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true);
+  v.setUint16(22, 1, true);
+  v.setUint32(24, sampleRate, true);
+  v.setUint32(28, sampleRate * 2, true);
+  v.setUint16(32, 2, true);
+  v.setUint16(34, 16, true);
+  text(36, "data");
+  v.setUint32(40, samples.length * 2, true);
+  for (let i = 0; i < samples.length; i++) {
+    const s = Math.max(-1, Math.min(1, samples[i]));
+    v.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+  }
+  return new Blob([buffer], { type: "audio/wav" });
+}
+
+/**
+ * One cycle of a built-in ringtone as a WAV file, so the phone app can ring
+ * with it (looped) while ChiChat is closed or the phone is locked.
+ */
+export async function renderRingtoneWav(id: BuiltInRingtoneId): Promise<Blob> {
+  const pattern = PATTERNS[id] ?? PATTERNS[DEFAULT_RINGTONE];
+  const sampleRate = 44100;
+  const ctx = new OfflineAudioContext(1, Math.ceil(pattern.cycle * sampleRate), sampleRate);
+  const master = ctx.createGain();
+  master.gain.value = 0.9;
+  master.connect(ctx.destination);
+  pattern.render(ctx as unknown as AudioContext, master, 0.02);
+  const rendered = await ctx.startRendering();
+  const samples = rendered.getChannelData(0);
+  // As loud as a phone ringtone: bring the loudest point up to 90%.
+  let peak = 0;
+  for (let i = 0; i < samples.length; i++) peak = Math.max(peak, Math.abs(samples[i]));
+  if (peak > 0) {
+    const gain = 0.9 / peak;
+    for (let i = 0; i < samples.length; i++) samples[i] *= gain;
+  }
+  return encodeWav(samples, sampleRate);
+}
+
+/** The audio file of the selected ringtone (null: the saved file is gone). */
+export async function selectedRingtoneFile(): Promise<{ blob: Blob; ext: string; key: string } | null> {
+  const id = getSelectedRingtone();
+  if (id.startsWith("custom:")) {
+    const meta = getCustomRingtone();
+    const blob = await dbGet().catch(() => null);
+    if (!meta || !blob) return null;
+    const ext = (meta.name.includes(".") ? meta.name.split(".").pop() : "") || "audio";
+    return { blob, ext: ext.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 5) || "audio", key: `custom:${meta.savedAt}` };
+  }
+  return { blob: await renderRingtoneWav(id as BuiltInRingtoneId), ext: "wav", key: id };
+}
