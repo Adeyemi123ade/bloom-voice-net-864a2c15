@@ -26,6 +26,7 @@ import VerifyResetCode from "./pages/VerifyResetCode.tsx";
 import VerifyDevice from "./pages/VerifyDevice.tsx";
 import GoogleReturn from "./pages/GoogleReturn.tsx";
 import OutboundCall from "./pages/OutboundCall.tsx";
+import BlockedPeople from "./pages/BlockedPeople.tsx";
 import NewContact from "./pages/NewContact.tsx";
 import InviteFriends from "./pages/InviteFriends.tsx";
 import MicTest from "./pages/MicTest.tsx";
@@ -75,6 +76,7 @@ const App = () => (
                   <Route path="/settings/phone" element={<PhoneSettings />} />
                   <Route path="/settings/backup" element={<ChatBackup />} />
                   <Route path="/settings/app" element={<AppSettings />} />
+                  <Route path="/settings/blocked" element={<BlockedPeople />} />
                   <Route path="/forgot-password" element={<ForgotPassword />} />
                   <Route path="/verify-reset-code" element={<VerifyResetCode />} />
                   <Route path="/reset-password" element={<ResetPassword />} />

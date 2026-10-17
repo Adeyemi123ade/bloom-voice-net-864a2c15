@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { loadCachedContacts, loadManualContacts } from "@/lib/deviceContacts";
 import { formatDisplay } from "@/lib/phone";
 import { initials, timeAgo } from "@/lib/chat/format";
+import { Ban, Flag } from "lucide-react";
 
 type Contact = {
   id: string;
@@ -19,10 +20,16 @@ export default function ContactInfoSheet({
   open,
   onOpenChange,
   contact,
+  blocked,
+  onBlock,
+  onReport,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   contact: Contact;
+  blocked?: boolean;
+  onBlock?: () => void;
+  onReport?: () => void;
 }) {
   const [phone, setPhone] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -56,6 +63,9 @@ export default function ContactInfoSheet({
   if (!contact) return null;
 
   const online = contact.is_online && contact.show_last_seen !== false;
+  // No last seen when it's hidden or unknown (e.g. this person blocked you).
+  const hasLastSeen = contact.show_last_seen !== false && new Date(contact.last_seen_at).getTime() > 0;
+  const name = contact.display_name ?? "this person";
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -71,11 +81,13 @@ export default function ContactInfoSheet({
             </AvatarFallback>
           </Avatar>
           <p className="text-lg font-semibold text-foreground mt-3">
-            {contact.display_name ?? "Unknown"}
+            {contact.display_name ?? "ChiChat user"}
           </p>
-          <p className="text-xs text-muted-foreground mt-1">
-            {online ? "online" : `last seen ${timeAgo(contact.last_seen_at)}`}
-          </p>
+          {(online || hasLastSeen) && (
+            <p className="text-xs text-muted-foreground mt-1">
+              {online ? "online" : `last seen ${timeAgo(contact.last_seen_at)}`}
+            </p>
+          )}
         </div>
 
         <div className="space-y-1">
@@ -91,6 +103,27 @@ export default function ContactInfoSheet({
             )}
           </div>
         </div>
+
+        {(onBlock || onReport) && (
+          <div className="mt-6 space-y-1">
+            {onBlock && (
+              <button
+                onClick={onBlock}
+                className="w-full flex items-center gap-3 px-3 py-3 rounded-lg bg-card text-sm text-destructive"
+              >
+                <Ban className="w-4 h-4" /> {blocked ? `Unblock ${name}` : `Block ${name}`}
+              </button>
+            )}
+            {onReport && (
+              <button
+                onClick={onReport}
+                className="w-full flex items-center gap-3 px-3 py-3 rounded-lg bg-card text-sm text-destructive"
+              >
+                <Flag className="w-4 h-4" /> Report {name}
+              </button>
+            )}
+          </div>
+        )}
       </SheetContent>
     </Sheet>
   );

@@ -433,6 +433,10 @@ export default function CallSession({
         cleanupAndExit({ keepRoom: true });
         return;
       }
+      if (savedCall.result === "blocked") {
+        fail("Call not available", "You can't call this person right now.");
+        return;
+      }
       if (savedCall.result === "error") {
         fail("Could not start call", "Please check your connection and try again.");
         return;
