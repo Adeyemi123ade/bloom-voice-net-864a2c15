@@ -1,4 +1,4 @@
-import { Mic, MicOff, Volume2, VolumeX, Video, VideoOff, PhoneOff, SwitchCamera, VideoIcon, Pause, Play } from "lucide-react";
+import { Mic, MicOff, Volume2, VolumeX, Video, VideoOff, PhoneOff, SwitchCamera, VideoIcon, Pause, Play, MessageCircle } from "lucide-react";
 
 type Props = {
   muted: boolean;
@@ -12,6 +12,8 @@ type Props = {
   onSwitchCamera: () => void;
   onUpgradeToVideo: () => void;
   onEndCall: () => void;
+  /** Opens the chat with this person; the call carries on. Hidden when not given. */
+  onOpenChat?: () => void;
   /** Shown when another call is waiting or on hold, or this call is on hold. */
   showHold?: boolean;
   held?: boolean;
@@ -30,6 +32,7 @@ export default function CallControls({
   onSwitchCamera,
   onUpgradeToVideo,
   onEndCall,
+  onOpenChat,
   showHold = false,
   held = false,
   onToggleHold,
@@ -96,9 +99,22 @@ export default function CallControls({
         >
           <SwitchCamera className="w-5 h-5" />
         </button>
+
+        {onOpenChat && (
+          <button
+            onClick={onOpenChat}
+            className="w-12 h-12 rounded-full flex items-center justify-center active:scale-90 transition-transform bg-secondary text-foreground hover:bg-secondary/80"
+            aria-label="Open chat"
+            title="Chat"
+          >
+            <MessageCircle className="w-5 h-5" />
+          </button>
+        )}
       </div>
 
-      <div className="mt-5 flex gap-3">
+      {/* End call is half the width (same shape); next to Hold, the two
+          share the row. */}
+      <div className={`mt-5 flex gap-3 ${showHold ? "" : "w-1/2 mx-auto"}`}>
         {showHold && (
           <button
             onClick={onToggleHold}

@@ -1399,6 +1399,9 @@ export default function CallSession({
           onSwitchCamera={switchCamera}
           onUpgradeToVideo={upgradeToVideo}
           onEndCall={endCall}
+          // Straight to the chat with this person; the call keeps going
+          // (bubble and chat strip lead back). Not over the lock screen.
+          onOpenChat={isLockedCall(callId) ? undefined : () => navigate(`/chat/${conversationId}`, { replace: true })}
           showHold={showHold && status !== "ended"}
           held={held}
           onToggleHold={() => setCallHeld(callId, !held)}
