@@ -64,6 +64,42 @@ Deno.serve(async (req) => {
       }
     };
 
+    // ── Files this user uploaded (photos, voice notes, videos, documents,
+    //    profile photo, backups). Removed completely, first, while the
+    //    user id is still known. Each bucket keeps a user's files under a
+    //    folder named after their id, with sub-folders per chat.
+    const removeFolder = async (bucket: string, prefix: string): Promise<number> => {
+      let removed = 0;
+      for (let round = 0; round < 50; round++) {
+        const { data: items, error } = await admin.storage
+          .from(bucket)
+          .list(prefix, { limit: 1000, offset: 0 });
+        if (error) throw new Error(error.message);
+        if (!items || items.length === 0) break;
+        const files: string[] = [];
+        for (const it of items) {
+          const full = `${prefix}/${it.name}`;
+          // Folders come back without an id; walk into them.
+          if (!it.id) removed += await removeFolder(bucket, full);
+          else files.push(full);
+        }
+        if (files.length === 0) break;
+        for (let i = 0; i < files.length; i += 100) {
+          const { error: rmErr } = await admin.storage.from(bucket).remove(files.slice(i, i + 100));
+          if (rmErr) throw new Error(rmErr.message);
+        }
+        removed += files.length;
+      }
+      return removed;
+    };
+    for (const bucket of ["chat-media", "avatars", "backup-media"]) {
+      try {
+        await removeFolder(bucket, userId);
+      } catch (e) {
+        failures.push(`storage_${bucket}: ${(e as Error).message ?? String(e)}`);
+      }
+    }
+
     // ── App data owned by this user ───────────────────────────────────────
     await safe("chat_backups", admin.from("chat_backups").delete().eq("user_id", userId));
     await safe("device_push_tokens", admin.from("device_push_tokens").delete().eq("user_id", userId));
