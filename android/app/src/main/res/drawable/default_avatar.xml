@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ChiChat's default avatar (same picture as src/assets/default-avatar.svg). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="96dp"
+    android:height="96dp"
+    android:viewportWidth="96"
+    android:viewportHeight="96">
+    <path android:fillColor="#DDF1E8" android:pathData="M0,0h96v96h-96z" />
+    <path android:fillColor="#7FC5A8" android:pathData="M48,21a17,17 0,1 1,0 34a17,17 0,1 1,0 -34z" />
+    <path android:fillColor="#7FC5A8" android:pathData="M14,92C17,73 31,62 48,62C65,62 79,73 82,92Z" />
+</vector>

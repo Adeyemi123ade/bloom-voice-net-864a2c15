@@ -128,15 +128,6 @@ public class IncomingCallActivity extends AppCompatActivity {
         return Math.round(v * getResources().getDisplayMetrics().density);
     }
 
-    private static String initials(String name) {
-        if (name == null || name.trim().isEmpty()) return "?";
-        String[] parts = name.trim().split("\\s+");
-        StringBuilder b = new StringBuilder();
-        for (int i = 0; i < parts.length && b.length() < 2; i++) {
-            if (!parts[i].isEmpty()) b.append(Character.toUpperCase(parts[i].charAt(0)));
-        }
-        return b.toString();
-    }
 
     private View ring(int size) {
         View v = new View(this);
@@ -239,13 +230,18 @@ public class IncomingCallActivity extends AppCompatActivity {
         circle.setColor(AVATAR_BG);
         circle.setStroke(dp(4), Color.argb(90, 15, 127, 92));
         avatar.setBackground(circle);
-        TextView letters = new TextView(this);
-        letters.setText(initials(caller));
-        letters.setTextColor(TEXT);
-        letters.setTextSize(40);
-        letters.setTypeface(Typeface.DEFAULT_BOLD);
-        letters.setGravity(Gravity.CENTER);
-        avatar.addView(letters, new FrameLayout.LayoutParams(-1, -1));
+        // No photo: ChiChat's default avatar picture (the photo covers it).
+        avatar.setClipToOutline(true);
+        avatar.setOutlineProvider(new android.view.ViewOutlineProvider() {
+            @Override
+            public void getOutline(View v, android.graphics.Outline o) {
+                o.setOval(0, 0, v.getWidth(), v.getHeight());
+            }
+        });
+        ImageView placeholder = new ImageView(this);
+        placeholder.setImageResource(R.drawable.default_avatar);
+        placeholder.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        avatar.addView(placeholder, new FrameLayout.LayoutParams(-1, -1));
         ImageView photo = new ImageView(this);
         photo.setScaleType(ImageView.ScaleType.CENTER_CROP);
         photo.setVisibility(View.GONE);
@@ -338,7 +334,7 @@ public class IncomingCallActivity extends AppCompatActivity {
         finishAndRemoveTask();
     }
 
-    /** Caller's profile photo, if they have one; the initials stay otherwise. */
+    /** Caller's profile photo, if they have one; the default avatar stays otherwise. */
     private void loadPhoto(String url, ImageView into) {
         if (url == null || url.isEmpty() || !url.startsWith("https://")) return;
         new Thread(() -> {
@@ -360,7 +356,7 @@ public class IncomingCallActivity extends AppCompatActivity {
                     into.setVisibility(View.VISIBLE);
                 });
             } catch (Throwable ignored) {
-                // Keep the initials.
+                // Keep the default avatar.
             }
         }).start();
     }

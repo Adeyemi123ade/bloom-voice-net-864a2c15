@@ -59,30 +59,152 @@ export const RINGTONES: RingtonePreset[] = [
 ];
 
 const STORAGE_KEY = "chichat:ringtone";
-const CUSTOM_KEY = "chichat:ringtone:custom"; // { name, dataUrl }
+const CUSTOM_KEY = "chichat:ringtone:custom"; // details only: { name, size, type, savedAt }
 export const DEFAULT_RINGTONE: BuiltInRingtoneId = "melody-marimba";
 
-export type CustomRingtone = { name: string; dataUrl: string };
+/** Largest audio file accepted as a ringtone. */
+export const MAX_CUSTOM_RINGTONE_BYTES = 50 * 1024 * 1024;
+
+/**
+ * The user's own ringtone. Its details live in localStorage; the audio itself
+ * lives in IndexedDB, which (unlike localStorage, a few MB at most) can hold
+ * files up to MAX_CUSTOM_RINGTONE_BYTES.
+ */
+export type CustomRingtone = { name: string; size: number; type: string; savedAt: number };
+
+const DB_NAME = "chichat-ringtones";
+const DB_STORE = "files";
+const DB_KEY = "custom";
+
+function openDb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore(DB_STORE);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function dbPut(blob: Blob): Promise<void> {
+  const db = await openDb();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(DB_STORE, "readwrite");
+    tx.objectStore(DB_STORE).put(blob, DB_KEY);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+  db.close();
+}
+
+async function dbGet(): Promise<Blob | null> {
+  const db = await openDb();
+  const blob = await new Promise<Blob | null>((resolve, reject) => {
+    const req = db.transaction(DB_STORE, "readonly").objectStore(DB_STORE).get(DB_KEY);
+    req.onsuccess = () => resolve((req.result as Blob | undefined) ?? null);
+    req.onerror = () => reject(req.error);
+  });
+  db.close();
+  return blob;
+}
+
+async function dbDelete(): Promise<void> {
+  const db = await openDb();
+  await new Promise<void>((resolve) => {
+    const tx = db.transaction(DB_STORE, "readwrite");
+    tx.objectStore(DB_STORE).delete(DB_KEY);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => resolve();
+  });
+  db.close();
+}
 
 export function getCustomRingtone(): CustomRingtone | null {
   try {
     const raw = localStorage.getItem(CUSTOM_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (parsed?.name && parsed?.dataUrl) return parsed;
+    if (parsed?.name && typeof parsed?.size === "number") return parsed as CustomRingtone;
   } catch {
     /* ignore */
   }
   return null;
 }
 
-export function setCustomRingtone(c: CustomRingtone | null) {
+/** Saves the user's audio file as their ringtone (replacing any earlier one). */
+export async function saveCustomRingtone(file: File): Promise<CustomRingtone> {
+  await dbPut(file);
+  const meta: CustomRingtone = {
+    name: file.name,
+    size: file.size,
+    type: file.type || "audio",
+    savedAt: Date.now(),
+  };
+  localStorage.setItem(CUSTOM_KEY, JSON.stringify(meta));
+  forgetCachedUrl();
+  return meta;
+}
+
+export async function removeCustomRingtone(): Promise<void> {
   try {
-    if (c) localStorage.setItem(CUSTOM_KEY, JSON.stringify(c));
-    else localStorage.removeItem(CUSTOM_KEY);
+    localStorage.removeItem(CUSTOM_KEY);
   } catch {
     /* ignore */
   }
+  forgetCachedUrl();
+  await dbDelete().catch(() => {});
+}
+
+/** Whether the saved audio is still on this device. */
+export async function hasCustomRingtoneFile(): Promise<boolean> {
+  try {
+    return !!(await dbGet());
+  } catch {
+    return false;
+  }
+}
+
+let cachedUrl: string | null = null;
+function forgetCachedUrl() {
+  if (cachedUrl) URL.revokeObjectURL(cachedUrl);
+  cachedUrl = null;
+}
+
+/** A playable address for the saved audio, kept ready so a call rings at once. */
+export async function loadCustomRingtoneUrl(): Promise<string | null> {
+  if (cachedUrl) return cachedUrl;
+  try {
+    const blob = await dbGet();
+    if (!blob) return null;
+    cachedUrl = URL.createObjectURL(blob);
+    return cachedUrl;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Ringtones picked before files moved to IndexedDB were saved inside
+ * localStorage as text ({ name, dataUrl }). Move such a file once.
+ */
+async function migrateOldCustomRingtone() {
+  try {
+    const raw = localStorage.getItem(CUSTOM_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.dataUrl || !parsed?.name) return;
+    const blob = await (await fetch(parsed.dataUrl)).blob();
+    await dbPut(blob);
+    const meta: CustomRingtone = { name: parsed.name, size: blob.size, type: blob.type || "audio", savedAt: Date.now() };
+    localStorage.setItem(CUSTOM_KEY, JSON.stringify(meta));
+  } catch {
+    /* keep the old copy; nothing else depends on it */
+  }
+}
+
+if (typeof window !== "undefined" && typeof indexedDB !== "undefined") {
+  void migrateOldCustomRingtone().then(() => {
+    if (getCustomRingtone()) void loadCustomRingtoneUrl();
+  });
 }
 
 export function getSelectedRingtone(): RingtoneId {
@@ -404,30 +526,39 @@ const PATTERNS: Record<BuiltInRingtoneId, Pattern> = {
 
 /** Plays a custom (user-uploaded) ringtone via HTMLAudioElement, looping. */
 function playCustom(maxSeconds?: number): StopFn {
-  const c = getCustomRingtone();
-  if (!c) return () => {};
-  const audio = new Audio(c.dataUrl);
-  audio.loop = true;
-  audio.volume = 0.9;
+  if (!getCustomRingtone()) return playRingtone(DEFAULT_RINGTONE, maxSeconds);
   let stopped = false;
-  audio.play().catch(() => {
-    /* autoplay may fail before priming */
-  });
+  let audio: HTMLAudioElement | null = null;
+  let fallbackStop: StopFn | null = null;
   let autoStop: number | undefined;
-  if (maxSeconds && maxSeconds > 0) {
-    autoStop = window.setTimeout(() => stop(), maxSeconds * 1000);
-  }
   const stop = () => {
     if (stopped) return;
     stopped = true;
     if (autoStop) window.clearTimeout(autoStop);
+    fallbackStop?.();
     try {
-      audio.pause();
-      audio.src = "";
+      audio?.pause();
     } catch {
       /* ignore */
     }
   };
+  if (maxSeconds && maxSeconds > 0) {
+    autoStop = window.setTimeout(() => stop(), maxSeconds * 1000);
+  }
+  void loadCustomRingtoneUrl().then((url) => {
+    if (stopped) return;
+    // The file is gone from this device: ring with the default instead.
+    if (!url) {
+      fallbackStop = playRingtone(DEFAULT_RINGTONE);
+      return;
+    }
+    audio = new Audio(url);
+    audio.loop = true;
+    audio.volume = 0.9;
+    audio.play().catch(() => {
+      /* autoplay may fail before priming */
+    });
+  });
   return stop;
 }
 

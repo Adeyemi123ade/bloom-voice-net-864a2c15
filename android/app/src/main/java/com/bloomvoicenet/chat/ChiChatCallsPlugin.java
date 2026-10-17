@@ -10,7 +10,6 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.PowerManager;
 import android.provider.Settings;
-import android.widget.Toast;
 import androidx.core.app.NotificationManagerCompat;
 import java.lang.reflect.Method;
 
@@ -53,28 +52,23 @@ public class ChiChatCallsPlugin extends Plugin {
         call.resolve();
     }
 
-    // ── FIX 2: Replace ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS (direct grant,
-    //           Play Store restricted) with ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS
-    //           (opens the system list — always policy-compliant for VoIP apps).
+    /**
+     * "Run in background": Android's own one-tap "Allow" prompt for ChiChat;
+     * if a phone doesn't offer it, its battery list instead. No message of
+     * our own on screen.
+     */
     @PluginMethod
     public void requestIgnoreBatteryOptimizations(PluginCall call) {
         try {
             PowerManager pm = (PowerManager)
                     getContext().getSystemService(Context.POWER_SERVICE);
             String pkg = getContext().getPackageName();
-
             if (!pm.isIgnoringBatteryOptimizations(pkg)) {
-                Toast.makeText(
-                        getContext(),
-                        "Allow ChiChat to run in the background so calls can ring when your screen is off.",
-                        Toast.LENGTH_LONG
-                ).show();
-
-                // Navigates to the battery-optimisation list; user manually
-                // exempts the app. No restricted permission required.
-                Intent i = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
-                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                getActivity().startActivity(i);
+                Intent i = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+                i.setData(Uri.parse("package:" + pkg));
+                if (!tryStart(i)) {
+                    tryStart(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
+                }
             }
         } catch (Exception ignored) {}
 
@@ -108,12 +102,6 @@ public class ChiChatCallsPlugin extends Plugin {
         try {
             // ── FIX 3 (same): named constant instead of hardcoded 34.
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                Toast.makeText(
-                        getContext(),
-                        "Allow ChiChat to show full-screen incoming calls so the screen wakes when someone calls.",
-                        Toast.LENGTH_LONG
-                ).show();
-
                 Intent i = new Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT);
                 i.setData(Uri.parse("package:" + getContext().getPackageName()));
                 i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);

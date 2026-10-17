@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  BellRing,
   ChevronDown,
   ChevronRight,
   Cloud,
   Loader2,
   LogOut,
+  SlidersHorizontal,
   Smartphone,
   Trash2,
   User as UserIcon,
@@ -51,15 +51,6 @@ export default function Settings() {
   useEffect(() => {
     if (!loading && !user) navigate("/login");
   }, [loading, user, navigate]);
-
-  // Google OAuth redirects back here with ?code=…; the actual completion lives
-  // inside Phone settings now, so forward the user there preserving the code.
-  useEffect(() => {
-    const search = window.location.search;
-    if (search.includes("code=") && search.includes("scope=")) {
-      navigate(`/settings/phone${search}`, { replace: true });
-    }
-  }, [navigate]);
 
   // Load backup row (for the summary line on the Chat backup nav row)
   useEffect(() => {
@@ -120,7 +111,7 @@ export default function Settings() {
         </div>
 
         <div className="flex-1 px-4 py-4 flex flex-col gap-2">
-          {/* 1. Phone settings — Theme, Ringtone, Google account & contacts. */}
+          {/* 1. Phone settings — Theme, Ringtone. */}
           <button
             onClick={() => navigate("/settings/phone")}
             className="w-full flex items-center gap-3 px-3 py-3.5 rounded-lg hover:bg-secondary text-left"
@@ -131,24 +122,24 @@ export default function Settings() {
             <div className="flex-1 min-w-0">
               <p className="text-base font-semibold text-foreground">Phone settings</p>
               <p className="text-sm text-muted-foreground truncate">
-                Theme, ringtone, Google account
+                Theme, ringtone
               </p>
             </div>
             <ChevronRight className="w-5 h-5 text-muted-foreground" />
           </button>
 
-          {/* Calls when ChiChat is closed: setup check and test ring. */}
+          {/* App settings: notifications, autostart, battery, transcription. */}
           <button
-            onClick={() => navigate("/settings/calls")}
+            onClick={() => navigate("/settings/app")}
             className="w-full flex items-center gap-3 px-3 py-3.5 rounded-lg hover:bg-secondary text-left"
           >
             <span className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center">
-              <BellRing className="w-5 h-5 text-primary" />
+              <SlidersHorizontal className="w-5 h-5 text-primary" />
             </span>
             <div className="flex-1 min-w-0">
-              <p className="text-base font-semibold text-foreground">Calls when ChiChat is closed</p>
+              <p className="text-base font-semibold text-foreground">App settings</p>
               <p className="text-sm text-muted-foreground truncate">
-                Check your phone's settings and send a test call
+                Notifications, autostart, battery
               </p>
             </div>
             <ChevronRight className="w-5 h-5 text-muted-foreground" />

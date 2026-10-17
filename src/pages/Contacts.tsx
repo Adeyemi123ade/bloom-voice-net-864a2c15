@@ -33,11 +33,6 @@ import {
   saveCachedContacts,
   saveManualContacts,
 } from "@/lib/deviceContacts";
-import {
-  isGoogleConnected,
-  startGoogleContactsConnect,
-  syncGoogleContacts,
-} from "@/lib/googleContacts";
 import ContactActionSheet, { ContactAction } from "@/components/ContactActionSheet";
 import SaveContactDialog from "@/components/SaveContactDialog";
 import {
@@ -69,8 +64,6 @@ export default function Contacts() {
   const [query, setQuery] = useState("");
   // Ignores repeat taps while the call is being opened.
   const startingCall = useRef(false);
-  const [googleConnected, setGoogleConnected] = useState<boolean | null>(null);
-  const [connectingGoogle, setConnectingGoogle] = useState(false);
   const [permissionDenied, setPermissionDenied] = useState(false);
   // Asked once and refused again: Android won't show the prompt any more,
   // so the button opens ChiChat's app settings instead.
@@ -147,73 +140,12 @@ export default function Contacts() {
       if (merged.length) await runMatch(merged);
       await loadInvited();
 
-      // On native Android: load device contacts directly.
-      if (isNativePlatform()) {
-        setGoogleConnected(true);
-        await loadPhoneContacts();
-        return;
-      }
-
-      try {
-        const connected = await isGoogleConnected();
-        setGoogleConnected(connected);
-        if (connected) {
-          setSyncing(true);
-          try {
-            const { contacts: list } = await syncGoogleContacts();
-            const fresh = mergeContacts(list, loadManualContacts());
-            setContacts(fresh);
-            if (fresh.length) await runMatch(fresh);
-          } catch {
-            /* user can retry from Settings */
-          } finally {
-            setSyncing(false);
-          }
-        }
-      } catch {
-        setGoogleConnected(false);
-      }
+      // On native Android: load the phone's contacts directly.
+      if (isNativePlatform()) await loadPhoneContacts();
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  // Auto-refresh Google contacts in the background: on tab focus and every 5
-  // minutes while the page is open. Keeps contacts fresh without the user
-  // tapping the refresh icon. Native uses device contacts directly so we skip.
-  useEffect(() => {
-    if (!user || isNativePlatform()) return;
-    let cancelled = false;
-
-    const backgroundSync = async () => {
-      if (cancelled) return;
-      try {
-        const connected = await isGoogleConnected();
-        if (!connected || cancelled) return;
-        const { contacts: list } = await syncGoogleContacts();
-        if (cancelled) return;
-        const fresh = mergeContacts(list, loadManualContacts());
-        setContacts(fresh);
-        if (fresh.length) await runMatch(fresh);
-      } catch {
-        /* silent — user can retry via the refresh button */
-      }
-    };
-
-    const onVisible = () => {
-      if (document.visibilityState === "visible") void backgroundSync();
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    window.addEventListener("focus", onVisible);
-    const interval = window.setInterval(backgroundSync, 5 * 60 * 1000);
-
-    return () => {
-      cancelled = true;
-      document.removeEventListener("visibilitychange", onVisible);
-      window.removeEventListener("focus", onVisible);
-      window.clearInterval(interval);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
 
 
   const loadInvited = async () => {
@@ -281,22 +213,10 @@ export default function Contacts() {
       }
       return;
     }
-    setSyncing(true);
-    try {
-      const list = isNativePlatform()
-        ? await loadNativeContacts()
-        : (await syncGoogleContacts()).contacts;
-      if (isNativePlatform()) saveCachedContacts(list);
-      const merged = mergeContacts(list, loadManualContacts());
-      setContacts(merged);
-      await runMatch(merged);
-      toast({ title: `Loaded ${list.length} contacts` });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Could not load contacts";
-      toast({ title: "Sync failed", description: msg, variant: "destructive" });
-    } finally {
-      setSyncing(false);
-    }
+    // In the browser: contacts saved here and picked from the phone.
+    const merged = mergeContacts(loadCachedContacts() ?? [], loadManualContacts());
+    setContacts(merged);
+    if (merged.length) await runMatch(merged);
   };
 
   const canPickWebContacts = isWebContactPickerSupported() && !isNativePlatform();
@@ -340,17 +260,6 @@ export default function Contacts() {
       }
     } finally {
       setSyncing(false);
-    }
-  };
-
-  const connectGoogle = async () => {
-    setConnectingGoogle(true);
-    try {
-      await startGoogleContactsConnect();
-    } catch (err) {
-      setConnectingGoogle(false);
-      const msg = err instanceof Error ? err.message : "Could not start Google sign-in";
-      toast({ title: "Google sign-in failed", description: msg, variant: "destructive" });
     }
   };
 
@@ -539,7 +448,7 @@ export default function Contacts() {
         {/* Header */}
         <div className="px-4 pt-4 pb-3 border-b border-border flex items-center gap-2">
           <h1 className="text-lg font-semibold text-foreground flex-1">Contacts</h1>
-          {googleConnected && (
+          {isNativePlatform() && (
             <button
               aria-label="Refresh contacts"
               onClick={refreshContacts}
@@ -640,29 +549,6 @@ export default function Contacts() {
             </div>
           )}
 
-          {/* Google connection prompt — only on web when not yet linked. */}
-          {googleConnected === false && !isNativePlatform() && (
-            <div className="mx-4 mt-3 p-3 rounded-xl bg-secondary border border-border">
-              <p className="text-sm font-semibold text-foreground">
-                Connect your Google account
-              </p>
-              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                We'll show your Google contacts here so you can message friends already on
-                Chichat or invite the rest with one tap.
-              </p>
-              <Button
-                onClick={connectGoogle}
-                disabled={connectingGoogle}
-                className="mt-3 w-full h-10 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-sm font-semibold"
-              >
-                {connectingGoogle ? (
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                ) : null}
-                {connectingGoogle ? "Opening Google…" : "Connect Google"}
-              </Button>
-            </div>
-          )}
-
           {syncing && totalContacts === 0 && (
             <p className="px-4 pt-4 text-xs text-muted-foreground text-center">
               Loading contacts…
@@ -728,7 +614,7 @@ export default function Contacts() {
             </div>
           )}
 
-          {!isLoading && totalContacts === 0 && googleConnected && (
+          {!isLoading && totalContacts === 0 && isNativePlatform() && (
             <EmptyState
               title="No contacts found"
               hint="Tap refresh above to load your contacts."
