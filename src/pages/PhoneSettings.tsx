@@ -1,78 +1,58 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import {
-  ArrowLeft,
-  Check,
-  ChevronRight,
-  Contact2,
-  Loader2,
-  Music,
-  Palette,
-  Play,
-  RefreshCw,
-  Square,
-  Type,
-  Upload,
-  X,
-} from "lucide-react";
+import { Check, ChevronRight, Loader2, Moon, Music, Play, Square, Upload, X } from "lucide-react";
 import { useTheme } from "next-themes";
 import MobileFrame from "@/components/MobileFrame";
+import { ArrowLeft } from "lucide-react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Monitor, Moon, Sun } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
-import {
-  startGoogleContactsConnect,
-  completeGoogleContactsConnect,
-  syncGoogleContacts,
-  GoogleContactsReconnectRequired,
-} from "@/lib/googleContacts";
-import {
-  isVoiceTranscribeEnabled,
-  setVoiceTranscribeEnabled,
-} from "@/lib/transcriptionPrefs";
 import {
   RINGTONES,
   RingtoneId,
+  DEFAULT_RINGTONE,
+  MAX_CUSTOM_RINGTONE_BYTES,
   getSelectedRingtone,
   setSelectedRingtone,
   playRingtone,
   getCustomRingtone,
-  setCustomRingtone,
+  saveCustomRingtone,
+  removeCustomRingtone,
+  hasCustomRingtoneFile,
   CustomRingtone,
 } from "@/lib/ringtones";
 import { useBackNavigation } from "@/hooks/useBackNavigation";
 
-const MAX_CUSTOM_BYTES = 3 * 1024 * 1024; // 3MB cap (localStorage friendly)
+/** "4.2 MB", "820 KB". */
+function formatSize(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
+/** "MP3", "M4A", "WAV" from the file name, else from its type. */
+function formatOf(c: CustomRingtone): string {
+  const ext = c.name.includes(".") ? c.name.split(".").pop() : "";
+  if (ext && ext.length <= 5) return ext.toUpperCase();
+  const sub = c.type.split("/")[1] ?? "";
+  return (sub.replace(/^x-/, "") || "Audio").toUpperCase();
+}
 
 export default function PhoneSettings() {
-  const navigate = useNavigate();
   const { showBackArrow, goBack } = useBackNavigation("/settings");
-  const { user } = useAuth();
-  const { theme, setTheme } = useTheme();
-  const [themeOpen, setThemeOpen] = useState(false);
+  const { resolvedTheme, setTheme } = useTheme();
   const [toneOpen, setToneOpen] = useState(false);
   const [selected, setSelected] = useState<RingtoneId>(getSelectedRingtone());
   const [custom, setCustom] = useState<CustomRingtone | null>(getCustomRingtone());
+  // False when the saved audio is no longer on this device.
+  const [customAvailable, setCustomAvailable] = useState(true);
+  const [savingTone, setSavingTone] = useState(false);
   const [previewing, setPreviewing] = useState<string | null>(null);
   const stopRef = useRef<(() => void) | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
-
-  const [voiceTranscribe, setVoiceTranscribe] = useState(() => isVoiceTranscribeEnabled());
-
-  // Google contacts integration (moved here from Settings).
-  const [googleEmail, setGoogleEmail] = useState<string | null>(null);
-  const [googleOpen, setGoogleOpen] = useState(false);
-  const [connecting, setConnecting] = useState(false);
-  const [syncing, setSyncing] = useState(false);
-  const [params, setParams] = useSearchParams();
 
   useEffect(() => {
     document.title = "Phone settings — Chichat";
@@ -86,106 +66,16 @@ export default function PhoneSettings() {
     return () => stopPreview();
   }, []);
 
-  // Load Google connection status
   useEffect(() => {
-    if (!user) return;
-    (async () => {
-      const { data } = await supabase
-        .from("google_oauth_tokens")
-        .select("google_email")
-        .maybeSingle();
-      setGoogleEmail(data?.google_email ?? null);
-    })();
-  }, [user]);
-
-  // Complete OAuth if redirected back here with ?code=…
-  const oauthHandledRef = useRef<string | null>(null);
-  useEffect(() => {
-    const code = params.get("code");
-    const state = params.get("state");
-    if (!code || !user) return;
-    if (oauthHandledRef.current === code) return;
-    oauthHandledRef.current = code;
-    params.delete("code");
-    params.delete("scope");
-    params.delete("state");
-    setParams(params, { replace: true });
-    (async () => {
-      try {
-        const r = await completeGoogleContactsConnect(code, state);
-        setGoogleEmail(r.email);
-        setGoogleOpen(true);
-        toast({ title: "Google connected", description: "Account linked." });
-        setSyncing(true);
-        const { contacts: list, warning } = await syncGoogleContacts();
-        toast({
-          title: list.length === 0 ? "No contacts imported" : "Contacts synced",
-          // The server's warning names the real reason (API disabled, request
-          // refused, contacts without numbers, or an empty account); show it
-          // instead of always claiming the account has no contacts.
-          description:
-            list.length === 0
-              ? (warning || "This Google account has no saved contacts with phone numbers.")
-              : `${list.length} contacts loaded.`,
-        });
-      } catch (e) {
-        if (e instanceof GoogleContactsReconnectRequired) setGoogleEmail(null);
-        toast({
-          title: "Google connect failed",
-          description: friendlyError(e),
-          variant: "destructive",
-        });
-      } finally {
-        setSyncing(false);
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
-
-  const connectGoogle = async () => {
-    setConnecting(true);
-    try {
-      await startGoogleContactsConnect();
-    } catch (e) {
-      setConnecting(false);
-      toast({
-        title: "Could not start Google sign-in",
-        description: friendlyError(e),
-        variant: "destructive",
-      });
-    }
-  };
-
-  const syncGoogleNow = async () => {
-    setSyncing(true);
-    try {
-      const { contacts: list, warning } = await syncGoogleContacts();
-      toast({
-        title: list.length === 0 ? "No contacts imported" : "Contacts synced",
-        // The server's warning names the real reason (API disabled, request
-        // refused, contacts without numbers, or an empty account); show it
-        // instead of always claiming the account has no contacts.
-        description:
-          list.length === 0
-            ? (warning || "This Google account has no saved contacts with phone numbers.")
-            : `${list.length} contacts loaded.`,
-      });
-    } catch (e) {
-      if (e instanceof GoogleContactsReconnectRequired) setGoogleEmail(null);
-      toast({
-        title: "Sync failed",
-        description: friendlyError(e),
-        variant: "destructive",
-      });
-    } finally {
-      setSyncing(false);
-    }
-  };
-
-  const toggleVoiceTranscribe = (v: boolean) => {
-    setVoiceTranscribe(v);
-    setVoiceTranscribeEnabled(v);
-  };
+    if (!custom) return;
+    let cancelled = false;
+    void hasCustomRingtoneFile().then((ok) => {
+      if (!cancelled) setCustomAvailable(ok);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [custom]);
 
   const stopPreview = () => {
     stopRef.current?.();
@@ -214,41 +104,49 @@ export default function PhoneSettings() {
       toast({ title: "Please choose an audio file", variant: "destructive" });
       return;
     }
-    if (file.size > MAX_CUSTOM_BYTES) {
+    if (file.size > MAX_CUSTOM_RINGTONE_BYTES) {
       toast({
         title: "File too large",
-        description: "Please pick an audio file under 3 MB.",
+        description: "Please pick an audio file under 50 MB.",
         variant: "destructive",
       });
       return;
     }
-    const dataUrl = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-    const c = { name: file.name, dataUrl };
-    setCustomRingtone(c);
-    setCustom(c);
-    choose("custom:user");
-  };
-
-  const removeCustom = () => {
-    setCustomRingtone(null);
-    setCustom(null);
-    if (selected === "custom:user") {
-      setSelected("melody-marimba");
-      setSelectedRingtone("melody-marimba");
+    setSavingTone(true);
+    try {
+      const c = await saveCustomRingtone(file);
+      setCustom(c);
+      setCustomAvailable(true);
+      choose("custom:user");
+    } catch {
+      toast({ title: "Couldn't use that file", description: "Please try another audio file.", variant: "destructive" });
+    } finally {
+      setSavingTone(false);
     }
   };
 
-  const themeLabel =
-    theme === "dark" ? "Dark" : theme === "light" ? "Light" : "System default";
+  const removeCustom = async () => {
+    stopPreview();
+    await removeCustomRingtone();
+    setCustom(null);
+    if (selected === "custom:user") {
+      setSelected(DEFAULT_RINGTONE);
+      setSelectedRingtone(DEFAULT_RINGTONE);
+    }
+  };
+
+  const isDark = resolvedTheme === "dark";
+  const customMissing = selected === "custom:user" && custom !== null && !customAvailable;
   const toneLabel =
-    selected === "custom:user"
-      ? custom?.name ?? "From my music"
+    selected === "custom:user" && custom
+      ? custom.name
       : RINGTONES.find((r) => r.id === selected)?.label ?? "Default";
+  const toneDetails =
+    selected === "custom:user" && custom
+      ? customMissing
+        ? "File no longer on this phone · choose another"
+        : `${formatSize(custom.size)} · ${formatOf(custom)}`
+      : RINGTONES.find((r) => r.id === selected)?.description ?? "";
 
   const grouped = {
     Melody: RINGTONES.filter((r) => r.category === "Melody"),
@@ -275,131 +173,47 @@ export default function PhoneSettings() {
         </div>
 
         <div className="flex-1 px-3 py-4">
-          {/* Theme */}
-          <button
-            onClick={() => setThemeOpen(true)}
-            className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-secondary text-left"
-          >
-            <span className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center">
-              <Palette className="w-4 h-4 text-primary" />
-            </span>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-foreground">Theme</p>
-              <p className="text-xs text-muted-foreground">{themeLabel}</p>
-            </div>
-            <ChevronRight className="w-4 h-4 text-muted-foreground" />
-          </button>
-
-          {/* Ringtone */}
-          <button
-            onClick={() => setToneOpen(true)}
-            className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-secondary text-left"
-          >
-            <span className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center">
-              <Music className="w-4 h-4 text-primary" />
-            </span>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-foreground">Ringtone</p>
-              <p className="text-xs text-muted-foreground truncate">
-                {toneLabel} · plays on incoming calls
-              </p>
-            </div>
-            <ChevronRight className="w-4 h-4 text-muted-foreground" />
-          </button>
-
-          {/* Google contacts — collapsible. Connect when not linked, sync when linked. */}
-          <button
-            onClick={() => setGoogleOpen((v) => !v)}
-            className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-secondary text-left"
-          >
-            <span className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center">
-              <Contact2 className="w-4 h-4 text-primary" />
-            </span>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-foreground">Google contact</p>
-              <p className="text-xs text-muted-foreground truncate">
-                {googleEmail ? `Connected · ${googleEmail}` : "Not connected"}
-              </p>
-            </div>
-            <ChevronRight
-              className={`w-4 h-4 text-muted-foreground transition-transform ${googleOpen ? "rotate-90" : ""}`}
-            />
-          </button>
-          {googleOpen && (
-            <div className="px-3 pb-3 -mt-1">
-              {googleEmail ? (
-                <button
-                  onClick={syncGoogleNow}
-                  disabled={syncing}
-                  className="w-full h-10 rounded-md bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-60 inline-flex items-center justify-center gap-1.5"
-                >
-                  <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} />
-                  {syncing ? "Syncing…" : "Sync now"}
-                </button>
-              ) : (
-                <button
-                  onClick={connectGoogle}
-                  disabled={connecting}
-                  className="w-full h-10 rounded-md bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-60 inline-flex items-center justify-center gap-1.5"
-                >
-                  {connecting && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {connecting ? "Opening Google…" : "Connect account"}
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* Voice note transcription — a "Transcribe" option on voice notes
-              (sent or received) in chat. Off by default it'd never get
-              discovered, so this defaults on with an easy opt-out here. */}
+          {/* Theme: dark mode on or off */}
           <div className="w-full flex items-center gap-3 px-3 py-3 rounded-lg">
             <span className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center">
-              <Type className="w-4 h-4 text-primary" />
+              <Moon className="w-4 h-4 text-primary" />
             </span>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-foreground">Voice note transcription</p>
-              <p className="text-xs text-muted-foreground truncate">
-                Show a "Transcribe" option on voice notes
-              </p>
+              <p className="text-xs font-semibold text-foreground">Dark mode</p>
             </div>
-            <Switch checked={voiceTranscribe} onCheckedChange={toggleVoiceTranscribe} />
+            <Switch
+              checked={isDark}
+              onCheckedChange={(on) => setTheme(on ? "dark" : "light")}
+              aria-label="Dark mode"
+            />
+          </div>
+
+          {/* Ringtone: the chosen tone, with its details and a preview */}
+          <div className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-secondary">
+            <button
+              onClick={() => togglePreview(selected)}
+              disabled={customMissing}
+              aria-label={previewing === selected ? "Stop preview" : "Preview ringtone"}
+              className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center shrink-0 disabled:opacity-50"
+            >
+              {previewing === selected ? (
+                <Square className="w-3.5 h-3.5 text-primary fill-primary" />
+              ) : (
+                <Music className="w-4 h-4 text-primary" />
+              )}
+            </button>
+            <button onClick={() => setToneOpen(true)} className="flex-1 min-w-0 flex items-center gap-3 text-left">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-foreground">Ringtone</p>
+                <p className="text-xs text-foreground truncate">{toneLabel}</p>
+                <p className={`text-2xs truncate ${customMissing ? "text-destructive" : "text-muted-foreground"}`}>
+                  {toneDetails}
+                </p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+            </button>
           </div>
         </div>
-
-        {/* Theme dialog */}
-        <Dialog open={themeOpen} onOpenChange={setThemeOpen}>
-          <DialogContent className="max-w-[300px] bg-card border-border">
-            <DialogHeader>
-              <DialogTitle className="text-sm">Choose theme</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-1">
-              {[
-                { value: "system", label: "System default", Icon: Monitor },
-                { value: "dark", label: "Dark", Icon: Moon },
-                { value: "light", label: "Light", Icon: Sun },
-              ].map(({ value, label, Icon }) => (
-                <button
-                  key={value}
-                  onClick={() => {
-                    setTheme(value);
-                    setThemeOpen(false);
-                  }}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-left text-xs ${
-                    theme === value
-                      ? "bg-primary/15 text-foreground"
-                      : "hover:bg-secondary text-foreground"
-                  }`}
-                >
-                  <Icon className="w-4 h-4 text-primary" />
-                  <span className="flex-1">{label}</span>
-                  {theme === value && (
-                    <Check className="w-4 h-4 text-primary" />
-                  )}
-                </button>
-              ))}
-            </div>
-          </DialogContent>
-        </Dialog>
 
         {/* Ringtone dialog */}
         <Dialog open={toneOpen} onOpenChange={setToneOpen}>
@@ -430,14 +244,14 @@ export default function PhoneSettings() {
                   {custom && (
                     <RingtoneRow
                       label={custom.name}
-                      description="Custom audio"
+                      description={customAvailable ? `${formatSize(custom.size)} · ${formatOf(custom)}` : "File no longer on this phone"}
                       isSelected={selected === "custom:user"}
                       isPlaying={previewing === "custom:user"}
                       onPreview={() => togglePreview("custom:user")}
                       onSelect={() => choose("custom:user")}
                       trailing={
                         <button
-                          onClick={removeCustom}
+                          onClick={() => void removeCustom()}
                           aria-label="Remove custom ringtone"
                           className="w-6 h-6 rounded-full hover:bg-destructive/20 flex items-center justify-center shrink-0"
                         >
@@ -448,17 +262,22 @@ export default function PhoneSettings() {
                   )}
                   <button
                     onClick={() => fileRef.current?.click()}
-                    className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md hover:bg-secondary text-left"
+                    disabled={savingTone}
+                    className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md hover:bg-secondary text-left disabled:opacity-60"
                   >
                     <span className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-                      <Upload className="w-3.5 h-3.5 text-primary" />
+                      {savingTone ? (
+                        <Loader2 className="w-3.5 h-3.5 text-primary animate-spin" />
+                      ) : (
+                        <Upload className="w-3.5 h-3.5 text-primary" />
+                      )}
                     </span>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium text-foreground">
                         {custom ? "Replace audio…" : "Pick audio from device…"}
                       </p>
                       <p className="text-2xs text-muted-foreground">
-                        Any audio file under 3 MB
+                        Any audio file up to 50 MB
                       </p>
                     </div>
                   </button>
@@ -547,17 +366,5 @@ function RingtoneRow({
       )}
       {trailing}
     </div>
-  );
-}
-
-/** Strip technical noise (URLs, UUIDs) from error messages before showing them. */
-function friendlyError(e: unknown): string {
-  const raw = e instanceof Error ? e.message : String(e ?? "");
-  return (
-    raw
-      .replace(/https?:\/\/\S+/gi, "")
-      .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, "")
-      .replace(/\s{2,}/g, " ")
-      .trim() || "Please try again."
   );
 }

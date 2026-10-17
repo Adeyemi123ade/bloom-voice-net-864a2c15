@@ -18,7 +18,7 @@ import Profile from "./pages/Profile.tsx";
 import Settings from "./pages/Settings.tsx";
 import PhoneSettings from "./pages/PhoneSettings.tsx";
 import ChatBackup from "./pages/ChatBackup.tsx";
-import CallSetup from "./pages/CallSetup.tsx";
+import AppSettings from "./pages/AppSettings.tsx";
 import ForgotPassword from "./pages/ForgotPassword.tsx";
 import ResetPassword from "./pages/ResetPassword.tsx";
 import VerifyEmail from "./pages/VerifyEmail.tsx";
@@ -73,7 +73,7 @@ const App = () => (
                   <Route path="/settings" element={<Settings />} />
                   <Route path="/settings/phone" element={<PhoneSettings />} />
                   <Route path="/settings/backup" element={<ChatBackup />} />
-                  <Route path="/settings/calls" element={<CallSetup />} />
+                  <Route path="/settings/app" element={<AppSettings />} />
                   <Route path="/forgot-password" element={<ForgotPassword />} />
                   <Route path="/verify-reset-code" element={<VerifyResetCode />} />
                   <Route path="/reset-password" element={<ResetPassword />} />

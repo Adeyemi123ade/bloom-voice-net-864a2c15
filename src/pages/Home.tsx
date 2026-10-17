@@ -28,7 +28,7 @@ import {
   updateMatters,
 } from "@/lib/chat/chatList";
 import Dialpad from "@/components/Dialpad";
-import CallSetupBanner from "@/components/CallSetupBanner";
+import { runFirstStartSetup } from "@/lib/appSettings";
 
 type Profile = {
   id: string;
@@ -104,6 +104,12 @@ export default function Home() {
     navigate(location.pathname, { replace: true, state: {} });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state]);
+
+  // First start on Android: ask once to run in the background, so calls
+  // ring with the app closed.
+  useEffect(() => {
+    if (user) void runFirstStartSetup();
+  }, [user]);
 
   // Daily auto-backup on app open (once per day, silent)
   useEffect(() => {
@@ -369,7 +375,6 @@ export default function Home() {
           </div>
         </div>
 
-        <CallSetupBanner />
 
         {/* List */}
         <div className="flex-1 overflow-y-auto px-2 pb-4">

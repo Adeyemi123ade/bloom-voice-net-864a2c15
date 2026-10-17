@@ -4,11 +4,6 @@ import { ArrowLeft, Camera, User } from "lucide-react";
 import { addManualContact } from "@/lib/deviceContacts";
 import { saveDeviceContact } from "@/lib/saveDeviceContact";
 import { toast } from "@/hooks/use-toast";
-import {
-  syncGoogleContacts,
-  startGoogleContactsConnect,
-  normalizeGoogleContactsError,
-} from "@/lib/googleContacts";
 import { supabase } from "@/integrations/supabase/client";
 import MobileFrame from "@/components/MobileFrame";
 import CountryPicker from "@/components/CountryPicker";
@@ -35,7 +30,7 @@ export default function NewContact() {
   const [country, setCountry] = useState<CountryEntry | null>(null);
   const [phoneLocal, setPhoneLocal] = useState("");
   const [avatar, setAvatar] = useState<string | null>(null);
-  const [busy, setBusy] = useState<"google" | "phone" | null>(null);
+  const [busy, setBusy] = useState<"phone" | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Pre-fill avatar from the signed-in user's profile + sensible default country
@@ -147,49 +142,6 @@ export default function NewContact() {
     navigate(-1);
   };
 
-  const onSaveGoogle = async () => {
-    const v = validate();
-    if (!v) return;
-    setBusy("google");
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast({ title: "Sign in required", variant: "destructive" });
-        setBusy(null);
-        return;
-      }
-      const { data: tok } = await supabase
-        .from("google_oauth_tokens")
-        .select("user_id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (!tok) {
-        toast({
-          title: "Connect Google first",
-          description: "Redirecting to Google to authorise contacts.",
-        });
-        await startGoogleContactsConnect();
-        return;
-      }
-      const { error } = await supabase.functions.invoke("google-contacts-create", {
-        body: { name: v.name, phone: v.e164 },
-      });
-      if (error) throw await normalizeGoogleContactsError(error);
-      addManualContact(v.name, v.e164, avatar);
-      await syncGoogleContacts().catch(() => null);
-      toast({ title: "Saved to Google Contacts" });
-      navigate(-1);
-    } catch (e) {
-      toast({
-        title: "Couldn't save to Google",
-        description: e instanceof Error ? e.message : "Try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setBusy(null);
-    }
-  };
-
   return (
     <MobileFrame>
       <div className="h-full bg-background text-foreground flex flex-col overflow-y-auto">
@@ -284,15 +236,6 @@ export default function NewContact() {
               <p className="text-xs font-semibold tracking-[0.15em] text-muted-foreground">
                 SAVE TO
               </p>
-
-              <button
-                onClick={onSaveGoogle}
-                disabled={busy !== null}
-                className="w-full h-12 rounded-xl border border-blue-500/60 bg-blue-500/10 hover:bg-blue-500/15 text-blue-400 font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
-              >
-                <span className="font-bold text-base">G</span>
-                {busy === "google" ? "Saving…" : "Save to Google Contacts"}
-              </button>
 
               <button
                 onClick={onSavePhoneBook}
