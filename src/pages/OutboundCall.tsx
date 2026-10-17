@@ -5,11 +5,13 @@ import { Mic, MicOff, PhoneOff, Phone, UserPlus } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { toast } from "@/hooks/use-toast";
 import { formatDisplay, toE164 } from "@/lib/phone";
 import SaveContactDialog from "@/components/SaveContactDialog";
 import { loadManualContacts, loadCachedContacts } from "@/lib/deviceContacts";
 import { startCallForegroundService, stopCallForegroundService } from "@/lib/nativeCalls";
+import { isCallableNumber, paidCallMessage, type PaidCallBlock } from "@/lib/paidCallRules";
+
+const CALL_FAILED_TEXT = "We couldn't connect this call. Please try again.";
 
 type Status = "connecting" | "ringing" | "connected" | "ended" | "failed";
 
@@ -21,7 +23,14 @@ export default function OutboundCall() {
   const [status, setStatus] = useState<Status>("connecting");
   const [muted, setMuted] = useState(false);
   const [seconds, setSeconds] = useState(0);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [errorMsg, setErrorMsgState] = useState<string | null>(null);
+  // Kept in a ref too: endLocally runs in the same tick as setErrorMsg, so it
+  // must not read a stale state value and overwrite a specific message.
+  const errorMsgRef = useRef<string | null>(null);
+  const setErrorMsg = (m: string | null) => {
+    errorMsgRef.current = m;
+    setErrorMsgState(m);
+  };
   const [askSave, setAskSave] = useState(false);
 
   const deviceRef = useRef<Device | null>(null);
@@ -55,12 +64,26 @@ export default function OutboundCall() {
     dialedRef.current = true;
     let cancelled = false;
 
+    const refuse = (reason: PaidCallBlock) => {
+      setErrorMsg(paidCallMessage(reason));
+      endLocally("failed");
+    };
+
+    if (!isCallableNumber(e164)) {
+      refuse("country");
+      return;
+    }
+
     (async () => {
       try {
         const { data, error } = await supabase.functions.invoke("twilio-voice-token", {
           body: {},
         });
         if (cancelled) return;
+        if (data?.blocked === "too_new" || data?.blocked === "daily_limit") {
+          refuse(data.blocked);
+          return;
+        }
         if (error || !data?.token) {
           throw new Error(error?.message ?? "Could not get voice token");
         }
@@ -72,7 +95,7 @@ export default function OutboundCall() {
 
         device.on("error", (e) => {
           console.error("Device error", e);
-          setErrorMsg(e?.message ?? "Device error");
+          setErrorMsg(CALL_FAILED_TEXT);
           endLocally("failed");
         });
 
@@ -101,14 +124,13 @@ export default function OutboundCall() {
         call.on("reject", () => endLocally("ended"));
         call.on("error", (e) => {
           console.error("Call error", e);
-          setErrorMsg(e?.message ?? "Call error");
+          setErrorMsg(CALL_FAILED_TEXT);
           endLocally("failed");
         });
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "Could not start call";
-        setErrorMsg(msg);
+        console.error("Outbound call failed", err);
+        setErrorMsg(CALL_FAILED_TEXT);
         endLocally("failed");
-        toast({ title: "Call failed", description: msg, variant: "destructive" });
       }
     })();
 
@@ -148,8 +170,8 @@ export default function OutboundCall() {
     endedRef.current = true;
     cleanup();
     setStatus(s);
-    if (s === "failed" && seconds < 3 && errorMsg == null) {
-      setErrorMsg("Call dropped — if you're on a Twilio trial, consider upgrading for longer calls.");
+    if (s === "failed" && seconds < 3 && errorMsgRef.current == null) {
+      setErrorMsg(CALL_FAILED_TEXT);
     }
     // Do NOT auto-prompt to save the number after a call ends.
     // The user can tap the "Save contact" button if they want to.
