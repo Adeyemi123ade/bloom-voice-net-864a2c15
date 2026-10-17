@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft, Send, Check, CheckCheck, Mic, Trash2, Pencil, X,
   Paperclip, Copy, Share2, Forward, Phone, Video, Smile, MoreVertical, Search, Info,
-  Type, Loader2,
+  Type, Loader2, Flag, Ban,
 } from "lucide-react";
 import ForwardSheet, { type ForwardResult } from "@/components/chat/ForwardSheet";
 import EmojiPicker, { Theme as EmojiTheme } from "emoji-picker-react";
@@ -19,6 +19,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import ContactInfoSheet from "@/components/chat/ContactInfoSheet";
+import { BlockDialog, ReportDialog } from "@/components/chat/SafetyDialogs";
+import { acceptChat, isBlockedError, isMessageRequest, useIsBlocked } from "@/lib/safety";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -199,6 +201,18 @@ export default function ChatRoom() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [forwardOpen, setForwardOpen] = useState(false);
   const [contactInfoOpen, setContactInfoOpen] = useState(false);
+  // Block / report / message requests.
+  const [blockOpen, setBlockOpen] = useState(false);
+  const [report, setReport] = useState<{ messageId: string | null } | null>(null);
+  /** "checking" until we know; "yes" shows Accept / Block / Report instead of the composer. */
+  const [requestState, setRequestState] = useState<"checking" | "yes" | "no">("checking");
+  const requestStateRef = useRef<"checking" | "yes" | "no">("checking");
+  const setRequest = (v: "checking" | "yes" | "no") => {
+    requestStateRef.current = v;
+    setRequestState(v);
+  };
+  const blockedByMe = useIsBlocked(other?.id);
+  const otherName = other?.display_name ?? "this person";
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [highlightId, setHighlightId] = useState<string | null>(null);
@@ -303,7 +317,12 @@ export default function ChatRoom() {
         .select("id, display_name, avatar_url, is_online, last_seen_at, show_last_seen")
         .eq("id", otherId)
         .maybeSingle();
-      if (prof && !cancelled) setOther(prof as Profile);
+      if (cancelled) return;
+      if (prof) setOther(prof as Profile);
+      // Not visible (this person blocked you): keep the chat usable without
+      // their name, photo or last seen.
+      else
+        setOther({ id: otherId, display_name: null, avatar_url: null, is_online: false, last_seen_at: new Date(0).toISOString(), show_last_seen: false });
     })();
     void (async () => {
       const { data: msgs } = await supabase
@@ -323,10 +342,25 @@ export default function ChatRoom() {
       });
       cacheReady.current = true;
       if (blank.length) void reconcileBlankRows(blank).then((fixed) => !cancelled && patchMessages(fixed));
+
+      // Message request? (first messages from someone not in my contacts).
+      // Until it's answered, their messages aren't marked read.
+      const theirs = ready.find((m) => m.sender_id !== user.id);
+      const request = theirs
+        ? await isMessageRequest({
+            conversationId,
+            otherUserId: theirs.sender_id,
+            iHaveSent: ready.some((m) => m.sender_id === user.id),
+            theyHaveSent: true,
+          })
+        : false;
+      if (cancelled) return;
+      setRequest(request ? "yes" : "no");
+      // Opening the chat reads all of it, including messages older than the
+      // page shown, so the chat list badge clears completely.
+      if (!request) void markConversationRead();
     })();
-    // Opening the chat reads all of it, including messages older than the
-    // page shown, so the chat list badge clears completely.
-    void markConversationRead();
+    setRequest("checking");
     return () => {
       cancelled = true;
     };
@@ -433,7 +467,7 @@ export default function ChatRoom() {
     const pending = messages.some(
       (m) => m.sender_id !== user.id && !m.id.startsWith("tmp-") && (!m.delivered_at || !m.read_at),
     );
-    if (pending) void markConversationRead();
+    if (pending && requestStateRef.current === "no") void markConversationRead();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages, user, conversationId]);
 
@@ -795,7 +829,11 @@ export default function ChatRoom() {
       // Roll back optimistic message on failure
       console.error("[msg-send] insert failed", error);
       setMessages((prev) => prev.filter((m) => m.id !== tmpId));
-      toast({ title: "Failed to send", description: error?.message ?? "Please try again.", variant: "destructive" });
+      if (isBlockedError(error)) {
+        toast({ title: "Message not sent", description: "You can't message this person right now." });
+      } else {
+        toast({ title: "Message not sent", description: "Please check your connection and try again." });
+      }
       return;
     }
     // Adopt the real row id immediately instead of waiting for the realtime
@@ -1421,6 +1459,18 @@ export default function ChatRoom() {
                 <Forward className="w-4 h-4 text-foreground" />
               </button>
             )}
+            {actions.canReport && onlySelected && (
+              <button
+                aria-label="Report"
+                onClick={() => {
+                  setReport({ messageId: onlySelected.id });
+                  clearSelection();
+                }}
+                className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
+              >
+                <Flag className="w-4 h-4 text-foreground" />
+              </button>
+            )}
             {actions.canEdit && (
               <button
                 aria-label="Edit"
@@ -1465,7 +1515,7 @@ export default function ChatRoom() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-foreground truncate leading-tight">
-                {other?.display_name ?? "Chat"}
+                {other?.display_name ?? "ChiChat user"}
               </p>
               {/* Fixed-height status row — never changes header height */}
               <div className="h-[14px] flex items-center">
@@ -1520,6 +1570,19 @@ export default function ChatRoom() {
                 >
                   <Trash2 className="w-4 h-4 mr-2" /> Clear chat
                 </DropdownMenuItem>
+                {other && (
+                  <>
+                    <DropdownMenuItem onClick={() => setBlockOpen(true)}>
+                      <Ban className="w-4 h-4 mr-2" /> {blockedByMe ? "Unblock" : "Block"}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setReport({ messageId: null })}
+                      className="text-destructive focus:text-destructive"
+                    >
+                      <Flag className="w-4 h-4 mr-2" /> Report
+                    </DropdownMenuItem>
+                  </>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -1834,6 +1897,58 @@ export default function ChatRoom() {
         )}
 
         {/* Composer — lifted above bottom edge */}
+        {blockedByMe && other ? (
+          <div
+            className="px-4 pt-3 pb-5 border-t border-border bg-background text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-sm text-muted-foreground">
+              You blocked {otherName}. They can't message or call you.
+            </p>
+            <button
+              onClick={() => setBlockOpen(true)}
+              className="mt-2 text-sm font-semibold text-primary"
+            >
+              Unblock
+            </button>
+          </div>
+        ) : requestState === "yes" && other ? (
+          <div
+            className="px-4 pt-3 pb-5 border-t border-border bg-background"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-sm text-foreground text-center">
+              {otherName} isn't in your contacts.
+            </p>
+            <p className="text-xs text-muted-foreground text-center mt-1">
+              They won't know you've seen their messages until you accept.
+            </p>
+            <div className="grid grid-cols-3 gap-2 mt-3">
+              <button
+                onClick={() => setBlockOpen(true)}
+                className="h-11 rounded-xl border border-border text-sm font-medium text-destructive"
+              >
+                Block
+              </button>
+              <button
+                onClick={() => setReport({ messageId: null })}
+                className="h-11 rounded-xl border border-border text-sm font-medium text-foreground"
+              >
+                Report
+              </button>
+              <button
+                onClick={() => {
+                  setRequest("no");
+                  void acceptChat(conversationId!);
+                  void markConversationRead();
+                }}
+                className="h-11 rounded-xl bg-primary text-primary-foreground text-sm font-semibold"
+              >
+                Accept
+              </button>
+            </div>
+          </div>
+        ) : (
         <div
           className="px-3 pt-2 pb-4 border-t border-border flex items-end gap-2 bg-background"
           onClick={(e) => e.stopPropagation()}
@@ -1962,6 +2077,7 @@ export default function ChatRoom() {
             </>
           )}
         </div>
+        )}
         {emojiOpen && (
           <div className="border-t border-border bg-background h-[300px] overflow-hidden shrink-0">
             <EmojiPicker
@@ -2055,10 +2171,39 @@ export default function ChatRoom() {
           </div>
         </>
       )}
+      {other && (
+        <BlockDialog
+          open={blockOpen}
+          onOpenChange={setBlockOpen}
+          userId={other.id}
+          name={otherName}
+          blocked={blockedByMe}
+        />
+      )}
+      {other && (
+        <ReportDialog
+          open={!!report}
+          onOpenChange={(o) => !o && setReport(null)}
+          userId={other.id}
+          name={otherName}
+          conversationId={conversationId}
+          messageId={report?.messageId ?? null}
+          alreadyBlocked={blockedByMe}
+        />
+      )}
       <ContactInfoSheet
         open={contactInfoOpen}
         onOpenChange={setContactInfoOpen}
         contact={other}
+        blocked={blockedByMe}
+        onBlock={() => {
+          setContactInfoOpen(false);
+          setBlockOpen(true);
+        }}
+        onReport={() => {
+          setContactInfoOpen(false);
+          setReport({ messageId: null });
+        }}
       />
     </MobileFrame>
   );

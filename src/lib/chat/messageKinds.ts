@@ -223,6 +223,8 @@ export type SelectionActions = {
   canEdit: boolean;
   canDelete: boolean;
   canDeleteForEveryone: boolean;
+  /** One message from the other person: it can be reported. */
+  canReport: boolean;
   /** How many selected items an action like Forward will leave out (call records, deleted). */
   skipped: number;
 };
@@ -253,6 +255,12 @@ export function selectionActions(selected: SelectableMessage[], myId: string | u
       messageKind(only.content) === "text",
     canDelete: selected.length > 0,
     canDeleteForEveryone: live.length > 0 && live.length === selected.length && selected.every((m) => m.sender_id === myId),
+    canReport:
+      !!only &&
+      !!myId &&
+      only.sender_id !== myId &&
+      !only.deleted_for_everyone &&
+      messageKind(only.content) !== "call",
     skipped: selected.length - actionable.length,
   };
 }

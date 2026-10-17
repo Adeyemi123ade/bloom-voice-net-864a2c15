@@ -76,6 +76,8 @@ export type SavedCall =
   | { result: "existing"; call: { id: string; caller_id: string; callee_id: string; status: string; room_name: string; call_type: string; conversation_id: string } }
   /** The caller is already on another call (maybe on another phone). */
   | { result: "busy" }
+  /** One of the two people has blocked the other. */
+  | { result: "blocked" }
   | { result: "error" };
 
 type RpcResult = { data: unknown; error: { code?: string; message?: string } | null };
@@ -109,6 +111,10 @@ export async function saveNewCall(row: {
     if (d && (d.result === "created" || d.result === "existing" || d.result === "busy")) return d;
     return { result: "error" };
   }
+  // Refused because one of the two has blocked the other.
+  if (r.error.message === "blocked" || (r.error as { hint?: string }).hint === "chichat_blocked") {
+    return { result: "blocked" };
+  }
   // The server doesn't have start_call yet: save the call the old way.
   const missing =
     r.error.code === "PGRST202" ||
@@ -116,5 +122,6 @@ export async function saveNewCall(row: {
     /start_call/i.test(r.error.message ?? "");
   if (!missing) return { result: "error" };
   const { error } = await supabase.from("calls").insert(row);
+  if (error && (error.message === "blocked" || error.hint === "chichat_blocked")) return { result: "blocked" };
   return error ? { result: "error" } : { result: "created" };
 }

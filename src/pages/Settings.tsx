@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { getCallsSnapshot, requestEndCall } from "@/lib/activeCall";
 import { useNavigate } from "react-router-dom";
 import {
+  Ban,
   ChevronDown,
   ChevronRight,
   Cloud,
@@ -148,6 +149,21 @@ export default function Settings() {
               <p className="text-sm text-muted-foreground truncate">
                 Notifications, autostart, battery
               </p>
+            </div>
+            <ChevronRight className="w-5 h-5 text-muted-foreground" />
+          </button>
+
+          {/* Blocked people. */}
+          <button
+            onClick={() => navigate("/settings/blocked")}
+            className="w-full flex items-center gap-3 px-3 py-3.5 rounded-lg hover:bg-secondary text-left"
+          >
+            <span className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center">
+              <Ban className="w-5 h-5 text-primary" />
+            </span>
+            <div className="flex-1 min-w-0">
+              <p className="text-base font-semibold text-foreground">Blocked</p>
+              <p className="text-sm text-muted-foreground truncate">People you blocked</p>
             </div>
             <ChevronRight className="w-5 h-5 text-muted-foreground" />
           </button>
