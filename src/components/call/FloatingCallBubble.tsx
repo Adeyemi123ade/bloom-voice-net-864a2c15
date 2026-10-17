@@ -10,6 +10,8 @@ type Props = {
   isVideo: boolean;
   other: Profile | null;
   status: "connecting" | "ringing" | "connected" | "ended";
+  /** The connection dropped and is coming back; the call is still on. */
+  reconnecting?: boolean;
   seconds: number;
   remoteVideoTrack: RemoteVideoTrack | null;
   localVideoTrack: LocalVideoTrack | null;
@@ -104,6 +106,7 @@ export default function FloatingCallBubble({
   isVideo,
   other,
   status,
+  reconnecting = false,
   seconds,
   remoteVideoTrack,
   localVideoTrack,
@@ -180,7 +183,7 @@ export default function FloatingCallBubble({
   };
 
   const label =
-    status === "connected" ? fmt(seconds) : status === "ended" ? "Ended" : status === "ringing" ? "Calling…" : "Connecting…";
+    status === "connected" ? (reconnecting ? "Reconnecting…" : fmt(seconds)) : status === "ended" ? "Ended" : status === "ringing" ? "Calling…" : "Connecting…";
   const name = other?.display_name ?? "Contact";
 
   // Buttons in the strip must not start a drag or reopen the call.

@@ -4,6 +4,7 @@ import { Capacitor } from "@capacitor/core";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { minimizeTarget } from "@/lib/activeCall";
+import { isLockedCall } from "@/lib/lockedCall";
 
 // Nothing in this app previously listened for the Android hardware/gesture
 // back button. Capacitor's default behavior when a WebView has no more
@@ -46,6 +47,10 @@ export function useBackButtonGuard() {
         // screen, Back minimises the call: it keeps running and a floating
         // bubble brings the user back to it.
         if (path.startsWith("/call/")) {
+          // A call answered on the locked phone stays on its call screen:
+          // minimising would show the app over the lock screen.
+          const callId = new URLSearchParams(locationRef.current.search).get("callId");
+          if (callId && isLockedCall(callId)) return;
           const t = minimizeTarget(path.slice("/call/".length), locationRef.current.state);
           if ("back" in t) navigate(-1);
           else navigate(t.to, { replace: true });

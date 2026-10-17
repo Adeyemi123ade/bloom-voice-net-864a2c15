@@ -103,7 +103,6 @@ export function formatCallMediaError(error: unknown, isVideo: boolean) {
       : "Microphone is busy in another app. Close it and try again.";
   }
 
-  return error instanceof Error
-    ? error.message
-    : `Could not access the ${isVideo ? "microphone and camera" : "microphone"}.`;
+  // Anything else is a technical fault, never shown as is.
+  return `Could not access the ${isVideo ? "microphone and camera" : "microphone"}.`;
 }

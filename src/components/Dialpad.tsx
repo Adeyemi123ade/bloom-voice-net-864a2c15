@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { canStartAnotherCall } from "@/lib/callStart";
 import { Phone, Delete, Search, UserPlus } from "lucide-react";
 import {
   Dialog,
@@ -203,6 +204,7 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
       });
       return;
     }
+    if (!canStartAnotherCall()) return;
     onOpenChange(false);
     navigate(`/dial/${encodeURIComponent(e164)}`);
   };

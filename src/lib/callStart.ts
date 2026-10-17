@@ -1,7 +1,9 @@
 import type { NavigateFunction } from "react-router-dom";
-import { activeCallPath, getActiveCall } from "@/lib/activeCall";
+import { FROM_CALL_BUBBLE, activeCallPath, getActiveCall, getCallsSnapshot } from "@/lib/activeCall";
 import { startCallTimeline } from "@/lib/callTimeline";
 import { tapFeedback } from "@/lib/haptics";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
 
 // Starting a call. The call screen opens IMMEDIATELY on the tap; the slow
 // parts (microphone, saving the call, waking the other phone, the call room)
@@ -31,14 +33,28 @@ export type OutgoingCall = {
   peer: { name: string; avatarUrl?: string | null };
 };
 
+/** Shown when Call is tapped for someone else while a call is on. */
+export const END_CURRENT_CALL_FIRST = "End your current call to start a new one.";
+
+/** False (with a short note) while a ChiChat call is on. */
+export function canStartAnotherCall(): boolean {
+  if (getCallsSnapshot().calls.length === 0) return true;
+  toast({ title: END_CURRENT_CALL_FIRST, duration: 3000 });
+  return false;
+}
+
 /**
  * Open the outgoing call screen now. Repeated taps (within 2 s, or while a
- * call is running) never start a second call; during a call they go back to it.
+ * call is running) never start a second call. During a call, calling the
+ * same person goes back to that call; calling anyone else is refused with a
+ * short note (the call on now has to be ended first).
  */
 export function beginOutgoingCall(call: OutgoingCall, navigate: NavigateFunction): void {
   const active = getActiveCall();
   if (active) {
-    navigate(activeCallPath(active));
+    const same = getCallsSnapshot().calls.find((c) => c.conversationId === call.conversationId);
+    if (same) navigate(activeCallPath(same), { state: { [FROM_CALL_BUBBLE]: true } });
+    else toast({ title: END_CURRENT_CALL_FIRST, duration: 3000 });
     return;
   }
   const now = Date.now();
@@ -52,4 +68,53 @@ export function beginOutgoingCall(call: OutgoingCall, navigate: NavigateFunction
     `/call/${call.conversationId}?type=${call.type}&callId=${callId}&room=${encodeURIComponent(roomName)}&role=caller`,
     { replace: true, state: { peer: call.peer, setup: { calleeId: call.calleeId } } },
   );
+}
+
+export type SavedCall =
+  | { result: "created" }
+  /** A call between these two people is already ringing or on. */
+  | { result: "existing"; call: { id: string; caller_id: string; callee_id: string; status: string; room_name: string; call_type: string; conversation_id: string } }
+  /** The caller is already on another call (maybe on another phone). */
+  | { result: "busy" }
+  | { result: "error" };
+
+type RpcResult = { data: unknown; error: { code?: string; message?: string } | null };
+
+/**
+ * Save a new call. The server does it in one step, so two taps, two phones
+ * or two people calling each other at the same moment can never make two
+ * calls: if a call between the two is already on, that call comes back
+ * instead. (Until the server has that step, the call is saved directly.)
+ */
+export async function saveNewCall(row: {
+  id: string;
+  conversation_id: string;
+  caller_id: string;
+  callee_id: string;
+  room_name: string;
+  call_type: "voice" | "video";
+}): Promise<SavedCall> {
+  const rpc = (supabase as unknown as { rpc: (fn: string, args: object) => PromiseLike<RpcResult> }).rpc.bind(supabase);
+  const r = await Promise.resolve(
+    rpc("start_call", {
+      _id: row.id,
+      _conversation_id: row.conversation_id,
+      _callee_id: row.callee_id,
+      _room_name: row.room_name,
+      _call_type: row.call_type,
+    }),
+  ).catch((e) => ({ data: null, error: { message: String(e) } }) as RpcResult);
+  if (!r.error) {
+    const d = r.data as SavedCall | null;
+    if (d && (d.result === "created" || d.result === "existing" || d.result === "busy")) return d;
+    return { result: "error" };
+  }
+  // The server doesn't have start_call yet: save the call the old way.
+  const missing =
+    r.error.code === "PGRST202" ||
+    r.error.code === "42883" ||
+    /start_call/i.test(r.error.message ?? "");
+  if (!missing) return { result: "error" };
+  const { error } = await supabase.from("calls").insert(row);
+  return error ? { result: "error" } : { result: "created" };
 }

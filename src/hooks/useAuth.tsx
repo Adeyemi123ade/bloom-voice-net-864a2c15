@@ -7,12 +7,18 @@ interface AuthState {
   session: Session | null;
   user: User | null;
   loading: boolean;
+  /**
+   * True only after a real sign out (the user signed out, or the session
+   * was revoked). Not set when the session just couldn't be read in time.
+   */
+  signedOut: boolean;
 }
 
 const AuthContext = createContext<AuthState>({
   session: null,
   user: null,
   loading: true,
+  signedOut: false,
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -20,6 +26,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     session: null,
     user: null,
     loading: true,
+    signedOut: false,
   });
 
   useEffect(() => {
@@ -28,7 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // IMPORTANT: subscribe BEFORE calling getSession to avoid missing events.
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       resolved = true;
-      setState({ session, user: session?.user ?? null, loading: false });
+      setState({ session, user: session?.user ?? null, loading: false, signedOut: event === "SIGNED_OUT" });
       if (event === "SIGNED_OUT") {
         // Saved chats on this device go with the account.
         clearChatCaches();
@@ -52,10 +59,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       resolved = true;
-      setState({ session, user: session?.user ?? null, loading: false });
+      setState((st) => ({ ...st, session, user: session?.user ?? null, loading: false }));
     }).catch(() => {
       resolved = true;
-      setState({ session: null, user: null, loading: false });
+      setState((st) => ({ ...st, session: null, user: null, loading: false }));
     });
 
     // Hard safety net: if neither getSession nor onAuthStateChange resolves
@@ -63,7 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // signed-out state so the UI never hangs on "Signing you in…".
     const failsafe = window.setTimeout(() => {
       if (!resolved) {
-        setState({ session: null, user: null, loading: false });
+        setState((st) => ({ ...st, session: null, user: null, loading: false }));
       }
     }, 8000);
 

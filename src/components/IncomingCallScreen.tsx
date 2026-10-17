@@ -370,89 +370,49 @@ export default function IncomingCallScreen() {
 
   const isVideo = incoming.call_type === "video";
 
-  if (inCall) {
-    // Quarter-screen card over the ongoing call (which stays full screen).
-    return (
-      <div
-        data-testid="call-waiting-card"
-        // About a quarter of the screen (roughly 60% wide x 40% tall), as
-        // sketched: big enough for a clear photo, name, status and buttons.
-        className="fixed z-[100] left-3 top-[calc(env(safe-area-inset-top)+60px)] w-[min(62vw,320px)] h-[min(40vh,340px)] rounded-3xl bg-card/95 backdrop-blur border border-border shadow-xl px-4 py-4 flex flex-col items-center justify-between text-center"
-      >
-        <span className="text-xs uppercase tracking-widest text-muted-foreground inline-flex items-center gap-1.5">
-          Incoming {isVideo ? "video" : "voice"} call
-          {isVideo ? <Video className="w-3.5 h-3.5" /> : <Phone className="w-3.5 h-3.5" />}
-        </span>
-        <div className="call-ring rounded-full my-2" data-testid="waiting-avatar" data-ringing="true">
-          <Avatar className="w-[min(11vh,96px)] h-[min(11vh,96px)] ring-4 ring-primary/30">
-            <AvatarImage src={callerAvatar ?? undefined} />
-            <AvatarFallback className="bg-primary/20 text-foreground text-2xl font-semibold">
-              {initials(callerName)}
-            </AvatarFallback>
-          </Avatar>
-        </div>
-        <div className="w-full min-w-0">
-          <p className="text-lg font-bold text-foreground truncate">{callerName ?? "Unknown"}</p>
-          <p className="text-xs text-muted-foreground">Ringing…</p>
-        </div>
-        <div className="flex w-full gap-2">
-          <button
-            onClick={decline}
-            disabled={accepting}
-            aria-label="Reject call"
-            className="flex-1 h-11 rounded-full bg-destructive text-destructive-foreground text-sm font-semibold inline-flex items-center justify-center gap-1.5 disabled:opacity-50 active:scale-95 transition-transform"
-          >
-            <PhoneOff className="w-4 h-4" /> Reject
-          </button>
-          <button
-            onClick={accept}
-            disabled={accepting}
-            aria-label="Accept call"
-            className="flex-1 h-11 rounded-full bg-primary text-primary-foreground text-sm font-semibold inline-flex items-center justify-center gap-1.5 disabled:opacity-50 active:scale-95 transition-transform"
-          >
-            {isVideo ? <Video className="w-4 h-4" /> : <Phone className="w-4 h-4" />} Accept
-          </button>
-        </div>
-      </div>
-    );
-  }
-
+  // The compact in-app card: about a quarter of the screen, over whatever
+    // is open (the ongoing call when this is a call waiting). With the app
+  // closed or the phone locked, Android's own full-screen call screen
+  // shows instead (IncomingCallActivity).
   return (
-    <div className="fixed inset-0 z-[100] bg-gradient-to-b from-secondary to-background flex flex-col items-center justify-between py-16 px-6">
-      <div className="flex flex-col items-center gap-3 mt-8">
-        <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-muted-foreground">
-          <span>Incoming {isVideo ? "video" : "voice"} call</span>
-          {isVideo ? <Video className="w-3.5 h-3.5" /> : <Phone className="w-3.5 h-3.5" />}
-        </div>
-        {/* Same pulsing rings the caller sees, for as long as it rings. */}
-        <div className="call-ring rounded-full my-8" data-testid="incoming-avatar" data-ringing="true">
-          <Avatar className="w-32 h-32 ring-4 ring-primary/30">
-            <AvatarImage src={callerAvatar ?? undefined} />
-            <AvatarFallback className="bg-primary/20 text-foreground text-4xl font-semibold">
-              {initials(callerName)}
-            </AvatarFallback>
-          </Avatar>
-        </div>
-        <h2 className="text-2xl font-bold text-foreground mt-4">{callerName ?? "Unknown"}</h2>
-        <p className="text-sm text-muted-foreground animate-pulse">Ringing…</p>
+    <div
+      data-testid={inCall ? "call-waiting-card" : "incoming-call-card"}
+      // About a quarter of the screen (roughly 60% wide x 40% tall), as
+      // sketched: big enough for a clear photo, name, status and buttons.
+      className="fixed z-[100] left-3 top-[calc(env(safe-area-inset-top)+60px)] w-[min(62vw,320px)] h-[min(40vh,340px)] rounded-3xl bg-card/95 backdrop-blur border border-border shadow-xl px-4 py-4 flex flex-col items-center justify-between text-center"
+    >
+      <span className="text-xs uppercase tracking-widest text-muted-foreground inline-flex items-center gap-1.5">
+        Incoming {isVideo ? "video" : "voice"} call
+        {isVideo ? <Video className="w-3.5 h-3.5" /> : <Phone className="w-3.5 h-3.5" />}
+      </span>
+      <div className="call-ring rounded-full my-2" data-testid="waiting-avatar" data-ringing="true">
+        <Avatar className="w-[min(11vh,96px)] h-[min(11vh,96px)] ring-4 ring-primary/30">
+          <AvatarImage src={callerAvatar ?? undefined} />
+          <AvatarFallback className="bg-primary/20 text-foreground text-2xl font-semibold">
+            {initials(callerName)}
+          </AvatarFallback>
+        </Avatar>
       </div>
-
-      <div className="flex items-center justify-around w-full max-w-xs">
-        <button onClick={decline} aria-label="Decline call" className="flex flex-col items-center gap-2 active:scale-90 transition-transform">
-          <span className="w-16 h-16 rounded-full bg-destructive hover:bg-destructive/90 flex items-center justify-center shadow-lg">
-            <PhoneOff className="w-7 h-7 text-destructive-foreground" />
-          </span>
-          <span className="text-xs text-foreground">Decline</span>
+      <div className="w-full min-w-0">
+        <p className="text-lg font-bold text-foreground truncate">{callerName ?? "Unknown"}</p>
+        <p className="text-xs text-muted-foreground">Ringing…</p>
+      </div>
+      <div className="flex w-full gap-2">
+        <button
+          onClick={decline}
+          disabled={accepting}
+          aria-label="Reject call"
+          className="flex-1 h-11 rounded-full bg-destructive text-destructive-foreground text-sm font-semibold inline-flex items-center justify-center gap-1.5 disabled:opacity-50 active:scale-95 transition-transform"
+        >
+          <PhoneOff className="w-4 h-4" /> Reject
         </button>
-        <button onClick={accept} aria-label="Accept call" className="flex flex-col items-center gap-2 active:scale-90 transition-transform">
-          <span className="w-16 h-16 rounded-full bg-primary hover:bg-primary/90 flex items-center justify-center shadow-lg animate-pulse">
-            {isVideo ? (
-              <Video className="w-7 h-7 text-primary-foreground" />
-            ) : (
-              <Phone className="w-7 h-7 text-primary-foreground" />
-            )}
-          </span>
-          <span className="text-xs text-foreground">Accept</span>
+        <button
+          onClick={accept}
+          disabled={accepting}
+          aria-label="Accept call"
+          className="flex-1 h-11 rounded-full bg-primary text-primary-foreground text-sm font-semibold inline-flex items-center justify-center gap-1.5 disabled:opacity-50 active:scale-95 transition-transform"
+        >
+          {isVideo ? <Video className="w-4 h-4" /> : <Phone className="w-4 h-4" />} Accept
         </button>
       </div>
     </div>
