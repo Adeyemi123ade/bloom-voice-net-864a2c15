@@ -38,6 +38,7 @@ import ErrorBoundary from "./components/ErrorBoundary.tsx";
 import BackButtonGuard from "./components/BackButtonGuard.tsx";
 import GoogleOAuthReturnListener from "./components/GoogleOAuthReturnListener.tsx";
 import ActiveCallHost from "./components/call/ActiveCallHost.tsx";
+import CallRecovery from "./components/call/CallRecovery.tsx";
 import NativeNavigateBridge from "./components/NativeNavigateBridge.tsx";
 
 const queryClient = new QueryClient();
@@ -87,11 +88,13 @@ const App = () => (
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </ErrorBoundary>
-              {/* Outside <Routes> so an ongoing call survives navigation. */}
-              <ErrorBoundary>
-                <ActiveCallHost />
-              </ErrorBoundary>
             </DeviceGate>
+            {/* Outside <Routes> (and the sign-in gate, which can briefly show
+                a loading screen) so an ongoing call survives navigation. */}
+            <ErrorBoundary>
+              <ActiveCallHost />
+            </ErrorBoundary>
+            <CallRecovery />
           </BrowserRouter>
         </TooltipProvider>
       </AuthProvider>

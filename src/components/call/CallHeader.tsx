@@ -7,6 +7,8 @@ type Props = {
   isVideo: boolean;
   other: Profile | null;
   status: "connecting" | "ringing" | "connected" | "ended";
+  /** The connection dropped and is coming back; the call is still on. */
+  reconnecting?: boolean;
   seconds: number;
   role?: "caller" | "callee";
   /** You put this call on hold, or the other person did. */
@@ -31,6 +33,7 @@ export default function CallHeader({
   isVideo,
   other,
   status,
+  reconnecting = false,
   seconds,
   role = "caller",
   onHold = false,
@@ -86,10 +89,10 @@ export default function CallHeader({
       <p className="text-sm text-muted-foreground">
         {status === "ringing" && "Ringing…"}
         {status === "connecting" && "Connecting…"}
-        {status === "connected" && (onHold ? "On hold" : fmt(seconds))}
+        {status === "connected" && (reconnecting ? "Reconnecting…" : onHold ? "On hold" : fmt(seconds))}
         {status === "ended" && "Call ended"}
       </p>
-      {status === "connected" && !onHold && (
+      {status === "connected" && !onHold && !reconnecting && (
         <span className="mt-1 inline-flex items-center gap-1.5 text-2xs text-accent">
           <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
           Connected

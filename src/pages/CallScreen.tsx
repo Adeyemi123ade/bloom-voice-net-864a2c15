@@ -34,7 +34,7 @@ import {
   takePreparedCallMedia,
 } from "@/lib/callMedia";
 import { getCallToken, prefetchCallToken } from "@/lib/callToken";
-import { markCall } from "@/lib/callTimeline";
+import { markCall, startCallTimeline } from "@/lib/callTimeline";
 import { startCallForegroundService, stopCallForegroundService } from "@/lib/nativeCalls";
 import { isLockedCall } from "@/lib/lockedCall";
 import {
@@ -52,6 +52,20 @@ import {
   type ActiveCallParams,
 } from "@/lib/activeCall";
 import HeldCallCard from "@/components/call/HeldCallCard";
+import { saveNewCall } from "@/lib/callStart";
+import { clearLiveCall, liveCallRecord, saveLiveCall, touchLiveCall, type LiveCallRecord } from "@/lib/liveCallRecord";
+
+/**
+ * How long a call waits for the other person (or for this phone's own
+ * connection) to come back before it counts as lost. A dropped connection,
+ * a phone switching networks, or the other app restarting all come back
+ * within this; only then is the call ended for both.
+ */
+const RECONNECT_GRACE_MS = 60_000;
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const MEDIA_ERRORS = new Set(["NotAllowedError", "NotFoundError", "NotReadableError", "OverconstrainedError", "SecurityError"]);
+const isMediaError = (e: unknown) =>
+  typeof e === "object" && !!e && MEDIA_ERRORS.has(String((e as { name?: string }).name ?? ""));
 
 type Profile = { id: string; display_name: string | null; avatar_url: string | null };
 
@@ -78,7 +92,13 @@ export default function CallSession({
   const onCallScreen = location.pathname === `/call/${conversationId}`;
   const onCallScreenRef = useRef(onCallScreen);
   onCallScreenRef.current = onCallScreen;
-  const { user, loading } = useAuth();
+  const { user, loading, signedOut } = useAuth();
+
+  // Picking up a call this phone was already connected to, after the app
+  // reloaded or Android restarted it: join it again, don't start or answer it.
+  const resumeRef = useRef<LiveCallRecord | null | undefined>(undefined);
+  if (resumeRef.current === undefined) resumeRef.current = callId ? liveCallRecord(callId) : null;
+  const resume = resumeRef.current;
 
   const [other, setOther] = useState<Profile | null>(() =>
     params.peer
@@ -86,8 +106,11 @@ export default function CallSession({
       : null,
   );
   const [status, setStatus] = useState<"connecting" | "ringing" | "connected" | "ended">(
-    role === "caller" ? "ringing" : "connecting",
+    resume ? "connecting" : role === "caller" ? "ringing" : "connecting",
   );
+  // The connection dropped (or the other person's did) and is coming back.
+  // The call is still on: nothing is ended while this shows.
+  const [reconnecting, setReconnecting] = useState(false);
   const [isVideo, setIsVideo] = useState(initialIsVideo);
   const [muted, setMuted] = useState(false);
   // The other person put this call on hold (they're on another call).
@@ -102,7 +125,9 @@ export default function CallSession({
   const [speakerOn, setSpeakerOn] = useState(true);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
   const [canSwitchCamera, setCanSwitchCamera] = useState(false);
-  const [seconds, setSeconds] = useState(0);
+  const [seconds, setSeconds] = useState(() =>
+    resume ? Math.max(0, Math.floor((Date.now() - resume.connectedAt) / 1000)) : 0,
+  );
   const [needsTapForSound, setNeedsTapForSound] = useState(false);
   const [videoSwapped, setVideoSwapped] = useState(false);
   // Tracks rendered by RemoteMedia. Keeping them in state guarantees the
@@ -190,12 +215,12 @@ export default function CallSession({
   // Caller hears classic phone ringback while waiting for the callee to pick up.
   useRingback(role === "caller" && status === "ringing");
 
-  // Signed out mid-call: release the camera/mic and leave the call. (The
-  // route guard handles getting the user to /login.)
+  // Signed out mid-call: end the call. Only a real sign out counts; the
+  // sign-in briefly not being readable (slow network at start up) is not one.
   useEffect(() => {
-    if (!loading && !user) void cleanupAndExit();
+    if (!loading && !user && signedOut) void endCallRef.current();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, user]);
+  }, [loading, user, signedOut]);
 
   useEffect(() => {
     document.title = `${isVideo ? "Video" : "Voice"} call — Chichat`;
@@ -332,6 +357,21 @@ export default function CallSession({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [role, status, callId]);
 
+  // Both people tapped Call at the same moment: this phone answers the
+  // other person's call (already ringing here) instead of making a second one.
+  const answerInstead = (ex: { id: string; conversation_id: string; room_name: string; call_type: string }) => {
+    if (endedRef.current) return;
+    endedRef.current = true;
+    clearPreparedCallMedia();
+    startPreparingCallMedia(ex.call_type === "video").catch(() => {});
+    startCallTimeline(ex.id, "callee");
+    finishActiveCall(callId);
+    navigate(
+      `/call/${ex.conversation_id}?type=${ex.call_type}&callId=${ex.id}&room=${encodeURIComponent(ex.room_name)}&role=callee`,
+      { replace: true, state: { peer: params.peer } },
+    );
+  };
+
   // ── Outgoing setup ───────────────────────────────────────────────────
   // The call screen opened the moment Call was tapped (lib/callStart). Here,
   // behind it: microphone, saving the call, waking the other phone, the call
@@ -339,7 +379,7 @@ export default function CallSession({
   // joins the call while it rings, so answering connects at once.
   const setupStarted = useRef(false);
   useEffect(() => {
-    if (role !== "caller" || !params.setup || !user || setupStarted.current) return;
+    if (role !== "caller" || !params.setup || !user || setupStarted.current || resume) return;
     setupStarted.current = true;
     markCall(callId, "screen");
     const calleeId = params.setup.calleeId;
@@ -365,7 +405,7 @@ export default function CallSession({
       (e) => fail("Call permission needed", formatCallMediaError(e, initialIsVideo)),
     );
     (async () => {
-      const { error } = await supabase.from("calls").insert({
+      const savedCall = await saveNewCall({
         id: callId,
         conversation_id: conversationId,
         caller_id: user.id,
@@ -373,8 +413,28 @@ export default function CallSession({
         room_name: roomName,
         call_type: initialIsVideo ? "video" : "voice",
       });
-      if (error) {
-        fail("Could not start call", error.message);
+      if (savedCall.result === "existing") {
+        const ex = savedCall.call;
+        if (ex.status === "ringing" && ex.callee_id === user.id) {
+          // They're calling at this very moment: answer their call instead
+          // of starting a second one.
+          answerInstead(ex);
+          return;
+        }
+        // Already on a call with this person (on this or another phone).
+        failed = true;
+        endNotice("You're already on a call with this person.");
+        cleanupAndExit({ keepRoom: true });
+        return;
+      }
+      if (savedCall.result === "busy") {
+        failed = true;
+        endNotice("End your current call to start a new one.");
+        cleanupAndExit({ keepRoom: true });
+        return;
+      }
+      if (savedCall.result === "error") {
+        fail("Could not start call", "Please check your connection and try again.");
         return;
       }
       saved = true;
@@ -416,8 +476,16 @@ export default function CallSession({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
+  // Back after a reload: join the same call again. Nothing is saved: the
+  // call never stopped.
   useEffect(() => {
-    if (role !== "callee" || !callId) return;
+    if (!resume) return;
+    void joinRoom({ resume: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (role !== "callee" || !callId || resume) return;
     markCall(callId, "screen");
     // Start joining straight away, alongside saving "accepted" (it used to
     // wait for that round trip first). If the call turns out to be over,
@@ -467,15 +535,22 @@ export default function CallSession({
     }
   };
 
-  const cleanupAndExit = async () => {
+  /**
+   * Close this call on this phone. `keepRoom`: the call room isn't closed
+   * (the call was never started, or carries on elsewhere).
+   */
+  const cleanupAndExit = async (opts: { keepRoom?: boolean } = {}) => {
     if (endedRef.current) return;
     endedRef.current = true;
     setStatus("ended");
+    setReconnecting(false);
+    stopLostGrace();
+    clearLiveCall(callId);
     if (tickTimer.current) window.clearInterval(tickTimer.current);
     try {
       localAudioRef.current?.stop();
       localVideoRef.current?.stop();
-      roomRef.current?.disconnect();
+      leaveRoom();
       if (remoteAudioEl.current) {
         remoteAudioEl.current.pause();
         remoteAudioEl.current.srcObject = null;
@@ -487,7 +562,7 @@ export default function CallSession({
       /* ignore */
     }
     // Close the Twilio room so it can't keep billing as a ghost room.
-    void completeRoom();
+    if (!opts.keepRoom) void completeRoom();
     // Keep Android's call service running while another call is still on.
     const others = getCallsSnapshot().calls.filter((c) => c.callId !== callId);
     if (others.length === 0) void stopCallForegroundService();
@@ -554,7 +629,7 @@ export default function CallSession({
     try {
       localAudioRef.current?.stop();
       localVideoRef.current?.stop();
-      roomRef.current?.disconnect();
+      leaveRoom();
       // Clear video DOM immediately so the local preview disappears the moment the call ends.
       setLocalVideoTrack(null);
       setRemoteVideoTrack(null);
@@ -629,20 +704,111 @@ export default function CallSession({
     participant.on("trackUnsubscribed", (track: RemoteTrack) => detachRemoteTrack(track));
   };
 
+  /** Leave the call room on purpose (so it isn't taken for a lost connection). */
+  const leaveRoom = () => {
+    const room = roomRef.current;
+    roomRef.current = null;
+    try { room?.disconnect(); } catch { /* ignore */ }
+  };
+
+  // ── The other person's connection dropped ─────────────────────────────
+  // Their phone lost signal, switched network or restarted the app. The call
+  // stays on and says "Reconnecting…"; if they're back within the grace
+  // period it carries on. If they hung up, the call's saved status says so
+  // (handled by the status watcher above) and it ends straight away.
+  const lostTimerRef = useRef<number | null>(null);
+  const lostShowRef = useRef<number | null>(null);
+  const stopLostGrace = () => {
+    if (lostTimerRef.current) window.clearTimeout(lostTimerRef.current);
+    if (lostShowRef.current) window.clearTimeout(lostShowRef.current);
+    lostTimerRef.current = null;
+    lostShowRef.current = null;
+  };
+  const startLostGrace = () => {
+    if (endedRef.current || lostTimerRef.current) return;
+    // Not shown for a blip of a second or two.
+    lostShowRef.current = window.setTimeout(() => {
+      if (!endedRef.current && (roomRef.current?.participants.size ?? 0) === 0) setReconnecting(true);
+    }, 2500);
+    lostTimerRef.current = window.setTimeout(async () => {
+      lostTimerRef.current = null;
+      if (endedRef.current) return;
+      if ((roomRef.current?.participants.size ?? 0) > 0) return;
+      const { data } = await supabase.from("calls").select("status").eq("id", callId).maybeSingle();
+      if (endedRef.current) return;
+      if (data?.status && data.status !== "accepted" && data.status !== "ringing") {
+        handleCallStatus(data.status);
+        return;
+      }
+      // Gone for the whole grace period: the call is lost.
+      endNotice("Call disconnected");
+      void endCallRef.current();
+    }, RECONNECT_GRACE_MS);
+  };
+
+  // ── This phone's own connection dropped ───────────────────────────────
+  // The call room connection closed without anyone ending the call: join
+  // again (same microphone and camera) until it's back or the grace period
+  // runs out. Only then does the call end, as a real failure.
+  const rejoiningRef = useRef(false);
+  const rejoin = async () => {
+    if (rejoiningRef.current || endedRef.current) return;
+    rejoiningRef.current = true;
+    setReconnecting(true);
+    const deadline = Date.now() + RECONNECT_GRACE_MS;
+    let delay = 1500;
+    try {
+      while (!endedRef.current && Date.now() < deadline) {
+        await wait(delay);
+        if (endedRef.current) return;
+        delay = Math.min(Math.round(delay * 1.5), 5000);
+        if (typeof navigator !== "undefined" && navigator.onLine === false) continue;
+        // Ended meanwhile (the other person hung up)? Then don't come back.
+        const { data, error } = await supabase.from("calls").select("status").eq("id", callId).maybeSingle();
+        if (endedRef.current) return;
+        if (!error && data?.status && data.status !== "accepted" && data.status !== "ringing") {
+          handleCallStatus(data.status);
+          return;
+        }
+        if (await joinRoom({ rejoin: true })) return;
+      }
+      if (!endedRef.current) {
+        endNotice("Call disconnected");
+        void endCallRef.current();
+      }
+    } finally {
+      rejoiningRef.current = false;
+    }
+  };
+
   /**
    * Join the call room. `early`: the caller joining while it still rings, so
    * the screen keeps ringing and a failure here isn't the end of the call
-   * (joining is tried again when the other person answers).
+   * (joining is tried again when the other person answers). `rejoin`: back
+   * into the call after the connection dropped. `resume`: back into the call
+   * after the app reloaded. Returns whether this phone is in the room.
    */
-  const joinRoom = async (opts: { early?: boolean } = {}) => {
-    if (roomRef.current || joiningRef.current || endedRef.current) return;
+  const joinRoom = async (opts: { early?: boolean; rejoin?: boolean; resume?: boolean } = {}): Promise<boolean> => {
+    if (roomRef.current) return true;
+    if (joiningRef.current || endedRef.current) return false;
     joiningRef.current = true;
-    if (!opts.early) setStatus("connecting");
+    if (!opts.early && !opts.rejoin) setStatus((s) => (s === "connected" ? s : "connecting"));
     try {
       // On Android native, the voice audio route must be active before
       // Twilio starts capturing/publishing WebRTC tracks. Starting this only
       // after "connected" can leave both sides with silent call media.
       await startCallForegroundService();
+
+      const reuse = (t: LocalAudioTrack | LocalVideoTrack | null) =>
+        t && !(t as unknown as { isStopped?: boolean }).isStopped ? t : null;
+      const keptAudio = reuse(localAudioRef.current) as LocalAudioTrack | null;
+      const keptVideo = reuse(localVideoRef.current) as LocalVideoTrack | null;
+      if (opts.rejoin || opts.resume) {
+        // The room may have been closed while nobody was in it: open it again.
+        await supabase.functions
+          .invoke("twilio-room", { body: { action: "create", roomName } })
+          .catch(() => {});
+      }
 
       // Both usually already in hand: the token was fetched while it rang
       // and the microphone was switched on when Call/Accept was tapped.
@@ -651,17 +817,18 @@ export default function CallSession({
           markCall(callId, "token");
           return t;
         }),
-        takePreparedCallMedia(),
+        keptAudio ? Promise.resolve(null) : takePreparedCallMedia(),
       ]);
       if (endedRef.current) {
         try { preparedMedia?.audioTrack.stop(); preparedMedia?.videoTrack?.stop(); } catch { /* ignore */ }
-        return;
+        return false;
       }
-      const audio = preparedMedia?.audioTrack ?? await createLocalAudioTrack();
+      const audio = keptAudio ?? preparedMedia?.audioTrack ?? await createLocalAudioTrack();
       localAudioRef.current = audio;
+      if (mutedRef.current) audio.disable();
       const tracks: (LocalAudioTrack | LocalVideoTrack)[] = [audio];
       if (isVideo) {
-        const video = preparedMedia?.videoTrack ?? await createLocalVideoTrack({ width: 640 });
+        const video = keptVideo ?? preparedMedia?.videoTrack ?? await createLocalVideoTrack({ width: 640 });
         localVideoRef.current = video;
         tracks.push(video);
         setLocalVideoTrack(video);
@@ -677,14 +844,19 @@ export default function CallSession({
       });
       if (endedRef.current) {
         room.disconnect();
-        return;
+        return false;
       }
       roomRef.current = room;
       markCall(callId, "joined");
       // The caller joined while ringing: "connected" only once the other
       // person arrives (participantConnected below).
       const otherHere = room.participants.size > 0;
-      if (role === "callee" || otherHere) markConnected();
+      if (otherHere || (role === "callee" && !opts.rejoin && !opts.resume)) markConnected();
+      else if (opts.rejoin || opts.resume) {
+        // Back in, but the other person isn't (yet): wait for them.
+        if (connectedRef.current || opts.resume) startLostGrace();
+      }
+      if (!otherHere && opts.rejoin && !connectedRef.current) setReconnecting(false);
       // Put on hold before it connected (e.g. a call came in while ringing).
       if (heldRef.current) {
         localAudioRef.current?.disable();
@@ -697,26 +869,47 @@ export default function CallSession({
         markConnected();
       });
       room.on("participantDisconnected", () => {
-        // Twilio fires this on transient network blips during ICE/DTLS renegotiation.
-        // Wait briefly and only end the call if the remote really stayed gone.
-        window.setTimeout(() => {
-          if (endedRef.current) return;
-          if (!roomRef.current) return;
-          if (roomRef.current.participants.size === 0) {
-            toast({ title: "Other participant left" });
-            endCall();
-          }
-        }, 3500);
+        // Never ends the call by itself (see startLostGrace).
+        if (room.participants.size === 0) startLostGrace();
       });
-      room.on("disconnected", cleanupAndExit);
+      // Twilio is getting this phone's connection back by itself.
+      room.on("reconnecting", () => {
+        if (!endedRef.current) setReconnecting(true);
+      });
+      room.on("reconnected", () => {
+        if (!endedRef.current && room.participants.size > 0) setReconnecting(false);
+      });
+      room.on("disconnected", (_r: Room, error?: { code?: number }) => {
+        if (endedRef.current || roomRef.current !== room) return; // left on purpose
+        roomRef.current = null;
+        setRemoteVideoTrack(null);
+        if (error?.code === 53205) {
+          // This account joined the same call from another phone, which
+          // carries the call on. Leave it here quietly.
+          endNotice("Call moved to another device");
+          void cleanupAndExit({ keepRoom: true });
+          return;
+        }
+        void rejoin();
+      });
 
       // Make sure audio element is unmuted + ready.
       void tryPlayRemoteAudio();
+      return true;
     } catch (err) {
       if (opts.early) {
         // Not fatal while it's still ringing: joining is tried again on answer.
         console.warn("[call] early join failed", err);
-        return;
+        return false;
+      }
+      if (opts.rejoin) return false; // rejoin() keeps trying
+      if (!isMediaError(err)) {
+        // A network problem joining: keep trying for a while rather than
+        // dropping the call at once.
+        console.warn("[call] join failed, retrying", err);
+        joiningRef.current = false;
+        void rejoin();
+        return false;
       }
       const msg = formatCallMediaError(err, isVideo);
       endNotice("Call failed", { description: msg, destructive: true });
@@ -728,16 +921,26 @@ export default function CallSession({
         .in("status", ["ringing", "accepted"])
         .then(() => {});
       cleanupAndExit();
+      return false;
     } finally {
       joiningRef.current = false;
     }
   };
 
   const markConnected = () => {
-    if (connectedRef.current || endedRef.current) return;
+    stopLostGrace();
+    setReconnecting(false);
+    if (endedRef.current) return;
+    if (connectedRef.current) {
+      setStatus("connected");
+      return;
+    }
     connectedRef.current = true;
     setStatus("connected");
     markCall(callId, "connected");
+    // Remember the call on this phone, so it can be picked up again if the
+    // app reloads.
+    saveLiveCall(params, resume?.connectedAt ?? Date.now());
   };
 
   const toggleMute = () => {
@@ -902,9 +1105,6 @@ export default function CallSession({
     }
   };
 
-  // Safety nets so a camera/mic can never be left running without a call UI.
-  // 1. This session unmounting while the call is still live (it normally
-  //    only unmounts after cleanupAndExit) ends the call for BOTH sides.
   const endCallRef = useRef(endCall);
   endCallRef.current = endCall;
 
@@ -947,26 +1147,76 @@ export default function CallSession({
     }
     void callChannelRef.current?.send({ type: "broadcast", event: "hold", payload: { held } });
   }, [held]);
+  // Safety nets so a camera/mic can never be left running without a call UI.
+  // Neither of these ENDS the call: only End, the other person hanging up,
+  // or a connection that never comes back does. The other person sees
+  // "Reconnecting…" and this phone joins again when the app is back
+  // (CallRecovery picks the call up).
+  // 1. This session being taken down while the call is still on (it
+  //    normally only goes once the call is over): leave the room here.
   useEffect(() => {
     return () => {
-      if (!endedRef.current) void endCallRef.current();
+      if (endedRef.current) return;
+      stopLostGrace();
+      try {
+        localAudioRef.current?.stop();
+        localVideoRef.current?.stop();
+      } catch { /* ignore */ }
+      leaveRoom();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  // 2. Tab closed / reloaded / navigated off-site mid-call: release the
-  //    camera and mic and leave the room. The other side sees the
-  //    participant leave and ends the call on its end.
+  // 2. The page itself closing or reloading mid-call: release the camera
+  //    and mic and leave the room. If the page comes back from the
+  //    browser's cache instead, join the call again.
   useEffect(() => {
     const onPageHide = () => {
       if (endedRef.current) return;
       try {
         localAudioRef.current?.stop();
         localVideoRef.current?.stop();
-        roomRef.current?.disconnect();
       } catch { /* ignore */ }
+      leaveRoom();
+    };
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (e.persisted && !endedRef.current && !roomRef.current) void rejoin();
     };
     window.addEventListener("pagehide", onPageHide);
-    return () => window.removeEventListener("pagehide", onPageHide);
+    window.addEventListener("pageshow", onPageShow);
+    return () => {
+      window.removeEventListener("pagehide", onPageHide);
+      window.removeEventListener("pageshow", onPageShow);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // While the call is on: note it on this phone every few seconds (so a
+  // reload can pick it up), and on the server every 20 s, so a call left
+  // open by a phone that died is recognised as over and never blocks new
+  // calls between the two.
+  useEffect(() => {
+    if (status !== "connected" || !callId) return;
+    let serverBeat = true;
+    const beat = () => {
+      supabase
+        .from("calls")
+        .update({ last_active_at: new Date().toISOString() } as never)
+        .eq("id", callId)
+        .eq("status", "accepted")
+        .then(({ error }) => {
+          // Server without the column yet: stop trying.
+          if (error) serverBeat = false;
+        });
+    };
+    beat();
+    let n = 0;
+    const id = window.setInterval(() => {
+      touchLiveCall(callId);
+      n += 1;
+      if (serverBeat && n % 4 === 0) beat();
+    }, 5000);
+    return () => window.clearInterval(id);
+  }, [status, callId]);
 
   // Leave the call screen without ending the call.
   const minimize = () => {
@@ -1009,6 +1259,7 @@ export default function CallSession({
           isVideo={isVideo}
           other={other}
           status={status}
+          reconnecting={reconnecting && status === "connected"}
           seconds={seconds}
           remoteVideoTrack={remoteVideoTrack}
           localVideoTrack={localVideoTrack}
@@ -1055,6 +1306,7 @@ export default function CallSession({
             isVideo={isVideo}
             other={other}
             status={status}
+            reconnecting={reconnecting && status === "connected"}
             seconds={seconds}
             role={role}
             onHold={onHold}

@@ -142,8 +142,23 @@ public class MainActivity extends BridgeActivity {
         String base = bridge.getServerUrl() != null
                 ? bridge.getServerUrl()
                 : bridge.getLocalUrl();
+        // Move inside the running app, never reload it: a reload would cut
+        // off a call that is on (minimised) while the chat is opened.
+        navigateInApp(base, "/chat/" + enc(conversationId));
+    }
+
+    /**
+     * Go to a screen inside the running web app (instant, keeps any call
+     * on). Only if the app isn't running yet is the page loaded fresh.
+     */
+    private void navigateInApp(String base, String route) {
         WebView webView = bridge.getWebView();
-        webView.post(() -> webView.loadUrl(base + "/chat/" + enc(conversationId)));
+        webView.post(() -> webView.evaluateJavascript(
+                "(function(){if(window.__chichatNavigate){window.__chichatNavigate('"
+                        + route.replace("'", "%27") + "');return 'ok';}return 'no';})()",
+                result -> {
+                    if (result == null || !result.contains("ok")) webView.loadUrl(base + route);
+                }));
     }
 
     private void openCallFromIntent(Intent intent) {
@@ -187,13 +202,7 @@ public class MainActivity extends BridgeActivity {
 
         // If the app is already running, move to the call inside it (fast)
         // instead of reloading the whole app; reload only if that fails.
-        WebView webView = bridge.getWebView();
-        webView.post(() -> webView.evaluateJavascript(
-                "(function(){if(window.__chichatNavigate){window.__chichatNavigate('"
-                        + target.replace("'", "%27") + "');return 'ok';}return 'no';})()",
-                result -> {
-                    if (result == null || !result.contains("ok")) webView.loadUrl(base + target);
-                }));
+        navigateInApp(base, target);
     }
 
     private boolean isPhoneLocked() {

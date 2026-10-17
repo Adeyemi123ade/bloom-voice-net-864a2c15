@@ -22,7 +22,7 @@ import ContactInfoSheet from "@/components/chat/ContactInfoSheet";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { activeCallPath, getActiveCall } from "@/lib/activeCall";
+import { FROM_CALL_BUBBLE, activeCallPath, swapToCall, useCalls } from "@/lib/activeCall";
 import { isReallyOnline } from "@/lib/presence";
 import { pickRecordingMimeType, extensionForMimeType, baseMimeType } from "@/lib/audioMime";
 import { checkMicPrerequisites, describeMicError } from "@/lib/micPermission";
@@ -649,6 +649,15 @@ export default function ChatRoom() {
     didInitialScroll.current = false;
     prevMsgCount.current = 0;
   }, [conversationId]);
+
+  // A call with this person that is on right now (maybe minimised).
+  const callsSnap = useCalls();
+  const chatCall = callsSnap.calls.find((c) => c.conversationId === conversationId) ?? null;
+  const returnToChatCall = () => {
+    if (!chatCall) return;
+    if (chatCall.held) swapToCall(chatCall.callId);
+    navigate(activeCallPath(chatCall), { state: { [FROM_CALL_BUBBLE]: true } });
+  };
 
   const startCall = (type: "voice" | "video") => {
     if (!user || !conversationId || !other) return;
@@ -1514,6 +1523,19 @@ export default function ChatRoom() {
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
+        )}
+
+        {chatCall && (
+          <button
+            type="button"
+            data-testid="chat-ongoing-call"
+            onClick={returnToChatCall}
+            className="w-full flex items-center justify-center gap-2 py-2 bg-primary text-primary-foreground text-sm font-medium active:opacity-90"
+          >
+            {chatCall.initialIsVideo ? <Video className="w-4 h-4" /> : <Phone className="w-4 h-4" />}
+            {chatCall.held ? "Call on hold" : chatCall.initialIsVideo ? "Ongoing video call" : "Ongoing voice call"}
+            <span className="opacity-80">· Tap to return</span>
+          </button>
         )}
 
         {/* Messages */}

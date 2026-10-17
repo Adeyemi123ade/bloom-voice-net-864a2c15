@@ -19,7 +19,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { useInviteLink } from "@/hooks/useInviteLink";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { activeCallPath, getActiveCall } from "@/lib/activeCall";
 import { formatDisplay } from "@/lib/phone";
 import {
   DeviceContact,
@@ -46,7 +45,7 @@ import {
 import { ActiveRow, EmptyState, InviteRow } from "@/components/contacts/ContactRows";
 import { SectionList, sectionLetter } from "@/components/contacts/ContactSectionList";
 import { shareChichatInvite } from "@/components/contacts/ShareInviteCard";
-import { beginOutgoingCall } from "@/lib/callStart";
+import { beginOutgoingCall, canStartAnotherCall } from "@/lib/callStart";
 
 export default function Contacts() {
   const navigate = useNavigate();
@@ -327,12 +326,8 @@ export default function Contacts() {
 
   const callActive = async (c: ActiveContact) => {
     if (!user || startingCall.current) return;
-    const activeCall = getActiveCall();
-    if (activeCall) {
-      // Quietly back to the call in progress.
-      navigate(activeCallPath(activeCall));
-      return;
-    }
+    // During a call: the same person goes back to it, anyone else gets a
+    // short note (beginOutgoingCall). Never a second call.
     startingCall.current = true;
     try {
       // The conversation is needed for the call's address; usually instant.
@@ -351,9 +346,8 @@ export default function Contacts() {
         },
         navigate,
       );
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Could not start call";
-      toast({ title: "Call failed", description: msg, variant: "destructive" });
+    } catch {
+      toast({ title: "Call failed", description: "Please check your connection and try again.", variant: "destructive" });
     } finally {
       startingCall.current = false;
     }
@@ -428,7 +422,9 @@ export default function Contacts() {
         {
           label: "Call this number",
           icon: Phone,
-          onClick: () => navigate(`/dial/${encodeURIComponent(c.phone)}`),
+          onClick: () => {
+            if (canStartAnotherCall()) navigate(`/dial/${encodeURIComponent(c.phone)}`);
+          },
         },
         {
           label: "Edit name",

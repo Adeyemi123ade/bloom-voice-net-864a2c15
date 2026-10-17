@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { getCallsSnapshot, requestEndCall } from "@/lib/activeCall";
 import { useNavigate } from "react-router-dom";
 import {
   ChevronDown,
@@ -62,6 +63,12 @@ export default function Settings() {
   const signOutWeb = async () => {
     setWorking(true);
     try {
+      // Signing out is a deliberate end to any call that is on.
+      const calls = getCallsSnapshot().calls;
+      if (calls.length) {
+        calls.forEach((c) => requestEndCall(c.callId));
+        await new Promise((r) => setTimeout(r, 800));
+      }
       await unregisterCallPush();
       try { await supabase.auth.signOut(); } catch { /* ignore */ }
       toast({ title: "Signed out" });
