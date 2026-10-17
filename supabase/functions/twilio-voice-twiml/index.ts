@@ -23,6 +23,23 @@
 // exact webhook URL configured in the Twilio Console if this function ever
 // runs behind a proxy that rewrites the path seen by `req.url`.
 
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
+import {
+  DAILY_LIMIT_SECONDS,
+  MAX_CALL_SECONDS,
+  isAccountTooNew,
+  isAllowedNumber,
+  loadAccountCreatedAt,
+  loadUsage,
+  normaliseNumber,
+} from "../_shared/paidCallRules.ts";
+
+// Paid-call limits (see _shared/paidCallRules.ts): only allowed countries,
+// a daily minutes cap per person, a maximum call length, and no paid calls
+// in an account's first 24 hours. Each call is recorded in outbound_calls;
+// Twilio reports the real length back to this function (the <Dial action>
+// below) when the call ends.
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "*",
@@ -32,6 +49,21 @@ function escapeXml(s: string) {
   return s.replace(/[<>&'"]/g, (c) =>
     ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", "'": "&apos;", '"': "&quot;" })[c]!,
   );
+}
+
+function sayAndHangUp(text: string): Response {
+  return new Response(
+    `<?xml version="1.0" encoding="UTF-8"?><Response><Say>${escapeXml(text)}</Say><Hangup/></Response>`,
+    { headers: { "Content-Type": "text/xml" }, status: 200 },
+  );
+}
+
+/** The address Twilio should call back, without any query string. */
+function baseUrl(req: Request): string {
+  const configured = Deno.env.get("TWILIO_VOICE_TWIML_URL")?.trim();
+  if (configured) return configured;
+  const u = new URL(req.url);
+  return `${u.origin}${u.pathname}`;
 }
 
 function timingSafeEqual(a: string, b: string): boolean {
@@ -51,7 +83,10 @@ async function isValidTwilioRequest(
   const signature = req.headers.get("X-Twilio-Signature");
   if (!signature) return false;
 
-  const url = Deno.env.get("TWILIO_VOICE_TWIML_URL")?.trim() || req.url;
+  // Twilio signs the exact URL it called, query string included (the end of
+  // call report below carries ?event=done&id=...).
+  const configured = Deno.env.get("TWILIO_VOICE_TWIML_URL")?.trim();
+  const url = configured ? configured + new URL(req.url).search : req.url;
 
   let data = url;
   for (const key of Object.keys(params).sort()) {
@@ -103,18 +138,78 @@ Deno.serve(async (req) => {
       return new Response("Invalid signature", { status: 403 });
     }
 
-    const to = (params["To"] ?? "").trim();
+    const admin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
+    const query = new URL(req.url).searchParams;
 
-    if (!to) {
+    // End-of-call report from <Dial action>: store the real length.
+    if (query.get("event") === "done") {
+      const id = query.get("id");
+      const duration = Number.parseInt(params["DialCallDuration"] ?? "0", 10);
+      if (id) {
+        const { error } = await admin
+          .from("outbound_calls")
+          .update({
+            duration_seconds: Number.isFinite(duration) ? Math.max(0, duration) : 0,
+            ended_at: new Date().toISOString(),
+            status: params["DialCallStatus"] ?? null,
+          })
+          .eq("id", id);
+        if (error) console.error("twilio-voice-twiml: could not save call length", error.message);
+      }
       return new Response(
-        `<?xml version="1.0" encoding="UTF-8"?><Response><Say>No destination provided.</Say></Response>`,
-        { headers: { "Content-Type": "text/xml" } },
+        `<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>`,
+        { headers: { "Content-Type": "text/xml" }, status: 200 },
       );
     }
 
+    // Who is calling: the Voice SDK sends "client:<identity>", and the
+    // identity is the user id put in the token by twilio-voice-token.
+    const from = params["From"] ?? params["Caller"] ?? "";
+    const userId = from.startsWith("client:") ? from.slice("client:".length) : "";
+    if (!/^[0-9a-f-]{36}$/i.test(userId)) {
+      console.error("twilio-voice-twiml: unknown caller", from);
+      return sayAndHangUp("This call cannot be made.");
+    }
+
+    const to = normaliseNumber(params["To"] ?? "");
+    if (!isAllowedNumber(to)) {
+      return sayAndHangUp("Calls to this number are not available.");
+    }
+
+    const createdAt = await loadAccountCreatedAt(admin, userId);
+    if (isAccountTooNew(createdAt)) {
+      return sayAndHangUp("Phone calls are available 24 hours after you join ChiChat.");
+    }
+
+    const remaining = DAILY_LIMIT_SECONDS - (await loadUsage(admin, userId));
+    if (remaining < 30) {
+      return sayAndHangUp("You have used today's phone call minutes. Please try again tomorrow.");
+    }
+    const limit = Math.min(MAX_CALL_SECONDS, remaining);
+
+    const { data: row, error: insErr } = await admin
+      .from("outbound_calls")
+      .insert({
+        user_id: userId,
+        to_number: to,
+        call_sid: params["CallSid"] ?? null,
+        max_seconds: limit,
+      })
+      .select("id")
+      .single();
+    if (insErr || !row) {
+      // Fail closed: if the call can't be counted, it isn't placed.
+      console.error("twilio-voice-twiml: could not record call", insErr?.message);
+      return sayAndHangUp("This call cannot be made right now. Please try again.");
+    }
+
+    const action = `${baseUrl(req)}?event=done&id=${encodeURIComponent(row.id)}`;
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Dial callerId="${escapeXml(callerId)}" answerOnBridge="true">
+  <Dial callerId="${escapeXml(callerId)}" answerOnBridge="true" timeLimit="${limit}" action="${escapeXml(action)}" method="POST">
     <Number>${escapeXml(to)}</Number>
   </Dial>
 </Response>`;

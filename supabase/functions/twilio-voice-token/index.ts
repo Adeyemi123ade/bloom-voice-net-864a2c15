@@ -1,6 +1,12 @@
 // Mints a Twilio Voice SDK access token bound to a TwiML App for outbound PSTN calls.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
 import { create, getNumericDate } from "https://deno.land/x/djwt@v3.0.2/mod.ts";
+import {
+  DAILY_LIMIT_SECONDS,
+  isAccountTooNew,
+  loadAccountCreatedAt,
+  loadUsage,
+} from "../_shared/paidCallRules.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -41,6 +47,27 @@ Deno.serve(async (req) => {
       });
     }
     const userId = claimsData.claims.sub as string;
+
+    // Paid-call limits, checked before a call can start. twilio-voice-twiml
+    // checks them again (it's the only place a number is dialled), so these
+    // checks are about telling the person clearly, not the last line of
+    // defence. Answered with 200 + `blocked` so the app can read the reason.
+    const admin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
+    const createdAt = await loadAccountCreatedAt(admin, userId);
+    if (isAccountTooNew(createdAt)) {
+      return new Response(JSON.stringify({ blocked: "too_new" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const used = await loadUsage(admin, userId);
+    if (used >= DAILY_LIMIT_SECONDS) {
+      return new Response(JSON.stringify({ blocked: "daily_limit" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const now = Math.floor(Date.now() / 1000);
     const payload = {
