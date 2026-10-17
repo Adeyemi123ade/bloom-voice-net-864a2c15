@@ -35,6 +35,7 @@ Deno.serve(async (req) => {
 
     const expected = await sign(`${callId}:${calleeId}:decline`);
     if (token !== expected) {
+      console.warn("decline refused: token does not match", callId);
       return new Response(JSON.stringify({ error: "invalid token" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -45,13 +46,17 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
-    const { error } = await supabase
+    const { data: updated, error } = await supabase
       .from("calls")
       .update({ status: "declined", ended_at: new Date().toISOString() })
       .eq("id", callId)
       .eq("callee_id", calleeId)
-      .eq("status", "ringing");
+      .eq("status", "ringing")
+      .select("id");
     if (error) throw error;
+    // Shows in the function's Logs: 1 = the caller is told now; 0 = the call
+    // had already been answered, ended or timed out.
+    console.log("decline", callId, "rows updated:", updated?.length ?? 0);
 
     return new Response(JSON.stringify({ ok: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
