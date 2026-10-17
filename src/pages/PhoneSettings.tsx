@@ -26,6 +26,7 @@ import {
   CustomRingtone,
 } from "@/lib/ringtones";
 import { useBackNavigation } from "@/hooks/useBackNavigation";
+import { syncNativeRingtone } from "@/lib/nativeRingtone";
 
 /** "4.2 MB", "820 KB". */
 function formatSize(bytes: number): string {
@@ -96,6 +97,8 @@ export default function PhoneSettings() {
   const choose = (id: RingtoneId) => {
     setSelected(id);
     setSelectedRingtone(id);
+    // The phone app rings with the same tone when ChiChat is closed.
+    void syncNativeRingtone();
     toast({ title: "Ringtone updated" });
   };
 
@@ -132,6 +135,7 @@ export default function PhoneSettings() {
     if (selected === "custom:user") {
       setSelected(DEFAULT_RINGTONE);
       setSelectedRingtone(DEFAULT_RINGTONE);
+      void syncNativeRingtone();
     }
   };
 

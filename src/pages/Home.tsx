@@ -29,6 +29,7 @@ import {
 } from "@/lib/chat/chatList";
 import Dialpad from "@/components/Dialpad";
 import { runFirstStartSetup } from "@/lib/appSettings";
+import { syncNativeRingtone } from "@/lib/nativeRingtone";
 
 type Profile = {
   id: string;
@@ -108,7 +109,10 @@ export default function Home() {
   // First start on Android: ask once to run in the background, so calls
   // ring with the app closed.
   useEffect(() => {
-    if (user) void runFirstStartSetup();
+    if (!user) return;
+    void runFirstStartSetup();
+    // The phone app needs its own copy of the chosen ringtone.
+    void syncNativeRingtone();
   }, [user]);
 
   // Daily auto-backup on app open (once per day, silent)

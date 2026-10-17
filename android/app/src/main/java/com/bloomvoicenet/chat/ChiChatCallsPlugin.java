@@ -239,4 +239,63 @@ public class ChiChatCallsPlugin extends Plugin {
         openAppDetails();
         call.resolve();
     }
+
+    // ── Ringtone for calls while ChiChat is closed ──────────────────────
+    // The web app sends its chosen tone in base64 pieces (files can be
+    // 50 MB): begin, append…, commit. CallRinger plays the committed file.
+
+    private java.io.File toneTmp() {
+        java.io.File dir = new java.io.File(getContext().getFilesDir(), "ringtone");
+        dir.mkdirs();
+        return new java.io.File(dir, "incoming.tmp");
+    }
+
+    private String toneExt = "audio";
+
+    @PluginMethod
+    public void ringtoneBegin(PluginCall call) {
+        String ext = call.getString("ext", "audio");
+        toneExt = ext == null || !ext.matches("[a-z0-9]{1,5}") ? "audio" : ext;
+        java.io.File tmp = toneTmp();
+        if (tmp.exists() && !tmp.delete()) {
+            call.reject("could not reset");
+            return;
+        }
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void ringtoneAppend(PluginCall call) {
+        String data = call.getString("data");
+        if (data == null) {
+            call.reject("no data");
+            return;
+        }
+        try (java.io.FileOutputStream out = new java.io.FileOutputStream(toneTmp(), true)) {
+            out.write(android.util.Base64.decode(data, android.util.Base64.DEFAULT));
+            call.resolve();
+        } catch (Throwable t) {
+            call.reject("write failed");
+        }
+    }
+
+    @PluginMethod
+    public void ringtoneCommit(PluginCall call) {
+        java.io.File tmp = toneTmp();
+        java.io.File dir = tmp.getParentFile();
+        java.io.File target = new java.io.File(dir, "incoming_" + System.currentTimeMillis() + "." + toneExt);
+        if (!tmp.isFile() || tmp.length() == 0 || !tmp.renameTo(target)) {
+            call.reject("nothing to save");
+            return;
+        }
+        getContext().getSharedPreferences(CallRinger.PREFS, Context.MODE_PRIVATE)
+            .edit().putString(CallRinger.KEY_PATH, target.getAbsolutePath()).apply();
+        java.io.File[] old = dir.listFiles();
+        if (old != null) {
+            for (java.io.File f : old) {
+                if (!f.equals(target)) f.delete();
+            }
+        }
+        call.resolve();
+    }
 }
