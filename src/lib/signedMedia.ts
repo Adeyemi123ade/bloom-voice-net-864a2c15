@@ -1,9 +1,10 @@
 /**
  * Signed-URL helper for chat-media attachments.
  *
- * Staged rollout: the `chat-media` bucket is still public, so falling back to
- * the original URL is safe. Once the bucket is privatized, the fallback
- * becomes a no-op (image just won't render) but normal flow keeps working.
+ * The `chat-media` bucket is private (migration 20261017130000): only people
+ * in the chat can open a file, and only through a signed link made here.
+ * Falling back to the original URL is kept only for the moment a signed link
+ * can't be made (offline); it no longer opens the file by itself.
  *
  * Stored message URLs may be in either form:
  *   .../storage/v1/object/public/chat-media/<path>
@@ -45,7 +46,7 @@ export async function getSignedChatMediaUrl(originalUrl: string): Promise<string
   const inflight = (async () => {
     const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, EXPIRY_SEC);
     if (error || !data?.signedUrl) {
-      // Fallback: while bucket is still public, original URL works.
+      // Can't sign right now (offline, or no access): leave the stored URL.
       return originalUrl;
     }
     cache.set(path, { url: data.signedUrl, expiresAt: Date.now() + EXPIRY_SEC * 1000 });
