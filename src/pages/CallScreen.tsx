@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
-  connect,
   createLocalAudioTrack,
   createLocalVideoTrack,
   type LocalAudioTrack,
@@ -33,7 +32,8 @@ import {
   startPreparingCallMedia,
   takePreparedCallMedia,
 } from "@/lib/callMedia";
-import { getCallToken, prefetchCallToken } from "@/lib/callToken";
+import { getCallToken, prefetchCallToken, renewCallToken } from "@/lib/callToken";
+import { connectCall, roomNeedsTwilioSetup } from "@/lib/callEngine";
 import { markCall, startCallTimeline } from "@/lib/callTimeline";
 import { startCallForegroundService, stopCallForegroundService } from "@/lib/nativeCalls";
 import { isLockedCall } from "@/lib/lockedCall";
@@ -458,12 +458,14 @@ export default function CallSession({
         })
         .then(() => markCall(callId, "push"), (e) => console.warn("[call-push] failed", e));
       prefetchCallToken(roomName);
-      const room = supabase.functions
-        .invoke("twilio-room", { body: { action: "create", roomName } })
-        .then(({ error: roomErr }) => {
-          if (roomErr) throw roomErr;
-          markCall(callId, "room");
-        });
+      const room = roomNeedsTwilioSetup(roomName)
+        ? supabase.functions
+            .invoke("twilio-room", { body: { action: "create", roomName } })
+            .then(({ error: roomErr }) => {
+              if (roomErr) throw roomErr;
+              markCall(callId, "room");
+            })
+        : Promise.resolve();
       try {
         await media;
       } catch {
@@ -529,7 +531,7 @@ export default function CallSession({
   }, [status]);
 
   const completeRoom = async () => {
-    if (!roomName) return;
+    if (!roomName || !roomNeedsTwilioSetup(roomName)) return;
     try {
       await supabase.functions.invoke("twilio-room", {
         body: { action: "complete", roomName },
@@ -807,7 +809,7 @@ export default function CallSession({
         t && !(t as unknown as { isStopped?: boolean }).isStopped ? t : null;
       const keptAudio = reuse(localAudioRef.current) as LocalAudioTrack | null;
       const keptVideo = reuse(localVideoRef.current) as LocalVideoTrack | null;
-      if (opts.rejoin || opts.resume) {
+      if ((opts.rejoin || opts.resume) && roomNeedsTwilioSetup(roomName)) {
         // The room may have been closed while nobody was in it: open it again.
         await supabase.functions
           .invoke("twilio-room", { body: { action: "create", roomName } })
@@ -841,11 +843,7 @@ export default function CallSession({
         try { preparedMedia.videoTrack.stop(); } catch { /* ignore */ }
       }
 
-      const room = await connect(token, {
-        name: roomName,
-        tracks,
-        dominantSpeaker: false,
-      });
+      const room = await connectCall(roomName, token, tracks, () => renewCallToken(roomName));
       if (endedRef.current) {
         room.disconnect();
         return false;
