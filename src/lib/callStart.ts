@@ -4,6 +4,7 @@ import { startCallTimeline } from "@/lib/callTimeline";
 import { tapFeedback } from "@/lib/haptics";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { newRoomName } from "@/lib/callEngine";
 
 // Starting a call. The call screen opens IMMEDIATELY on the tap; the slow
 // parts (microphone, saving the call, waking the other phone, the call room)
@@ -62,7 +63,7 @@ export function beginOutgoingCall(call: OutgoingCall, navigate: NavigateFunction
   lastStart = now;
   tapFeedback();
   const callId = newId();
-  const roomName = `chichat-${call.conversationId}-${now}`;
+  const roomName = newRoomName(call.conversationId, now);
   startCallTimeline(callId, "caller");
   navigate(
     `/call/${call.conversationId}?type=${call.type}&callId=${callId}&room=${encodeURIComponent(roomName)}&role=caller`,
