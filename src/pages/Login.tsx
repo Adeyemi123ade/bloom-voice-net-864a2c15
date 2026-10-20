@@ -1,3 +1,4 @@
+import { takeAfterSignIn } from "@/lib/afterSignIn";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -61,7 +62,7 @@ export default function Login() {
       navigate("/reset-password", { replace: true });
       return;
     }
-    navigate("/home", { replace: true });
+    navigate(takeAfterSignIn(), { replace: true });
   }, [authLoading, user, navigate]);
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
@@ -179,7 +180,7 @@ export default function Login() {
       clearRecoveryPending(data.session.user.id as string);
     }
     toast({ title: t("login.title") });
-    navigate("/home");
+    navigate(takeAfterSignIn());
   };
 
   return (

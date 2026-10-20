@@ -8,7 +8,7 @@ export default function TermsOfService() {
   return (
     <LegalPage
       title="Terms of Service"
-      lastUpdated="2026-10-13"
+      lastUpdated="2026-10-21"
       other={{ to: "/privacy", label: "Privacy Policy" }}
     >
       <LegalSection title="Agreement to These Terms">
@@ -53,6 +53,41 @@ export default function TermsOfService() {
             "Collect information about other users, including by scraping or by checking phone numbers in bulk.",
           ]}
         />
+      </LegalSection>
+
+      <LegalSection title="Reporting, Blocking and Enforcement">
+        <p>
+          You can block anyone from their chat or contact screen, and report a person or a single
+          message from the same menus. A blocked person can't message or call you, or see your
+          photo and last seen. People who aren't in your contacts reach you first as a message
+          request, which you can accept, block or report.
+        </p>
+        <p>
+          The ChiChat team reviews every report. If we find that someone broke these terms, we may
+          warn them, limit what they can do, or suspend their account. A suspended person's email
+          address and phone number can be kept on a block list so they can't simply register
+          again. New accounts have limits on how many new chats and calls they can start, to stop
+          spam.
+        </p>
+      </LegalSection>
+
+      <LegalSection title="Child Safety">
+        <p>
+          ChiChat has zero tolerance for child sexual abuse and exploitation. Sharing, requesting
+          or promoting such material, or using ChiChat to groom or contact a child for sexual
+          purposes, is forbidden. Accounts involved are suspended permanently, the material is
+          preserved only as required by law, and we report it to the relevant authorities,
+          including the National Center for Missing &amp; Exploited Children (NCMEC) where
+          applicable.
+        </p>
+        <p>
+          To report a concern about child safety, use Report in the app or write to our child
+          safety contact at{" "}
+          <a href="mailto:techpath411@gmail.com" className="text-primary underline underline-offset-2">
+            techpath411@gmail.com
+          </a>
+          . We act on these reports first.
+        </p>
       </LegalSection>
 
       <LegalSection title="Your Content">

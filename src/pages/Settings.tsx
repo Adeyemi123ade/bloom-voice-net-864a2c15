@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { getMyBackup, type BackupRow } from "@/lib/chatBackup";
 import { amIAdmin } from "@/lib/admin";
+import { deleteMyAccount } from "@/lib/deleteAccount";
 import { APP_BUILD } from "@/lib/appBuild";
 
 export default function Settings() {
@@ -110,30 +111,15 @@ export default function Settings() {
   // this is the only supported way to delete an account.
   const handleDeleteAccount = async () => {
     setDeleting(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("delete-account");
-      const result = data as { ok?: boolean; error?: string; detail?: string } | null;
-      if (error || !result?.ok) {
-        toast({
-          title: t("settings.deleteFail"),
-          description: result?.detail || t("auth.tryAgainMoment"),
-          variant: "destructive",
-        });
-        setDeleting(false);
-        return;
-      }
-      try { await supabase.auth.signOut(); } catch { /* ignore */ }
+    if (await deleteMyAccount()) {
       toast({ title: t("settings.deleted") });
       window.location.replace("/");
-    } catch {
-      toast({
-        title: t("settings.deleteFail"),
-        description: t("chat.checkConnection"),
-        variant: "destructive",
-      });
-      setDeleting(false);
+      return;
     }
+    toast({ title: t("settings.deleteFail"), description: t("auth.tryAgainMoment"), variant: "destructive" });
+    setDeleting(false);
   };
+
 
   return (
     <MobileFrame bottomNav="settings">

@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import LegalPage, { LegalList, LegalSection } from "@/components/legal/LegalPage";
 
 // Public route: /privacy (see EXEMPT_ROUTES in DeviceGate.tsx). Must render
@@ -7,7 +8,7 @@ export default function PrivacyPolicy() {
   return (
     <LegalPage
       title="Privacy Policy"
-      lastUpdated="2026-10-13"
+      lastUpdated="2026-10-21"
       other={{ to: "/terms", label: "Terms of Service" }}
     >
       <LegalSection title="Introduction">
@@ -28,6 +29,9 @@ export default function PrivacyPolicy() {
             "Call metadata (who called whom, when, and for how long) and, only for phone/PSTN calls placed through the app, call routing information handled by our telephony provider.",
             "Device and diagnostic information (device ID, platform, push-notification token) used to deliver notifications and secure sign-in.",
             "Phone numbers from your device contacts or Google Contacts, only if you choose to sync or import them, used solely to show you which of your contacts are already on ChiChat.",
+            "Problem reports sent automatically when something goes wrong in the app: the error, the screen it happened on, the app version, your device type and language.",
+            "Feedback you choose to send, including any screenshot you attach and your device type, app version and language.",
+            "Reports you make about other people, and reports others make about you, including the reported message.",
           ]}
         />
       </LegalSection>
@@ -91,6 +95,14 @@ export default function PrivacyPolicy() {
         </p>
       </LegalSection>
 
+      <LegalSection title="Voice Note Transcription">
+        <p>
+          When you ask for a voice note to be turned into text (or dictate a message), the
+          recording is sent to our speech-to-text provider (OpenAI) to be transcribed, and the
+          text is returned to you. This only happens when you ask for it.
+        </p>
+      </LegalSection>
+
       <LegalSection title="Calls / Voice / Video Communication">
         <p>
           Voice and video calls between ChiChat users are connected through our real-time media
@@ -108,7 +120,8 @@ export default function PrivacyPolicy() {
             "Authenticate you and keep your account secure.",
             "Deliver push notifications for messages and incoming calls.",
             "Show you which contacts already use ChiChat.",
-            "Diagnose and fix technical problems.",
+            "Diagnose and fix technical problems, using problem reports and your feedback.",
+            "Keep people safe: review reports, enforce our Terms, and stop spam and abuse.",
           ]}
         />
         <p>We do not sell your personal information.</p>
@@ -126,8 +139,9 @@ export default function PrivacyPolicy() {
         <p>
           ChiChat relies on a small number of service providers to operate: a
           database/authentication provider, a real-time communications provider for calls, a
-          transactional email provider for verification codes, and, where you opt in, Google (for
-          Google sign-in and Google Contacts). Each only receives the minimum information needed
+          transactional email provider for verification codes, a speech-to-text provider when you
+          ask for a voice note to be transcribed, and, where you opt in, Google (for Google sign-in
+          and Google Contacts). Each only receives the minimum information needed
           to perform its specific function.
         </p>
       </LegalSection>
@@ -136,8 +150,16 @@ export default function PrivacyPolicy() {
         <p>
           You can permanently delete your account from Settings. This removes your profile,
           messages you sent, call history, device/push registrations, and connected-account
-          tokens, and deletes your authentication record — freeing your email/phone for future use
-          if you choose to sign up again.
+          tokens, feedback and screenshots you sent, and problem reports linked to you, and deletes
+          your authentication record, freeing your email/phone for future use if you choose to
+          sign up again.
+        </p>
+        <p>
+          You can also delete your account, or ask us to delete it if you can't sign in, at{" "}
+          <Link to="/delete-account" className="text-primary underline underline-offset-2">
+            chichatapp.com/delete-account
+          </Link>
+          .
         </p>
       </LegalSection>
 
@@ -146,6 +168,11 @@ export default function PrivacyPolicy() {
           We keep your data for as long as your account is active and for a reasonable period
           afterward to comply with legal obligations and resolve disputes, unless you delete your
           account sooner via the option described above.
+        </p>
+        <p>
+          If an account is suspended for breaking our Terms, its email address and phone number
+          may be kept on a block list to stop the same person registering again. Reports about an
+          account are kept to keep ChiChat safe.
         </p>
       </LegalSection>
 
