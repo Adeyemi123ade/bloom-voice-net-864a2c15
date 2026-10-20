@@ -12,8 +12,32 @@
 //
 // Every reply carries `timings` (milliseconds per stage) so slow steps show
 // up in the app's console and in these logs.
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
-import { checkRateLimit } from "../_shared/rateLimit.ts";
+//
+// Self-contained (no ../_shared import) so it also deploys from the Supabase
+// dashboard editor, which uploads only this file.
+import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
+
+// Same as _shared/rateLimit.ts: true while the caller is within the limit.
+// Backed by the public.check_rate_limit() database function.
+async function checkRateLimit(
+  admin: SupabaseClient,
+  bucket: string,
+  key: string,
+  maxCount: number,
+  windowSeconds: number,
+): Promise<boolean> {
+  const { data, error } = await admin.rpc("check_rate_limit", {
+    _key: `${bucket}:${key}`,
+    _max_count: maxCount,
+    _window_seconds: windowSeconds,
+  });
+  if (error) {
+    // Fail open on a database hiccup rather than block everyone.
+    console.error("check_rate_limit error:", error.message);
+    return true;
+  }
+  return data === true;
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
