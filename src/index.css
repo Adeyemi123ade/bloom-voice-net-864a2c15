@@ -135,3 +135,8 @@
   0%, 50% { opacity: 1; }
   50.01%, 100% { opacity: 0; }
 }
+
+/* Right-to-left languages (Arabic): back arrows and "go on" chevrons point the other way. */
+[dir="rtl"] :is(.lucide-arrow-left, .lucide-arrow-right, .lucide-chevron-left, .lucide-chevron-right) {
+  transform: scaleX(-1);
+}

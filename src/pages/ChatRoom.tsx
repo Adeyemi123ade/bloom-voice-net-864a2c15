@@ -1716,6 +1716,7 @@ export default function ChatRoom() {
                 >
                   {quoted && !bareAttachment && (
                     <div
+                      dir="auto"
                       className={`mb-1 px-2 py-1 rounded-md border-l-2 text-xs line-clamp-4 whitespace-pre-wrap break-words ${
                         mine
                           ? "bg-primary-foreground/10 border-primary-foreground/60 text-primary-foreground/85"
@@ -1740,7 +1741,7 @@ export default function ChatRoom() {
                       }}
                     />
                   ) : (
-                    <p className="text-base whitespace-pre-wrap break-words leading-snug">
+                    <p dir="auto" className="text-base whitespace-pre-wrap break-words leading-snug">
                       {body}
                       <span
                         className={`float-right inline-flex items-center gap-1 ml-2 mt-1 text-[10px] leading-none whitespace-nowrap ${
@@ -2010,6 +2011,7 @@ export default function ChatRoom() {
                 </button>
               )}
               <textarea
+                dir="auto"
                 ref={composerInputRef}
                 rows={1}
                 value={text}

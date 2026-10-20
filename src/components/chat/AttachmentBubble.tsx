@@ -152,7 +152,7 @@ export function AttachmentBubble({
           )}
         </button>
         {meta.caption && (
-          <p className="text-base whitespace-pre-wrap break-words mt-1">{meta.caption}</p>
+          <p dir="auto" className="text-base whitespace-pre-wrap break-words mt-1">{meta.caption}</p>
         )}
         {imgOpen && (
           <ImageViewer
@@ -203,7 +203,7 @@ export function AttachmentBubble({
           )}
         </button>
         {meta.caption && (
-          <p className="text-base whitespace-pre-wrap break-words mt-1">{meta.caption}</p>
+          <p dir="auto" className="text-base whitespace-pre-wrap break-words mt-1">{meta.caption}</p>
         )}
         {videoOpen && <VideoViewer url={mediaUrl} name={meta.name} onClose={() => setVideoOpen(false)} />}
       </>
@@ -215,7 +215,7 @@ export function AttachmentBubble({
       <div className="flex flex-col gap-1 min-w-[200px]">
         <audio src={mediaUrl} controls className="w-full h-9" />
         {meta.caption && (
-          <p className="text-base whitespace-pre-wrap break-words">{meta.caption}</p>
+          <p dir="auto" className="text-base whitespace-pre-wrap break-words">{meta.caption}</p>
         )}
         {timeText && (
           <span className={`text-[10px] self-end ${mine ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
@@ -250,7 +250,7 @@ export function AttachmentBubble({
         <Download className={`w-4 h-4 flex-shrink-0 ${mine ? "text-primary-foreground/80" : "text-muted-foreground"}`} />
       </a>
       {meta.caption && (
-        <p className="text-base whitespace-pre-wrap break-words">{meta.caption}</p>
+        <p dir="auto" className="text-base whitespace-pre-wrap break-words">{meta.caption}</p>
       )}
       {timeText && (
         <span className={`text-[10px] self-end ${mine ? "text-primary-foreground/70" : "text-muted-foreground"}`}>

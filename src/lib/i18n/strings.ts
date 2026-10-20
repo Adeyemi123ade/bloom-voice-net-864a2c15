@@ -2714,13 +2714,33 @@ const ig: Dictionary = {
   "mn.newMessage": "Ozi ọhụrụ",
 };
 
+/**
+ * Languages offered in the picker: each in its own name, with the flag of
+ * the country most of its speakers know it from (a language isn't a country,
+ * the flag is just a quick visual cue). `dir: "rtl"` languages read right to
+ * left. English, Yoruba, Hausa and Igbo are built in; the others download
+ * only when chosen (see loadLanguage).
+ */
 export const LANGUAGES = [
-  { code: "en", name: "English" },
-  { code: "yo", name: "Yorùbá" },
-  { code: "ha", name: "Hausa" },
-  { code: "ig", name: "Igbo" },
+  { code: "en", name: "English", flag: "GB", dir: "ltr" },
+  { code: "yo", name: "Yorùbá", flag: "NG", dir: "ltr" },
+  { code: "ha", name: "Hausa", flag: "NG", dir: "ltr" },
+  { code: "ig", name: "Igbo", flag: "NG", dir: "ltr" },
+  { code: "fr", name: "Français", flag: "FR", dir: "ltr" },
+  { code: "es", name: "Español", flag: "ES", dir: "ltr" },
+  { code: "pt", name: "Português", flag: "BR", dir: "ltr" },
+  { code: "de", name: "Deutsch", flag: "DE", dir: "ltr" },
+  { code: "ar", name: "العربية", flag: "SA", dir: "rtl" },
+  { code: "zh", name: "中文", flag: "CN", dir: "ltr" },
+  { code: "hi", name: "हिन्दी", flag: "IN", dir: "ltr" },
+  { code: "ja", name: "日本語", flag: "JP", dir: "ltr" },
+  { code: "sw", name: "Kiswahili", flag: "KE", dir: "ltr" },
+  { code: "ru", name: "Русский", flag: "RU", dir: "ltr" },
+  { code: "tr", name: "Türkçe", flag: "TR", dir: "ltr" },
 ] as const;
 
 export type LanguageCode = (typeof LANGUAGES)[number]["code"];
+export type FlagCode = (typeof LANGUAGES)[number]["flag"];
 
-export const DICTIONARIES: Record<LanguageCode, Dictionary> = { en, yo, ha, ig };
+/** Built in (no download). Others are added by loadLanguage(). */
+export const DICTIONARIES: Partial<Record<LanguageCode, Dictionary>> = { en, yo, ha, ig };
