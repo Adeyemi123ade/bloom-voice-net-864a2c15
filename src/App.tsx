@@ -42,6 +42,7 @@ import GoogleOAuthReturnListener from "./components/GoogleOAuthReturnListener.ts
 import ActiveCallHost from "./components/call/ActiveCallHost.tsx";
 import CallRecovery from "./components/call/CallRecovery.tsx";
 import NativeNavigateBridge from "./components/NativeNavigateBridge.tsx";
+import AndroidAppPrompt from "./components/AndroidAppPrompt.tsx";
 
 const queryClient = new QueryClient();
 
@@ -54,6 +55,7 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
+            <AndroidAppPrompt />
             <GoogleOAuthReturnListener />
             <NativeNavigateBridge />
             <DeviceGate>
