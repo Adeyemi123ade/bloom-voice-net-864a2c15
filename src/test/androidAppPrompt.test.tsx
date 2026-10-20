@@ -49,14 +49,15 @@ describe("ChiChat Web on an Android phone", () => {
     setUA(ANDROID_UA);
     renderAt("/home");
     expect(screen.getByText("ChiChat works best in the app")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Open or install the app" })).toHaveAttribute("href", OPEN_APP_URL);
+    expect(screen.getByRole("link", { name: "Install or open" })).toHaveAttribute("href", OPEN_APP_URL);
     expect(screen.getByText("The app")).toBeInTheDocument();
     expect(signOut).not.toHaveBeenCalled();
   });
-  it("Continue in browser closes it and it isn't asked again for a week", () => {
+  it("closing it keeps the browser and it isn't asked again for a week", () => {
     setUA(ANDROID_UA);
     const first = renderAt("/home");
-    fireEvent.click(screen.getByRole("button", { name: "Continue in browser" }));
+    expect(screen.queryByRole("button", { name: "Continue in browser" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(screen.queryByText("ChiChat works best in the app")).not.toBeInTheDocument();
     first.unmount();
     renderAt("/home");
