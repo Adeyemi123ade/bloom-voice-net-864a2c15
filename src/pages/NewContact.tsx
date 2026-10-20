@@ -11,6 +11,7 @@ import { allCountries, findByDialPrefix, type CountryEntry } from "@/lib/countri
 import { parsePhoneNumberFromString, type CountryCode } from "libphonenumber-js";
 import { isTooManyDigits } from "@/lib/phone";
 import { useBackNavigation } from "@/hooks/useBackNavigation";
+import { useLanguage } from "@/lib/i18n/context";
 
 async function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -26,6 +27,7 @@ export default function NewContact() {
   const { showBackArrow, goBack } = useBackNavigation("/contacts");
   const [params] = useSearchParams();
   const [name, setName] = useState("");
+  const { t } = useLanguage();
   const initialPhone = params.get("phone") ?? "";
   const [country, setCountry] = useState<CountryEntry | null>(null);
   const [phoneLocal, setPhoneLocal] = useState("");
@@ -92,14 +94,14 @@ export default function NewContact() {
     const f = e.target.files?.[0];
     if (!f) return;
     if (f.size > 2 * 1024 * 1024) {
-      toast({ title: "Image too large", description: "Pick under 2MB.", variant: "destructive" });
+      toast({ title: t("nc.imageTooLarge"), description: t("nc.under2"), variant: "destructive" });
       return;
     }
     try {
       const url = await fileToDataUrl(f);
       setAvatar(url);
     } catch {
-      toast({ title: "Could not load image", variant: "destructive" });
+      toast({ title: t("nc.cantLoadImage"), variant: "destructive" });
     } finally {
       e.target.value = "";
     }
@@ -108,17 +110,17 @@ export default function NewContact() {
   const validate = (): { name: string; e164: string } | null => {
     const trimmed = name.trim();
     if (!trimmed) {
-      toast({ title: "Name required", variant: "destructive" });
+      toast({ title: t("nc.nameRequired"), variant: "destructive" });
       return null;
     }
     if (!country) {
-      toast({ title: "Select a country", variant: "destructive" });
+      toast({ title: t("nc.selectCountry"), variant: "destructive" });
       return null;
     }
     if (!e164) {
       toast({
-        title: "Invalid phone number",
-        description: `Enter a valid number for ${country.name}.`,
+        title: t("nc.invalidPhone"),
+        description: t("nc.validFor", { country: country.name }),
         variant: "destructive",
       });
       return null;
@@ -134,10 +136,10 @@ export default function NewContact() {
     const onDevice = await saveDeviceContact(v.name, v.e164);
     setBusy(null);
     toast({
-      title: "Contact saved",
+      title: t("save.saved"),
       description: onDevice
-        ? "Added to your device phone book."
-        : "Saved to your ChiChat contacts.",
+        ? t("nc.toPhoneBook")
+        : t("save.toChichat"),
     });
     navigate(-1);
   };
@@ -150,13 +152,13 @@ export default function NewContact() {
           {showBackArrow && (
             <button
               onClick={goBack}
-              aria-label="Back"
+              aria-label={t("common.back")}
               className="w-9 h-9 rounded-xl bg-secondary/60 hover:bg-secondary flex items-center justify-center"
             >
               <ArrowLeft className="w-4 h-4" />
             </button>
           )}
-          <h1 className="text-lg font-semibold">New Contact</h1>
+          <h1 className="text-lg font-semibold">{t("ct.newContact")}</h1>
         </header>
 
         {/* Centered form column. Fields sit at the top and the save actions
@@ -168,7 +170,7 @@ export default function NewContact() {
             <button
               type="button"
               onClick={onPickImage}
-              aria-label="Add photo"
+              aria-label={t("nc.addPhoto")}
               className="relative w-24 h-24 rounded-2xl border-2 border-dashed border-primary/60 bg-primary/10 hover:bg-primary/15 transition-colors flex items-center justify-center overflow-hidden"
             >
               {avatar ? (
@@ -193,20 +195,20 @@ export default function NewContact() {
           <div className="space-y-5">
             <div className="space-y-2">
               <label className="text-xs font-semibold tracking-[0.15em] text-muted-foreground">
-                FULL NAME
+                {t("nc.fullName")}
               </label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Enter full name"
+                placeholder={t("nc.fullNamePh")}
                 className="w-full h-12 px-4 rounded-xl bg-secondary/40 border border-border/40 text-sm placeholder:text-muted-foreground/70 focus:outline-none focus:border-primary/50"
               />
             </div>
 
             <div className="space-y-2">
               <label className="text-xs font-semibold tracking-[0.15em] text-muted-foreground">
-                PHONE NUMBER
+                {t("nc.phoneNumber")}
               </label>
               <div className="flex gap-2">
                 <CountryPicker value={country?.code ?? null} onChange={setCountry} />
@@ -225,7 +227,7 @@ export default function NewContact() {
                     }
                     setPhoneLocal(cleaned);
                   }}
-                  placeholder="Phone number"
+                  placeholder={t("nc.phonePh")}
                   className="flex-1 min-w-0 h-12 px-4 rounded-xl bg-secondary/40 border border-border/40 text-sm placeholder:text-muted-foreground/70 focus:outline-none focus:border-primary/50"
                 />
               </div>
@@ -234,7 +236,7 @@ export default function NewContact() {
 
           <div className="mt-auto pt-8 pb-[calc(env(safe-area-inset-bottom)+20px)] space-y-3">
               <p className="text-xs font-semibold tracking-[0.15em] text-muted-foreground">
-                SAVE TO
+                {t("nc.saveTo")}
               </p>
 
               <button
@@ -243,7 +245,7 @@ export default function NewContact() {
                 className="w-full h-12 rounded-xl border border-primary/60 bg-primary/10 hover:bg-primary/15 text-primary font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
               >
                 <span aria-hidden>📱</span>
-                {busy === "phone" ? "Saving…" : "Save to Phone Book"}
+                {busy === "phone" ? t("save.saving") : t("nc.savePhoneBook")}
               </button>
           </div>
         </div>

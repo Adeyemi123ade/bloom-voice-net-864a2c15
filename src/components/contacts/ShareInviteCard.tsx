@@ -1,3 +1,4 @@
+import { tNow } from "@/lib/i18n/language";
 import { useState } from "react";
 import { Copy, Share2, X, Mail, MessageSquare, Link as LinkIcon } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
@@ -180,8 +181,8 @@ const TARGETS: Target[] = [
       try {
         await navigator.clipboard.writeText(text);
         toast({
-          title: "Invite copied",
-          description: "Paste it into your Instagram chat or story.",
+          title: tNow("inv.copied"),
+          description: tNow("inv.pasteInsta"),
         });
       } catch {
         /* ignore */
@@ -254,9 +255,9 @@ export function ShareInviteCard() {
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(SHARE_TEXT);
-      toast({ title: "Invite copied", description: "Paste it anywhere." });
+      toast({ title: tNow("inv.copied"), description: tNow("inv.pasteAnywhere") });
     } catch {
-      toast({ title: "Couldn't copy", variant: "destructive" });
+      toast({ title: tNow("inv.cantCopy"), variant: "destructive" });
     }
   };
 
@@ -347,7 +348,7 @@ async function openNativeShare(text: string) {
   if (isNativePlatform()) {
     try {
       const { Share } = await import("@capacitor/share");
-      await Share.share({ title: "Chichat", text, dialogTitle: "Send invite with" });
+      await Share.share({ title: "Chichat", text, dialogTitle: tNow("inv.sendWith") });
       return true;
     } catch {
       return false;
@@ -394,8 +395,8 @@ function ShareChooserSheet({
       await t.open(text, url);
     } catch {
       toast({
-        title: `Couldn't open ${t.label}`,
-        description: "We've copied the invite — paste it into the app.",
+        title: tNow("inv.cantOpen", { app: t.label }),
+        description: tNow("inv.copiedPaste"),
       });
       try {
         await navigator.clipboard.writeText(text);
@@ -411,16 +412,16 @@ function ShareChooserSheet({
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/40"
       onClick={onClose}
       role="dialog"
-      aria-label="Share invite"
+      aria-label={tNow("inv.shareInvite")}
     >
       <div
         className="w-full max-w-md bg-background rounded-t-3xl border-t border-border p-4 pb-6 animate-in slide-in-from-bottom"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-base font-bold text-foreground">Share via</h3>
+          <h3 className="text-base font-bold text-foreground">{tNow("inv.shareVia")}</h3>
           <button
-            aria-label="Close"
+            aria-label={tNow("common.close")}
             onClick={onClose}
             className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-secondary"
           >
@@ -454,7 +455,7 @@ function ShareChooserSheet({
             className="flex flex-col items-center gap-1.5 py-3 rounded-xl hover:bg-secondary"
           >
             <IconCopyLink className="w-11 h-11" />
-            <span className="text-[11px] font-semibold text-foreground">Copy link</span>
+            <span className="text-[11px] font-semibold text-foreground">{tNow("inv.copyLink")}</span>
           </button>
         </div>
       </div>

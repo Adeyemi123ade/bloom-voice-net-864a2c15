@@ -1,3 +1,4 @@
+import { tNow } from "@/lib/i18n/language";
 import { MessageSquare, X } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -62,18 +63,18 @@ export function ActiveRow({
           </p>
           {c.call_count >= 3 && (
             <Badge variant="secondary" className="h-4 px-1.5 text-[10px] font-semibold">
-              Frequent
+              {tNow("ct.frequent")}
             </Badge>
           )}
         </div>
-        <p className="text-xs text-muted-foreground truncate">Hello there!</p>
+        <p className="text-xs text-muted-foreground truncate">{tNow("ct.status")}</p>
       </div>
       <Button
         onClick={(e) => {
           e.stopPropagation();
           onChat();
         }}
-        aria-label={`Message ${c.display_name}`}
+        aria-label={tNow("ct.messageName", { name: c.display_name })}
         variant="ghost"
         className="h-10 w-10 p-0 text-primary hover:text-primary hover:bg-primary/10 rounded-full"
       >
@@ -114,7 +115,7 @@ export function InviteRow({
       </div>
       {isManual && (
         <button
-          aria-label="Remove"
+          aria-label={tNow("ct.remove")}
           onClick={(e) => {
             e.stopPropagation();
             onRemove();
@@ -135,7 +136,7 @@ export function InviteRow({
             : "text-sm font-bold text-primary hover:text-primary/80 px-2"
         }
       >
-        {c.invited ? "Sent" : "Invite"}
+        {c.invited ? tNow("ct.sent") : tNow("ct.invite")}
       </button>
     </div>
   );

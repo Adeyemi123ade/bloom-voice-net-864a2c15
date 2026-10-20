@@ -13,6 +13,7 @@ import { addManualContact } from "@/lib/deviceContacts";
 import { saveDeviceContact } from "@/lib/saveDeviceContact";
 import { formatDisplay } from "@/lib/phone";
 import { toast } from "@/hooks/use-toast";
+import { useLanguage } from "@/lib/i18n/context";
 
 interface Props {
   open: boolean;
@@ -29,6 +30,7 @@ export default function SaveContactDialog({
 }: Props) {
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
+  const { t } = useLanguage();
 
   const save = async () => {
     const trimmed = name.trim() || phoneE164;
@@ -37,10 +39,10 @@ export default function SaveContactDialog({
     const onDevice = await saveDeviceContact(trimmed, phoneE164);
     setBusy(false);
     toast({
-      title: "Contact saved",
+      title: t("save.saved"),
       description: onDevice
-        ? "Added to your device contacts."
-        : "Saved to your ChiChat contacts.",
+        ? t("save.toDevice")
+        : t("save.toChichat"),
     });
     setName("");
     onOpenChange(false);
@@ -51,18 +53,18 @@ export default function SaveContactDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[320px]">
         <DialogHeader>
-          <DialogTitle className="text-sm">Save contact</DialogTitle>
+          <DialogTitle className="text-sm">{t("save.title")}</DialogTitle>
           <DialogDescription className="text-xs">
             {formatDisplay(phoneE164) || phoneE164}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-2">
-          <Label htmlFor="contact-name" className="text-xs">Name</Label>
+          <Label htmlFor="contact-name" className="text-xs">{t("save.name")}</Label>
           <Input
             id="contact-name"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Contact name"
+            placeholder={t("save.namePh")}
             autoFocus
             className="h-9 text-xs"
           />
@@ -73,14 +75,14 @@ export default function SaveContactDialog({
             onClick={() => onOpenChange(false)}
             className="h-9 text-xs"
           >
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button
             onClick={save}
             disabled={busy}
             className="h-9 text-xs bg-primary hover:bg-primary/90 text-primary-foreground"
           >
-            {busy ? "Saving…" : "Save"}
+            {busy ? t("save.saving") : t("save.save")}
           </Button>
         </div>
       </DialogContent>

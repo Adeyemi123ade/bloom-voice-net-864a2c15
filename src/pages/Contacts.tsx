@@ -46,6 +46,7 @@ import { ActiveRow, EmptyState, InviteRow } from "@/components/contacts/ContactR
 import { SectionList, sectionLetter } from "@/components/contacts/ContactSectionList";
 import { shareChichatInvite } from "@/components/contacts/ShareInviteCard";
 import { beginOutgoingCall, canStartAnotherCall } from "@/lib/callStart";
+import { useLanguage } from "@/lib/i18n/context";
 import { inBatches, loadMatchCache, phonesKey, saveMatchCache, type CallStat } from "@/lib/contactMatchCache";
 
 // Long phone books: rows are added as the list is scrolled, not all at once
@@ -59,6 +60,7 @@ export default function Contacts() {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
   const myInviteLink = useInviteLink();
+  const { t } = useLanguage();
 
   const [contacts, setContacts] = useState<DeviceContact[]>([]);
   const [matched, setMatched] = useState<Map<string, MatchedUser>>(new Map());
@@ -107,8 +109,8 @@ export default function Contacts() {
       }
       setPhoneContactsError(
         code.startsWith("CONTACTS_UNAVAILABLE")
-          ? "This version of the app can't read phone contacts. Install the latest build."
-          : "Couldn't read your phone contacts. Pull down or tap refresh to try again.",
+          ? t("ct.oldApp")
+          : t("ct.readFailed"),
       );
       console.warn("[contacts] load failed", code);
       return "error";
@@ -219,8 +221,8 @@ export default function Contacts() {
       }
       lastCheckedRef.current = key;
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Could not match contacts";
-      toast({ title: "Matching failed", description: msg, variant: "destructive" });
+      const msg = err instanceof Error ? err.message : t("ct.matchFailedMsg");
+      toast({ title: t("ct.matchFailed"), description: msg, variant: "destructive" });
     } finally {
       if (seq === matchSeq.current) setMatching(false);
     }
@@ -229,7 +231,7 @@ export default function Contacts() {
   const refreshContacts = async () => {
     if (isNativePlatform()) {
       if ((await loadPhoneContacts()) === "ok") {
-        toast({ title: `Loaded ${loadCachedContacts()?.length ?? 0} contacts` });
+        toast({ title: t("ct.loaded", { n: loadCachedContacts()?.length ?? 0 }) });
       }
       return;
     }
@@ -246,7 +248,7 @@ export default function Contacts() {
     try {
       const picked = await pickWebContacts();
       if (!picked.length) {
-        toast({ title: "No contacts selected" });
+        toast({ title: t("ct.noneSelected") });
         return;
       }
       const existing = loadManualContacts();
@@ -262,20 +264,20 @@ export default function Contacts() {
       setContacts(merged);
       await runMatch(merged);
       toast({
-        title: `Imported ${picked.length} contact${picked.length === 1 ? "" : "s"}`,
+        title: picked.length === 1 ? t("ct.importedOne") : t("ct.importedMany", { n: picked.length }),
       });
     } catch (err) {
       const code = err instanceof Error ? err.message : "";
       if (code === "NOT_SUPPORTED") {
         toast({
-          title: "Not supported on this browser",
-          description: "Open Chichat in Chrome on Android to import phone contacts.",
+          title: t("ct.notSupported"),
+          description: t("ct.useChrome"),
           variant: "destructive",
         });
       } else {
         toast({
-          title: "Import cancelled",
-          description: err instanceof Error ? err.message : "Try again.",
+          title: t("ct.importCancelled"),
+          description: err instanceof Error ? err.message : t("common.tryAgain"),
         });
       }
     } finally {
@@ -392,12 +394,12 @@ export default function Contacts() {
           conversationId,
           calleeId: c.user_id,
           type: "voice",
-          peer: { name: c.display_name ?? "Contact", avatarUrl: c.avatar_url ?? null },
+          peer: { name: c.display_name ?? t("chat.contact"), avatarUrl: c.avatar_url ?? null },
         },
         navigate,
       );
     } catch {
-      toast({ title: "Call failed", description: "Please check your connection and try again.", variant: "destructive" });
+      toast({ title: t("ct.callFailed"), description: t("chat.checkConnection"), variant: "destructive" });
     } finally {
       startingCall.current = false;
     }
@@ -413,8 +415,8 @@ export default function Contacts() {
       if (error) throw error;
       navigate(`/chat/${data as string}`);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Could not open chat";
-      toast({ title: "Chat failed", description: msg, variant: "destructive" });
+      const msg = err instanceof Error ? err.message : t("ct.chatOpenFailed");
+      toast({ title: t("ct.chatFailed"), description: msg, variant: "destructive" });
     }
   };
 
@@ -448,10 +450,10 @@ export default function Contacts() {
       title: c.display_name,
       subtitle: formatDisplay(c.phone),
       actions: [
-        { label: "Open chat", icon: MessageSquare, onClick: () => chatActive(c) },
-        { label: "Voice call", icon: Phone, onClick: () => callActive(c) },
+        { label: t("ct.openChat"), icon: MessageSquare, onClick: () => chatActive(c) },
+        { label: t("call.voice"), icon: Phone, onClick: () => callActive(c) },
         {
-          label: "Edit name",
+          label: t("ct.editName"),
           icon: Edit3,
           onClick: () => setEditTarget({ phone: c.phone }),
         },
@@ -465,19 +467,19 @@ export default function Contacts() {
       subtitle: formatDisplay(c.phone),
       actions: [
         {
-          label: "Send invite",
+          label: t("ct.sendInvite"),
           icon: UserPlus,
           onClick: () => inviteContact(c),
         },
         {
-          label: "Call this number",
+          label: t("ct.callNumber"),
           icon: Phone,
           onClick: () => {
             if (canStartAnotherCall()) navigate(`/dial/${encodeURIComponent(c.phone)}`);
           },
         },
         {
-          label: "Edit name",
+          label: t("ct.editName"),
           icon: Edit3,
           onClick: () => setEditTarget({ phone: c.phone }),
         },
@@ -493,10 +495,10 @@ export default function Contacts() {
       <div className="h-full w-full flex flex-col bg-background relative">
         {/* Header */}
         <div className="px-4 pt-4 pb-3 border-b border-border flex items-center gap-2">
-          <h1 className="text-lg font-semibold text-foreground flex-1">Contacts</h1>
+          <h1 className="text-lg font-semibold text-foreground flex-1">{t("ct.title")}</h1>
           {isNativePlatform() && (
             <button
-              aria-label="Refresh contacts"
+              aria-label={t("ct.refresh")}
               onClick={refreshContacts}
               disabled={isLoading}
               className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-secondary disabled:opacity-50"
@@ -516,7 +518,7 @@ export default function Contacts() {
               <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search names or numbers"
+                placeholder={t("ct.searchPh")}
                 className="h-10 pl-9 text-sm bg-secondary/40 border-border"
               />
             </div>
@@ -526,24 +528,24 @@ export default function Contacts() {
           <div className="mx-4 mt-2 rounded-2xl bg-secondary/40 border border-border overflow-hidden">
             <ActionRow
               icon={Search}
-              label="Search ChiChat"
+              label={t("ct.searchChichat")}
               onClick={() => navigate("/home", { state: { openNewChat: true } })}
             />
             <Divider />
             <ActionRow
               icon={Users}
-              label="New Group Call"
+              label={t("ct.groupCall")}
               onClick={() =>
                 toast({
-                  title: "Group calls coming soon",
-                  description: "Stay tuned — we're putting the finishing touches on this.",
+                  title: t("ct.groupSoon"),
+                  description: t("ct.groupSoonBody"),
                 })
               }
             />
             <Divider />
             <ActionRow
               icon={UserPlus}
-              label="New Contact"
+              label={t("ct.newContact")}
               onClick={() => navigate("/contacts/new")}
             />
             {canPickWebContacts && (
@@ -551,7 +553,7 @@ export default function Contacts() {
                 <Divider />
                 <ActionRow
                   icon={Smartphone}
-                  label={syncing ? "Importing…" : "Import from phone"}
+                  label={syncing ? t("ct.importing") : t("ct.importPhone")}
                   onClick={importFromPhone}
                 />
               </>
@@ -559,7 +561,7 @@ export default function Contacts() {
             <Divider />
             <ActionRow
               icon={Heart}
-              label="Invite a friend"
+              label={t("ct.inviteFriend")}
               onClick={() => navigate("/invite")}
             />
           </div>
@@ -568,10 +570,10 @@ export default function Contacts() {
           {permissionDenied && (
             <div className="mx-4 mt-3 p-4 rounded-xl bg-secondary border border-border text-center">
               <p className="text-sm font-semibold text-foreground">
-                Contacts access needed
+                {t("ct.accessNeeded")}
               </p>
               <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                Allow ChiChat to access your contacts so you can see which friends are already on the app.
+                {t("ct.accessBody")}
               </p>
               <Button
                 onClick={async () => {
@@ -584,7 +586,7 @@ export default function Contacts() {
                 }}
                 className="mt-3 w-full h-10 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-sm font-semibold"
               >
-                {deniedTwice ? "Open settings → Permissions → Contacts" : "Allow contacts access"}
+                {deniedTwice ? t("ct.openSettings") : t("ct.allowAccess")}
               </Button>
             </div>
           )}
@@ -597,7 +599,7 @@ export default function Contacts() {
 
           {syncing && totalContacts === 0 && (
             <p className="px-4 pt-4 text-xs text-muted-foreground text-center">
-              Loading contacts…
+              {t("ct.loadingContacts")}
             </p>
           )}
 
@@ -619,10 +621,10 @@ export default function Contacts() {
             )}
             {!matching && filteredActive.length === 0 && totalContacts > 0 && !query && (
               <EmptyState
-                title="No contacts on Chichat yet"
-                hint="Invite friends below to start chatting and calling."
+                title={t("ct.noneOnChichat")}
+                hint={t("ct.inviteBelow")}
                 action={{
-                  label: "Can't find someone? Search ChiChat",
+                  label: t("ct.cantFind"),
                   onClick: () => navigate("/home", { state: { openNewChat: true } }),
                 }}
               />
@@ -633,7 +635,7 @@ export default function Contacts() {
           {filteredInvite.length > 0 && (
             <div className="mt-6">
               <div className="px-4 py-2 flex items-center justify-between">
-                <h2 className="text-sm font-bold text-foreground">Invite to Chichat</h2>
+                <h2 className="text-sm font-bold text-foreground">{t("ct.inviteHeading")}</h2>
                 <span className="text-xs text-muted-foreground">
                   {filteredInvite.length}
                 </span>
@@ -660,8 +662,8 @@ export default function Contacts() {
 
           {!isLoading && totalContacts === 0 && isNativePlatform() && (
             <EmptyState
-              title="No contacts found"
-              hint="Tap refresh above to load your contacts."
+              title={t("ct.noneFound")}
+              hint={t("ct.tapRefresh")}
             />
           )}
 
@@ -669,10 +671,10 @@ export default function Contacts() {
             filteredActive.length === 0 &&
             filteredInvite.length === 0 && (
               <EmptyState
-                title="No matches"
-                hint="Try a different name or number."
+                title={t("common.noMatches")}
+                hint={t("ct.tryOther")}
                 action={{
-                  label: "Search ChiChat directly",
+                  label: t("ct.searchDirect"),
                   onClick: () => navigate("/home", { state: { openNewChat: true } }),
                 }}
               />
