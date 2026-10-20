@@ -1,0 +1,6 @@
+# This file instructs Redocly's linter to ignore the rules contained for specific parts of your API.
+# See https://redocly.com/docs/cli/ for more information.
+# The invite page (api/invite.js) never returns a 4xx: unknown names fall back to "A friend".
+docs/openapi.yaml:
+  operation-4xx-response:
+    - '#/paths/~1i~1{name}/get/responses'
