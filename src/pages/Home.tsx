@@ -294,7 +294,8 @@ export default function Home() {
       _other_user: otherId,
     });
     if (error || !data) {
-      toast({ title: t("chats.startFail"), description: error?.message, variant: "destructive" });
+      console.error("[start-chat] failed", error);
+      toast({ title: t("chats.startFail"), description: t("chat.checkConnection"), variant: "destructive" });
       return;
     }
     setOpenNew(false);

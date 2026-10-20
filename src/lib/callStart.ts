@@ -1,3 +1,4 @@
+import { isLimitError, isSuspendedError } from "@/lib/accountStatus";
 import { tNow } from "@/lib/i18n/language";
 import type { NavigateFunction } from "react-router-dom";
 import { FROM_CALL_BUBBLE, activeCallPath, getActiveCall, getCallsSnapshot } from "@/lib/activeCall";
@@ -81,9 +82,19 @@ export type SavedCall =
   | { result: "busy" }
   /** One of the two people has blocked the other. */
   | { result: "blocked" }
+  /** Too many calls started in the last hour (limit for safety). */
+  | { result: "limited" }
+  /** This account is suspended. */
+  | { result: "suspended" }
   | { result: "error" };
 
 type RpcResult = { data: unknown; error: { code?: string; message?: string } | null };
+
+function refusalResult(err: unknown): SavedCall | null {
+  if (isSuspendedError(err)) return { result: "suspended" };
+  if (isLimitError(err)) return { result: "limited" };
+  return null;
+}
 
 /**
  * Save a new call. The server does it in one step, so two taps, two phones
@@ -114,6 +125,8 @@ export async function saveNewCall(row: {
     if (d && (d.result === "created" || d.result === "existing" || d.result === "busy")) return d;
     return { result: "error" };
   }
+  const refusal = refusalResult(r.error);
+  if (refusal) return refusal;
   // Refused because one of the two has blocked the other.
   if (r.error.message === "blocked" || (r.error as { hint?: string }).hint === "chichat_blocked") {
     return { result: "blocked" };
@@ -125,6 +138,8 @@ export async function saveNewCall(row: {
     /start_call/i.test(r.error.message ?? "");
   if (!missing) return { result: "error" };
   const { error } = await supabase.from("calls").insert(row);
+  const insertRefusal = refusalResult(error);
+  if (insertRefusal) return insertRefusal;
   if (error && (error.message === "blocked" || error.hint === "chichat_blocked")) return { result: "blocked" };
   return error ? { result: "error" } : { result: "created" };
 }

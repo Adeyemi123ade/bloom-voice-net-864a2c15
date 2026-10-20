@@ -42,6 +42,8 @@ const EXEMPT_ROUTES = new Set<string>([
   // auth-loading/redirect logic below.
   "/terms",
   "/privacy",
+  // Shown after a suspended account was signed out.
+  "/account-suspended",
 ]);
 
 export default function DeviceGate({ children }: { children: ReactNode }) {

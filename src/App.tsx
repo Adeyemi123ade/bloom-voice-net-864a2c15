@@ -43,6 +43,11 @@ import ActiveCallHost from "./components/call/ActiveCallHost.tsx";
 import CallRecovery from "./components/call/CallRecovery.tsx";
 import NativeNavigateBridge from "./components/NativeNavigateBridge.tsx";
 import AndroidAppPrompt from "./components/AndroidAppPrompt.tsx";
+import AccountGuard from "./components/AccountGuard.tsx";
+import RouteMemory from "./components/RouteMemory.tsx";
+import SendFeedback from "./pages/SendFeedback.tsx";
+import Admin from "./pages/Admin.tsx";
+import AccountSuspended from "./pages/AccountSuspended.tsx";
 
 const queryClient = new QueryClient();
 
@@ -56,6 +61,8 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <AndroidAppPrompt />
+            <AccountGuard />
+            <RouteMemory />
             <GoogleOAuthReturnListener />
             <NativeNavigateBridge />
             <DeviceGate>
@@ -90,6 +97,9 @@ const App = () => (
                   <Route path="/mic-test" element={<MicTest />} />
                   <Route path="/privacy" element={<PrivacyPolicy />} />
                   <Route path="/terms" element={<TermsOfService />} />
+                  <Route path="/settings/feedback" element={<SendFeedback />} />
+                  <Route path="/admin" element={<Admin />} />
+                  <Route path="/account-suspended" element={<AccountSuspended />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>

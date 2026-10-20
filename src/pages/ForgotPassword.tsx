@@ -42,7 +42,8 @@ export default function ForgotPassword() {
     const { error: err } = await supabase.auth.resetPasswordForEmail(result.data.email);
     setSubmitting(false);
     if (err) {
-      toast({ title: t("fp.cantSend"), description: err.message, variant: "destructive" });
+      console.error("[forgot-password] send failed", err);
+      toast({ title: t("fp.cantSend"), description: t("auth.tryAgainMoment"), variant: "destructive" });
       return;
     }
     toast({ title: t("fp.sent"), description: t("fp.checkEmail", { email: result.data.email }) });

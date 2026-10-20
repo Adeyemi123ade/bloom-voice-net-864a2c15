@@ -29,6 +29,7 @@ import {
   MAX_CALL_SECONDS,
   isAccountTooNew,
   isAllowedNumber,
+  isAccountSuspended,
   loadAccountCreatedAt,
   loadUsage,
   normaliseNumber,
@@ -177,6 +178,10 @@ Deno.serve(async (req) => {
     const to = normaliseNumber(params["To"] ?? "");
     if (!isAllowedNumber(to)) {
       return sayAndHangUp("Calls to this number are not available.");
+    }
+
+    if (await isAccountSuspended(admin, userId)) {
+      return sayAndHangUp("This call can't be made.");
     }
 
     const createdAt = await loadAccountCreatedAt(admin, userId);

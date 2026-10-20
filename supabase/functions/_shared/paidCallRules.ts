@@ -84,3 +84,20 @@ export async function loadAccountCreatedAt(admin: any, userId: string): Promise<
   if (error) throw new Error(`user lookup failed: ${error.message}`);
   return data?.user?.created_at ?? null;
 }
+
+/** True when an admin suspended this account. Treated as not suspended if it can't be checked. */
+// deno-lint-ignore no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function isAccountSuspended(admin: any, userId: string): Promise<boolean> {
+  try {
+    const { data, error } = await admin
+      .from("account_status")
+      .select("status")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (error) return false;
+    return data?.status === "suspended";
+  } catch {
+    return false;
+  }
+}
