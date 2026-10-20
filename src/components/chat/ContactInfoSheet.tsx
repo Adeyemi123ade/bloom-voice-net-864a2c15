@@ -1,3 +1,4 @@
+import { useLanguage } from "@/lib/i18n/context";
 import { useEffect, useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -33,6 +34,7 @@ export default function ContactInfoSheet({
 }) {
   const [phone, setPhone] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const { t } = useLanguage();
 
   // The app deliberately hides other users' phone numbers at the database
   // level (profiles.phone SELECT is revoked for everyone but the owner) —
@@ -71,7 +73,7 @@ export default function ContactInfoSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-sm bg-background border-border overflow-y-auto">
         <SheetHeader>
-          <SheetTitle className="text-foreground">Contact info</SheetTitle>
+          <SheetTitle className="text-foreground">{t("info.title")}</SheetTitle>
         </SheetHeader>
         <div className="flex flex-col items-center pt-4 pb-6">
           <Avatar className="w-24 h-24">
@@ -81,24 +83,24 @@ export default function ContactInfoSheet({
             </AvatarFallback>
           </Avatar>
           <p className="text-lg font-semibold text-foreground mt-3">
-            {contact.display_name ?? "ChiChat user"}
+            {contact.display_name ?? t("chat.chichatUser")}
           </p>
           {(online || hasLastSeen) && (
             <p className="text-xs text-muted-foreground mt-1">
-              {online ? "online" : `last seen ${timeAgo(contact.last_seen_at)}`}
+              {online ? t("common.online") : t("presence.lastSeen", { time: timeAgo(contact.last_seen_at) })}
             </p>
           )}
         </div>
 
         <div className="space-y-1">
           <div className="px-3 py-3 rounded-lg bg-card">
-            <p className="text-2xs uppercase tracking-wider text-muted-foreground mb-1">Phone</p>
+            <p className="text-2xs uppercase tracking-wider text-muted-foreground mb-1">{t("info.phone")}</p>
             <p className="text-sm text-foreground">
-              {loading ? "Checking…" : phone ? formatDisplay(phone) : "Not in your contacts"}
+              {loading ? t("reg.checking") : phone ? formatDisplay(phone) : t("info.notInContacts")}
             </p>
             {!loading && !phone && (
               <p className="text-2xs text-muted-foreground mt-1">
-                Save this person to your phone or Google contacts to see their number here.
+                {t("info.saveHint")}
               </p>
             )}
           </div>
@@ -111,7 +113,7 @@ export default function ContactInfoSheet({
                 onClick={onBlock}
                 className="w-full flex items-center gap-3 px-3 py-3 rounded-lg bg-card text-sm text-destructive"
               >
-                <Ban className="w-4 h-4" /> {blocked ? `Unblock ${name}` : `Block ${name}`}
+                <Ban className="w-4 h-4" /> {blocked ? t("info.unblockName", { name }) : t("info.blockName", { name })}
               </button>
             )}
             {onReport && (
@@ -119,7 +121,7 @@ export default function ContactInfoSheet({
                 onClick={onReport}
                 className="w-full flex items-center gap-3 px-3 py-3 rounded-lg bg-card text-sm text-destructive"
               >
-                <Flag className="w-4 h-4" /> Report {name}
+                <Flag className="w-4 h-4" /> {t("info.reportName", { name })}
               </button>
             )}
           </div>

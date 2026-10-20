@@ -10,12 +10,14 @@ import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { checkEmailStatus } from "@/lib/checkEmail";
+import { useLanguage } from "@/lib/i18n/context";
 
 const schema = z.object({
-  email: z.string().trim().email({ message: "Enter a valid email address" }).max(255),
+  email: z.string().trim().email({ message: "err.validEmail" }).max(255),
 });
 
 export default function ForgotPassword() {
+  const { t, tx } = useLanguage();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | undefined>();
@@ -33,17 +35,17 @@ export default function ForgotPassword() {
     const status = await checkEmailStatus(result.data.email);
     if (status && !status.exists) {
       setSubmitting(false);
-      setError("Account not recognized");
+      setError("fp.notRecognized");
       return;
     }
     // No redirectTo — Supabase will send a 6-digit OTP code, not a magic link.
     const { error: err } = await supabase.auth.resetPasswordForEmail(result.data.email);
     setSubmitting(false);
     if (err) {
-      toast({ title: "Couldn't send code", description: err.message, variant: "destructive" });
+      toast({ title: t("fp.cantSend"), description: err.message, variant: "destructive" });
       return;
     }
-    toast({ title: "Code sent", description: `Check ${result.data.email} for your 6-digit code.` });
+    toast({ title: t("fp.sent"), description: t("fp.checkEmail", { email: result.data.email }) });
     navigate("/verify-reset-code", { state: { email: result.data.email } });
   };
 
@@ -51,16 +53,16 @@ export default function ForgotPassword() {
     <AuthScreen onBack={() => navigate("/login")}>
       <div className="mt-1">
         <BrandHero className="mb-5" />
-        <h1 className={authStyles.title}>Forgot your password?</h1>
+        <h1 className={authStyles.title}>{t("fp.title")}</h1>
         <p className={authStyles.subtitle}>
-          Enter your email and we'll send you a 6-digit code to reset it.
+          {t("fp.subtitle")}
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="mt-4 flex flex-col">
         <div>
           <Label htmlFor="email" className={authStyles.label}>
-            Email address
+            {t("reg.email")}
           </Label>
           <Input
             id="email"
@@ -74,17 +76,17 @@ export default function ForgotPassword() {
             className="mt-1.5"
             aria-invalid={!!error}
           />
-          {error && <p className={authStyles.error}>{error}</p>}
+          {error && <p className={authStyles.error}>{tx(error)}</p>}
         </div>
 
         <div className="pt-5">
           <Button type="submit" disabled={submitting} className={authStyles.primaryButton}>
-            {submitting ? "Sending…" : "Send code"}
+            {submitting ? t("fp.sending") : t("fp.sendCode")}
           </Button>
           <p className={`${authStyles.footnote} mt-4`}>
-            Remembered it?{" "}
+            {t("fp.remembered")}{" "}
             <Link to="/login" className={authStyles.link}>
-              Sign in
+              {t("login.signIn")}
             </Link>
           </p>
         </div>

@@ -16,6 +16,7 @@ import {
   type DeviceContact,
 } from "@/lib/deviceContacts";
 import BottomNav from "@/components/BottomNav";
+import { useLanguage } from "@/lib/i18n/context";
 
 interface Props {
   open: boolean;
@@ -79,6 +80,7 @@ function playKeyTone() {
 
 export default function Dialpad({ open, onOpenChange, initial: init = "" }: Props) {
   const [value, setValue] = useState(init);
+  const { t } = useLanguage();
   // Where the next digit goes. The number is drawn as separate characters
   // (not a text field), so tapping a digit moves this cursor there without
   // the phone's keyboard popping up over the dial pad; keys then insert and
@@ -198,8 +200,8 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
     const e164 = toE164(raw.trim());
     if (!e164) {
       toast({
-        title: "Invalid number",
-        description: "Use international format like +234 801 234 5678.",
+        title: t("dial.invalid"),
+        description: t("dial.format"),
         variant: "destructive",
       });
       return;
@@ -214,15 +216,18 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
-          className="max-w-[420px] w-full top-0 bottom-0 h-auto max-h-none sm:bottom-auto sm:h-[92vh] sm:max-h-[85vh] p-0 gap-0 bg-background left-1/2 -translate-x-1/2 translate-y-0 rounded-none sm:rounded-2xl border-0 shadow-2xl flex flex-col overflow-hidden pb-[calc(70px+env(safe-area-inset-bottom))] [&>button.absolute]:hidden"
+          // Phone: the whole screen. Tablet/desktop: exactly the app's own
+          // column (same size and place as MobileFrame), so it covers it fully
+          // instead of sitting as a smaller card on top of it.
+          className="max-w-none w-full inset-0 h-full max-h-none translate-x-0 translate-y-0 md:inset-auto md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-[460px] md:h-[min(100vh,820px)] p-0 gap-0 bg-background rounded-none md:rounded-2xl border-0 md:border md:border-border shadow-none md:shadow-2xl flex flex-col overflow-hidden pb-[calc(70px+env(safe-area-inset-bottom))] [&>button.absolute]:hidden"
         >
-        <DialogTitle className="sr-only">Call</DialogTitle>
+        <DialogTitle className="sr-only">{t("dial.call")}</DialogTitle>
 
         {/* Header — Add Contact action; navigation handled by bottom nav. */}
         <header className="px-4 pt-4 pb-2 flex items-center justify-end shrink-0">
           <button
             type="button"
-            aria-label="Add contact"
+            aria-label={t("dial.addContact")}
             onClick={() => {
               const prefill = value ? toE164(value) : null;
               onOpenChange(false);
@@ -231,7 +236,7 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
             className="h-10 px-3 rounded-full hover:bg-secondary flex items-center gap-2 text-sm font-medium text-foreground"
           >
             <UserPlus className="w-5 h-5" />
-            Add contact
+            {t("dial.addContact")}
           </button>
         </header>
 
@@ -255,7 +260,7 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search contacts..."
+              placeholder={t("dial.searchPh")}
               className="w-full h-12 pl-11 pr-4 rounded-2xl bg-secondary/40 border border-border/30 text-sm placeholder:text-muted-foreground/70 focus:outline-none focus:border-primary/40"
             />
           </div>
@@ -267,7 +272,7 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
         <div className="px-5 pb-2 flex-1 min-h-[88px] overflow-y-auto space-y-2">
           {filteredContacts.length === 0 ? (
             <p className="text-xs text-muted-foreground/70 italic py-6 text-center">
-              {search ? "No matching contact" : "Your contacts will appear here"}
+              {search ? t("dial.noMatch") : t("dial.empty")}
             </p>
           ) : (
             filteredContacts.map((c) => {
@@ -294,7 +299,7 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
                   </div>
                   <button
                     onClick={() => placeCall(c.phones[0])}
-                    aria-label={`Call ${c.name}`}
+                    aria-label={t("dial.callName", { name: c.name })}
                     className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors"
                     style={{ backgroundColor: "hsl(var(--brand-deep))", color: "#FFFFFF" }}
                   >
@@ -311,15 +316,15 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
           <div
             ref={displayRef}
             role="textbox"
-            aria-label="Phone number"
+            aria-label={t("dial.phoneNumber")}
             aria-readonly="true"
             data-testid="dial-number"
             onClick={() => setCaret(value.length)}
-            className="h-12 px-2 flex items-center justify-center overflow-x-auto whitespace-nowrap text-[28px] font-light tracking-wide text-foreground cursor-text select-none [scrollbar-width:none]"
+            className="h-10 px-2 flex items-center justify-center overflow-x-auto whitespace-nowrap text-[24px] font-light tracking-wide text-foreground cursor-text select-none [scrollbar-width:none]"
           >
             {value.length === 0 && <DialCaret />}
             {value.length === 0 && (
-              <span className="text-muted-foreground/60 text-2xl">Enter number</span>
+              <span className="text-muted-foreground/60 text-xl">{t("dial.enter")}</span>
             )}
             {value.split("").map((ch, i) => (
               <span key={i} className="inline-flex items-center">
@@ -342,9 +347,10 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
 
         {/* Keypad, with Call and Backspace as its last row (same spacing as
             the digits, instead of a separate block further down). */}
-        {/* The keypad sits in its own card: thin green line, soft shadow (approved option A). */}
-        <div className="mx-4 mt-2 mb-2.5 rounded-3xl bg-card border border-primary/20 shadow-[0_2px_10px_rgba(14,88,62,0.08)] p-3.5 shrink-0" data-testid="dial-keypad-card">
-          <div className="grid grid-cols-3 gap-2.5">
+        {/* The keypad sits in its own card: thin green line, soft shadow (approved option A).
+            Kept compact so more contacts fit above it. */}
+        <div className="mx-3 mt-1.5 mb-2 rounded-2xl bg-card border border-primary/20 shadow-[0_2px_10px_rgba(14,88,62,0.08)] p-2.5 shrink-0" data-testid="dial-keypad-card">
+          <div className="grid grid-cols-3 gap-2">
             {KEYS.map((k) => (
               <button
                 key={k.d}
@@ -355,14 +361,14 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
                     longZero();
                   }
                 }}
-                className="h-14 rounded-[14px] flex flex-col items-center justify-center transition-colors active:opacity-80"
+                className="h-11 rounded-xl flex flex-col items-center justify-center transition-colors active:opacity-80"
                 style={{ backgroundColor: "hsl(var(--brand-deep))", color: "#FFFFFF" }}
               >
-                <span className="text-xl font-semibold leading-none" style={{ color: "#FFFFFF" }}>
+                <span className="text-lg font-semibold leading-none" style={{ color: "#FFFFFF" }}>
                   {k.d}
                 </span>
                 {k.sub && (
-                  <span className="text-[9px] tracking-[0.2em] leading-none mt-1" style={{ color: "#FFFFFF" }}>
+                  <span className="text-[8px] tracking-[0.2em] leading-none mt-0.5" style={{ color: "#FFFFFF" }}>
                     {k.sub}
                   </span>
                 )}
@@ -372,18 +378,18 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
             <button
               onClick={callTyped}
               disabled={!value}
-              aria-label="Call"
-              className="h-14 rounded-[14px] flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-40 transition-colors bg-primary text-primary-foreground active:opacity-80"
+              aria-label={t("dial.call")}
+              className="h-11 rounded-xl flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-40 transition-colors bg-primary text-primary-foreground active:opacity-80"
             >
-              <Phone className="w-6 h-6" />
+              <Phone className="w-5 h-5" />
             </button>
             <button
-              aria-label="Backspace"
+              aria-label={t("dial.backspace")}
               onClick={backspace}
               disabled={at === 0}
-              className="h-14 rounded-[14px] flex items-center justify-center text-foreground hover:bg-secondary active:bg-secondary disabled:opacity-30"
+              className="h-11 rounded-xl flex items-center justify-center text-foreground hover:bg-secondary active:bg-secondary disabled:opacity-30"
             >
-              <Delete className="w-6 h-6" />
+              <Delete className="w-5 h-5" />
             </button>
           </div>
         </div>
@@ -403,7 +409,7 @@ function DialCaret() {
     <span
       data-caret
       aria-hidden
-      className="inline-block w-[2px] h-7 mx-[1px] bg-primary rounded-full animate-[dial-caret_1s_steps(1)_infinite]"
+      className="inline-block w-[2px] h-6 mx-[1px] bg-primary rounded-full animate-[dial-caret_1s_steps(1)_infinite]"
     />
   );
 }

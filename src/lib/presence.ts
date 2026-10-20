@@ -1,3 +1,4 @@
+import { tNow, appLocale } from "@/lib/i18n/language";
 /**
  * Centralized presence/last-seen formatting and privacy.
  *
@@ -23,7 +24,7 @@ export function isReallyOnline(p: PresenceProfile | null | undefined): boolean {
 }
 
 function fmtClock(d: Date): string {
-  return new Intl.DateTimeFormat([], {
+  return new Intl.DateTimeFormat(appLocale(), {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
@@ -32,7 +33,7 @@ function fmtClock(d: Date): string {
 
 export function formatLastSeen(iso: string): string {
   const d = new Date(iso);
-  return `last seen ${fmtClock(d)}`;
+  return tNow("presence.lastSeen", { time: fmtClock(d) });
 }
 
 /**
@@ -46,7 +47,7 @@ export function presenceLabel(
   mySettingsAllow: boolean,
 ): string {
   if (!other) return "";
-  if (isReallyOnline(other)) return "online";
+  if (isReallyOnline(other)) return tNow("common.online");
   if (!mySettingsAllow) return "";
   if (other.show_last_seen === false) return "";
   return formatLastSeen(other.last_seen_at);

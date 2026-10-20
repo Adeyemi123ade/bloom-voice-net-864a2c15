@@ -1,3 +1,4 @@
+import { tNow } from "@/lib/i18n/language";
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import MobileFrame from "@/components/MobileFrame";
@@ -33,8 +34,8 @@ export default function GoogleReturn() {
       if (error) {
         await supabase.auth.signOut();
         toast({
-          title: "Google couldn't be verified",
-          description: "Please sign in with your email and password, or register with the form.",
+          title: tNow("gr.failTitle"),
+          description: tNow("gr.failBody"),
           variant: "destructive",
         });
         navigate("/login", { replace: true });
@@ -46,8 +47,8 @@ export default function GoogleReturn() {
       // complete-google-registration on submit. No email OTP.
       if (data?.allowed === false && data.pending_registration) {
         toast({
-          title: "Almost done",
-          description: "Add your phone and a password to finish creating your account.",
+          title: tNow("gr.almost"),
+          description: tNow("gr.almostBody"),
         });
         navigate("/register", {
           replace: true,
@@ -70,7 +71,7 @@ export default function GoogleReturn() {
   return (
     <MobileFrame>
       <div className="h-full w-full flex items-center justify-center bg-background px-6">
-        <BrandHero message="Checking your Google account…" />
+        <BrandHero message={tNow("gr.checking")} />
       </div>
     </MobileFrame>
   );

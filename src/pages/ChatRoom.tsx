@@ -55,6 +55,7 @@ import { useBackNavigation } from "@/hooks/useBackNavigation";
 import chatWallpaper from "@/assets/chat-wallpaper.png";
 import { loadChatCache, saveChatCache } from "@/lib/chat/chatCache";
 import { transcribeRecording } from "@/lib/transcribe";
+import { useLanguage } from "@/lib/i18n/context";
 import { duplicateCallRecordIds, messageKind, mediaLabel, parseCallLog, selectionActions, stripQuotedReply } from "@/lib/chat/messageKinds";
 import { checkClipAvailable, copyMessages, extractTypedClip, matchPastedClip, mediaUrlOf } from "@/lib/chat/clipboard";
 import { getSignedChatMediaUrl, useSignedMediaUrl } from "@/lib/signedMedia";
@@ -180,6 +181,7 @@ export default function ChatRoom() {
   const navigate = useNavigate();
   const { showBackArrow, goBack } = useBackNavigation("/home");
   const { user, loading } = useAuth();
+  const { t } = useLanguage();
   const { resolvedTheme } = useTheme();
   const [messages, setMessages] = useState<Message[]>([]);
   const [other, setOther] = useState<Profile | null>(null);
@@ -213,7 +215,7 @@ export default function ChatRoom() {
     setRequestState(v);
   };
   const blockedByMe = useIsBlocked(other?.id);
-  const otherName = other?.display_name ?? "this person";
+  const otherName = other?.display_name ?? t("chat.thisPerson");
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [highlightId, setHighlightId] = useState<string | null>(null);
@@ -254,8 +256,8 @@ export default function ChatRoom() {
   }, [loading, user, navigate]);
 
   useEffect(() => {
-    document.title = other?.display_name ? `${other.display_name} — Chichat` : "Chat — Chichat";
-  }, [other]);
+    document.title = other?.display_name ? `${other.display_name} — Chichat` : `${t("chat.pageTitle")} — Chichat`;
+  }, [other, t]);
 
   useEffect(() => {
     if (conversationId) setHidden(loadHidden(conversationId));
@@ -703,7 +705,7 @@ export default function ChatRoom() {
         conversationId,
         calleeId: other.id,
         type,
-        peer: { name: other.display_name ?? "Contact", avatarUrl: other.avatar_url },
+        peer: { name: other.display_name ?? t("chat.contact"), avatarUrl: other.avatar_url },
       },
       navigate,
     );
@@ -785,7 +787,7 @@ export default function ChatRoom() {
         .from("messages")
         .update({ content, edited_at: editedAt })
         .eq("id", editId);
-      if (error) toast({ title: "Edit failed", description: error.message, variant: "destructive" });
+      if (error) toast({ title: t("chat.editFailed"), description: error.message, variant: "destructive" });
       return;
     }
 
@@ -831,9 +833,9 @@ export default function ChatRoom() {
       console.error("[msg-send] insert failed", error);
       setMessages((prev) => prev.filter((m) => m.id !== tmpId));
       if (isBlockedError(error)) {
-        toast({ title: "Message not sent", description: "You can't message this person right now." });
+        toast({ title: t("chat.notSent"), description: t("chat.cantMessage") });
       } else {
-        toast({ title: "Message not sent", description: "Please check your connection and try again." });
+        toast({ title: t("chat.notSent"), description: t("chat.checkConnection") });
       }
       return;
     }
@@ -937,7 +939,7 @@ export default function ChatRoom() {
   const deleteForEveryone = async (msgs: Message[]) => {
     const ids = msgs.map((m) => m.id).filter((id) => !id.startsWith("tmp-"));
     if (ids.length === 0) {
-      if (msgs.length) toast({ title: "Message is still sending", description: "Try again in a moment.", variant: "destructive" });
+      if (msgs.length) toast({ title: t("chat.stillSending"), description: t("chat.tryMoment"), variant: "destructive" });
       return;
     }
     // Ask for the updated rows back: an update the database's access rules
@@ -957,8 +959,8 @@ export default function ChatRoom() {
     if (error || done.size < ids.length) {
       const missed = ids.length - done.size;
       toast({
-        title: "Delete failed",
-        description: error?.message ?? (missed === 1 ? "That message couldn't be deleted for everyone." : `${missed} messages couldn't be deleted for everyone.`),
+        title: t("chat.deleteFailed"),
+        description: error?.message ?? (missed === 1 ? t("chat.cantDeleteOne") : t("chat.cantDeleteMany", { n: missed })),
         variant: "destructive",
       });
     }
@@ -978,9 +980,9 @@ export default function ChatRoom() {
     try {
       const result = await copyMessages(msgs.map((m) => m.content));
       if (result.ok) toast({ title: result.label });
-      else toast({ title: "Can't copy", description: result.reason, variant: "destructive" });
+      else toast({ title: t("chat.cantCopy"), description: result.reason, variant: "destructive" });
     } catch {
-      toast({ title: "Copy failed", variant: "destructive" });
+      toast({ title: t("chat.copyFailed"), variant: "destructive" });
     }
     clearSelection();
   };
@@ -995,7 +997,7 @@ export default function ChatRoom() {
         const url = mediaUrlOf(m.content);
         const link = url ? await getSignedChatMediaUrl(url).catch(() => url) : "";
         const meta = parseFileMessage(m.content);
-        const name = messageKind(m.content) === "voice" ? "Voice note" : meta?.name ?? mediaLabel(m.content);
+        const name = messageKind(m.content) === "voice" ? t("msg.voiceNote") : meta?.name ?? mediaLabel(m.content);
         return link ? `${name}: ${link}` : name;
       }),
     );
@@ -1003,18 +1005,18 @@ export default function ChatRoom() {
     try {
       if (Capacitor.isNativePlatform()) {
         const { Share } = await import("@capacitor/share");
-        await Share.share({ text: txt, dialogTitle: "Share" });
+        await Share.share({ text: txt, dialogTitle: t("chat.share") });
       } else if ((navigator as Navigator & { share?: (d: ShareData) => Promise<void> }).share) {
         await navigator.share({ text: txt });
       } else {
         await navigator.clipboard.writeText(txt);
-        toast({ title: "Copied to clipboard (share unavailable)" });
+        toast({ title: t("chat.copiedNoShare") });
       }
     } catch (e) {
       // Closing the share sheet without picking anything isn't a failure.
       const msg = e instanceof Error ? e.message : String(e);
       if (!(e instanceof Error && e.name === "AbortError") && !/cancel/i.test(msg)) {
-        toast({ title: "Share failed", description: msg, variant: "destructive" });
+        toast({ title: t("chat.shareFailed"), description: msg, variant: "destructive" });
       }
     }
     clearSelection();
@@ -1034,11 +1036,11 @@ export default function ChatRoom() {
     setForwardOpen(false);
     clearSelection();
     // Only one toast shows at a time, so a partial result goes in one message.
-    if (!failed.length) toast({ title: `Forwarded to ${sent.join(", ")}` });
+    if (!failed.length) toast({ title: t("chat.forwardedTo", { names: sent.join(", ") }) });
     else
       toast({
-        title: "Forward failed",
-        description: `${sent.length ? `Sent to ${sent.join(", ")}. ` : ""}Couldn't forward to ${failed.join(", ")}. Please try again.`,
+        title: t("chat.forwardFailed"),
+        description: `${sent.length ? `${t("chat.sentTo", { names: sent.join(", ") })} ` : ""}${t("chat.couldntForward", { names: failed.join(", ") })}`,
         variant: "destructive",
       });
   };
@@ -1052,7 +1054,7 @@ export default function ChatRoom() {
   const startRecording = async () => {
     const prereqError = checkMicPrerequisites();
     if (prereqError) {
-      toast({ title: "Can't record voice", description: prereqError, variant: "destructive" });
+      toast({ title: t("chat.cantRecord"), description: prereqError, variant: "destructive" });
       return;
     }
     try {
@@ -1101,8 +1103,8 @@ export default function ChatRoom() {
       const transcript = await transcribeRecording(blob);
       if (!transcript) {
         toast({
-          title: "Couldn't hear anything",
-          description: "Try recording again, a bit closer to the mic.",
+          title: t("chat.heardNothing"),
+          description: t("chat.recordCloser"),
           variant: "destructive",
         });
         return;
@@ -1110,8 +1112,8 @@ export default function ChatRoom() {
       setText((prev) => (prev.trim() ? `${prev.trim()} ${transcript}` : transcript));
     } catch (e) {
       toast({
-        title: "Transcription failed",
-        description: e instanceof Error ? e.message : "Please try again.",
+        title: t("chat.transcribeFailed"),
+        description: e instanceof Error ? e.message : t("auth.tryAgain"),
         variant: "destructive",
       });
     } finally {
@@ -1150,7 +1152,7 @@ export default function ChatRoom() {
       console.error("[voice-send] storage upload failed", upErr);
       setMessages((prev) => prev.filter((m) => m.id !== tmpId));
       URL.revokeObjectURL(localUrl);
-      toast({ title: "Upload failed", description: upErr.message, variant: "destructive" });
+      toast({ title: t("chat.uploadFailed"), description: upErr.message, variant: "destructive" });
       return;
     }
     const { data: pub } = supabase.storage.from("chat-media").getPublicUrl(path);
@@ -1171,7 +1173,7 @@ export default function ChatRoom() {
     if (error || !inserted) {
       console.error("[voice-send] insert failed", error);
       setMessages((prev) => prev.filter((m) => m.id !== tmpId));
-      toast({ title: "Send failed", description: error?.message ?? "Please try again.", variant: "destructive" });
+      toast({ title: t("chat.sendFailed"), description: error?.message ?? t("auth.tryAgain"), variant: "destructive" });
       return;
     }
     // Adopt the real row id immediately — see the matching comment in
@@ -1190,7 +1192,7 @@ export default function ChatRoom() {
     if (!f) return;
     const MAX = 25 * 1024 * 1024; // 25MB
     if (f.size > MAX) {
-      toast({ title: "File too large", description: "Max 25MB", variant: "destructive" });
+      toast({ title: t("chat.fileTooLarge"), description: t("chat.max25"), variant: "destructive" });
       return;
     }
     setPendingFile({ file: f, previewUrl: URL.createObjectURL(f) });
@@ -1258,7 +1260,7 @@ export default function ChatRoom() {
         })
         .select("id")
         .single();
-      if (error || !inserted) throw error ?? new Error("Insert failed");
+      if (error || !inserted) throw error ?? new Error(t("chat.uploadFailed"));
       // Adopt the real row id immediately — see the matching comment in
       // send() for why relying on the realtime echo's content-match to
       // reconcile this is fragile.
@@ -1269,8 +1271,8 @@ export default function ChatRoom() {
       setText("");
     } catch (err) {
       setMessages((prev) => prev.filter((m) => m.id !== tmpId));
-      const msg = err instanceof Error ? err.message : "Upload failed";
-      toast({ title: "Upload failed", description: msg, variant: "destructive" });
+      const msg = err instanceof Error ? err.message : t("chat.uploadFailed");
+      toast({ title: t("chat.uploadFailed"), description: msg, variant: "destructive" });
     } finally {
       setUploading(false);
     }
@@ -1295,7 +1297,7 @@ export default function ChatRoom() {
       e.preventDefault();
       const MAX = 25 * 1024 * 1024;
       if (file.size > MAX) {
-        toast({ title: "File too large", description: "Max 25MB", variant: "destructive" });
+        toast({ title: t("chat.fileTooLarge"), description: t("chat.max25"), variant: "destructive" });
         return;
       }
       setPendingFile({ file, previewUrl: URL.createObjectURL(file) });
@@ -1328,7 +1330,7 @@ export default function ChatRoom() {
     try {
       const check = await checkClipAvailable(pendingClip);
       if (!check.ok) {
-        toast({ title: "Can't paste this", description: check.reason, variant: "destructive" });
+        toast({ title: t("chat.cantPaste"), description: check.reason, variant: "destructive" });
         setPendingClip(null);
         return;
       }
@@ -1339,7 +1341,7 @@ export default function ChatRoom() {
       const rows = [{ conversation_id: conversationId, sender_id: user.id, content }];
       if (!meta && caption) rows.push({ conversation_id: conversationId, sender_id: user.id, content: caption });
       const { data: inserted, error } = await supabase.from("messages").insert(rows).select("*");
-      if (error || !inserted?.length) throw error ?? new Error("Send failed");
+      if (error || !inserted?.length) throw error ?? new Error(t("chat.sendFailed"));
       const fresh = inserted.map((r) => normalizeMessage(r as Record<string, unknown>));
       fresh.forEach((m) => pushNewMessage(m.id));
       setMessages((prev) => {
@@ -1350,8 +1352,8 @@ export default function ChatRoom() {
       setText("");
     } catch (err) {
       toast({
-        title: "Failed to send",
-        description: err instanceof Error ? err.message : "Please try again.",
+        title: t("chat.failedSend"),
+        description: err instanceof Error ? err.message : t("auth.tryAgain"),
         variant: "destructive",
       });
     } finally {
@@ -1401,7 +1403,7 @@ export default function ChatRoom() {
             onClick={(e) => e.stopPropagation()}
           >
             <button
-              aria-label="Close search"
+              aria-label={t("chat.closeSearch")}
               onClick={() => { setSearchOpen(false); setSearchQuery(""); }}
               className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-secondary shrink-0"
             >
@@ -1411,7 +1413,7 @@ export default function ChatRoom() {
               autoFocus
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search in this chat"
+              placeholder={t("chat.searchHere")}
               className="h-9 text-xs bg-input border-border flex-1"
             />
           </div>
@@ -1421,7 +1423,7 @@ export default function ChatRoom() {
             onClick={(e) => e.stopPropagation()}
           >
             <button
-              aria-label="Cancel"
+              aria-label={t("common.cancel")}
               onClick={clearSelection}
               className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
             >
@@ -1433,7 +1435,7 @@ export default function ChatRoom() {
             <div className="flex-1" />
             {actions.canCopy && (
               <button
-                aria-label="Copy"
+                aria-label={t("chat.copy")}
                 onClick={() => copyMsgs(actionable)}
                 className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
               >
@@ -1442,7 +1444,7 @@ export default function ChatRoom() {
             )}
             {actions.canShare && (
               <button
-                aria-label="Share"
+                aria-label={t("chat.share")}
                 onClick={() => shareMsgs(actionable)}
                 className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
               >
@@ -1451,7 +1453,7 @@ export default function ChatRoom() {
             )}
             {actions.canForward && forwardContents.length > 0 && (
               <button
-                aria-label="Forward"
+                aria-label={t("chat.forward")}
                 onClick={() => setForwardOpen(true)}
                 className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
               >
@@ -1460,7 +1462,7 @@ export default function ChatRoom() {
             )}
             {actions.canReport && onlySelected && (
               <button
-                aria-label="Report"
+                aria-label={t("chat.report")}
                 onClick={() => {
                   setReport({ messageId: onlySelected.id });
                   clearSelection();
@@ -1472,7 +1474,7 @@ export default function ChatRoom() {
             )}
             {actions.canEdit && (
               <button
-                aria-label="Edit"
+                aria-label={t("chat.edit")}
                 onClick={() => onlySelected && startEdit(onlySelected)}
                 className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
               >
@@ -1480,7 +1482,7 @@ export default function ChatRoom() {
               </button>
             )}
             <button
-              aria-label="Delete selected"
+              aria-label={t("chat.deleteSelected")}
               onClick={() => setDeleteOpen(true)}
               className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
             >
@@ -1491,7 +1493,7 @@ export default function ChatRoom() {
           <div className="px-3 pt-4 pb-3 flex items-center gap-2 border-b border-border">
             {showBackArrow && (
               <button
-                aria-label="Back"
+                aria-label={t("common.back")}
                 onClick={(e) => { e.stopPropagation(); goBack(); }}
                 className="w-9 h-9 -ml-1 rounded-full flex items-center justify-center hover:bg-secondary shrink-0"
               >
@@ -1514,7 +1516,7 @@ export default function ChatRoom() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-foreground truncate leading-tight">
-                {other?.display_name ?? "ChiChat user"}
+                {other?.display_name ?? t("chat.chichatUser")}
               </p>
               {/* Fixed-height status row — never changes header height */}
               <div className="h-[14px] flex items-center">
@@ -1528,19 +1530,19 @@ export default function ChatRoom() {
                     typing
                   </span>
                 ) : isReallyOnline(other) ? (
-                  <span className="text-xs text-muted-foreground truncate">online</span>
+                  <span className="text-xs text-muted-foreground truncate">{t("common.online")}</span>
                 ) : null}
               </div>
             </div>
             <button
-              aria-label="Voice call"
+              aria-label={t("call.voice")}
               onClick={(e) => { e.stopPropagation(); startCall("voice"); }}
               className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-secondary active:bg-secondary active:scale-90 transition-transform"
             >
               <Phone className="w-5 h-5 text-foreground" />
             </button>
             <button
-              aria-label="Video call"
+              aria-label={t("call.video")}
               onClick={(e) => { e.stopPropagation(); startCall("video"); }}
               className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-secondary active:bg-secondary active:scale-90 transition-transform"
             >
@@ -1549,7 +1551,7 @@ export default function ChatRoom() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
-                  aria-label="More options"
+                  aria-label={t("chat.moreOptions")}
                   onClick={(e) => e.stopPropagation()}
                   className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-secondary"
                 >
@@ -1558,27 +1560,27 @@ export default function ChatRoom() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
                 <DropdownMenuItem onClick={() => setContactInfoOpen(true)}>
-                  <Info className="w-4 h-4 mr-2" /> View contact
+                  <Info className="w-4 h-4 mr-2" /> {t("chat.viewContact")}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setSearchOpen(true)}>
-                  <Search className="w-4 h-4 mr-2" /> Search
+                  <Search className="w-4 h-4 mr-2" /> {t("chat.search")}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => setClearChatOpen(true)}
                   className="text-destructive focus:text-destructive"
                 >
-                  <Trash2 className="w-4 h-4 mr-2" /> Clear chat
+                  <Trash2 className="w-4 h-4 mr-2" /> {t("chat.clearChat")}
                 </DropdownMenuItem>
                 {other && (
                   <>
                     <DropdownMenuItem onClick={() => setBlockOpen(true)}>
-                      <Ban className="w-4 h-4 mr-2" /> {blockedByMe ? "Unblock" : "Block"}
+                      <Ban className="w-4 h-4 mr-2" /> {blockedByMe ? t("chat.unblock") : t("chat.block")}
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => setReport({ messageId: null })}
                       className="text-destructive focus:text-destructive"
                     >
-                      <Flag className="w-4 h-4 mr-2" /> Report
+                      <Flag className="w-4 h-4 mr-2" /> {t("chat.report")}
                     </DropdownMenuItem>
                   </>
                 )}
@@ -1595,8 +1597,8 @@ export default function ChatRoom() {
             className="w-full flex items-center justify-center gap-2 py-2 bg-primary text-primary-foreground text-sm font-medium active:opacity-90"
           >
             {chatCall.initialIsVideo ? <Video className="w-4 h-4" /> : <Phone className="w-4 h-4" />}
-            {chatCall.held ? "Call on hold" : chatCall.initialIsVideo ? "Ongoing video call" : "Ongoing voice call"}
-            <span className="opacity-80">· Tap to return</span>
+            {chatCall.held ? t("chat.callOnHold") : chatCall.initialIsVideo ? t("chat.ongoingVideo") : t("chat.ongoingVoice")}
+            <span className="opacity-80">· {t("chat.tapReturn")}</span>
           </button>
         )}
 
@@ -1613,14 +1615,14 @@ export default function ChatRoom() {
         >
           {loadingOlder && !searchOpen && (
             <p className="text-2xs text-muted-foreground text-center py-1" role="status">
-              Loading earlier messages…
+              {t("chat.loadingEarlier")}
             </p>
           )}
           {searchOpen && searchQuery.trim() && searchResults.length === 0 && (
-            <p className="text-xs text-muted-foreground text-center mt-6">No matches</p>
+            <p className="text-xs text-muted-foreground text-center mt-6">{t("common.noMatches")}</p>
           )}
           {!searchOpen && visible.length === 0 && (
-            <p className="text-xs text-muted-foreground text-center mt-6">Say hello 👋</p>
+            <p className="text-xs text-muted-foreground text-center mt-6">{t("chat.sayHello")}</p>
           )}
           {(searchOpen && searchQuery.trim() ? searchResults : visible).map((m) => {
             const mine = m.sender_id === user?.id;
@@ -1714,6 +1716,7 @@ export default function ChatRoom() {
                 >
                   {quoted && !bareAttachment && (
                     <div
+                      dir="auto"
                       className={`mb-1 px-2 py-1 rounded-md border-l-2 text-xs line-clamp-4 whitespace-pre-wrap break-words ${
                         mine
                           ? "bg-primary-foreground/10 border-primary-foreground/60 text-primary-foreground/85"
@@ -1724,7 +1727,7 @@ export default function ChatRoom() {
                     </div>
                   )}
                   {isDeleted ? (
-                    <p className="text-[12px]">🚫 This message was deleted</p>
+                    <p className="text-[12px]">🚫 {t("chat.deletedMsg")}</p>
                   ) : isVoice ? (
                     <VoiceBubble id={m.id} url={voiceUrl} mine={mine} />
                   ) : isFile && fileMeta ? (
@@ -1738,14 +1741,14 @@ export default function ChatRoom() {
                       }}
                     />
                   ) : (
-                    <p className="text-base whitespace-pre-wrap break-words leading-snug">
+                    <p dir="auto" className="text-base whitespace-pre-wrap break-words leading-snug">
                       {body}
                       <span
                         className={`float-right inline-flex items-center gap-1 ml-2 mt-1 text-[10px] leading-none whitespace-nowrap ${
                           mine ? "text-primary-foreground/70" : "text-muted-foreground"
                         }`}
                       >
-                        {m.edited_at && <span>edited</span>}
+                        {m.edited_at && <span>{t("chat.edited")}</span>}
                         <span>{formatTime(m.created_at)}</span>
                         {mine && (
                           m.read_at ? (
@@ -1823,17 +1826,17 @@ export default function ChatRoom() {
             <div className="w-1 self-stretch rounded bg-primary" />
             <div className="flex-1 min-w-0">
               <p className="text-2xs font-semibold text-primary">
-                Replying to {replyTo.sender_id === user?.id ? "yourself" : other?.display_name ?? "them"}
+                {t("chat.replyingTo", { name: replyTo.sender_id === user?.id ? t("chat.yourself") : other?.display_name ?? t("chat.them") })}
               </p>
               <p className="text-xs text-muted-foreground truncate">
                 {replyTo.content.startsWith(VOICE_PREFIX)
-                  ? "🎤 Voice note"
+                  ? `🎤 ${t("msg.voiceNote")}`
                   : replyTo.content.startsWith(FILE_PREFIX)
-                    ? `📎 ${parseFileMessage(replyTo.content)?.name ?? "Attachment"}`
+                    ? `📎 ${parseFileMessage(replyTo.content)?.name ?? t("msg.attachment")}`
                     : replyTo.content}
               </p>
             </div>
-            <button onClick={cancelReply} aria-label="Cancel reply" className="text-muted-foreground hover:text-foreground">
+            <button onClick={cancelReply} aria-label={t("chat.cancelReply")} className="text-muted-foreground hover:text-foreground">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -1868,7 +1871,7 @@ export default function ChatRoom() {
             </div>
             <button
               onClick={cancelPending}
-              aria-label="Remove attachment"
+              aria-label={t("chat.removeAttachment")}
               className="w-7 h-7 rounded-full hover:bg-background flex items-center justify-center text-muted-foreground"
               disabled={uploading}
             >
@@ -1886,7 +1889,7 @@ export default function ChatRoom() {
             <PastedClipPreview content={pendingClip} />
             <button
               onClick={cancelClip}
-              aria-label="Remove pasted item"
+              aria-label={t("chat.removePasted")}
               className="w-7 h-7 rounded-full hover:bg-background flex items-center justify-center text-muted-foreground"
               disabled={uploading}
             >
@@ -1902,13 +1905,13 @@ export default function ChatRoom() {
             onClick={(e) => e.stopPropagation()}
           >
             <p className="text-sm text-muted-foreground">
-              You blocked {otherName}. They can't message or call you.
+              {t("chat.youBlocked", { name: otherName })}
             </p>
             <button
               onClick={() => setBlockOpen(true)}
               className="mt-2 text-sm font-semibold text-primary"
             >
-              Unblock
+              {t("chat.unblock")}
             </button>
           </div>
         ) : requestState === "yes" && other ? (
@@ -1917,23 +1920,23 @@ export default function ChatRoom() {
             onClick={(e) => e.stopPropagation()}
           >
             <p className="text-sm text-foreground text-center">
-              {otherName} isn't in your contacts.
+              {t("chat.notInContacts", { name: otherName })}
             </p>
             <p className="text-xs text-muted-foreground text-center mt-1">
-              They won't know you've seen their messages until you accept.
+              {t("chat.wontKnowSeen")}
             </p>
             <div className="grid grid-cols-3 gap-2 mt-3">
               <button
                 onClick={() => setBlockOpen(true)}
                 className="h-11 rounded-xl border border-border text-sm font-medium text-destructive"
               >
-                Block
+                {t("chat.block")}
               </button>
               <button
                 onClick={() => setReport({ messageId: null })}
                 className="h-11 rounded-xl border border-border text-sm font-medium text-foreground"
               >
-                Report
+                {t("chat.report")}
               </button>
               <button
                 onClick={() => {
@@ -1943,7 +1946,7 @@ export default function ChatRoom() {
                 }}
                 className="h-11 rounded-xl bg-primary text-primary-foreground text-sm font-semibold"
               >
-                Accept
+                {t("chat.accept")}
               </button>
             </div>
           </div>
@@ -1955,13 +1958,13 @@ export default function ChatRoom() {
           {transcribing ? (
             <div className="flex-1 flex items-center gap-2 px-3 h-9 rounded-md bg-input border border-border">
               <Loader2 className="w-4 h-4 text-primary animate-spin" />
-              <span className="text-xs text-muted-foreground">Transcribing…</span>
+              <span className="text-xs text-muted-foreground">{t("chat.transcribing")}</span>
             </div>
           ) : recording ? (
             <>
               <button
                 onClick={() => stopRecording("cancel")}
-                aria-label="Cancel recording"
+                aria-label={t("chat.cancelRecording")}
                 className="w-9 h-9 rounded-full bg-secondary hover:bg-secondary/80 flex items-center justify-center"
               >
                 <X className="w-4 h-4 text-foreground" />
@@ -1974,8 +1977,8 @@ export default function ChatRoom() {
               {isVoiceTranscribeEnabled() && (
                 <button
                   onClick={() => stopRecording("transcribe")}
-                  aria-label="Convert to text"
-                  title="Convert to text"
+                  aria-label={t("chat.convertText")}
+                  title={t("chat.convertText")}
                   className="w-9 h-9 rounded-full bg-secondary hover:bg-secondary/80 flex items-center justify-center"
                 >
                   <Type className="w-4 h-4 text-foreground" />
@@ -1983,7 +1986,7 @@ export default function ChatRoom() {
               )}
               <button
                 onClick={() => stopRecording("send")}
-                aria-label="Send voice note"
+                aria-label={t("chat.sendVoice")}
                 className="w-9 h-9 rounded-full bg-primary hover:bg-primary/90 flex items-center justify-center"
               >
                 <Send className="w-4 h-4 text-primary-foreground" />
@@ -2001,13 +2004,14 @@ export default function ChatRoom() {
               {!pendingFile && !pendingClip && (
                 <button
                   onClick={() => fileRef.current?.click()}
-                  aria-label="Attach file"
+                  aria-label={t("chat.attachFile")}
                   className="w-9 h-9 rounded-full hover:bg-secondary flex items-center justify-center"
                 >
                   <Paperclip className="w-4 h-4 text-foreground" />
                 </button>
               )}
               <textarea
+                dir="auto"
                 ref={composerInputRef}
                 rows={1}
                 value={text}
@@ -2025,13 +2029,13 @@ export default function ChatRoom() {
                 }}
                 placeholder={
                   pendingFile || (pendingClip && messageKind(pendingClip) !== "voice")
-                    ? "Add a caption (optional)…"
+                    ? t("chat.captionPh")
                     : editing
-                      ? "Edit message"
-                      : "Type a message"
+                      ? t("chat.editMessage")
+                      : t("chat.typeMessage")
                 }
                 disabled={uploading}
-                aria-label="Message"
+                aria-label={t("chat.message")}
                 className="flex-1 min-w-0 min-h-10 resize-none rounded-lg border-[1.5px] border-border bg-input px-3.5 py-[7px] text-base leading-6 text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:border-primary disabled:opacity-50"
               />
               {!pendingFile && (
@@ -2040,7 +2044,7 @@ export default function ChatRoom() {
                     composerInputRef.current?.blur();
                     setEmojiOpen((v) => !v);
                   }}
-                  aria-label="Emoji"
+                  aria-label={t("chat.emoji")}
                   className="w-9 h-9 rounded-full hover:bg-secondary flex items-center justify-center"
                 >
                   <Smile className="w-4 h-4 text-foreground" />
@@ -2049,7 +2053,7 @@ export default function ChatRoom() {
               {pendingFile || pendingClip ? (
                 <button
                   onClick={() => (pendingFile ? sendPending() : void sendClip())}
-                  aria-label="Send attachment"
+                  aria-label={t("chat.sendAttachment")}
                   disabled={uploading}
                   className="w-9 h-9 rounded-full bg-primary hover:bg-primary/90 flex items-center justify-center disabled:opacity-50"
                 >
@@ -2058,7 +2062,7 @@ export default function ChatRoom() {
               ) : text.trim() || editing ? (
                 <button
                   onClick={send}
-                  aria-label="Send"
+                  aria-label={t("chat.send")}
                   className="w-9 h-9 rounded-full bg-primary hover:bg-primary/90 flex items-center justify-center disabled:opacity-50"
                   disabled={!text.trim()}
                 >
@@ -2067,7 +2071,7 @@ export default function ChatRoom() {
               ) : (
                 <button
                   onClick={startRecording}
-                  aria-label="Record voice"
+                  aria-label={t("chat.recordVoice")}
                   className="w-9 h-9 rounded-full bg-primary hover:bg-primary/90 flex items-center justify-center"
                 >
                   <Mic className="w-4 h-4 text-primary-foreground" />
@@ -2114,7 +2118,7 @@ export default function ChatRoom() {
                 }}
                 className="w-full h-11 text-sm text-foreground hover:bg-secondary border-b border-border"
               >
-                Delete for everyone
+                {t("chat.deleteEveryone")}
               </button>
             )}
             <button
@@ -2124,13 +2128,13 @@ export default function ChatRoom() {
               }}
               className="w-full h-11 text-sm text-foreground hover:bg-secondary border-b border-border"
             >
-              Delete for me
+              {t("chat.deleteMe")}
             </button>
             <button
               onClick={() => setDeleteOpen(false)}
               className="w-full h-11 text-sm text-foreground hover:bg-secondary"
             >
-              Cancel
+              {t("common.cancel")}
             </button>
           </div>
         </>
@@ -2138,7 +2142,7 @@ export default function ChatRoom() {
       <CallBackSheet
         open={!!callSheet}
         onOpenChange={(o) => !o && setCallSheet(null)}
-        name={other?.display_name ?? "Contact"}
+        name={other?.display_name ?? t("chat.contact")}
         type={callSheet ?? "voice"}
         onConfirm={() => callSheet && startCall(callSheet)}
       />
@@ -2150,22 +2154,22 @@ export default function ChatRoom() {
           />
           <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[61] w-[280px] rounded-xl bg-background border border-border shadow-lg overflow-hidden">
             <div className="px-4 py-3 border-b border-border">
-              <p className="text-sm font-semibold text-foreground">Clear this chat?</p>
+              <p className="text-sm font-semibold text-foreground">{t("chat.clearTitle")}</p>
               <p className="text-xs text-muted-foreground mt-1">
-                All messages will be removed from your view. This only affects you — {other?.display_name ?? "the other person"} will still see them.
+                {t("chat.clearBody", { name: other?.display_name ?? t("chat.otherPerson") })}
               </p>
             </div>
             <button
               onClick={clearChat}
               className="w-full h-11 text-sm text-destructive hover:bg-secondary border-b border-border"
             >
-              Clear chat
+              {t("chat.clearChat")}
             </button>
             <button
               onClick={() => setClearChatOpen(false)}
               className="w-full h-11 text-sm text-foreground hover:bg-secondary"
             >
-              Cancel
+              {t("common.cancel")}
             </button>
           </div>
         </>
@@ -2212,8 +2216,9 @@ function PastedClipPreview({ content }: { content: string }) {
   const kind = messageKind(content);
   const meta = parseFileMessage(content);
   const url = useSignedMediaUrl(kind === "image" || kind === "video" ? mediaUrlOf(content) : null);
-  const title = kind === "voice" ? "Voice note" : meta?.name ?? mediaLabel(content);
-  const sub = kind === "voice" ? "Pasted voice note" : kind === "image" ? "Pasted photo" : kind === "video" ? "Pasted video" : "Pasted document";
+  const { t } = useLanguage();
+  const title = kind === "voice" ? t("msg.voiceNote") : meta?.name ?? mediaLabel(content);
+  const sub = kind === "voice" ? t("chat.pastedVoice") : kind === "image" ? t("chat.pastedPhoto") : kind === "video" ? t("chat.pastedVideo") : t("chat.pastedDoc");
   return (
     <>
       <div className="w-12 h-12 rounded-lg overflow-hidden bg-background flex items-center justify-center flex-shrink-0">

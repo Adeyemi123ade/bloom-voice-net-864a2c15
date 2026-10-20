@@ -1,4 +1,5 @@
 // Small formatting helpers shared across chat UI.
+import { tNow, appLocale } from "@/lib/i18n/language";
 export function initials(name?: string | null) {
   if (!name) return "?";
   return name.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
@@ -7,15 +8,15 @@ export function initials(name?: string | null) {
 export function timeAgo(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
   const m = Math.floor(diff / 60000);
-  if (m < 1) return "just now";
-  if (m < 60) return `${m}m ago`;
+  if (m < 1) return tNow("time.justNow");
+  if (m < 60) return tNow("time.mAgo", { n: m });
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
+  if (h < 24) return tNow("time.hAgo", { n: h });
+  return tNow("time.dAgo", { n: Math.floor(h / 24) });
 }
 
 export function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return new Date(iso).toLocaleTimeString(appLocale(), { hour: "2-digit", minute: "2-digit" });
 }
 
 export function fmtDuration(s: number) {

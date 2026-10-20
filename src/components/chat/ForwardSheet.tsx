@@ -1,3 +1,5 @@
+import { useLanguage } from "@/lib/i18n/context";
+import { tNow } from "@/lib/i18n/language";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Check, Loader2, Search, Send } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -41,6 +43,7 @@ export default function ForwardSheet({
   const [query, setQuery] = useState("");
   const [picked, setPicked] = useState<string[]>([]);
   const [sending, setSending] = useState(false);
+  const { t } = useLanguage();
 
   useEffect(() => {
     let cancelled = false;
@@ -52,7 +55,7 @@ export default function ForwardSheet({
       const ids = (parts ?? []).map((p) => p.conversation_id);
       if (e1 || ids.length === 0) {
         if (!cancelled) {
-          setLoadError(e1 ? "Couldn't load your chats." : null);
+          setLoadError(e1 ? tNow("fwd.loadError") : null);
           setChats([]);
         }
         return;
@@ -77,7 +80,7 @@ export default function ForwardSheet({
       for (const c of convs ?? []) {
         const p = prof.get(otherByConv.get(c.id) ?? "");
         if (!p) continue;
-        rows.push({ conversation_id: c.id, name: p.display_name ?? "Contact", avatar_url: p.avatar_url ?? null });
+        rows.push({ conversation_id: c.id, name: p.display_name ?? tNow("chat.contact"), avatar_url: p.avatar_url ?? null });
       }
       setChats(rows);
     })();
@@ -125,12 +128,12 @@ export default function ForwardSheet({
     <div
       className="absolute inset-0 z-[70] flex flex-col bg-background"
       role="dialog"
-      aria-label="Forward to"
+      aria-label={t("fwd.titleShort")}
       onClick={(e) => e.stopPropagation()}
     >
       <header className="px-2 pt-4 pb-3 flex items-center gap-2 border-b border-border">
         <button
-          aria-label="Close"
+          aria-label={t("common.close")}
           onClick={onClose}
           disabled={sending}
           className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-secondary"
@@ -138,7 +141,7 @@ export default function ForwardSheet({
           <ArrowLeft className="w-5 h-5 text-foreground" />
         </button>
         <div className="flex-1 min-w-0">
-          <h2 className="text-base font-bold text-foreground">Forward to…</h2>
+          <h2 className="text-base font-bold text-foreground">{t("fwd.title")}</h2>
           <p className="text-xs text-muted-foreground">
             {contents.length === 1 ? "1 message" : `${contents.length} messages`}
             {picked.length > 0 && ` · ${picked.length} selected`}
@@ -152,8 +155,8 @@ export default function ForwardSheet({
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search chats"
-            aria-label="Search chats"
+            placeholder={t("fwd.search")}
+            aria-label={t("fwd.search")}
             className="w-full h-10 rounded-lg border-[1.5px] border-border bg-input pl-9 pr-3 text-base text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:border-primary"
           />
         </div>
@@ -168,7 +171,7 @@ export default function ForwardSheet({
           <p className="text-sm text-destructive text-center py-10 px-6">{loadError}</p>
         ) : visible.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-10 px-6">
-            {query ? "No chats match your search." : "You don't have any chats yet."}
+            {query ? t("fwd.noMatch") : t("fwd.noChats")}
           </p>
         ) : (
           <ul>
@@ -216,7 +219,7 @@ export default function ForwardSheet({
           <button
             onClick={send}
             disabled={sending}
-            aria-label="Send forward"
+            aria-label={t("fwd.send")}
             className="w-11 h-11 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-60"
           >
             {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}

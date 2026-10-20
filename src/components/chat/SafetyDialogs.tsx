@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLanguage } from "@/lib/i18n/context";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,6 +34,7 @@ export function BlockDialog({
   onDone?: (nowBlocked: boolean) => void;
 }) {
   const [busy, setBusy] = useState(false);
+  const { t } = useLanguage();
 
   const confirm = async () => {
     setBusy(true);
@@ -43,7 +45,7 @@ export function BlockDialog({
       toast({ title: blocked ? `${name} unblocked` : `${name} blocked` });
       onDone?.(!blocked);
     } else {
-      toast({ title: "That didn't work. Please try again." });
+      toast({ title: t("safety.failed") });
     }
   };
 
@@ -51,15 +53,15 @@ export function BlockDialog({
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>{blocked ? `Unblock ${name}?` : `Block ${name}?`}</AlertDialogTitle>
+          <AlertDialogTitle>{blocked ? t("safety.unblockQ", { name }) : t("safety.blockQ", { name })}</AlertDialogTitle>
           <AlertDialogDescription>
             {blocked
-              ? "They'll be able to message and call you again."
-              : "They won't be able to message or call you, or see your photo and last seen. They won't be told."}
+              ? t("safety.unblockBody")
+              : t("safety.blockBody")}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel disabled={busy}>{t("common.cancel")}</AlertDialogCancel>
           <AlertDialogAction
             disabled={busy}
             onClick={(e) => {
@@ -67,7 +69,7 @@ export function BlockDialog({
               void confirm();
             }}
           >
-            {blocked ? "Unblock" : "Block"}
+            {blocked ? t("chat.unblock") : t("chat.block")}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
@@ -99,6 +101,7 @@ export function ReportDialog({
   const [details, setDetails] = useState("");
   const [alsoBlock, setAlsoBlock] = useState(true);
   const [busy, setBusy] = useState(false);
+  const { t } = useLanguage();
 
   useEffect(() => {
     if (open) {
@@ -124,12 +127,12 @@ export function ReportDialog({
     if (ok) {
       onOpenChange(false);
       toast({
-        title: "Thanks for letting us know",
-        description: block ? `We'll review this. ${name} is now blocked.` : "We'll review this.",
+        title: t("safety.thanks"),
+        description: block ? t("safety.reviewBlocked", { name }) : t("safety.review"),
       });
       onDone?.(block);
     } else {
-      toast({ title: "We couldn't send your report. Please try again." });
+      toast({ title: t("safety.reportFailed") });
     }
   };
 
@@ -137,15 +140,15 @@ export function ReportDialog({
     <Dialog open={open} onOpenChange={(o) => !busy && onOpenChange(o)}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>{messageId ? "Report message" : `Report ${name}`}</DialogTitle>
+          <DialogTitle>{messageId ? t("safety.reportMessage") : t("info.reportName", { name })}</DialogTitle>
           <DialogDescription>
             {messageId
-              ? `This message from ${name} will be sent to ChiChat to review.`
-              : `Tell us what's wrong. ${name} won't be told who reported them.`}
+              ? t("safety.reportMsgBody", { name })
+              : t("safety.reportPersonBody", { name })}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-2" role="radiogroup" aria-label="Reason">
+        <div className="space-y-2" role="radiogroup" aria-label={t("safety.reason")}>
           {REPORT_REASONS.map((r) => (
             <button
               key={r.id}
@@ -157,7 +160,7 @@ export function ReportDialog({
                 reason === r.id ? "border-primary bg-primary/10 text-foreground" : "border-border bg-card text-foreground"
               }`}
             >
-              {r.label}
+              {t(r.labelKey)}
             </button>
           ))}
         </div>
@@ -165,23 +168,23 @@ export function ReportDialog({
         <Textarea
           value={details}
           onChange={(e) => setDetails(e.target.value.slice(0, 1000))}
-          placeholder="Anything else we should know? (optional)"
+          placeholder={t("safety.anythingElse")}
           rows={3}
         />
 
         {!alreadyBlocked && (
           <label className="flex items-center gap-3 text-sm text-foreground">
             <Checkbox checked={alsoBlock} onCheckedChange={(v) => setAlsoBlock(v === true)} />
-            Also block {name}
+            {t("safety.alsoBlock", { name })}
           </label>
         )}
 
         <div className="flex gap-2 justify-end pt-1">
           <Button variant="ghost" disabled={busy} onClick={() => onOpenChange(false)}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button disabled={!reason || busy} onClick={() => void send()}>
-            {busy ? "Sending…" : "Report"}
+            {busy ? t("safety.sending") : t("chat.report")}
           </Button>
         </div>
       </DialogContent>

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import AuthScreen from "@/components/auth/AuthScreen";
 import { authStyles } from "@/components/auth/authStyles";
+import { useLanguage } from "@/lib/i18n/context";
 import BrandHero from "@/components/BrandHero";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,6 +23,7 @@ const OTP_LENGTH = 6;
  * details, per project rule).
  */
 export default function VerifyEmail() {
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
   const stateEmail = (location.state as { email?: string } | null)?.email ?? "";
@@ -36,8 +38,8 @@ export default function VerifyEmail() {
   const autoSubmitted = useRef(false);
 
   useEffect(() => {
-    document.title = "Verify email — ChiChat";
-  }, []);
+    document.title = `${t("ve.pageTitle")} — ChiChat`;
+  }, [t]);
 
   useEffect(() => {
     if (!email) {
@@ -63,8 +65,8 @@ export default function VerifyEmail() {
       setCode("");
       autoSubmitted.current = false;
       toast({
-        title: "Wrong or expired code",
-        description: "Double-check the code in your email and try again.",
+        title: t("code.wrong"),
+        description: t("code.wrongBody"),
         variant: "destructive",
       });
       return;
@@ -76,7 +78,7 @@ export default function VerifyEmail() {
       });
     }
     clearVerifyEmailPending();
-    toast({ title: "Email verified — welcome to ChiChat!" });
+    toast({ title: t("ve.verified") });
     navigate("/welcome", { replace: true });
   };
 
@@ -99,13 +101,13 @@ export default function VerifyEmail() {
     setResending(false);
     if (error) {
       toast({
-        title: "Couldn't send a new code",
+        title: t("code.cantResend"),
         description: error.message,
         variant: "destructive",
       });
       return;
     }
-    toast({ title: "New code sent" });
+    toast({ title: t("code.newSent") });
     setSecondsLeft(45);
   };
 
@@ -116,14 +118,12 @@ export default function VerifyEmail() {
       <div className="mt-1 flex flex-col items-center">
         <BrandHero
           className="mb-5"
-          message={`Enter the 6-digit code we sent to ${email} to finish setting up your account.`}
+          message={t("ve.msg", { email })}
         />
 
-        <h1 className={`${authStyles.title} text-center`}>Check your email</h1>
+        <h1 className={`${authStyles.title} text-center`}>{t("ve.title")}</h1>
         <p className={`${authStyles.subtitle} text-center max-w-xs`}>
-          Code sent to{" "}
-          <span className="text-foreground font-semibold">{email}</span>.
-          It expires in 5 minutes.
+          {t("code.sentTo", { email })}
         </p>
 
         <div className="mt-6 w-full flex justify-center">
@@ -150,7 +150,7 @@ export default function VerifyEmail() {
         </div>
 
         <p className={`${authStyles.footnote} mt-4`}>
-          {verifying ? "Verifying…" : "We'll verify it automatically when you finish typing."}
+          {verifying ? t("code.verifying") : t("code.auto")}
         </p>
 
         <Button
@@ -158,13 +158,13 @@ export default function VerifyEmail() {
           disabled={verifying || code.length !== OTP_LENGTH}
           className={`${authStyles.primaryButton} mt-6`}
         >
-          {verifying ? "Verifying…" : "Verify"}
+          {verifying ? t("code.verifying") : t("code.verify")}
         </Button>
 
         <div className="mt-5 text-center">
           {secondsLeft > 0 ? (
             <p className={authStyles.footnote}>
-              Didn't get it? Resend in <span className="font-semibold text-foreground">{secondsLeft}s</span>
+              {t("code.resendIn", { s: secondsLeft })}
             </p>
           ) : (
             <button
@@ -173,19 +173,19 @@ export default function VerifyEmail() {
               disabled={resending}
               className={`text-[13px] ${authStyles.link} disabled:opacity-50`}
             >
-              {resending ? "Sending…" : "Resend code"}
+              {resending ? t("fp.sending") : t("code.resend")}
             </button>
           )}
         </div>
 
         <p className={`${authStyles.footnote} mt-2`}>
-          Wrong email?{" "}
+          {t("code.wrongEmail")}{" "}
           <Link
             to="/register"
             onClick={() => clearVerifyEmailPending()}
             className={authStyles.link}
           >
-            Start over
+            {t("code.startOver")}
           </Link>
         </p>
       </div>

@@ -1,3 +1,4 @@
+import { tNow } from "@/lib/i18n/language";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Phone, PhoneOff, Video } from "lucide-react";
@@ -162,7 +163,7 @@ export default function IncomingCallScreen() {
     if (incoming && inCall) {
       setWaitingCall({
         callId: incoming.id,
-        name: callerName ?? "Unknown",
+        name: callerName ?? tNow("common.unknown"),
         avatarUrl: callerAvatar,
         isVideo: incoming.call_type === "video",
       });
@@ -269,7 +270,7 @@ export default function IncomingCallScreen() {
         .select("display_name, avatar_url")
         .eq("id", call.caller_id)
         .maybeSingle();
-      setCallerName(prof?.display_name ?? "Unknown");
+      setCallerName(prof?.display_name ?? tNow("common.unknown"));
       setCallerAvatar(prof?.avatar_url ?? null);
       setIncoming({
         id: call.id,
@@ -351,7 +352,7 @@ export default function IncomingCallScreen() {
     setIncoming(null);
     navigate(
       `/call/${c.conversation_id}?type=${c.call_type}&callId=${c.id}&room=${encodeURIComponent(c.room_name)}&role=callee`,
-      { replace: true, state: { peer: { name: callerName ?? "Contact", avatarUrl: callerAvatar } } },
+      { replace: true, state: { peer: { name: callerName ?? tNow("chat.contact"), avatarUrl: callerAvatar } } },
     );
   };
 
@@ -394,14 +395,14 @@ export default function IncomingCallScreen() {
         </Avatar>
       </div>
       <div className="w-full min-w-0">
-        <p className="text-lg font-bold text-foreground truncate">{callerName ?? "Unknown"}</p>
-        <p className="text-xs text-muted-foreground">Ringing…</p>
+        <p className="text-lg font-bold text-foreground truncate">{callerName ?? tNow("common.unknown")}</p>
+        <p className="text-xs text-muted-foreground">{tNow("oc.ringing")}</p>
       </div>
       <div className="flex w-full gap-2">
         <button
           onClick={decline}
           disabled={accepting}
-          aria-label="Reject call"
+          aria-label={tNow("ic.reject")}
           className="flex-1 h-11 rounded-full bg-destructive text-destructive-foreground text-sm font-semibold inline-flex items-center justify-center gap-1.5 disabled:opacity-50 active:scale-95 transition-transform"
         >
           <PhoneOff className="w-4 h-4" /> Reject
@@ -409,7 +410,7 @@ export default function IncomingCallScreen() {
         <button
           onClick={accept}
           disabled={accepting}
-          aria-label="Accept call"
+          aria-label={tNow("ic.accept")}
           className="flex-1 h-11 rounded-full bg-primary text-primary-foreground text-sm font-semibold inline-flex items-center justify-center gap-1.5 disabled:opacity-50 active:scale-95 transition-transform"
         >
           {isVideo ? <Video className="w-4 h-4" /> : <Phone className="w-4 h-4" />} Accept

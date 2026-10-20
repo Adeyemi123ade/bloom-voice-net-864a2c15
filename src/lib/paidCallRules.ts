@@ -1,3 +1,4 @@
+import { tNow } from "@/lib/i18n/language";
 // Client copy of the paid-call country list, so the app can explain a
 // refusal before trying. The server (supabase/functions/_shared/
 // paidCallRules.ts) is what actually enforces it; keep the two in step.
@@ -25,10 +26,10 @@ export type PaidCallBlock = "country" | "too_new" | "daily_limit";
 export function paidCallMessage(reason: PaidCallBlock): string {
   switch (reason) {
     case "country":
-      return "For now, phone calls can only go to numbers in Nigeria or the UAE.";
+      return tNow("pc.country");
     case "too_new":
-      return "Phone calls become available 24 hours after you join ChiChat.";
+      return tNow("pc.tooNew");
     case "daily_limit":
-      return "You've used today's 30 minutes of phone calls. You can call again tomorrow.";
+      return tNow("pc.dailyLimit");
   }
 }
