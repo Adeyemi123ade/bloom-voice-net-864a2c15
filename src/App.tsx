@@ -41,12 +41,14 @@ import GoogleOAuthReturnListener from "./components/GoogleOAuthReturnListener.ts
 import ActiveCallHost from "./components/call/ActiveCallHost.tsx";
 import CallRecovery from "./components/call/CallRecovery.tsx";
 import NativeNavigateBridge from "./components/NativeNavigateBridge.tsx";
+import { LanguageProvider } from "./lib/i18n/LanguageProvider.tsx";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+      <LanguageProvider>
       <AuthProvider>
         <TooltipProvider>
           <Toaster />
@@ -100,6 +102,7 @@ const App = () => (
           </BrowserRouter>
         </TooltipProvider>
       </AuthProvider>
+      </LanguageProvider>
     </ThemeProvider>
   </QueryClientProvider>
 );

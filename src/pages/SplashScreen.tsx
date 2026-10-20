@@ -1,4 +1,8 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { Globe } from "lucide-react";
+import LanguagePicker from "@/components/LanguagePicker";
+import { useLanguage } from "@/lib/i18n/context";
+import { LANGUAGES } from "@/lib/i18n/strings";
 import chichatLogo from "@/assets/chichat-logo.png";
 
 const IMAGES = [
@@ -87,6 +91,22 @@ const CSS = `
   animation: chichat-fadein 1.6s ease 0.5s forwards;
 }
 @keyframes chichat-fadein { to { opacity: 1; } }
+/* Language button: top right, over the photos, always in reach. */
+.chichat-splash .lang-btn {
+  position: absolute;
+  top: max(env(safe-area-inset-top), 28px);
+  right: max(env(safe-area-inset-right), 28px);
+  margin: 12px;
+  z-index: 4;
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 40px; padding: 0 14px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  color: #fff; font-size: 14px; font-weight: 600;
+  cursor: pointer;
+}
+.chichat-splash .lang-btn svg { width: 18px; height: 18px; }
 .chichat-splash .content {
   position: absolute;
   top: max(env(safe-area-inset-top), 28px);
@@ -329,6 +349,9 @@ interface Props {
 }
 
 export default function SplashScreen({ onGetStarted, onSignIn }: Props) {
+  const { t, language } = useLanguage();
+  const [langOpen, setLangOpen] = useState(false);
+  const languageName = LANGUAGES.find((l) => l.code === language)?.name ?? "English";
   useEffect(() => {
     if (document.getElementById(STYLE_ID)) return;
     const style = document.createElement("style");
@@ -356,6 +379,13 @@ export default function SplashScreen({ onGetStarted, onSignIn }: Props) {
       <div className="frame-outer" />
       <div className="frame-inner" />
 
+      {/* Language first, before anything that needs reading. */}
+      <button type="button" className="lang-btn" onClick={() => setLangOpen(true)} aria-label={t("lang.title")}>
+        <Globe aria-hidden />
+        <span>{languageName}</span>
+      </button>
+      <LanguagePicker open={langOpen} onOpenChange={setLangOpen} />
+
       <div className="content">
         <div style={{ height: 0 }} />
         <div className="brand">
@@ -365,24 +395,24 @@ export default function SplashScreen({ onGetStarted, onSignIn }: Props) {
           <div className="wordmark">
             Chi<em>chat</em>
           </div>
-          <div className="tagline">Experience The Possibilities</div>
+          <div className="tagline">{t("splash.tagline")}</div>
         </div>
 
         <div className="cta-wrap">
           <div className="cta-group">
             <button className="cta" onClick={onGetStarted}>
-              Get Started
+              {t("splash.getStarted")}
             </button>
             <div className="signin">
-              Already have an account?
-              <button type="button" onClick={onSignIn}>Sign in</button>
+              {t("splash.haveAccount")}
+              <button type="button" onClick={onSignIn}>{t("splash.signIn")}</button>
             </div>
             {/* Required for app-store / Google OAuth review: the home page
                 must link to the Terms of Service and Privacy Policy. */}
             <nav className="legal" aria-label="Legal">
-              <a href="/terms">Terms of Service</a>
+              <a href="/terms">{t("splash.terms")}</a>
               <span className="dot" aria-hidden>·</span>
-              <a href="/privacy">Privacy Policy</a>
+              <a href="/privacy">{t("splash.privacy")}</a>
             </nav>
           </div>
         </div>
