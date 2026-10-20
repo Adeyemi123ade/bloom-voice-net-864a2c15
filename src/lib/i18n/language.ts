@@ -21,6 +21,11 @@ export function initialLanguage(): LanguageCode {
   return "en";
 }
 
+/** True when `s` is a key of a translated line (error messages are stored as keys). */
+export function isTextKey(s: unknown): s is TextKey {
+  return typeof s === "string" && Object.prototype.hasOwnProperty.call(en, s);
+}
+
 export function saveLanguage(code: LanguageCode): void {
   try { localStorage.setItem(KEY, code); } catch { /* ignore */ }
 }
