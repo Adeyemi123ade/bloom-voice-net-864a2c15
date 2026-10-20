@@ -214,7 +214,10 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
-          className="max-w-[420px] w-full top-0 bottom-0 h-auto max-h-none sm:bottom-auto sm:h-[92vh] sm:max-h-[85vh] p-0 gap-0 bg-background left-1/2 -translate-x-1/2 translate-y-0 rounded-none sm:rounded-2xl border-0 shadow-2xl flex flex-col overflow-hidden pb-[calc(70px+env(safe-area-inset-bottom))] [&>button.absolute]:hidden"
+          // Phone: the whole screen. Tablet/desktop: exactly the app's own
+          // column (same size and place as MobileFrame), so it covers it fully
+          // instead of sitting as a smaller card on top of it.
+          className="max-w-none w-full inset-0 h-full max-h-none translate-x-0 translate-y-0 md:inset-auto md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-[460px] md:h-[min(100vh,820px)] p-0 gap-0 bg-background rounded-none md:rounded-2xl border-0 md:border md:border-border shadow-none md:shadow-2xl flex flex-col overflow-hidden pb-[calc(70px+env(safe-area-inset-bottom))] [&>button.absolute]:hidden"
         >
         <DialogTitle className="sr-only">Call</DialogTitle>
 
@@ -315,11 +318,11 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
             aria-readonly="true"
             data-testid="dial-number"
             onClick={() => setCaret(value.length)}
-            className="h-12 px-2 flex items-center justify-center overflow-x-auto whitespace-nowrap text-[28px] font-light tracking-wide text-foreground cursor-text select-none [scrollbar-width:none]"
+            className="h-10 px-2 flex items-center justify-center overflow-x-auto whitespace-nowrap text-[24px] font-light tracking-wide text-foreground cursor-text select-none [scrollbar-width:none]"
           >
             {value.length === 0 && <DialCaret />}
             {value.length === 0 && (
-              <span className="text-muted-foreground/60 text-2xl">Enter number</span>
+              <span className="text-muted-foreground/60 text-xl">Enter number</span>
             )}
             {value.split("").map((ch, i) => (
               <span key={i} className="inline-flex items-center">
@@ -342,9 +345,10 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
 
         {/* Keypad, with Call and Backspace as its last row (same spacing as
             the digits, instead of a separate block further down). */}
-        {/* The keypad sits in its own card: thin green line, soft shadow (approved option A). */}
-        <div className="mx-4 mt-2 mb-2.5 rounded-3xl bg-card border border-primary/20 shadow-[0_2px_10px_rgba(14,88,62,0.08)] p-3.5 shrink-0" data-testid="dial-keypad-card">
-          <div className="grid grid-cols-3 gap-2.5">
+        {/* The keypad sits in its own card: thin green line, soft shadow (approved option A).
+            Kept compact so more contacts fit above it. */}
+        <div className="mx-3 mt-1.5 mb-2 rounded-2xl bg-card border border-primary/20 shadow-[0_2px_10px_rgba(14,88,62,0.08)] p-2.5 shrink-0" data-testid="dial-keypad-card">
+          <div className="grid grid-cols-3 gap-2">
             {KEYS.map((k) => (
               <button
                 key={k.d}
@@ -355,14 +359,14 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
                     longZero();
                   }
                 }}
-                className="h-14 rounded-[14px] flex flex-col items-center justify-center transition-colors active:opacity-80"
+                className="h-11 rounded-xl flex flex-col items-center justify-center transition-colors active:opacity-80"
                 style={{ backgroundColor: "hsl(var(--brand-deep))", color: "#FFFFFF" }}
               >
-                <span className="text-xl font-semibold leading-none" style={{ color: "#FFFFFF" }}>
+                <span className="text-lg font-semibold leading-none" style={{ color: "#FFFFFF" }}>
                   {k.d}
                 </span>
                 {k.sub && (
-                  <span className="text-[9px] tracking-[0.2em] leading-none mt-1" style={{ color: "#FFFFFF" }}>
+                  <span className="text-[8px] tracking-[0.2em] leading-none mt-0.5" style={{ color: "#FFFFFF" }}>
                     {k.sub}
                   </span>
                 )}
@@ -373,17 +377,17 @@ export default function Dialpad({ open, onOpenChange, initial: init = "" }: Prop
               onClick={callTyped}
               disabled={!value}
               aria-label="Call"
-              className="h-14 rounded-[14px] flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-40 transition-colors bg-primary text-primary-foreground active:opacity-80"
+              className="h-11 rounded-xl flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-40 transition-colors bg-primary text-primary-foreground active:opacity-80"
             >
-              <Phone className="w-6 h-6" />
+              <Phone className="w-5 h-5" />
             </button>
             <button
               aria-label="Backspace"
               onClick={backspace}
               disabled={at === 0}
-              className="h-14 rounded-[14px] flex items-center justify-center text-foreground hover:bg-secondary active:bg-secondary disabled:opacity-30"
+              className="h-11 rounded-xl flex items-center justify-center text-foreground hover:bg-secondary active:bg-secondary disabled:opacity-30"
             >
-              <Delete className="w-6 h-6" />
+              <Delete className="w-5 h-5" />
             </button>
           </div>
         </div>
@@ -403,7 +407,7 @@ function DialCaret() {
     <span
       data-caret
       aria-hidden
-      className="inline-block w-[2px] h-7 mx-[1px] bg-primary rounded-full animate-[dial-caret_1s_steps(1)_infinite]"
+      className="inline-block w-[2px] h-6 mx-[1px] bg-primary rounded-full animate-[dial-caret_1s_steps(1)_infinite]"
     />
   );
 }
