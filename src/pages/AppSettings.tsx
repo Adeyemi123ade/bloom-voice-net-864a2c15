@@ -5,12 +5,14 @@ import { Switch } from "@/components/ui/switch";
 import { useBackNavigation } from "@/hooks/useBackNavigation";
 import { type AppSwitches, changeAppSwitch, readAppSwitches } from "@/lib/appSettings";
 import { isVoiceTranscribeEnabled, setVoiceTranscribeEnabled } from "@/lib/transcriptionPrefs";
+import { useLanguage } from "@/lib/i18n/context";
 
 /** Settings > App settings: one switch per item, nothing else. */
 export default function AppSettings() {
   const { showBackArrow, goBack } = useBackNavigation("/settings");
   const [switches, setSwitches] = useState<AppSwitches | null>(null);
   const [transcribe, setTranscribe] = useState(() => isVoiceTranscribeEnabled());
+  const { t } = useLanguage();
 
   const refresh = useCallback(async () => {
     setSwitches(await readAppSwitches());
@@ -40,16 +42,16 @@ export default function AppSettings() {
 
   const rows: { key: string; label: string; checked: boolean; onChange: (on: boolean) => void }[] = [];
   if (switches) {
-    rows.push({ key: "notifications", label: "Notifications", checked: switches.notifications, onChange: flip("notifications") });
-    rows.push({ key: "overApps", label: "Show calls over other apps", checked: switches.overApps, onChange: flip("overApps") });
+    rows.push({ key: "notifications", label: t("appSettings.notifications"), checked: switches.notifications, onChange: flip("notifications") });
+    rows.push({ key: "overApps", label: t("appSettings.overApps"), checked: switches.overApps, onChange: flip("overApps") });
     if (switches.autostart !== null) {
-      rows.push({ key: "autostart", label: "Autostart", checked: switches.autostart, onChange: flip("autostart") });
+      rows.push({ key: "autostart", label: t("appSettings.autostart"), checked: switches.autostart, onChange: flip("autostart") });
     }
-    rows.push({ key: "background", label: "Run in background", checked: switches.background, onChange: flip("background") });
+    rows.push({ key: "background", label: t("appSettings.background"), checked: switches.background, onChange: flip("background") });
   }
   rows.push({
     key: "transcribe",
-    label: "Voice note transcription",
+    label: t("appSettings.transcribe"),
     checked: transcribe,
     onChange: (on) => {
       setTranscribe(on);
@@ -70,7 +72,7 @@ export default function AppSettings() {
               <ArrowLeft className="w-5 h-5 text-foreground" />
             </button>
           )}
-          <h1 className={`text-base font-semibold text-foreground ${showBackArrow ? "" : "pl-2"}`}>App settings</h1>
+          <h1 className={`text-base font-semibold text-foreground ${showBackArrow ? "" : "pl-2"}`}>{t("appSettings.title")}</h1>
         </div>
 
         <div className="px-4 py-4">

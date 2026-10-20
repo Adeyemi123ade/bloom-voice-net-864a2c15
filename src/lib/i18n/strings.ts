@@ -1,0 +1,218 @@
+/**
+ * Every piece of app text that has been moved into translation, per
+ * language. English is the source: a line missing in another language shows
+ * in English, so screens can be translated a few at a time.
+ *
+ * Yoruba, Hausa and Igbo below are first drafts and need checking by native
+ * speakers before release. {name} marks a value filled in by the app.
+ */
+export const en = {
+  // Language picker
+  "lang.title": "Language",
+  "lang.choose": "Choose your language",
+  "lang.note": "Some screens are still in English while we translate them.",
+
+  // Bottom bar
+  "nav.calls": "Calls",
+  "nav.messages": "Messages",
+  "nav.contacts": "Contacts",
+  "nav.settings": "Settings",
+
+  // Welcome screen
+  "splash.tagline": "Experience The Possibilities",
+  "splash.getStarted": "Get Started",
+  "splash.haveAccount": "Already have an account?",
+  "splash.signIn": "Sign in",
+  "splash.terms": "Terms of Service",
+  "splash.privacy": "Privacy Policy",
+
+  // Settings
+  "settings.title": "Settings",
+  "settings.phone": "Phone settings",
+  "settings.phoneSub": "Theme, ringtone",
+  "settings.app": "App settings",
+  "settings.appSub": "Notifications, autostart, battery",
+  "settings.language": "Language",
+  "settings.blocked": "Blocked",
+  "settings.blockedSub": "People you blocked",
+  "settings.backup": "Chat backup",
+  "settings.noBackup": "No backup yet",
+  "settings.lastBackup": "Last: {date} · {count} msgs",
+  "settings.account": "Account",
+  "settings.profile": "Profile",
+  "settings.thisDevice": "this device",
+  "settings.profileSetting": "Profile setting",
+  "settings.profileSub": "Edit name, photo and about",
+  "settings.delete": "Delete account",
+  "settings.deleteSub": "Permanently remove your account and all data",
+  "settings.deleting": "Deleting…",
+  "settings.signOut": "Sign out",
+  "settings.signingOut": "Signing out…",
+  "settings.deleteTitle": "Delete your account?",
+  "settings.deleteBody":
+    "This permanently deletes your profile, messages, calls, and contacts. This cannot be undone, and this email can be used to register a new account afterward.",
+  "common.cancel": "Cancel",
+
+  // App settings
+  "appSettings.title": "App settings",
+  "appSettings.notifications": "Notifications",
+  "appSettings.overApps": "Show calls over other apps",
+  "appSettings.autostart": "Autostart",
+  "appSettings.background": "Run in background",
+  "appSettings.transcribe": "Voice note transcription",
+} as const;
+
+export type TextKey = keyof typeof en;
+export type Dictionary = Partial<Record<TextKey, string>>;
+
+const yo: Dictionary = {
+  "lang.title": "Èdè",
+  "lang.choose": "Yan èdè rẹ",
+  "lang.note": "Àwọn ojú-ìwé kan ṣì wà ní èdè Gẹ̀ẹ́sì bí a ṣe ń túmọ̀ wọn.",
+  "nav.calls": "Ìpè",
+  "nav.messages": "Ìfiránṣẹ́",
+  "nav.contacts": "Olùbásọ̀rọ̀",
+  "nav.settings": "Ètò",
+  "splash.tagline": "Ní ìrírí àwọn àǹfààní",
+  "splash.getStarted": "Bẹ̀rẹ̀",
+  "splash.haveAccount": "Ṣé o ti ní àkọọ́lẹ̀ tẹ́lẹ̀?",
+  "splash.signIn": "Wọlé",
+  "splash.terms": "Àwọn òfin iṣẹ́",
+  "splash.privacy": "Ìlànà àṣírí",
+  "settings.title": "Ètò",
+  "settings.phone": "Ètò fóònù",
+  "settings.phoneSub": "Àwọ̀, ohùn ìpè",
+  "settings.app": "Ètò áàpù",
+  "settings.appSub": "Ìfitónilétí, ìbẹ̀rẹ̀ aládàáṣe, bátìrì",
+  "settings.language": "Èdè",
+  "settings.blocked": "Àwọn tí a dènà",
+  "settings.blockedSub": "Àwọn ènìyàn tí o dènà",
+  "settings.backup": "Ìpamọ́ ìfọ̀rọ̀wérọ̀",
+  "settings.noBackup": "Kò sí ìpamọ́ síbẹ̀",
+  "settings.lastBackup": "Èyí tó kẹ́yìn: {date} · {count} ìfiránṣẹ́",
+  "settings.account": "Àkọọ́lẹ̀",
+  "settings.profile": "Profaili",
+  "settings.thisDevice": "ẹ̀rọ yìí",
+  "settings.profileSetting": "Ètò profaili",
+  "settings.profileSub": "Ṣàtúnṣe orúkọ, fọ́tò àti nípa rẹ",
+  "settings.delete": "Pa àkọọ́lẹ̀ rẹ́",
+  "settings.deleteSub": "Yọ àkọọ́lẹ̀ rẹ àti gbogbo dátà kúrò pátápátá",
+  "settings.deleting": "Ó ń pa á rẹ́…",
+  "settings.signOut": "Jáde",
+  "settings.signingOut": "Ó ń jáde…",
+  "settings.deleteTitle": "Ṣé kí a pa àkọọ́lẹ̀ rẹ rẹ́?",
+  "settings.deleteBody":
+    "Èyí yóò pa profaili rẹ, àwọn ìfiránṣẹ́, ìpè àti olùbásọ̀rọ̀ rẹ rẹ́ pátápátá. A kò lè dá a padà, o sì lè fi ímeèlì yìí forúkọsílẹ̀ àkọọ́lẹ̀ tuntun lẹ́yìn náà.",
+  "common.cancel": "Fagilé",
+  "appSettings.title": "Ètò áàpù",
+  "appSettings.notifications": "Ìfitónilétí",
+  "appSettings.overApps": "Fi ìpè hàn lórí àwọn áàpù mìíràn",
+  "appSettings.autostart": "Ìbẹ̀rẹ̀ aládàáṣe",
+  "appSettings.background": "Ṣiṣẹ́ lábẹ́lẹ̀",
+  "appSettings.transcribe": "Yíyí ohùn padà sí ọ̀rọ̀",
+};
+
+const ha: Dictionary = {
+  "lang.title": "Harshe",
+  "lang.choose": "Zaɓi harshenka",
+  "lang.note": "Wasu shafuka suna cikin Turanci har yanzu yayin da muke fassara su.",
+  "nav.calls": "Kira",
+  "nav.messages": "Saƙonni",
+  "nav.contacts": "Lambobi",
+  "nav.settings": "Saituna",
+  "splash.tagline": "Gano sababbin damarmaki",
+  "splash.getStarted": "Fara",
+  "splash.haveAccount": "Kana da asusu tuni?",
+  "splash.signIn": "Shiga",
+  "splash.terms": "Sharuɗɗan amfani",
+  "splash.privacy": "Manufar sirri",
+  "settings.title": "Saituna",
+  "settings.phone": "Saitunan waya",
+  "settings.phoneSub": "Jigo, sautin kira",
+  "settings.app": "Saitunan manhaja",
+  "settings.appSub": "Sanarwa, farawa da kai, batir",
+  "settings.language": "Harshe",
+  "settings.blocked": "Waɗanda aka toshe",
+  "settings.blockedSub": "Mutanen da ka toshe",
+  "settings.backup": "Ajiyar hira",
+  "settings.noBackup": "Babu ajiya tukuna",
+  "settings.lastBackup": "Na ƙarshe: {date} · saƙonni {count}",
+  "settings.account": "Asusu",
+  "settings.profile": "Bayananka",
+  "settings.thisDevice": "wannan na'ura",
+  "settings.profileSetting": "Saitin bayananka",
+  "settings.profileSub": "Gyara suna, hoto da bayani",
+  "settings.delete": "Goge asusu",
+  "settings.deleteSub": "Cire asusunka da dukkan bayanai har abada",
+  "settings.deleting": "Ana gogewa…",
+  "settings.signOut": "Fita",
+  "settings.signingOut": "Ana fita…",
+  "settings.deleteTitle": "Goge asusunka?",
+  "settings.deleteBody":
+    "Wannan zai goge bayananka, saƙonni, kira da lambobinka har abada. Ba za a iya dawo da shi ba, kuma ana iya amfani da wannan imel don buɗe sabon asusu daga baya.",
+  "common.cancel": "Soke",
+  "appSettings.title": "Saitunan manhaja",
+  "appSettings.notifications": "Sanarwa",
+  "appSettings.overApps": "Nuna kira a saman wasu manhajoji",
+  "appSettings.autostart": "Farawa da kai",
+  "appSettings.background": "Aiki a bayan fage",
+  "appSettings.transcribe": "Mayar da saƙon murya rubutu",
+};
+
+const ig: Dictionary = {
+  "lang.title": "Asụsụ",
+  "lang.choose": "Họrọ asụsụ gị",
+  "lang.note": "Ụfọdụ ihuenyo ka dị n'asụsụ Bekee ka anyị na-asụgharị ha.",
+  "nav.calls": "Oku",
+  "nav.messages": "Ozi",
+  "nav.contacts": "Kọntaktị",
+  "nav.settings": "Ntọala",
+  "splash.tagline": "Nweta ahụmịhe ohere niile",
+  "splash.getStarted": "Malite",
+  "splash.haveAccount": "Ị nweelarị akaụntụ?",
+  "splash.signIn": "Banye",
+  "splash.terms": "Usoro ojiji",
+  "splash.privacy": "Iwu nzuzo",
+  "settings.title": "Ntọala",
+  "settings.phone": "Ntọala ekwentị",
+  "settings.phoneSub": "Isiokwu, ụda oku",
+  "settings.app": "Ntọala ngwa",
+  "settings.appSub": "Ọkwa, mmalite onwe, batrị",
+  "settings.language": "Asụsụ",
+  "settings.blocked": "Ndị egbochiri",
+  "settings.blockedSub": "Ndị ị gbochiri",
+  "settings.backup": "Nchekwa mkparịta ụka",
+  "settings.noBackup": "Enweghị nchekwa ka",
+  "settings.lastBackup": "Nke ikpeazụ: {date} · ozi {count}",
+  "settings.account": "Akaụntụ",
+  "settings.profile": "Profaịlụ",
+  "settings.thisDevice": "ngwaọrụ a",
+  "settings.profileSetting": "Ntọala profaịlụ",
+  "settings.profileSub": "Dezie aha, foto na nkọwa",
+  "settings.delete": "Hichapụ akaụntụ",
+  "settings.deleteSub": "Wepụ akaụntụ gị na data niile kpamkpam",
+  "settings.deleting": "Na-ehichapụ…",
+  "settings.signOut": "Pụọ",
+  "settings.signingOut": "Na-apụ…",
+  "settings.deleteTitle": "Hichapụ akaụntụ gị?",
+  "settings.deleteBody":
+    "Nke a ga-ehichapụ profaịlụ gị, ozi, oku na kọntaktị gị kpamkpam. A pụghị ịlaghachi ya, enwere ike iji email a mepee akaụntụ ọhụrụ ma emechaa.",
+  "common.cancel": "Kagbuo",
+  "appSettings.title": "Ntọala ngwa",
+  "appSettings.notifications": "Ọkwa",
+  "appSettings.overApps": "Gosi oku n'elu ngwa ndị ọzọ",
+  "appSettings.autostart": "Mmalite onwe",
+  "appSettings.background": "Rụọ ọrụ n'azụ",
+  "appSettings.transcribe": "Ide ozi olu ka ederede",
+};
+
+export const LANGUAGES = [
+  { code: "en", name: "English" },
+  { code: "yo", name: "Yorùbá" },
+  { code: "ha", name: "Hausa" },
+  { code: "ig", name: "Igbo" },
+] as const;
+
+export type LanguageCode = (typeof LANGUAGES)[number]["code"];
+
+export const DICTIONARIES: Record<LanguageCode, Dictionary> = { en, yo, ha, ig };
