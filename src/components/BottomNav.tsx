@@ -2,6 +2,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { Home as HomeIcon, Phone, MessageSquare, Users, Settings as SettingsIcon } from "lucide-react";
 import { useState } from "react";
 import Dialpad from "@/components/Dialpad";
+import { useLanguage } from "@/lib/i18n/context";
 
 type TabKey = "home" | "calls" | "messages" | "contacts" | "settings";
 
@@ -35,6 +36,7 @@ export default function BottomNav({
   const navigate = useNavigate();
   const location = useLocation();
   const [dialOpen, setDialOpen] = useState(false);
+  const { t: tr } = useLanguage();
 
   const tabs = TABS.filter((t) => t.key !== active);
 
@@ -66,16 +68,17 @@ export default function BottomNav({
         <ul className="mx-auto max-w-[520px] flex items-center justify-around px-2 py-2">
           {tabs.map((t) => {
             const Icon = t.icon;
+            const label = tr(`nav.${t.key as Exclude<TabKey, "home">}`);
             return (
               <li key={t.key}>
                 <button
                   type="button"
-                  aria-label={t.label}
+                  aria-label={label}
                   onClick={() => onTap(t)}
                   className="flex flex-col items-center gap-1 px-3 py-1.5 rounded-xl text-white/85 hover:text-white hover:bg-white/10 active:bg-white/15 transition-colors"
                 >
                   <Icon className="w-5 h-5" />
-                  <span className="text-2xs font-medium">{t.label}</span>
+                  <span className="text-2xs font-medium">{label}</span>
                 </button>
               </li>
             );

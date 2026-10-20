@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Check, ChevronDown, Search } from "lucide-react";
 import { allCountries, type CountryEntry } from "@/lib/countries";
+import { useLanguage } from "@/lib/i18n/context";
 import {
   Popover,
   PopoverContent,
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export default function CountryPicker({ value, onChange }: Props) {
+  const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const list = allCountries();
@@ -52,14 +54,14 @@ export default function CountryPicker({ value, onChange }: Props) {
               autoFocus
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Search country or +code"
+              placeholder={t("country.search")}
               className="w-full h-9 pl-8 pr-2 rounded-md bg-secondary/40 text-xs focus:outline-none border border-border/30"
             />
           </div>
         </div>
         <div className="max-h-[260px] overflow-y-auto">
           {filtered.length === 0 ? (
-            <p className="text-xs text-muted-foreground p-3 text-center">No matches</p>
+            <p className="text-xs text-muted-foreground p-3 text-center">{t("country.none")}</p>
           ) : (
             filtered.map((c) => (
               <button

@@ -1,4 +1,5 @@
 import chichatLogo from "@/assets/chichat-logo.png";
+import { useLanguage } from "@/lib/i18n/context";
 
 /**
  * ChiChat brand banner used across access/auth/invite screens.
@@ -17,6 +18,7 @@ export function BrandHero({
   message?: string;
   className?: string;
 }) {
+  const { t } = useLanguage();
   return (
     <section
       className={`w-full rounded-[18px] overflow-hidden ${className}`}
@@ -32,7 +34,7 @@ export function BrandHero({
             ChiChat
           </h2>
           <p className="text-xs mt-0.5 leading-snug" style={{ color: "#FFFFFF" }}>
-            Experience the possibilities
+            {t("brand.tagline")}
           </p>
         </div>
         {message ? (

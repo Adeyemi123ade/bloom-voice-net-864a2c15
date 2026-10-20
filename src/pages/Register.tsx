@@ -23,25 +23,27 @@ import { checkEmailExists } from "@/lib/checkEmail";
 import { isRecoveryPending } from "@/lib/recoveryPending";
 import { markVerifyEmailPending, getVerifyEmailPending } from "@/lib/verifyEmailPending";
 import { startGoogleAuth } from "@/lib/googleAuth";
+import { useLanguage } from "@/lib/i18n/context";
 
 const baseSchema = z.object({
   name: z
     .string()
     .trim()
-    .min(2, { message: "Name must be at least 2 characters" })
-    .max(60, { message: "Name must be less than 60 characters" }),
+    // Messages are keys of translated text (src/lib/i18n), shown with tx().
+    .min(2, { message: "reg.nameMin" })
+    .max(60, { message: "reg.nameMax" }),
   email: z
     .string()
     .trim()
-    .email({ message: "Enter a valid email address" })
-    .max(255, { message: "Email must be less than 255 characters" }),
+    .email({ message: "err.validEmail" })
+    .max(255, { message: "reg.emailMax" }),
   // Same rules the live hint under the field shows (src/lib/passwordStrength).
   password: z
     .string()
-    .max(72, { message: "Password must be less than 72 characters" })
+    .max(72, { message: "reg.passwordMax" })
     .superRefine((p, ctx) => {
         const unmet = firstUnmetPasswordRule(p);
-        if (unmet) ctx.addIssue({ code: "custom", message: unmet.message });
+        if (unmet) ctx.addIssue({ code: "custom", message: unmet.messageKey });
       }),
 });
 
@@ -67,6 +69,7 @@ export default function Register() {
   const location = useLocation();
   const prefill = (location.state as { prefill?: { email?: string; name?: string; googleVerified?: boolean } } | null)?.prefill;
   const googleVerified = !!prefill?.googleVerified;
+  const { t, tx } = useLanguage();
   const { user, loading: authLoading } = useAuth();
   useEffect(() => {
     // Don't redirect away when the user is mid-Google-completion: they're
@@ -121,18 +124,18 @@ export default function Register() {
     const trimmed = email.trim();
     if (!trimmed) return;
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(trimmed)) {
-      setErrors((prev) => ({ ...prev, email: "Enter a valid email address" }));
+      setErrors((prev) => ({ ...prev, email: "err.validEmail" }));
       return;
     }
     setEmailChecking(true);
     const exists = await checkEmailExists(trimmed);
     setEmailChecking(false);
     if (exists === true) {
-      setErrors((prev) => ({ ...prev, email: "Email already in use — sign in instead" }));
+      setErrors((prev) => ({ ...prev, email: "reg.emailInUse" }));
     } else if (exists === false) {
       setErrors((prev) => {
         const next = { ...prev };
-        if (next.email === "Email already in use — sign in instead") delete next.email;
+        if (next.email === "reg.emailInUse") delete next.email;
         return next;
       });
     }
@@ -147,8 +150,8 @@ export default function Register() {
     if (error) {
       setGoogleLoading(false);
       toast({
-        title: "Google didn't work",
-        description: "Please try again, or fill the form below to create your account.",
+        title: t("reg.googleFailTitle"),
+        description: t("reg.googleFailBody"),
       });
     }
   };
@@ -168,16 +171,16 @@ export default function Register() {
     // Compose the full international number from country + local digits.
     const localDigits = phoneLocal.replace(/[^\d]/g, "");
     if (!localDigits) {
-      fieldErrors.phone = "Enter your phone number";
+      fieldErrors.phone = "reg.enterPhone";
     }
     const composed = localDigits ? `+${country.dial}${localDigits}` : "";
     const e164 = composed ? toE164(composed) : null;
     if (composed && !e164) {
-      fieldErrors.phone = "That phone number doesn't look right";
+      fieldErrors.phone = "reg.phoneWrong";
     }
 
     if (password !== confirmPassword) {
-      fieldErrors.confirmPassword = "Passwords don't match";
+      fieldErrors.confirmPassword = "reg.passwordsDontMatch";
     }
     if (Object.keys(fieldErrors).length > 0 || !parsed.success || !e164) {
       setErrors(fieldErrors);
@@ -186,8 +189,8 @@ export default function Register() {
     if (!agreedToPolicy) {
       setAgreeError(true);
       toast({
-        title: "Please agree to continue",
-        description: "You need to agree to the Terms of Service and Privacy Policy to create an account.",
+        title: t("reg.agreeTitle"),
+        description: t("reg.agreeBody"),
         variant: "destructive",
       });
       return;
@@ -210,25 +213,25 @@ export default function Register() {
       if (fnErr || (data && (data as { error?: string }).error)) {
         const code = (data as { error?: string } | null)?.error;
         if (code === "phone_taken") {
-          setErrors({ phone: "This phone number is already registered" });
+          setErrors({ phone: "reg.phoneTaken" });
           return;
         }
         if (code === "invalid_phone") {
-          setErrors({ phone: "That phone number doesn't look right" });
+          setErrors({ phone: "reg.phoneWrong" });
           return;
         }
         if (code === "invalid_password") {
-          setErrors({ password: "Password must be 8+ chars with a number and an uppercase letter" });
+          setErrors({ password: "reg.invalidPassword" });
           return;
         }
         toast({
-          title: "Couldn't finish your account",
-          description: "Please try again in a moment.",
+          title: t("reg.finishFailTitle"),
+          description: t("auth.tryAgainMoment"),
           variant: "destructive",
         });
         return;
       }
-      toast({ title: "Welcome to ChiChat" });
+      toast({ title: t("reg.welcome") });
       navigate("/home", { replace: true });
       return;
     }
@@ -242,10 +245,10 @@ export default function Register() {
       // passed client-side parsing — surface this as a phone problem, not a
       // generic "couldn't register" failure.
       setSubmitting(false);
-      setErrors({ phone: "That phone number doesn't look right — check the country code and number." });
+      setErrors({ phone: "reg.phoneWrongCountry" });
       toast({
-        title: "Check your phone number",
-        description: "Make sure you've selected the right country code and entered a valid number.",
+        title: t("reg.checkPhoneTitle"),
+        description: t("reg.checkPhoneBody"),
         variant: "destructive",
       });
       return;
@@ -254,10 +257,10 @@ export default function Register() {
       const emailExists = await checkEmailExists(parsed.data.email);
       if (emailExists === true) {
         setSubmitting(false);
-        setErrors({ email: "This email is already registered — sign in instead" });
+        setErrors({ email: "reg.emailRegisteredInline" });
         toast({
-          title: "Email already registered",
-          description: `${parsed.data.email} already has an account. Try signing in.`,
+          title: t("reg.emailRegisteredTitle"),
+          description: t("reg.emailRegisteredBody", { email: parsed.data.email }),
           variant: "destructive",
         });
         return;
@@ -267,16 +270,16 @@ export default function Register() {
     if (availabilityResult?.email_exists || availabilityResult?.phone_exists) {
       setSubmitting(false);
       const nextErrors: FormErrors = {};
-      if (availabilityResult.email_exists) nextErrors.email = "This email is already registered — sign in instead";
-      if (availabilityResult.phone_exists) nextErrors.phone = `${e164} is already registered — sign in instead`;
+      if (availabilityResult.email_exists) nextErrors.email = "reg.emailRegisteredInline";
+      if (availabilityResult.phone_exists) nextErrors.phone = t("reg.phoneRegisteredInline", { phone: e164 });
       setErrors(nextErrors);
       toast({
         title: availabilityResult.email_exists && availabilityResult.phone_exists
-          ? "Email and phone already registered"
+          ? t("reg.bothRegisteredTitle")
           : availabilityResult.email_exists
-            ? "Email already registered"
-            : "Phone number already registered",
-        description: "This account detail is already in use. Sign in instead, or use different details for a new account.",
+            ? t("reg.emailRegisteredTitle")
+            : t("reg.phoneRegisteredTitle"),
+        description: t("reg.detailInUseBody"),
         variant: "destructive",
       });
       return;
@@ -300,16 +303,16 @@ export default function Register() {
         msg.includes("user already") ||
         (error as { status?: number }).status === 422;
       if (duplicate) {
-        setErrors({ email: "This email is already registered — sign in instead" });
+        setErrors({ email: "reg.emailRegisteredInline" });
         toast({
-          title: "Email already registered",
-          description: `${parsed.data.email} already has an account. Try signing in.`,
+          title: t("reg.emailRegisteredTitle"),
+          description: t("reg.emailRegisteredBody", { email: parsed.data.email }),
           variant: "destructive",
         });
       } else {
         toast({
-          title: "We couldn't create your account",
-          description: error.message || "Please try again in a moment.",
+          title: t("reg.createFailTitle"),
+          description: error.message || t("auth.tryAgainMoment"),
           variant: "destructive",
         });
       }
@@ -324,16 +327,16 @@ export default function Register() {
       if (profileError) {
         setSubmitting(false);
         if (profileError.code === "23505") {
-          setErrors({ phone: `${e164} is already registered to another account` });
+          setErrors({ phone: t("reg.phoneTakenInline", { phone: e164 }) });
           toast({
-            title: "Phone number already registered",
-            description: `${e164} is already in use. Use a different number, or sign in to the existing account.`,
+            title: t("reg.phoneRegisteredTitle"),
+            description: t("reg.phoneTakenBody", { phone: e164 }),
             variant: "destructive",
           });
         } else {
           toast({
-            title: "Couldn't save your phone number",
-            description: profileError.message || "Please try again.",
+            title: t("reg.phoneSaveFailTitle"),
+            description: profileError.message || t("auth.tryAgain"),
             variant: "destructive",
           });
         }
@@ -355,14 +358,14 @@ export default function Register() {
           <div className="mt-1">
             <BrandHero
               className="mb-5"
-              message="Join Chichat and experience the possibilities."
+              message={t("reg.joinMessage")}
             />
             <h1 className={authStyles.title}>
-              {googleVerified ? "Finish setting up" : "Create your account"}
+              {googleVerified ? t("reg.finishTitle") : t("reg.title")}
             </h1>
             {googleVerified && (
               <p className="text-sm text-muted-foreground mt-1">
-                We got your name and email from Google. Add a phone number and password to finish.
+                {t("reg.googleNote")}
               </p>
             )}
           </div>
@@ -372,7 +375,7 @@ export default function Register() {
             <div className={authStyles.fieldGap}>
               <div>
                 <Label htmlFor="name" className={authStyles.label}>
-                  Full name
+                  {t("reg.fullName")}
                 </Label>
                 <Input
                   id="name"
@@ -386,13 +389,13 @@ export default function Register() {
                   aria-invalid={!!errors.name}
                 />
                 {errors.name && (
-                  <p className="text-sm text-destructive mt-1">{errors.name}</p>
+                  <p className="text-sm text-destructive mt-1">{tx(errors.name)}</p>
                 )}
               </div>
 
               <div>
                 <Label htmlFor="email" className={authStyles.label}>
-                  Email address
+                  {t("reg.email")}
                 </Label>
                 <Input
                   id="email"
@@ -419,20 +422,20 @@ export default function Register() {
                 />
                 {googleVerified && (
                   <p className="text-sm text-muted-foreground mt-1">
-                    Verified by Google. You can't change this here.
+                    {t("reg.googleEmailNote")}
                   </p>
                 )}
                 {!googleVerified && emailChecking && !errors.email && (
-                  <p className="text-sm text-muted-foreground mt-1">Checking…</p>
+                  <p className="text-sm text-muted-foreground mt-1">{t("reg.checking")}</p>
                 )}
                 {errors.email && (
-                  <p className="text-sm text-destructive mt-1">{errors.email}</p>
+                  <p className="text-sm text-destructive mt-1">{tx(errors.email)}</p>
                 )}
               </div>
 
               <div>
                 <Label htmlFor="phone" className={authStyles.label}>
-                  Phone number
+                  {t("reg.phone")}
                 </Label>
                 <div className="mt-1.5 flex gap-2">
                   <CountryPicker
@@ -471,14 +474,14 @@ export default function Register() {
                   />
                 </div>
                 {errors.phone && (
-                  <p className="text-sm text-destructive mt-1">{errors.phone}</p>
+                  <p className="text-sm text-destructive mt-1">{tx(errors.phone)}</p>
                 )}
 
               </div>
 
               <div>
                 <Label htmlFor="password" className={authStyles.label}>
-                  Password
+                  {t("auth.password")}
                 </Label>
                 <div className="relative mt-1.5">
                   <Input
@@ -487,7 +490,7 @@ export default function Register() {
                     autoComplete="new-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="At least 8 characters"
+                    placeholder={t("reg.passwordPlaceholder")}
                     maxLength={72}
                     className="pr-11"
                     aria-invalid={!!errors.password}
@@ -495,7 +498,7 @@ export default function Register() {
                   <button
                     type="button"
                     onClick={() => setShowPwd((s) => !s)}
-                    aria-label={showPwd ? "Hide password" : "Show password"}
+                    aria-label={showPwd ? t("auth.hidePassword") : t("auth.showPassword")}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                   >
                     {showPwd ? <EyeOff className="w-[18px] h-[18px]" /> : <Eye className="w-[18px] h-[18px]" />}
@@ -503,13 +506,13 @@ export default function Register() {
                 </div>
                 <PasswordStrengthBar password={password} />
                 {errors.password && (
-                  <p className="text-sm text-destructive mt-1">{errors.password}</p>
+                  <p className="text-sm text-destructive mt-1">{tx(errors.password)}</p>
                 )}
               </div>
 
               <div>
                 <Label htmlFor="confirmPassword" className={authStyles.label}>
-                  Confirm password
+                  {t("reg.confirm")}
                 </Label>
                 <Input
                   id="confirmPassword"
@@ -517,13 +520,13 @@ export default function Register() {
                   autoComplete="new-password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Re-enter password"
+                  placeholder={t("reg.confirmPlaceholder")}
                   maxLength={72}
                   className="mt-1.5"
                   aria-invalid={!!errors.confirmPassword}
                 />
                 {errors.confirmPassword ? (
-                  <p className="text-sm text-destructive mt-1">{errors.confirmPassword}</p>
+                  <p className="text-sm text-destructive mt-1">{tx(errors.confirmPassword)}</p>
                 ) : (
                   <PasswordMatchHint password={password} confirm={confirmPassword} />
                 )}
@@ -536,7 +539,7 @@ export default function Register() {
                 disabled={submitting}
                 className={authStyles.primaryButton}
               >
-                {submitting ? (googleVerified ? "Finishing…" : "Creating account…") : (googleVerified ? "Finish & continue" : "Continue")}
+                {submitting ? (googleVerified ? t("reg.finishing") : t("reg.creating")) : (googleVerified ? t("reg.finish") : t("reg.continue"))}
               </Button>
               {!googleVerified && (
                 <>
@@ -554,14 +557,14 @@ export default function Register() {
                       <path fill="#FBBC05" d="M5.84 14.1A6.6 6.6 0 0 1 5.5 12c0-.73.13-1.44.34-2.1V7.07H2.18A11 11 0 0 0 1 12c0 1.78.43 3.46 1.18 4.93l3.66-2.83z"/>
                       <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.83C6.71 7.31 9.14 5.38 12 5.38z"/>
                     </svg>
-                    {googleLoading ? "Connecting…" : "Continue with Google"}
+                    {googleLoading ? t("auth.connecting") : t("auth.google")}
                   </Button>
                 </>
               )}
               <p className={`${authStyles.footnote} mt-4`}>
-                Already have an account?{" "}
+                {t("splash.haveAccount")}{" "}
                 <Link to="/login" className={authStyles.link}>
-                  Sign in
+                  {t("splash.signIn")}
                 </Link>
               </p>
               <div className={`flex items-center gap-2.5 mt-4 px-1 ${agreeError ? "text-destructive" : ""}`}>
@@ -579,13 +582,13 @@ export default function Register() {
                   htmlFor="agree-policy"
                   className={`text-[13px] font-normal leading-snug cursor-pointer ${agreeError ? "text-destructive" : "text-foreground"}`}
                 >
-                  I agree to the{" "}
+                  {t("reg.agreePrefix")}{" "}
                   <Link to="/terms" className="text-primary underline underline-offset-2">
-                    Terms of Service
+                    {t("splash.terms")}
                   </Link>{" "}
-                  and{" "}
+                  {t("reg.agreeAnd")}{" "}
                   <Link to="/privacy" className="text-primary underline underline-offset-2">
-                    Privacy Policy
+                    {t("splash.privacy")}
                   </Link>
                   .
                 </Label>
