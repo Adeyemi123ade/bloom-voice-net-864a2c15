@@ -71,7 +71,9 @@ export default function Settings() {
         await new Promise((r) => setTimeout(r, 800));
       }
       await unregisterCallPush();
-      try { await supabase.auth.signOut(); } catch { /* ignore */ }
+      // This device only: the default ("global") also signed the account out
+      // on every other phone and computer.
+      try { await supabase.auth.signOut({ scope: "local" }); } catch { /* ignore */ }
       toast({ title: "Signed out" });
       window.location.replace("/");
     } finally {
