@@ -1,6 +1,6 @@
 import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import type { LanguageCode } from "./strings";
-import { initialLanguage, saveLanguage, translate } from "./language";
+import { initialLanguage, isTextKey, saveLanguage, translate } from "./language";
 import { LanguageContext, type LanguageState } from "./context";
 
 /** The language chosen on this phone, for the whole app. */
@@ -17,7 +17,12 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<LanguageState>(
-    () => ({ language, setLanguage, t: (key, vars) => translate(language, key, vars) }),
+    () => ({
+      language,
+      setLanguage,
+      t: (key, vars) => translate(language, key, vars),
+      tx: (s) => (isTextKey(s) ? translate(language, s) : s),
+    }),
     [language, setLanguage],
   );
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
