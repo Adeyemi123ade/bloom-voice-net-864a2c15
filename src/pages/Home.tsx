@@ -17,6 +17,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { buildPreview } from "@/lib/chat/messageKinds";
+import { loadChatListCache, saveChatListCache } from "@/lib/chat/chatCache";
 import {
   type ChatRow as ChatListRow,
   type MessageLike,
@@ -148,14 +149,23 @@ export default function Home() {
   const loadSeq = useRef(0);
   const chatsRef = useRef<ChatRow[]>([]);
   chatsRef.current = chats;
+  // Set once the list came from the server (never save the saved copy back).
+  const listLoaded = useRef(false);
   const loadChats = async () => {
     if (!user) return;
     const seq = ++loadSeq.current;
     const rows = await loadChatList(user.id);
     if (seq !== loadSeq.current) return;
+    listLoaded.current = true;
     setChats(rows);
     setFetching(false);
   };
+  // Keep the list on this phone for next time, once changes settle.
+  useEffect(() => {
+    if (!user || !listLoaded.current) return;
+    const t = window.setTimeout(() => saveChatListCache(user.id, chats), 800);
+    return () => window.clearTimeout(t);
+  }, [chats, user]);
   // Bursts (several messages arriving together) collapse into one reload.
   const reloadTimer = useRef<number | null>(null);
   const scheduleReload = () => {
@@ -194,7 +204,16 @@ export default function Home() {
   };
 
   useEffect(() => {
-    if (user) loadChats();
+    if (!user) return;
+    // What was there last time, shown at once while the latest loads.
+    if (!listLoaded.current) {
+      const saved = loadChatListCache<ChatRow>(user.id);
+      if (saved?.length) {
+        setChats(saved);
+        setFetching(false);
+      }
+    }
+    loadChats();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 

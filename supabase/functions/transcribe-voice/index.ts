@@ -1,6 +1,17 @@
-// Transcribes a recorded voice note to text via OpenAI's transcription API,
-// so users can dictate a message instead of typing. Authenticated endpoint
-// only — never exposed to anon callers, since each call costs real money.
+// Transcribes a voice note to text via OpenAI's transcription API, so users
+// can dictate a message instead of typing, or read a voice note they got.
+// Authenticated endpoint only — never exposed to anon callers, since each
+// call costs real money.
+//
+// Two ways in:
+//  - the recording itself as the body (dictating, before it's sent);
+//  - JSON { path } for a voice note already in chat-media: the audio is read
+//    here, next to the storage, instead of the phone downloading it and
+//    uploading it again. The caller's own sign-in reads it, so the storage
+//    rules (only people in that chat) still decide who can.
+//
+// Every reply carries `timings` (milliseconds per stage) so slow steps show
+// up in the app's console and in these logs.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
 import { checkRateLimit } from "../_shared/rateLimit.ts";
 
@@ -20,9 +31,41 @@ function json(body: unknown, status = 200) {
 // cost and abuse potential bounded.
 const MAX_BYTES = 15 * 1024 * 1024;
 
+// Faster and cheaper than whisper-1 (OpenAI lists it at about half the price
+// per minute). Set TRANSCRIBE_MODEL to change it; whisper-1 is used if the
+// chosen model is refused.
+const MODEL = Deno.env.get("TRANSCRIBE_MODEL")?.trim() || "gpt-4o-mini-transcribe";
+const FALLBACK_MODEL = "whisper-1";
+
+function fileNameFor(type: string): string {
+  if (type.includes("mp4") || type.includes("m4a") || type.includes("aac")) return "voice.m4a";
+  if (type.includes("ogg")) return "voice.ogg";
+  if (type.includes("mpeg") || type.includes("mp3")) return "voice.mp3";
+  if (type.includes("wav")) return "voice.wav";
+  return "voice.webm";
+}
+
+async function transcribe(key: string, audio: Blob, model: string) {
+  const form = new FormData();
+  form.append("file", audio, fileNameFor(audio.type));
+  form.append("model", model);
+  form.append("response_format", "json");
+  const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}` },
+    body: form,
+  });
+  const data = await res.json().catch(() => ({}));
+  return { ok: res.ok, status: res.status, data };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "invalid_request" }, 405);
+
+  const t0 = Date.now();
+  const timings: Record<string, number> = {};
+  const mark = (name: string, since: number) => (timings[name] = Date.now() - since);
 
   try {
     const auth = req.headers.get("Authorization") ?? "";
@@ -30,44 +73,69 @@ Deno.serve(async (req) => {
 
     const url = Deno.env.get("SUPABASE_URL")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const userClient = createClient(url, anonKey, {
-      global: { headers: { Authorization: auth } },
-    });
-    const { data: { user }, error: userErr } = await userClient.auth.getUser();
-    if (userErr || !user) return json({ error: "unauthorized" }, 401);
-
     const openaiKey = Deno.env.get("OPENAI_API_KEY");
     if (!openaiKey) return json({ error: "transcription_unavailable" }, 500);
 
+    const userClient = createClient(url, anonKey, {
+      global: { headers: { Authorization: auth } },
+    });
     const admin = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    // Per-user cap, not per-IP — this is an authenticated endpoint and each
-    // call has a real dollar cost, so the limit key is the user, not the ip.
-    const withinLimit = await checkRateLimit(admin, "transcribe-voice", user.id, 30, 3600);
+    const contentType = req.headers.get("content-type") || "audio/webm";
+
+    // Reading the upload, checking the sign-in and the limit run together.
+    const bodyStart = Date.now();
+    const bodyP = req.arrayBuffer().then((b) => (mark("receive", bodyStart), b));
+    const authStart = Date.now();
+    const { data: claimsData, error: claimsErr } = await userClient.auth.getClaims(auth.slice(7));
+    const userId = claimsData?.claims?.sub as string | undefined;
+    mark("auth", authStart);
+    if (claimsErr || !userId) return json({ error: "unauthorized" }, 401);
+
+    // Per-user cap, not per-IP — each call has a real dollar cost.
+    const limitStart = Date.now();
+    const withinLimit = await checkRateLimit(admin, "transcribe-voice", userId, 30, 3600);
+    mark("limit", limitStart);
     if (!withinLimit) {
       return json({ error: "Too many transcriptions. Please try again in a bit." }, 429);
     }
 
-    const audioBuf = await req.arrayBuffer();
-    if (audioBuf.byteLength === 0) return json({ error: "empty_audio" }, 400);
-    if (audioBuf.byteLength > MAX_BYTES) return json({ error: "audio_too_large" }, 400);
+    const body = await bodyP;
+    let audio: Blob;
+    if (contentType.includes("application/json")) {
+      // A voice note already sent: read it from storage with the caller's sign-in.
+      let path = "";
+      try {
+        path = String(JSON.parse(new TextDecoder().decode(body))?.path ?? "");
+      } catch { /* handled below */ }
+      if (!path || path.includes("..")) return json({ error: "bad_request" }, 400);
+      const dlStart = Date.now();
+      const { data, error } = await userClient.storage.from("chat-media").download(path);
+      mark("download", dlStart);
+      if (error || !data) return json({ error: "not_found" }, 404);
+      audio = data;
+    } else {
+      audio = new Blob([body], { type: contentType });
+    }
+    if (audio.size === 0) return json({ error: "empty_audio" }, 400);
+    if (audio.size > MAX_BYTES) return json({ error: "audio_too_large" }, 400);
 
-    const contentType = req.headers.get("content-type") || "audio/webm";
-    const form = new FormData();
-    form.append("file", new Blob([audioBuf], { type: contentType }), "voice.webm");
-    form.append("model", "whisper-1");
-
-    const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${openaiKey}` },
-      body: form,
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      console.error("OpenAI transcription error:", data);
-      return json({ error: "transcription_failed" }, 502);
+    const aiStart = Date.now();
+    let model = MODEL;
+    let result = await transcribe(openaiKey, audio, model);
+    if (!result.ok && model !== FALLBACK_MODEL && (result.status === 400 || result.status === 404)) {
+      console.error("transcription model refused, using whisper-1:", result.status, result.data);
+      model = FALLBACK_MODEL;
+      result = await transcribe(openaiKey, audio, model);
+    }
+    mark("openai", aiStart);
+    if (!result.ok) {
+      console.error("OpenAI transcription error:", result.status, result.data);
+      return json({ error: "transcription_failed", timings }, 502);
     }
 
-    return json({ text: String(data.text ?? "").trim() });
+    timings.total = Date.now() - t0;
+    console.log("transcribe-voice", JSON.stringify({ model, bytes: audio.size, timings }));
+    return json({ text: String(result.data?.text ?? "").trim(), model, timings });
   } catch (e) {
     console.error("transcribe-voice error:", e);
     return json({ error: "bad_request" }, 400);
