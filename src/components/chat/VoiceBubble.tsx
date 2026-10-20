@@ -5,6 +5,8 @@ import { fmtDuration } from "@/lib/chat/format";
 import { useSignedMediaUrl, getSignedChatMediaUrl } from "@/lib/signedMedia";
 import { isVoiceTranscribeEnabled } from "@/lib/transcriptionPrefs";
 import { transcribeVoiceNote } from "@/lib/transcribe";
+import { useLanguage } from "@/lib/i18n/context";
+import { tNow } from "@/lib/i18n/language";
 
 
 // --- Single-instance audio manager (prevents overlap & playback bugs) ---
@@ -60,7 +62,7 @@ function useAudioPlayer(id: string, url: string) {
     if (audioCtl.id === id && audioCtl.current) {
       if (audioCtl.current.paused) {
         audioCtl.current.play().catch((e) =>
-          toast({ title: "Playback failed", description: e.message, variant: "destructive" }),
+          toast({ title: tNow("voice.playFailed"), description: e.message, variant: "destructive" }),
         );
       } else {
         audioCtl.current.pause();
@@ -83,7 +85,7 @@ function useAudioPlayer(id: string, url: string) {
       notify();
     };
     a.onerror = () => {
-      toast({ title: "Audio error", description: "Could not load voice note", variant: "destructive" });
+      toast({ title: tNow("voice.audioError"), description: tNow("voice.cantLoad"), variant: "destructive" });
       audioCtl.current = null;
       audioCtl.id = null;
       notify();
@@ -91,7 +93,7 @@ function useAudioPlayer(id: string, url: string) {
     a.play()
       .then(() => notify())
       .catch((e) => {
-        toast({ title: "Playback failed", description: e.message, variant: "destructive" });
+        toast({ title: tNow("voice.playFailed"), description: e.message, variant: "destructive" });
         audioCtl.current = null;
         audioCtl.id = null;
         notify();
@@ -107,6 +109,7 @@ export function VoiceBubble({ id, url, mine }: { id: string; url: string; mine: 
   const [transcript, setTranscript] = useState<string | null>(null);
   const [showTranscript, setShowTranscript] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
+  const { t } = useLanguage();
 
   const onTranscribe = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -135,8 +138,8 @@ export function VoiceBubble({ id, url, mine }: { id: string; url: string; mine: 
       const text = await transcribeVoiceNote(url, download);
       if (!text) {
         toast({
-          title: "Couldn't transcribe",
-          description: "No speech was detected in this voice note.",
+          title: t("voice.cantTranscribe"),
+          description: t("voice.noSpeech"),
           variant: "destructive",
         });
         return;
@@ -146,9 +149,9 @@ export function VoiceBubble({ id, url, mine }: { id: string; url: string; mine: 
     } catch (e) {
       const message = e instanceof Error ? e.message : "";
       const description = message.startsWith("signed_url_fetch_failed")
-        ? "Couldn't download this voice note. Check your connection and try again."
-        : message || "Please try again.";
-      toast({ title: "Transcription failed", description, variant: "destructive" });
+        ? t("voice.cantDownload")
+        : message || t("auth.tryAgain");
+      toast({ title: t("chat.transcribeFailed"), description, variant: "destructive" });
     } finally {
       setTranscribing(false);
     }
@@ -179,8 +182,8 @@ export function VoiceBubble({ id, url, mine }: { id: string; url: string; mine: 
           <button
             onClick={onTranscribe}
             disabled={transcribing}
-            aria-label={transcript ? "Toggle transcript" : "Transcribe"}
-            title={transcript ? "Toggle transcript" : "Transcribe"}
+            aria-label={transcript ? t("voice.toggle") : t("voice.transcribe")}
+            title={transcript ? t("voice.toggle") : t("voice.transcribe")}
             className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${
               mine ? "bg-primary-foreground/20" : "bg-foreground/10"
             }`}

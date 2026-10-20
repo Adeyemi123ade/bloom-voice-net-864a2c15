@@ -1,3 +1,4 @@
+import { tNow } from "@/lib/i18n/language";
 // Shared microphone-access diagnostics for anything that calls getUserMedia
 // (voice notes in chat, the mic test page, calls). Centralized so every
 // entry point gives the same, actionable guidance instead of each caller
@@ -25,15 +26,15 @@ export function isLikelyInAppBrowser(): boolean {
  */
 export function checkMicPrerequisites(): string | null {
   if (typeof window !== "undefined" && window.isSecureContext === false) {
-    return "Voice messages require a secure (https://) connection. Please reload over https.";
+    return tNow("mic.https");
   }
   if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
     return isLikelyInAppBrowser()
-      ? "This link is open inside an app's built-in browser, which blocks microphone access. Tap the menu (••• or ⋮) and choose \"Open in Chrome\" or \"Open in Safari\", then try again."
-      : "This browser doesn't support microphone recording. Try the latest Chrome, Safari, or Firefox.";
+      ? tNow("mic.inApp")
+      : tNow("mic.unsupported");
   }
   if (typeof MediaRecorder === "undefined") {
-    return "This browser can't record audio. Try the latest Chrome, Safari, or Firefox.";
+    return tNow("mic.unsupported");
   }
   return null;
 }
@@ -46,25 +47,23 @@ export function describeMicError(e: unknown): { title: string; description: stri
   if (name === "NotAllowedError" || name === "SecurityError") {
     if (isLikelyInAppBrowser()) {
       return {
-        title: "Microphone blocked by this app",
-        description:
-          "This link is open inside an app's built-in browser, which blocks microphone access and won't show a permission prompt. Tap the menu (••• or ⋮) and choose \"Open in Chrome\" or \"Open in Safari\", then try again.",
+        title: tNow("mic.blockedApp"),
+        description: tNow("mic.inApp"),
       };
     }
     return {
-      title: "Microphone access denied",
-      description:
-        "Tap the lock/site-info icon next to the address bar → Permissions → Microphone → Allow, then reload the page. On Android, also check Settings → Apps → Chrome → Permissions → Microphone is on.",
+      title: tNow("mic.denied"),
+      description: tNow("mic.deniedBody"),
     };
   }
   if (name === "NotFoundError" || name === "OverconstrainedError") {
-    return { title: "No microphone found", description: "No microphone was found on this device." };
+    return { title: tNow("mic.none"), description: tNow("mic.noneBody") };
   }
   if (name === "NotReadableError" || name === "AbortError") {
     return {
-      title: "Microphone busy",
-      description: "Microphone is busy in another app. Close it and try again.",
+      title: tNow("mic.busy"),
+      description: tNow("mic.busyBody"),
     };
   }
-  return { title: "Microphone blocked", description: message || "Could not access the microphone." };
+  return { title: tNow("mic.blocked"), description: message || tNow("mic.blockedBody") };
 }

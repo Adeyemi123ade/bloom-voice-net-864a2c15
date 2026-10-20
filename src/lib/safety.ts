@@ -1,3 +1,4 @@
+import type { TextKey } from "@/lib/i18n/strings";
 // Block, report and message requests (client side).
 //
 // The database is what enforces a block (see migration
@@ -120,13 +121,13 @@ export function isBlockedError(err: unknown): boolean {
 
 export type ReportReason = "spam" | "harassment" | "inappropriate" | "scam" | "violence" | "other";
 
-export const REPORT_REASONS: { id: ReportReason; label: string }[] = [
-  { id: "spam", label: "Spam" },
-  { id: "harassment", label: "Harassment or bullying" },
-  { id: "inappropriate", label: "Inappropriate or sexual content" },
-  { id: "scam", label: "Scam or fake account" },
-  { id: "violence", label: "Threats or violence" },
-  { id: "other", label: "Something else" },
+export const REPORT_REASONS: { id: ReportReason; label: string; labelKey: TextKey }[] = [
+  { id: "spam", label: "Spam", labelKey: "reason.spam" },
+  { id: "harassment", label: "Harassment or bullying", labelKey: "reason.harassment" },
+  { id: "inappropriate", label: "Inappropriate or sexual content", labelKey: "reason.inappropriate" },
+  { id: "scam", label: "Scam or fake account", labelKey: "reason.scam" },
+  { id: "violence", label: "Threats or violence", labelKey: "reason.violence" },
+  { id: "other", label: "Something else", labelKey: "reason.other" },
 ];
 
 export async function submitReport(input: {

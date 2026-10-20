@@ -1,4 +1,5 @@
 import { Download, Eye, Play, X, FileText, FileSpreadsheet, Presentation, FileArchive, FileCode, FileAudio, FileVideo, File as FileIcon, Trash2 } from "lucide-react";
+import { tNow } from "@/lib/i18n/language";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
@@ -171,7 +172,7 @@ export function AttachmentBubble({
         {/* A preview in the chat; tapping it opens the full-screen player. */}
         <button
           type="button"
-          aria-label="Play video"
+          aria-label={tNow("att.playVideo")}
           onClick={(e) => {
             e.stopPropagation();
             setVideoOpen(true);
@@ -302,7 +303,7 @@ function VideoViewer({ url, name, onClose }: { url: string; name: string; onClos
       />
       <button
         type="button"
-        aria-label="Close video"
+        aria-label={tNow("att.closeVideo")}
         onClick={onClose}
         className="absolute left-3 top-[calc(env(safe-area-inset-top)+12px)] w-10 h-10 rounded-full bg-black/55 text-white flex items-center justify-center"
       >
@@ -453,7 +454,7 @@ function ImageViewer({
             onDelete();
             onClose();
           }}
-          aria-label="Delete image"
+          aria-label={tNow("att.deleteImage")}
           className="absolute top-6 right-6 w-12 h-12 rounded-full bg-destructive/90 hover:bg-destructive flex items-center justify-center shadow-lg"
         >
           <Trash2 className="w-5 h-5 text-destructive-foreground" />
@@ -473,14 +474,14 @@ function ImageViewer({
               className="w-full h-11 text-sm text-foreground hover:bg-secondary border-b border-border flex items-center justify-center gap-2"
             >
               <Eye className="w-4 h-4" />
-              Preview (pinch to zoom)
+              {tNow("att.preview")}
             </button>
             <button
               onClick={triggerDownload}
               className="w-full h-11 text-sm text-foreground hover:bg-secondary flex items-center justify-center gap-2"
             >
               <Download className="w-4 h-4" />
-              Download to phone
+              {tNow("att.download")}
             </button>
           </div>
         </>

@@ -36,3 +36,12 @@ export function translate(lang: LanguageCode, key: TextKey, vars?: Record<string
   if (!vars) return text;
   return text.replace(/\{(\w+)\}/g, (m, name) => (name in vars ? String(vars[name]) : m));
 }
+
+/**
+ * For text made outside the screens (helpers, notifications): uses the
+ * language saved on this phone. Screens use useLanguage() instead, so they
+ * change at once when the language is switched.
+ */
+export function tNow(key: TextKey, vars?: Record<string, string | number>): string {
+  return translate(initialLanguage(), key, vars);
+}

@@ -4,6 +4,7 @@
 // and those raw strings must never reach the screen.
 import { CALL_PREFIX, VOICE_PREFIX } from "@/lib/chat/format";
 import { FILE_PREFIX, parseFileMessage } from "@/components/chat/AttachmentBubble";
+import { tNow } from "@/lib/i18n/language";
 
 export type MessageKind = "text" | "voice" | "image" | "video" | "document" | "call";
 
@@ -56,22 +57,22 @@ export function stripQuotedReply(content: string): string {
 /** Short label for a non-text message, e.g. in a notification or chat list. */
 export function mediaLabel(content: string): string {
   const kind = messageKind(content);
-  if (kind === "voice") return "Voice note";
-  if (kind === "image") return parseFileMessage(content)?.caption || "Photo";
-  if (kind === "video") return parseFileMessage(content)?.caption || "Video";
-  if (kind === "document") return parseFileMessage(content)?.name || "Document";
+  if (kind === "voice") return tNow("msg.voiceNote");
+  if (kind === "image") return parseFileMessage(content)?.caption || tNow("msg.photo");
+  if (kind === "video") return parseFileMessage(content)?.caption || tNow("msg.video");
+  if (kind === "document") return parseFileMessage(content)?.name || tNow("msg.document");
   return "";
 }
 
 /** 40 → "40 secs", 75 → "1 min", 190 → "3 mins", 3900 → "1 hr 5 mins". */
 export function callDuration(seconds: number): string {
   const s = Math.max(0, Math.round(seconds));
-  if (s < 60) return `${s} sec${s === 1 ? "" : "s"}`;
+  if (s < 60) return s === 1 ? tNow("dur.sec") : tNow("dur.secs", { n: s });
   const totalMin = Math.round(s / 60);
-  if (totalMin < 60) return `${totalMin} min${totalMin === 1 ? "" : "s"}`;
+  if (totalMin < 60) return totalMin === 1 ? tNow("dur.min") : tNow("dur.mins", { n: totalMin });
   const h = Math.floor(totalMin / 60);
   const m = totalMin % 60;
-  return m ? `${h} hr ${m} min${m === 1 ? "" : "s"}` : `${h} hr`;
+  return m ? tNow("dur.hrMins", { h, m }) : tNow("dur.hr", { h });
 }
 
 export type CallView = {
@@ -95,7 +96,7 @@ export function describeCall(content: string, mine: boolean): CallView | null {
   const call = parseCallLog(content);
   if (!call) return null;
   const isVideo = call.callType === "video";
-  const type = isVideo ? "Video call" : "Voice call";
+  const type = isVideo ? tNow("call.video") : tNow("call.voice");
   // A "declined" record was written by the person called.
   const outgoing = call.kind === "declined" || call.kind === "received" ? !mine : mine;
   const base = { callType: call.callType, outgoing };
@@ -103,13 +104,13 @@ export function describeCall(content: string, mine: boolean): CallView | null {
     case "no_answer":
     case "missed":
       return outgoing
-        ? { ...base, title: type, detail: "No answer", tone: "normal" }
-        : { ...base, title: isVideo ? "Missed video call" : "Missed voice call", detail: "Tap to call back", tone: "missed" };
+        ? { ...base, title: type, detail: tNow("call.noAnswer"), tone: "normal" }
+        : { ...base, title: isVideo ? tNow("call.missedVideo") : tNow("call.missedVoice"), detail: tNow("call.tapBack"), tone: "missed" };
     case "rejected":
     case "declined":
-      return { ...base, title: type, detail: "Declined", tone: "normal" };
+      return { ...base, title: type, detail: tNow("call.declined"), tone: "normal" };
     case "failed":
-      return { ...base, title: "Call failed", detail: "Try again", tone: "failed" };
+      return { ...base, title: tNow("call.failed"), detail: tNow("common.tryAgain"), tone: "failed" };
     default:
       // "ended" (and anything older): the length, or nothing when it never really started.
       return { ...base, title: type, detail: call.duration > 0 ? callDuration(call.duration) : null, tone: "normal" };
@@ -181,9 +182,9 @@ export function buildPreview(content: string | null, senderId: string | null, my
     return { kind: "call", text, callType: call.callType, callKind: call.kind, missed, outgoing: v.outgoing };
   }
   const kind = messageKind(content);
-  if (kind === "voice") return { kind: "voice", text: "Voice note" };
+  if (kind === "voice") return { kind: "voice", text: tNow("msg.voiceNote") };
   if (kind !== "text") return { kind: "file", text: mediaLabel(content) };
-  if (content.startsWith(FILE_PREFIX)) return { kind: "file", text: "Attachment" };
+  if (content.startsWith(FILE_PREFIX)) return { kind: "file", text: tNow("msg.attachment") };
   const cleaned = content.startsWith("> ") ? stripQuotedReply(content).trim() || content : content;
   return { kind: "text", text: cleaned };
 }
@@ -200,11 +201,11 @@ export function notificationText(content: string | null | undefined): string | n
   if (call) {
     // The caller logs "no_answer" when you didn't pick up: that's a missed call for you.
     if (call.kind === "no_answer" || call.kind === "missed")
-      return call.callType === "video" ? "Missed video call" : "Missed voice call";
+      return call.callType === "video" ? tNow("call.missedVideo") : tNow("call.missedVoice");
     return null;
   }
   const kind = messageKind(content);
-  if (kind === "voice") return "🎤 Voice note";
+  if (kind === "voice") return `🎤 ${tNow("msg.voiceNote")}`;
   if (kind === "image") return `📷 ${mediaLabel(content)}`;
   if (kind === "video") return `🎥 ${mediaLabel(content)}`;
   if (kind === "document") return `📄 ${mediaLabel(content)}`;

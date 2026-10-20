@@ -1,5 +1,6 @@
 import { Phone, Video } from "lucide-react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { useLanguage } from "@/lib/i18n/context";
 
 type Props = {
   open: boolean;
@@ -11,7 +12,8 @@ type Props = {
 
 export default function CallBackSheet({ open, onOpenChange, name, type, onConfirm }: Props) {
   const Icon = type === "video" ? Video : Phone;
-  const label = type === "video" ? "Video call" : "Call";
+  const { t } = useLanguage();
+  const label = type === "video" ? t("call.video") : t("callback.call");
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent

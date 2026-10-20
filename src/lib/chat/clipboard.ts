@@ -1,3 +1,4 @@
+import { tNow } from "@/lib/i18n/language";
 // In-app copy and paste for chat messages of every type.
 //
 // Copying a voice note, photo, video or document used to put a raw storage
@@ -115,28 +116,28 @@ export type CopyResult = { ok: boolean; label?: string; reason?: string };
  * tap handler: browsers only allow clipboard writes during the tap.
  */
 export async function copyMessages(contents: string[]): Promise<CopyResult> {
-  if (contents.length === 0) return { ok: false, reason: "Nothing to copy." };
+  if (contents.length === 0) return { ok: false, reason: tNow("clip.nothing") };
   if (contents.length > 1) {
     if (!contents.every((c) => messageKind(c) === "text"))
-      return { ok: false, reason: "Copy one photo, video, voice note or file at a time." };
+      return { ok: false, reason: tNow("clip.oneAtATime") };
     const text = contents.map((c) => stripQuotedReply(c)).join("\n\n");
     await navigator.clipboard.writeText(text);
     save({ content: text, kind: "text", text, copiedAt: Date.now() });
-    return { ok: true, label: "Copied" };
+    return { ok: true, label: tNow("clip.copied") };
   }
 
   const content = contents[0];
   const kind = messageKind(content);
-  if (kind === "call") return { ok: false, reason: "Call records can't be copied." };
+  if (kind === "call") return { ok: false, reason: tNow("clip.noCalls") };
   if (kind === "text") {
     const text = stripQuotedReply(content);
     await navigator.clipboard.writeText(text);
     save({ content: text, kind, text, copiedAt: Date.now() });
-    return { ok: true, label: "Copied" };
+    return { ok: true, label: tNow("clip.copied") };
   }
 
   const url = mediaUrlOf(content);
-  if (!url || url.startsWith("blob:")) return { ok: false, reason: "This is still sending. Try again in a moment." };
+  if (!url || url.startsWith("blob:")) return { ok: false, reason: tNow("clip.stillSending") };
 
   const text = clipLabel(content);
   // Remember the reference before touching the clipboard, so the in-app
@@ -161,14 +162,14 @@ export async function copyMessages(contents: string[]): Promise<CopyResult> {
           "image/png": png as unknown as Promise<Blob>,
         }),
       ]);
-      return { ok: true, label: "Photo copied" };
+      return { ok: true, label: tNow("clip.photoCopied") };
     } catch {
       // Fall through to the label only. In-app paste still works.
     }
   }
   await navigator.clipboard.writeText(text);
-  const what = kind === "voice" ? "Voice note" : kind === "image" ? "Photo" : kind === "video" ? "Video" : "File";
-  return { ok: true, label: `${what} copied` };
+  const label = kind === "voice" ? tNow("clip.voiceCopied") : kind === "image" ? tNow("clip.photoCopied") : kind === "video" ? tNow("clip.videoCopied") : tNow("clip.fileCopied");
+  return { ok: true, label };
 }
 
 /**
@@ -177,15 +178,15 @@ export async function copyMessages(contents: string[]): Promise<CopyResult> {
  */
 export async function checkClipAvailable(content: string): Promise<{ ok: boolean; reason?: string }> {
   const url = mediaUrlOf(content);
-  if (!url || url.startsWith("blob:")) return { ok: false, reason: "That copied item is no longer available." };
+  if (!url || url.startsWith("blob:")) return { ok: false, reason: tNow("clip.gone") };
   try {
     const signed = await getSignedChatMediaUrl(url);
     const res = await fetch(signed, { method: "HEAD" });
     if (res.ok) return { ok: true };
     if (res.status === 404 || res.status === 400)
-      return { ok: false, reason: "The original file was removed, so it can't be pasted." };
-    return { ok: false, reason: "Couldn't reach the copied file. Check your connection and try again." };
+      return { ok: false, reason: tNow("clip.removed") };
+    return { ok: false, reason: tNow("clip.unreachable") };
   } catch {
-    return { ok: false, reason: "Couldn't reach the copied file. Check your connection and try again." };
+    return { ok: false, reason: tNow("clip.unreachable") };
   }
 }
