@@ -7,7 +7,6 @@ Storage + Edge Functions). Calls via Twilio. Deployed on Vercel.
 - Architecture (client/server split, why there's no `client/`/`server/`
   folder split): [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - Secrets/env var reference: [docs/SECRETS.md](docs/SECRETS.md)
-- Session log / open items: [docs/SESSION_STATUS.md](docs/SESSION_STATUS.md)
 
 ## Development
 

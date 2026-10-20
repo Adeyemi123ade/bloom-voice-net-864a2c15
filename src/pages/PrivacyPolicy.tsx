@@ -98,8 +98,9 @@ export default function PrivacyPolicy() {
       <LegalSection title="Voice Note Transcription">
         <p>
           When you ask for a voice note to be turned into text (or dictate a message), the
-          recording is sent to our speech-to-text provider (OpenAI) to be transcribed, and the
-          text is returned to you. This only happens when you ask for it.
+          recording is sent to our speech-to-text service provider to be transcribed, and the
+          text is returned to you. This only happens when you ask for it. The provider processes
+          the recording only to return the text.
         </p>
       </LegalSection>
 
@@ -210,8 +211,8 @@ export default function PrivacyPolicy() {
       <LegalSection title="Contact / Support">
         <p>
           Questions about this policy or your data can be sent to{" "}
-          <a href="mailto:support@chichatapp.com" className="text-primary underline underline-offset-2">
-            support@chichatapp.com
+          <a href="mailto:techpath411@gmail.com" className="text-primary underline underline-offset-2">
+            techpath411@gmail.com
           </a>
           .
         </p>

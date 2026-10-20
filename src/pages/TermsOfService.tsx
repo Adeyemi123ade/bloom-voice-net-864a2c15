@@ -35,7 +35,7 @@ export default function TermsOfService() {
       <LegalSection title="Your Account">
         <p>
           You are responsible for keeping your password secure and for activity on your account.
-          Tell us promptly at support@chichatapp.com if you believe your account has been used
+          Tell us promptly at techpath411@gmail.com if you believe your account has been used
           without your permission. You may delete your account at any time from Settings.
         </p>
       </LegalSection>
@@ -173,8 +173,8 @@ export default function TermsOfService() {
       <LegalSection title="Contact">
         <p>
           Questions about these terms can be sent to{" "}
-          <a href="mailto:support@chichatapp.com" className="text-primary underline underline-offset-2">
-            support@chichatapp.com
+          <a href="mailto:techpath411@gmail.com" className="text-primary underline underline-offset-2">
+            techpath411@gmail.com
           </a>
           .
         </p>
