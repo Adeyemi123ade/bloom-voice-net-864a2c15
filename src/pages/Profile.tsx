@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { toE164, formatDisplay } from "@/lib/phone";
 import { useBackNavigation } from "@/hooks/useBackNavigation";
+import { useLanguage } from "@/lib/i18n/context";
 
 function initials(name?: string | null) {
   if (!name) return "?";
@@ -28,10 +29,11 @@ export default function Profile() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const { t } = useLanguage();
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    document.title = "Profile — Chichat";
+    document.title = `${t("pr.title")} — Chichat`;
   }, []);
 
   useEffect(() => {
@@ -64,7 +66,7 @@ export default function Profile() {
     const file = e.target.files?.[0];
     if (!file || !user) return;
     if (file.size > 3 * 1024 * 1024) {
-      toast({ title: "Image too large", description: "Please pick under 3MB.", variant: "destructive" });
+      toast({ title: t("nc.imageTooLarge"), description: t("pr.imageTooLarge3"), variant: "destructive" });
       return;
     }
     setUploading(true);
@@ -74,7 +76,7 @@ export default function Profile() {
       .from("avatars")
       .upload(path, file, { upsert: true, contentType: file.type });
     if (upErr) {
-      toast({ title: "Upload failed", description: upErr.message, variant: "destructive" });
+      toast({ title: t("chat.uploadFailed"), description: upErr.message, variant: "destructive" });
       setUploading(false);
       return;
     }
@@ -84,10 +86,10 @@ export default function Profile() {
       .from("profiles")
       .upsert({ id: user.id, avatar_url: url }, { onConflict: "id" });
     if (updErr) {
-      toast({ title: "Save failed", description: updErr.message, variant: "destructive" });
+      toast({ title: t("pr.saveFailed"), description: updErr.message, variant: "destructive" });
     } else {
       setAvatarUrl(url);
-      toast({ title: "Profile photo updated" });
+      toast({ title: t("pr.photoUpdated") });
     }
     setUploading(false);
   };
@@ -99,8 +101,8 @@ export default function Profile() {
       normalizedPhone = toE164(phone.trim());
       if (!normalizedPhone) {
         toast({
-          title: "Invalid phone number",
-          description: "Use international format, e.g. +234 801 234 5678",
+          title: t("nc.invalidPhone"),
+          description: t("pr.useIntl"),
           variant: "destructive",
         });
         return;
@@ -117,12 +119,12 @@ export default function Profile() {
       const msg =
         error.message.includes("phone_taken") ||
         error.message.includes("profiles_phone_unique")
-          ? "That phone number is already linked to another account."
-          : "Could not save your profile. Please try again.";
-      toast({ title: "Save failed", description: msg, variant: "destructive" });
+          ? t("pr.phoneLinked")
+          : t("pr.cantSave");
+      toast({ title: t("pr.saveFailed"), description: msg, variant: "destructive" });
     } else {
       if (normalizedPhone) setPhone(normalizedPhone);
-      toast({ title: "Profile saved" });
+      toast({ title: t("pr.saved") });
     }
   };
 
@@ -135,12 +137,12 @@ export default function Profile() {
             <button
               onClick={goBack}
               className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-secondary"
-              aria-label="Back"
+              aria-label={t("common.back")}
             >
               <ArrowLeft className="w-5 h-5 text-foreground" />
             </button>
           )}
-          <h1 className={`text-sm font-semibold text-foreground ${showBackArrow ? "" : "pl-2"}`}>Profile</h1>
+          <h1 className={`text-sm font-semibold text-foreground ${showBackArrow ? "" : "pl-2"}`}>{t("pr.title")}</h1>
         </div>
 
         <div className="flex-1 px-6 py-5 flex flex-col items-center">
@@ -157,7 +159,7 @@ export default function Profile() {
             <button
               onClick={onPick}
               disabled={uploading}
-              aria-label="Change photo"
+              aria-label={t("pr.changePhoto")}
               className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-primary hover:bg-primary/90 flex items-center justify-center border-2 border-background"
             >
               {uploading ? (
@@ -176,18 +178,18 @@ export default function Profile() {
           </div>
 
           <div className="w-full mt-5 space-y-1.5">
-            <Label htmlFor="name" className="text-xs text-muted-foreground">Display name</Label>
+            <Label htmlFor="name" className="text-xs text-muted-foreground">{t("pr.displayName")}</Label>
             <Input
               id="name"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
-              placeholder="Your name"
+              placeholder={t("pr.namePh")}
               className="h-9 text-xs bg-input border-border"
             />
           </div>
 
           <div className="w-full mt-3 space-y-1.5">
-            <Label htmlFor="email" className="text-xs text-muted-foreground">Email address</Label>
+            <Label htmlFor="email" className="text-xs text-muted-foreground">{t("pr.email")}</Label>
             <Input
               id="email"
               type="email"
@@ -197,24 +199,24 @@ export default function Profile() {
               className="h-9 text-xs bg-muted/40 border-border text-muted-foreground cursor-not-allowed"
             />
             <p className="text-2xs text-muted-foreground">
-              Email cannot be changed.
+              {t("pr.emailFixed")}
             </p>
           </div>
 
           <div className="w-full mt-3 space-y-1.5">
-            <Label htmlFor="about" className="text-xs text-muted-foreground">About</Label>
+            <Label htmlFor="about" className="text-xs text-muted-foreground">{t("pr.about")}</Label>
             <Textarea
               id="about"
               value={about}
               onChange={(e) => setAbout(e.target.value)}
-              placeholder="Hey there! I'm using Chichat."
+              placeholder={t("pr.aboutPh")}
               className="min-h-[56px] text-xs bg-input border-border resize-none"
             />
           </div>
 
           <div className="w-full mt-3 space-y-1.5">
             <Label htmlFor="phone" className="text-xs text-muted-foreground">
-              Phone number
+              {t("pr.phone")}
             </Label>
             <div className="flex items-center gap-2">
               <Input
@@ -236,14 +238,14 @@ export default function Profile() {
                   type="button"
                   onClick={() => setPhone("")}
                   className="text-2xs text-muted-foreground hover:text-foreground px-2 h-9"
-                  aria-label="Clear phone"
+                  aria-label={t("pr.clearPhone")}
                 >
-                  Clear
+                  {t("pr.clear")}
                 </button>
               )}
             </div>
             <p className="text-2xs text-muted-foreground">
-              Required so friends can find you when they sync their contacts.
+              {t("pr.required")}
             </p>
           </div>
 
@@ -252,7 +254,7 @@ export default function Profile() {
             disabled={saving}
             className="w-full mt-5 h-10 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-xs"
           >
-            {saving ? "Saving…" : "Save changes"}
+            {saving ? t("save.saving") : t("pr.saveChanges")}
           </Button>
 
         </div>

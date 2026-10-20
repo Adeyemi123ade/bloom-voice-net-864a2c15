@@ -24,6 +24,8 @@ import {
   type BackupRow,
 } from "@/lib/chatBackup";
 import { useBackNavigation } from "@/hooks/useBackNavigation";
+import { useLanguage } from "@/lib/i18n/context";
+import { tNow } from "@/lib/i18n/language";
 
 function bytesLabel(n: number) {
   if (n < 1024) return `${n} B`;
@@ -38,20 +40,21 @@ function friendly(e: unknown): string {
     .replace(/https?:\/\/\S+/gi, "")
     .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, "")
     .replace(/\s{2,}/g, " ")
-    .trim() || "Please try again.";
+    .trim() || tNow("auth.tryAgain");
 }
 
 export default function ChatBackup() {
   const navigate = useNavigate();
   const { showBackArrow, goBack } = useBackNavigation("/settings");
   const { user, loading } = useAuth();
+  const { t, language } = useLanguage();
   const [backup, setBackup] = useState<BackupRow | null>(null);
   const [backingUp, setBackingUp] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [restoreOpen, setRestoreOpen] = useState(false);
 
   useEffect(() => {
-    document.title = "Chat backup — Chichat";
+    document.title = `${t("bk.title")} — Chichat`;
   }, []);
 
   useEffect(() => {
@@ -70,7 +73,7 @@ export default function ChatBackup() {
       const current = backup ?? (await getMyBackup());
       const hasChanges = await hasNewChangesSinceBackup(user.id, current?.last_backup_at ?? null);
       if (current && !hasChanges) {
-        toast({ title: "Account is up to date" });
+        toast({ title: t("bk.upToDate") });
         setBackingUp(false);
         return;
       }
@@ -78,11 +81,11 @@ export default function ChatBackup() {
       const fresh = await getMyBackup();
       setBackup(fresh);
       toast({
-        title: "Account backed up successfully",
-        description: `${r.message_count} messages saved (${bytesLabel(fresh?.total_bytes ?? 0)}). A reboot is recommended.`,
+        title: t("bk.done"),
+        description: t("bk.doneBody", { count: r.message_count, size: bytesLabel(fresh?.total_bytes ?? 0) }),
       });
     } catch (e) {
-      toast({ title: "Backup failed", description: friendly(e), variant: "destructive" });
+      toast({ title: t("bk.failed"), description: friendly(e), variant: "destructive" });
     } finally {
       setBackingUp(false);
     }
@@ -93,9 +96,9 @@ export default function ChatBackup() {
     setRestoring(true);
     try {
       const r = await runRestore();
-      toast({ title: "Restore complete", description: `${r.restored} of ${r.total} messages restored.` });
+      toast({ title: t("bk.restored"), description: t("bk.restoredBody", { restored: r.restored, total: r.total }) });
     } catch (e) {
-      toast({ title: "Restore failed", description: friendly(e), variant: "destructive" });
+      toast({ title: t("bk.restoreFailed"), description: friendly(e), variant: "destructive" });
     } finally {
       setRestoring(false);
     }
@@ -106,7 +109,7 @@ export default function ChatBackup() {
       await setAutoBackup(v);
       setBackup((b) => (b ? { ...b, auto_backup_enabled: v } : b));
     } catch (e) {
-      toast({ title: "Could not update setting", description: friendly(e), variant: "destructive" });
+      toast({ title: t("bk.settingFailed"), description: friendly(e), variant: "destructive" });
     }
   };
 
@@ -118,12 +121,12 @@ export default function ChatBackup() {
             <button
               onClick={goBack}
               className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-secondary"
-              aria-label="Back"
+              aria-label={t("common.back")}
             >
               <ArrowLeft className="w-5 h-5 text-foreground" />
             </button>
           )}
-          <h1 className={`text-lg font-bold text-foreground ${showBackArrow ? "" : "pl-2"}`}>Chat backup</h1>
+          <h1 className={`text-lg font-bold text-foreground ${showBackArrow ? "" : "pl-2"}`}>{t("bk.title")}</h1>
         </div>
 
         <div className="flex-1 px-4 py-4 flex flex-col gap-4">
@@ -134,21 +137,21 @@ export default function ChatBackup() {
             <div className="flex-1 min-w-0">
               <p className="text-base font-semibold text-foreground">
                 {backup
-                  ? `Last backup ${new Date(backup.last_backup_at).toLocaleDateString()}`
-                  : "No backup yet"}
+                  ? t("bk.last", { date: new Date(backup.last_backup_at).toLocaleDateString(language) })
+                  : t("settings.noBackup")}
               </p>
               <p className="text-sm text-muted-foreground">
                 {backup
-                  ? `${backup.message_count} messages · ${bytesLabel(backup.total_bytes)}`
-                  : "Back up your chats to restore them later"}
+                  ? t("bk.summary", { count: backup.message_count, size: bytesLabel(backup.total_bytes) })
+                  : t("bk.hint")}
               </p>
             </div>
           </div>
 
           <div className="flex items-center justify-between px-1">
             <div>
-              <p className="text-base font-semibold text-foreground">Auto-backup daily</p>
-              <p className="text-sm text-muted-foreground">Keeps your chats safe automatically</p>
+              <p className="text-base font-semibold text-foreground">{t("bk.auto")}</p>
+              <p className="text-sm text-muted-foreground">{t("bk.autoBody")}</p>
             </div>
             <Switch
               checked={backup?.auto_backup_enabled ?? true}
@@ -160,13 +163,13 @@ export default function ChatBackup() {
             <div className="px-3 py-3 rounded-lg bg-primary/10 border border-primary/30">
               <div className="flex items-center gap-2 mb-2">
                 <Loader2 className="w-4 h-4 text-primary animate-spin" />
-                <p className="text-sm font-semibold text-foreground">Backing up your chats…</p>
+                <p className="text-sm font-semibold text-foreground">{t("bk.backingUpChats")}</p>
               </div>
               <div className="h-1.5 w-full rounded-full bg-secondary overflow-hidden">
                 <div className="h-full w-1/3 bg-primary animate-[indeterminate_1.4s_ease-in-out_infinite]" />
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                Please don't close the app until this finishes.
+                {t("bk.dontClose")}
               </p>
             </div>
           )}
@@ -177,14 +180,14 @@ export default function ChatBackup() {
               disabled={backingUp}
               className="w-full h-12 rounded-md bg-primary text-primary-foreground text-base font-semibold disabled:opacity-60"
             >
-              {backingUp ? "Backing up…" : "Back up now"}
+              {backingUp ? t("bk.backingUp") : t("bk.backUpNow")}
             </button>
             <button
               onClick={() => setRestoreOpen(true)}
               disabled={restoring || !backup}
               className="w-full h-12 rounded-md border border-border bg-background text-base font-semibold disabled:opacity-50"
             >
-              {restoring ? "Restoring…" : "Restore backup"}
+              {restoring ? t("bk.restoring") : t("bk.restore")}
             </button>
           </div>
 
@@ -192,17 +195,16 @@ export default function ChatBackup() {
             <AlertDialogContent className="max-w-[320px]">
               <AlertDialogHeader>
                 <AlertDialogTitle className="text-base">
-                  Restore chats from your latest backup?
+                  {t("bk.restoreQ")}
                 </AlertDialogTitle>
                 <AlertDialogDescription className="text-sm">
-                  This will pull in your most recent saved chats. Existing messages
-                  on this device won't be removed.
+                  {t("bk.restoreBody")}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel className="text-sm h-10">Cancel</AlertDialogCancel>
+                <AlertDialogCancel className="text-sm h-10">{t("common.cancel")}</AlertDialogCancel>
                 <AlertDialogAction onClick={onConfirmRestore} className="text-sm h-10">
-                  OK
+                  {t("common.ok")}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>

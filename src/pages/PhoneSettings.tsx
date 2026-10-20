@@ -26,6 +26,9 @@ import {
   CustomRingtone,
 } from "@/lib/ringtones";
 import { useBackNavigation } from "@/hooks/useBackNavigation";
+import { useLanguage } from "@/lib/i18n/context";
+import { tNow } from "@/lib/i18n/language";
+import type { TextKey } from "@/lib/i18n/strings";
 import { syncNativeRingtone } from "@/lib/nativeRingtone";
 
 /** "4.2 MB", "820 KB". */
@@ -46,6 +49,7 @@ export default function PhoneSettings() {
   const { showBackArrow, goBack } = useBackNavigation("/settings");
   const { resolvedTheme, setTheme } = useTheme();
   const [toneOpen, setToneOpen] = useState(false);
+  const { t } = useLanguage();
   const [selected, setSelected] = useState<RingtoneId>(getSelectedRingtone());
   const [custom, setCustom] = useState<CustomRingtone | null>(getCustomRingtone());
   // False when the saved audio is no longer on this device.
@@ -56,7 +60,7 @@ export default function PhoneSettings() {
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    document.title = "Phone settings — Chichat";
+    document.title = `${t("ps.title")} — Chichat`;
   }, []);
 
   useEffect(() => {
@@ -99,18 +103,18 @@ export default function PhoneSettings() {
     setSelectedRingtone(id);
     // The phone app rings with the same tone when ChiChat is closed.
     void syncNativeRingtone();
-    toast({ title: "Ringtone updated" });
+    toast({ title: t("ps.toneUpdated") });
   };
 
   const onPickFile = async (file: File) => {
     if (!file.type.startsWith("audio/")) {
-      toast({ title: "Please choose an audio file", variant: "destructive" });
+      toast({ title: t("ps.chooseAudio"), variant: "destructive" });
       return;
     }
     if (file.size > MAX_CUSTOM_RINGTONE_BYTES) {
       toast({
-        title: "File too large",
-        description: "Please pick an audio file under 50 MB.",
+        title: t("chat.fileTooLarge"),
+        description: t("ps.under50"),
         variant: "destructive",
       });
       return;
@@ -122,7 +126,7 @@ export default function PhoneSettings() {
       setCustomAvailable(true);
       choose("custom:user");
     } catch {
-      toast({ title: "Couldn't use that file", description: "Please try another audio file.", variant: "destructive" });
+      toast({ title: t("ps.cantUse"), description: t("ps.tryAnother"), variant: "destructive" });
     } finally {
       setSavingTone(false);
     }
@@ -144,13 +148,13 @@ export default function PhoneSettings() {
   const toneLabel =
     selected === "custom:user" && custom
       ? custom.name
-      : RINGTONES.find((r) => r.id === selected)?.label ?? "Default";
+      : RINGTONES.find((r) => r.id === selected)?.label ?? t("ps.default");
   const toneDetails =
     selected === "custom:user" && custom
       ? customMissing
-        ? "File no longer on this phone · choose another"
+        ? t("ps.fileGoneChoose")
         : `${formatSize(custom.size)} · ${formatOf(custom)}`
-      : RINGTONES.find((r) => r.id === selected)?.description ?? "";
+      : RINGTONES.some((r) => r.id === selected) ? t(`rt.${selected}` as TextKey) : "";
 
   const grouped = {
     Melody: RINGTONES.filter((r) => r.category === "Melody"),
@@ -168,12 +172,12 @@ export default function PhoneSettings() {
             <button
               onClick={goBack}
               className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-secondary"
-              aria-label="Back"
+              aria-label={t("common.back")}
             >
               <ArrowLeft className="w-5 h-5 text-foreground" />
             </button>
           )}
-          <h1 className={`text-sm font-semibold text-foreground ${showBackArrow ? "" : "pl-2"}`}>Phone settings</h1>
+          <h1 className={`text-sm font-semibold text-foreground ${showBackArrow ? "" : "pl-2"}`}>{t("ps.title")}</h1>
         </div>
 
         <div className="flex-1 px-3 py-4">
@@ -183,12 +187,12 @@ export default function PhoneSettings() {
               <Moon className="w-4 h-4 text-primary" />
             </span>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-foreground">Dark mode</p>
+              <p className="text-xs font-semibold text-foreground">{t("ps.darkMode")}</p>
             </div>
             <Switch
               checked={isDark}
               onCheckedChange={(on) => setTheme(on ? "dark" : "light")}
-              aria-label="Dark mode"
+              aria-label={t("ps.darkMode")}
             />
           </div>
 
@@ -197,7 +201,7 @@ export default function PhoneSettings() {
             <button
               onClick={() => togglePreview(selected)}
               disabled={customMissing}
-              aria-label={previewing === selected ? "Stop preview" : "Preview ringtone"}
+              aria-label={previewing === selected ? t("ps.stopPreview") : t("ps.previewTone")}
               className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center shrink-0 disabled:opacity-50"
             >
               {previewing === selected ? (
@@ -208,7 +212,7 @@ export default function PhoneSettings() {
             </button>
             <button onClick={() => setToneOpen(true)} className="flex-1 min-w-0 flex items-center gap-3 text-left">
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-foreground">Ringtone</p>
+                <p className="text-xs font-semibold text-foreground">{t("ps.ringtone")}</p>
                 <p className="text-xs text-foreground truncate">{toneLabel}</p>
                 <p className={`text-2xs truncate ${customMissing ? "text-destructive" : "text-muted-foreground"}`}>
                   {toneDetails}
@@ -223,7 +227,7 @@ export default function PhoneSettings() {
         <Dialog open={toneOpen} onOpenChange={setToneOpen}>
           <DialogContent className="max-w-[340px] bg-card border-border">
             <DialogHeader>
-              <DialogTitle className="text-sm">Choose ringtone</DialogTitle>
+              <DialogTitle className="text-sm">{t("ps.chooseTone")}</DialogTitle>
             </DialogHeader>
 
             <input
@@ -242,13 +246,13 @@ export default function PhoneSettings() {
               {/* From device */}
               <div>
                 <p className="text-2xs uppercase tracking-wider text-muted-foreground px-1 mb-1">
-                  From my music
+                  {t("ps.fromMusic")}
                 </p>
                 <div className="space-y-1">
                   {custom && (
                     <RingtoneRow
                       label={custom.name}
-                      description={customAvailable ? `${formatSize(custom.size)} · ${formatOf(custom)}` : "File no longer on this phone"}
+                      description={customAvailable ? `${formatSize(custom.size)} · ${formatOf(custom)}` : t("ps.fileGone")}
                       isSelected={selected === "custom:user"}
                       isPlaying={previewing === "custom:user"}
                       onPreview={() => togglePreview("custom:user")}
@@ -256,7 +260,7 @@ export default function PhoneSettings() {
                       trailing={
                         <button
                           onClick={() => void removeCustom()}
-                          aria-label="Remove custom ringtone"
+                          aria-label={t("ps.removeCustom")}
                           className="w-6 h-6 rounded-full hover:bg-destructive/20 flex items-center justify-center shrink-0"
                         >
                           <X className="w-3.5 h-3.5 text-destructive" />
@@ -278,10 +282,10 @@ export default function PhoneSettings() {
                     </span>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium text-foreground">
-                        {custom ? "Replace audio…" : "Pick audio from device…"}
+                        {custom ? t("ps.replace") : t("ps.pick")}
                       </p>
                       <p className="text-2xs text-muted-foreground">
-                        Any audio file up to 50 MB
+                        {t("ps.anyAudio")}
                       </p>
                     </div>
                   </button>
@@ -291,14 +295,14 @@ export default function PhoneSettings() {
               {(Object.keys(grouped) as Array<keyof typeof grouped>).map((cat) => (
                 <div key={cat}>
                   <p className="text-2xs uppercase tracking-wider text-muted-foreground px-1 mb-1">
-                    {cat}
+                    {t(`rt.cat.${cat}` as TextKey)}
                   </p>
                   <div className="space-y-1">
                     {grouped[cat].map((r) => (
                       <RingtoneRow
                         key={r.id}
                         label={r.label}
-                        description={r.description}
+                        description={t(`rt.${r.id}` as TextKey)}
                         isSelected={selected === r.id}
                         isPlaying={previewing === r.id}
                         onPreview={() => togglePreview(r.id)}
@@ -310,7 +314,7 @@ export default function PhoneSettings() {
               ))}
             </div>
             <p className="text-2xs text-muted-foreground px-1 pt-1">
-              Tap ▶ to preview, tap the name to select. ✓ marks the active ringtone.
+              {t("ps.howTo")}
             </p>
           </DialogContent>
         </Dialog>
@@ -344,7 +348,7 @@ function RingtoneRow({
     >
       <button
         onClick={onPreview}
-        aria-label={isPlaying ? "Stop preview" : "Preview"}
+        aria-label={isPlaying ? tNow("ps.stopPreview") : tNow("ps.preview")}
         className="w-7 h-7 rounded-full bg-primary/20 hover:bg-primary/30 flex items-center justify-center shrink-0"
       >
         {isPlaying ? (
