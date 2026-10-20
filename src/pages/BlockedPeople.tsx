@@ -24,7 +24,7 @@ export default function BlockedPeople() {
 
   useEffect(() => {
     document.title = `${t("bp.title")} — Chichat`;
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!loading && !user) navigate("/login");

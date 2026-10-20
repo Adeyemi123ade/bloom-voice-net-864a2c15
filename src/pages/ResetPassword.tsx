@@ -49,7 +49,7 @@ export default function ResetPassword() {
 
   useEffect(() => {
     document.title = `${t("rp.pageTitle")} — ChiChat`;
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     let mounted = true;

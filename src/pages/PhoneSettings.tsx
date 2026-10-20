@@ -61,7 +61,7 @@ export default function PhoneSettings() {
 
   useEffect(() => {
     document.title = `${t("ps.title")} — Chichat`;
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!toneOpen) stopPreview();

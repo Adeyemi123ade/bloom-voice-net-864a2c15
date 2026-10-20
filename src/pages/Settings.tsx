@@ -55,7 +55,7 @@ export default function Settings() {
 
   useEffect(() => {
     document.title = `${t("settings.title")} — Chichat`;
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!loading && !user) navigate("/login");

@@ -39,7 +39,7 @@ export default function VerifyEmail() {
 
   useEffect(() => {
     document.title = `${t("ve.pageTitle")} — ChiChat`;
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!email) {

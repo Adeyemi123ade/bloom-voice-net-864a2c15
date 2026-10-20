@@ -34,7 +34,7 @@ export default function Profile() {
 
   useEffect(() => {
     document.title = `${t("pr.title")} — Chichat`;
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!loading && !user) navigate("/login");

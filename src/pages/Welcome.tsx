@@ -14,7 +14,7 @@ export default function Welcome() {
 
   useEffect(() => {
     document.title = t("wl.pageTitle");
-  }, []);
+  }, [t]);
 
   return (
     <MobileFrame>

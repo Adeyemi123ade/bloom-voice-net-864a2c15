@@ -39,7 +39,7 @@ export default function VerifyResetCode() {
 
   useEffect(() => {
     document.title = `${t("code.pageTitleReset")} — ChiChat`;
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!email) navigate("/forgot-password", { replace: true });

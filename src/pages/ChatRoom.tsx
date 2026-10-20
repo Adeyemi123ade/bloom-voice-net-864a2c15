@@ -257,7 +257,7 @@ export default function ChatRoom() {
 
   useEffect(() => {
     document.title = other?.display_name ? `${other.display_name} — Chichat` : `${t("chat.pageTitle")} — Chichat`;
-  }, [other]);
+  }, [other, t]);
 
   useEffect(() => {
     if (conversationId) setHidden(loadHidden(conversationId));

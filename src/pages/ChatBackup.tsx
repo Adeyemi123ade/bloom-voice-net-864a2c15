@@ -55,7 +55,7 @@ export default function ChatBackup() {
 
   useEffect(() => {
     document.title = `${t("bk.title")} — Chichat`;
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!loading && !user) navigate("/login");
