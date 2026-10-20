@@ -1,3 +1,4 @@
+import { tNow } from "@/lib/i18n/language";
 import { Capacitor } from "@capacitor/core";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { supabase } from "@/integrations/supabase/client";
@@ -35,8 +36,8 @@ export async function startNativeCallNotifications(userId: string) {
     // when screen is locked.
     await LocalNotifications.createChannel({
       id: "incoming_calls",
-      name: "Incoming calls",
-      description: "Rings when someone calls you on ChiChat",
+      name: tNow("nn.channel"),
+      description: tNow("nn.channelDesc"),
       importance: 5, // IMPORTANCE_HIGH
       visibility: 1,
       sound: "ringtone.wav",
@@ -94,8 +95,8 @@ export async function startNativeCallNotifications(userId: string) {
             notifications: [
               {
                 id: hashId(row.id),
-                title: `Incoming ${row.call_type === "video" ? "video " : ""}call`,
-                body: `${callerName} is calling…`,
+                title: row.call_type === "video" ? tNow("nn.incomingVideo") : tNow("nn.incomingVoice"),
+                body: tNow("nn.isCalling", { name: callerName }),
                 channelId: "incoming_calls",
                 ongoing: true,
                 autoCancel: false,

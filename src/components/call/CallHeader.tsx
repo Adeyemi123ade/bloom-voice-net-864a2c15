@@ -1,3 +1,4 @@
+import { tNow } from "@/lib/i18n/language";
 import { Phone, Video } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
@@ -44,10 +45,10 @@ export default function CallHeader({
   const Icon = isVideo ? Video : Phone;
   const headerLabel =
     status === "connected"
-      ? isVideo ? "Video call" : "Voice call"
+      ? isVideo ? tNow("call.video") : tNow("call.voice")
       : role === "callee"
-        ? "Incoming call"
-        : "Calling";
+        ? tNow("ch.incoming")
+        : tNow("ch.calling");
   return (
     <div
       className={`pb-2 flex flex-col items-center gap-3 ${
@@ -84,18 +85,18 @@ export default function CallHeader({
       <h1
         className={`${size === "large" ? "text-2xl" : "text-lg"} font-bold text-center px-4 ${overlay ? "" : "text-foreground"}`}
       >
-        {other?.display_name ?? "Contact"}
+        {other?.display_name ?? tNow("chat.contact")}
       </h1>
       <p className="text-sm text-muted-foreground">
-        {status === "ringing" && "Ringing…"}
-        {status === "connecting" && "Connecting…"}
-        {status === "connected" && (reconnecting ? "Reconnecting…" : onHold ? "On hold" : fmt(seconds))}
-        {status === "ended" && "Call ended"}
+        {status === "ringing" && tNow("oc.ringing")}
+        {status === "connecting" && tNow("fb.connecting")}
+        {status === "connected" && (reconnecting ? tNow("ch.reconnecting") : onHold ? tNow("cs.onHold") : fmt(seconds))}
+        {status === "ended" && tNow("cs.ended")}
       </p>
       {status === "connected" && !onHold && !reconnecting && (
         <span className="mt-1 inline-flex items-center gap-1.5 text-2xs text-accent">
           <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-          Connected
+          {tNow("ch.connected")}
         </span>
       )}
     </div>

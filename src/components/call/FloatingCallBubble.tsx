@@ -1,3 +1,4 @@
+import { tNow } from "@/lib/i18n/language";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Mic, MicOff, Phone, PhoneOff, Video, VideoOff } from "lucide-react";
 import type { LocalVideoTrack, RemoteVideoTrack } from "twilio-video";
@@ -183,8 +184,8 @@ export default function FloatingCallBubble({
   };
 
   const label =
-    status === "connected" ? (reconnecting ? "Reconnecting…" : fmt(seconds)) : status === "ended" ? "Ended" : status === "ringing" ? "Calling…" : "Connecting…";
-  const name = other?.display_name ?? "Contact";
+    status === "connected" ? (reconnecting ? tNow("ch.reconnecting") : fmt(seconds)) : status === "ended" ? tNow("fb.ended") : status === "ringing" ? tNow("fb.calling") : tNow("fb.connecting");
+  const name = other?.display_name ?? tNow("chat.contact");
 
   // Buttons in the strip must not start a drag or reopen the call.
   const stop = (e: React.PointerEvent | React.MouseEvent) => e.stopPropagation();
@@ -194,7 +195,7 @@ export default function FloatingCallBubble({
       <div
         role="button"
         tabIndex={0}
-        aria-label={`Return to call with ${name}`}
+        aria-label={tNow("fb.returnTo", { name })}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -239,7 +240,7 @@ export default function FloatingCallBubble({
       <div
         role="button"
         tabIndex={0}
-        aria-label={`Return to video call with ${name}`}
+        aria-label={tNow("fb.returnToVideo", { name })}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -264,7 +265,7 @@ export default function FloatingCallBubble({
               </AvatarFallback>
             </Avatar>
             <span className="text-2xs font-medium opacity-90 flex items-center gap-1">
-              {connected ? <><VideoOff className="w-3 h-3" /> Camera off</> : label}
+              {connected ? <><VideoOff className="w-3 h-3" /> {tNow("fb.cameraOff")}</> : label}
             </span>
           </div>
         )}
@@ -297,7 +298,7 @@ export default function FloatingCallBubble({
         <span className="flex items-center gap-1.5 shrink-0">
           <button
             type="button"
-            aria-label={muted ? "Unmute" : "Mute"}
+            aria-label={muted ? tNow("cc.unmute") : tNow("cc.mute")}
             onPointerDown={stop}
             onPointerUp={stop}
             onClick={(e) => { e.stopPropagation(); onToggleMute(); }}
@@ -307,7 +308,7 @@ export default function FloatingCallBubble({
           </button>
           <button
             type="button"
-            aria-label="End call"
+            aria-label={tNow("cc.endCall")}
             onPointerDown={stop}
             onPointerUp={stop}
             onClick={(e) => { e.stopPropagation(); onEndCall(); }}

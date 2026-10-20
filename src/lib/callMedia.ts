@@ -1,3 +1,4 @@
+import { tNow } from "@/lib/i18n/language";
 import { LocalAudioTrack, LocalVideoTrack } from "twilio-video";
 import { isLikelyInAppBrowser } from "@/lib/micPermission";
 
@@ -88,21 +89,21 @@ export function formatCallMediaError(error: unknown, isVideo: boolean) {
 
   if (name === "NotAllowedError") {
     if (isLikelyInAppBrowser()) {
-      return "This link is open inside an app's built-in browser, which blocks microphone/camera access. Tap the menu (••• or ⋮) and choose \"Open in Chrome\" or \"Open in Safari\", then try again.";
+      return tNow("cm.inApp");
     }
     return isVideo
-      ? "Microphone or camera access was blocked. Allow it and try again."
-      : "Microphone access was blocked. Allow it and try again.";
+      ? tNow("cm.blockedBoth")
+      : tNow("cm.blockedMic");
   }
   if (name === "NotFoundError") {
-    return isVideo ? "Microphone or camera was not found on this device." : "No microphone was found on this device.";
+    return isVideo ? tNow("cm.notFoundBoth") : tNow("mic.noneBody");
   }
   if (name === "NotReadableError") {
     return isVideo
-      ? "Microphone or camera is busy in another app. Close it and try again."
-      : "Microphone is busy in another app. Close it and try again.";
+      ? tNow("cm.busyBoth")
+      : tNow("mic.busyBody");
   }
 
   // Anything else is a technical fault, never shown as is.
-  return `Could not access the ${isVideo ? "microphone and camera" : "microphone"}.`;
+  return isVideo ? tNow("cm.cantBoth") : tNow("mic.blockedBody");
 }

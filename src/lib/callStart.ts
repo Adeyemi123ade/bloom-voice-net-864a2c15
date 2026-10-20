@@ -1,3 +1,4 @@
+import { tNow } from "@/lib/i18n/language";
 import type { NavigateFunction } from "react-router-dom";
 import { FROM_CALL_BUBBLE, activeCallPath, getActiveCall, getCallsSnapshot } from "@/lib/activeCall";
 import { startCallTimeline } from "@/lib/callTimeline";
@@ -35,12 +36,13 @@ export type OutgoingCall = {
 };
 
 /** Shown when Call is tapped for someone else while a call is on. */
-export const END_CURRENT_CALL_FIRST = "End your current call to start a new one.";
+/** Shown when a second call is started during a call (in the chosen language). */
+export const endCurrentCallFirst = () => tNow("cs.endCurrent");
 
 /** False (with a short note) while a ChiChat call is on. */
 export function canStartAnotherCall(): boolean {
   if (getCallsSnapshot().calls.length === 0) return true;
-  toast({ title: END_CURRENT_CALL_FIRST, duration: 3000 });
+  toast({ title: endCurrentCallFirst(), duration: 3000 });
   return false;
 }
 
@@ -55,7 +57,7 @@ export function beginOutgoingCall(call: OutgoingCall, navigate: NavigateFunction
   if (active) {
     const same = getCallsSnapshot().calls.find((c) => c.conversationId === call.conversationId);
     if (same) navigate(activeCallPath(same), { state: { [FROM_CALL_BUBBLE]: true } });
-    else toast({ title: END_CURRENT_CALL_FIRST, duration: 3000 });
+    else toast({ title: endCurrentCallFirst(), duration: 3000 });
     return;
   }
   const now = Date.now();

@@ -1,3 +1,4 @@
+import { tNow } from "@/lib/i18n/language";
 import { forwardRef, useEffect, useRef, useState, useCallback } from "react";
 import type { LocalVideoTrack, RemoteVideoTrack } from "twilio-video";
 
@@ -148,7 +149,7 @@ const RemoteMedia = forwardRef<HTMLDivElement, Props>(
             {/* Draggable PiP tile — drag to reposition, tap to swap */}
             <div
               role="button"
-              aria-label="Swap video (drag to move)"
+              aria-label={tNow("rm.swap")}
               onPointerDown={onPointerDown}
               onPointerMove={onPointerMove}
               onPointerUp={onPointerUp}

@@ -1,3 +1,4 @@
+import { tNow } from "@/lib/i18n/language";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Device, Call } from "@twilio/voice-sdk";
@@ -11,7 +12,7 @@ import { loadManualContacts, loadCachedContacts } from "@/lib/deviceContacts";
 import { startCallForegroundService, stopCallForegroundService } from "@/lib/nativeCalls";
 import { isCallableNumber, paidCallMessage, type PaidCallBlock } from "@/lib/paidCallRules";
 
-const CALL_FAILED_TEXT = "We couldn't connect this call. Please try again.";
+const callFailedText = () => tNow("oc.failed");
 
 type Status = "connecting" | "ringing" | "connected" | "ended" | "failed";
 
@@ -49,7 +50,7 @@ export default function OutboundCall() {
   })();
 
   useEffect(() => {
-    document.title = `Calling ${display} — Chichat`;
+    document.title = `${tNow("oc.pageTitle", { name: display })} — Chichat`;
   }, [display]);
 
   useEffect(() => {
@@ -95,7 +96,7 @@ export default function OutboundCall() {
 
         device.on("error", (e) => {
           console.error("Device error", e);
-          setErrorMsg(CALL_FAILED_TEXT);
+          setErrorMsg(callFailedText());
           endLocally("failed");
         });
 
@@ -124,12 +125,12 @@ export default function OutboundCall() {
         call.on("reject", () => endLocally("ended"));
         call.on("error", (e) => {
           console.error("Call error", e);
-          setErrorMsg(CALL_FAILED_TEXT);
+          setErrorMsg(callFailedText());
           endLocally("failed");
         });
       } catch (err) {
         console.error("Outbound call failed", err);
-        setErrorMsg(CALL_FAILED_TEXT);
+        setErrorMsg(callFailedText());
         endLocally("failed");
       }
     })();
@@ -171,7 +172,7 @@ export default function OutboundCall() {
     cleanup();
     setStatus(s);
     if (s === "failed" && seconds < 3 && errorMsgRef.current == null) {
-      setErrorMsg(CALL_FAILED_TEXT);
+      setErrorMsg(callFailedText());
     }
     // Do NOT auto-prompt to save the number after a call ends.
     // The user can tap the "Save contact" button if they want to.
@@ -194,14 +195,14 @@ export default function OutboundCall() {
 
   const statusText =
     status === "connecting"
-      ? "Connecting…"
+      ? tNow("fb.connecting")
       : status === "ringing"
-        ? "Ringing…"
+        ? tNow("oc.ringing")
         : status === "connected"
           ? dur
           : status === "failed"
-            ? errorMsg ?? "Call failed"
-            : "Call ended";
+            ? errorMsg ?? tNow("call.failed")
+            : tNow("cs.ended");
 
   return (
     <MobileFrame>
@@ -214,7 +215,7 @@ export default function OutboundCall() {
             <Phone className="w-10 h-10" style={{ color: "#FFFFFF" }} />
           </div>
           <div>
-            <p className="text-xs text-muted-foreground">Calling</p>
+            <p className="text-xs text-muted-foreground">{tNow("ch.calling")}</p>
             <p className="text-lg font-semibold mt-1">{display || "Unknown"}</p>
             <p className="text-xs text-muted-foreground mt-2">{statusText}</p>
           </div>
@@ -224,7 +225,7 @@ export default function OutboundCall() {
           <button
             onClick={toggleMute}
             disabled={status !== "connected"}
-            aria-label={muted ? "Unmute" : "Mute"}
+            aria-label={muted ? tNow("cc.unmute") : tNow("cc.mute")}
             className={`w-14 h-14 rounded-full flex items-center justify-center transition-colors disabled:opacity-40 ${
               muted ? "bg-foreground text-background" : "bg-secondary text-foreground"
             }`}
@@ -236,14 +237,14 @@ export default function OutboundCall() {
             <button
               onClick={() => navigate("/home", { replace: true })}
               className="w-16 h-16 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground flex items-center justify-center"
-              aria-label="Done"
+              aria-label={tNow("oc.done")}
             >
               <Phone className="w-6 h-6" />
             </button>
           ) : (
             <button
               onClick={hangUp}
-              aria-label="End call"
+              aria-label={tNow("cc.endCall")}
               className="w-16 h-16 rounded-full flex items-center justify-center"
               style={{ backgroundColor: "hsl(var(--brand-deep))", color: "#FFFFFF" }}
             >
@@ -254,7 +255,7 @@ export default function OutboundCall() {
           <button
             onClick={() => setAskSave(true)}
             disabled={!e164 || isKnown}
-            aria-label="Save contact"
+            aria-label={tNow("save.title")}
             className="w-14 h-14 rounded-full bg-secondary text-foreground flex items-center justify-center disabled:opacity-30"
           >
             <UserPlus className="w-5 h-5" />

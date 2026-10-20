@@ -1,3 +1,4 @@
+import { tNow } from "@/lib/i18n/language";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
@@ -189,14 +190,14 @@ export default function CallSession({
     handledStatusesRef.current.add(nextStatus);
 
     if (nextStatus === "declined") {
-      endNotice("Call declined");
+      endNotice(tNow("cs.declined"));
       if (role === "caller") void logCallMessage("rejected", 0);
       cleanupAndExit();
       return;
     }
     if (nextStatus === "missed") {
       if (role === "caller") {
-        endNotice("No answer");
+        endNotice(tNow("call.noAnswer"));
         void logCallMessage("no_answer", 0);
       }
       cleanupAndExit();
@@ -223,7 +224,7 @@ export default function CallSession({
   }, [loading, user, signedOut]);
 
   useEffect(() => {
-    document.title = `${isVideo ? "Video" : "Voice"} call — Chichat`;
+    document.title = `${isVideo ? tNow("call.video") : tNow("call.voice")} — Chichat`;
   }, [isVideo]);
 
   // Who's on the other end. The screen that started the call passes their
@@ -264,7 +265,7 @@ export default function CallSession({
             .maybeSingle();
           if (prof && !cancelled) {
             setOther(prof as Profile);
-            setCallPeer(callId, { name: prof.display_name ?? "Contact", avatarUrl: prof.avatar_url ?? null });
+            setCallPeer(callId, { name: prof.display_name ?? tNow("chat.contact"), avatarUrl: prof.avatar_url ?? null });
             return;
           }
         }
@@ -300,7 +301,7 @@ export default function CallSession({
         if (accepted) {
           void publishLocalVideo();
         } else {
-          toast({ title: "Video request declined" });
+          toast({ title: tNow("cs.videoDeclined") });
         }
       })
       .on("broadcast", { event: "hold" }, ({ payload }) => {
@@ -347,7 +348,7 @@ export default function CallSession({
         .update({ status: "missed", ended_at: new Date().toISOString() })
         .eq("id", callId)
         .eq("status", "ringing");
-      endNotice("No answer");
+      endNotice(tNow("call.noAnswer"));
       // Stop their phone ringing and leave a missed-call notice on it.
       pushCallCancelled(callId, "missed");
       void logCallMessage("no_answer", 0);
@@ -402,7 +403,7 @@ export default function CallSession({
     const media = startPreparingCallMedia(initialIsVideo);
     media.then(
       () => markCall(callId, "media"),
-      (e) => fail("Call permission needed", formatCallMediaError(e, initialIsVideo)),
+      (e) => fail(tNow("cs.permNeeded"), formatCallMediaError(e, initialIsVideo)),
     );
     (async () => {
       const savedCall = await saveNewCall({
@@ -429,16 +430,16 @@ export default function CallSession({
       }
       if (savedCall.result === "busy") {
         failed = true;
-        endNotice("End your current call to start a new one.");
+        endNotice(tNow("cs.endCurrent"));
         cleanupAndExit({ keepRoom: true });
         return;
       }
       if (savedCall.result === "blocked") {
-        fail("Call not available", "You can't call this person right now.");
+        fail(tNow("cs.notAvailable"), tNow("cs.cantCall"));
         return;
       }
       if (savedCall.result === "error") {
-        fail("Could not start call", "Please check your connection and try again.");
+        fail(tNow("cs.cantStart"), tNow("chat.checkConnection"));
         return;
       }
       saved = true;
@@ -511,7 +512,7 @@ export default function CallSession({
         .select("id")
         .maybeSingle();
       if (!data) {
-        endNotice("Call ended");
+        endNotice(tNow("cs.ended"));
         cleanupAndExit();
         return;
       }
@@ -588,7 +589,7 @@ export default function CallSession({
       // minimised the call to), with the length when the call connected.
       if (!endNoticeShownRef.current) {
         endNoticeShownRef.current = true;
-        callNotice(connectedRef.current ? `Call ended · ${formatCallClock(secondsRef.current)}` : "Call ended");
+        callNotice(connectedRef.current ? tNow("cs.endedTime", { time: formatCallClock(secondsRef.current) }) : tNow("cs.ended"));
       }
     }, 500);
   };
@@ -747,7 +748,7 @@ export default function CallSession({
         return;
       }
       // Gone for the whole grace period: the call is lost.
-      endNotice("Call disconnected");
+      endNotice(tNow("cs.disconnected"));
       void endCallRef.current();
     }, RECONNECT_GRACE_MS);
   };
@@ -779,7 +780,7 @@ export default function CallSession({
         if (await joinRoom({ rejoin: true })) return;
       }
       if (!endedRef.current) {
-        endNotice("Call disconnected");
+        endNotice(tNow("cs.disconnected"));
         void endCallRef.current();
       }
     } finally {
@@ -888,7 +889,7 @@ export default function CallSession({
         if (error?.code === 53205) {
           // This account joined the same call from another phone, which
           // carries the call on. Leave it here quietly.
-          endNotice("Call moved to another device");
+          endNotice(tNow("cs.moved"));
           void cleanupAndExit({ keepRoom: true });
           return;
         }
@@ -914,7 +915,7 @@ export default function CallSession({
         return false;
       }
       const msg = formatCallMediaError(err, isVideo);
-      endNotice("Call failed", { description: msg, destructive: true });
+      endNotice(tNow("call.failed"), { description: msg, destructive: true });
       // Tell the other side too, so they aren't left waiting on "Connecting".
       void supabase
         .from("calls")
@@ -1014,7 +1015,7 @@ export default function CallSession({
       setVideoEnabled(true);
     } catch (err) {
       toast({
-        title: "Couldn't switch camera",
+        title: tNow("cs.cantSwitchCam"),
         description: formatCallMediaError(err, true),
         variant: "destructive",
       });
@@ -1038,7 +1039,7 @@ export default function CallSession({
       setFacingMode("user");
     } catch (err) {
       toast({
-        title: "Couldn't switch to video",
+        title: tNow("cs.cantSwitchVideo"),
         description: formatCallMediaError(err, true),
         variant: "destructive",
       });
@@ -1061,7 +1062,7 @@ export default function CallSession({
     upgradeTimeoutRef.current = window.setTimeout(() => {
       setUpgradeRequest((curr) => {
         if (curr === "outgoing") {
-          toast({ title: "No response to video request" });
+          toast({ title: tNow("cs.noVideoResponse") });
           return null;
         }
         return curr;
@@ -1325,7 +1326,7 @@ export default function CallSession({
 
         {videoFullscreen && onHold && (
           <div className="fixed inset-0 z-10 bg-black/60 flex items-center justify-center pointer-events-none">
-            <span className="px-4 py-2 rounded-full bg-white/15 text-white text-sm font-semibold">On hold</span>
+            <span className="px-4 py-2 rounded-full bg-white/15 text-white text-sm font-semibold">{tNow("cs.onHold")}</span>
           </div>
         )}
 
@@ -1334,7 +1335,7 @@ export default function CallSession({
           return (
             <HeldCallCard
               key={c.callId}
-              name={peer?.name ?? "Contact"}
+              name={peer?.name ?? tNow("chat.contact")}
               avatarUrl={peer?.avatarUrl ?? null}
               onSwap={() => {
                 swapToCall(c.callId);
@@ -1349,8 +1350,8 @@ export default function CallSession({
           <button
             type="button"
             onClick={minimize}
-            aria-label="Minimise call"
-            title="Minimise call"
+            aria-label={tNow("cs.minimise")}
+            title={tNow("cs.minimise")}
             className={`fixed z-30 left-3 top-[calc(env(safe-area-inset-top)+12px)] w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
               videoFullscreen
                 ? "bg-black/40 text-white hover:bg-black/60"
@@ -1369,7 +1370,7 @@ export default function CallSession({
             } px-4 py-2 rounded-full bg-primary text-primary-foreground text-xs font-medium flex items-center justify-center gap-2 animate-pulse`}
           >
             <Volume2 className="w-4 h-4" />
-            Tap to enable sound
+            {tNow("cs.tapSound")}
           </button>
         )}
 
