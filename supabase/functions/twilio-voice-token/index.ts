@@ -2,6 +2,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
 import { create, getNumericDate } from "https://deno.land/x/djwt@v3.0.2/mod.ts";
 import {
+  isAccountSuspended,
   DAILY_LIMIT_SECONDS,
   isAccountTooNew,
   loadAccountCreatedAt,
@@ -56,6 +57,11 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
+    if (await isAccountSuspended(admin, userId)) {
+      return new Response(JSON.stringify({ blocked: "suspended" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     const createdAt = await loadAccountCreatedAt(admin, userId);
     if (isAccountTooNew(createdAt)) {
       return new Response(JSON.stringify({ blocked: "too_new" }), {

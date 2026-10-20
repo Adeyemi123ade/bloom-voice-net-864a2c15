@@ -1,3 +1,4 @@
+import { requestAccountCheck } from "@/lib/accountStatus";
 import { tNow } from "@/lib/i18n/language";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -83,6 +84,12 @@ export default function OutboundCall() {
         if (cancelled) return;
         if (data?.blocked === "too_new" || data?.blocked === "daily_limit") {
           refuse(data.blocked);
+          return;
+        }
+        if (data?.blocked === "suspended") {
+          requestAccountCheck();
+          setErrorMsg(tNow("cs.cantCall"));
+          endLocally("failed");
           return;
         }
         if (error || !data?.token) {

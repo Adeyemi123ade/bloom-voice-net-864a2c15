@@ -1,3 +1,5 @@
+import { tNow } from "@/lib/i18n/language";
+import { isLimitError, isSuspendedError, requestAccountCheck } from "@/lib/accountStatus";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
@@ -176,6 +178,17 @@ type Profile = {
   show_last_seen?: boolean | null;
 };
 
+/** Plain words for why a message couldn't be sent. */
+function sendRefusalText(err: unknown): string {
+  if (isBlockedError(err)) return tNow("chat.cantMessage");
+  if (isLimitError(err)) return tNow("lim.chats");
+  if (isSuspendedError(err)) {
+    requestAccountCheck();
+    return tNow("chat.cantMessage");
+  }
+  return tNow("chat.checkConnection");
+}
+
 export default function ChatRoom() {
   const { id: conversationId } = useParams();
   const navigate = useNavigate();
@@ -227,6 +240,13 @@ export default function ChatRoom() {
   const [transcribing, setTranscribing] = useState(false);
   const [recSec, setRecSec] = useState(0);
   const recorderRef = useRef<MediaRecorder | null>(null);
+  // Lets the automatic update wait until a voice note is finished.
+  useEffect(() => {
+    document.body.dataset.recording = recording ? "true" : "false";
+    return () => {
+      document.body.dataset.recording = "false";
+    };
+  }, [recording]);
   const recStreamRef = useRef<MediaStream | null>(null);
   const recChunks = useRef<Blob[]>([]);
   const recTimer = useRef<number | null>(null);
@@ -787,7 +807,10 @@ export default function ChatRoom() {
         .from("messages")
         .update({ content, edited_at: editedAt })
         .eq("id", editId);
-      if (error) toast({ title: t("chat.editFailed"), description: error.message, variant: "destructive" });
+      if (error) {
+        console.error("[msg-edit] failed", error);
+        toast({ title: t("chat.editFailed"), description: t("chat.checkConnection"), variant: "destructive" });
+      }
       return;
     }
 
@@ -834,6 +857,10 @@ export default function ChatRoom() {
       setMessages((prev) => prev.filter((m) => m.id !== tmpId));
       if (isBlockedError(error)) {
         toast({ title: t("chat.notSent"), description: t("chat.cantMessage") });
+      } else if (isLimitError(error)) {
+        toast({ title: t("chat.notSent"), description: t("lim.chats") });
+      } else if (isSuspendedError(error)) {
+        requestAccountCheck();
       } else {
         toast({ title: t("chat.notSent"), description: t("chat.checkConnection") });
       }
@@ -960,7 +987,7 @@ export default function ChatRoom() {
       const missed = ids.length - done.size;
       toast({
         title: t("chat.deleteFailed"),
-        description: error?.message ?? (missed === 1 ? t("chat.cantDeleteOne") : t("chat.cantDeleteMany", { n: missed })),
+        description: missed === 1 ? t("chat.cantDeleteOne") : t("chat.cantDeleteMany", { n: missed }),
         variant: "destructive",
       });
     }
@@ -1113,7 +1140,7 @@ export default function ChatRoom() {
     } catch (e) {
       toast({
         title: t("chat.transcribeFailed"),
-        description: e instanceof Error ? e.message : t("auth.tryAgain"),
+        description: t("auth.tryAgain"),
         variant: "destructive",
       });
     } finally {
@@ -1152,7 +1179,7 @@ export default function ChatRoom() {
       console.error("[voice-send] storage upload failed", upErr);
       setMessages((prev) => prev.filter((m) => m.id !== tmpId));
       URL.revokeObjectURL(localUrl);
-      toast({ title: t("chat.uploadFailed"), description: upErr.message, variant: "destructive" });
+      toast({ title: t("chat.uploadFailed"), description: t("chat.checkConnection"), variant: "destructive" });
       return;
     }
     const { data: pub } = supabase.storage.from("chat-media").getPublicUrl(path);
@@ -1173,7 +1200,7 @@ export default function ChatRoom() {
     if (error || !inserted) {
       console.error("[voice-send] insert failed", error);
       setMessages((prev) => prev.filter((m) => m.id !== tmpId));
-      toast({ title: t("chat.sendFailed"), description: error?.message ?? t("auth.tryAgain"), variant: "destructive" });
+      toast({ title: t("chat.sendFailed"), description: sendRefusalText(error), variant: "destructive" });
       return;
     }
     // Adopt the real row id immediately — see the matching comment in
@@ -1353,7 +1380,7 @@ export default function ChatRoom() {
     } catch (err) {
       toast({
         title: t("chat.failedSend"),
-        description: err instanceof Error ? err.message : t("auth.tryAgain"),
+        description: sendRefusalText(err),
         variant: "destructive",
       });
     } finally {

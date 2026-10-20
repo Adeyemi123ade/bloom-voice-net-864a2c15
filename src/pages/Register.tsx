@@ -1,3 +1,5 @@
+import { isBannedError, signupAllowed } from "@/lib/accountStatus";
+import { SUPPORT_EMAIL } from "@/lib/support";
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -285,6 +287,17 @@ export default function Register() {
       return;
     }
 
+    // Details that belong to a suspended account can't be used again.
+    if (!(await signupAllowed(parsed.data.email, e164))) {
+      setSubmitting(false);
+      toast({
+        title: t("reg.notAllowedTitle"),
+        description: t("reg.notAllowedBody", { email: SUPPORT_EMAIL }),
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Standard email/password sign-up.
     const { data: signUpData, error } = await supabase.auth.signUp({
       email: parsed.data.email,
@@ -310,9 +323,10 @@ export default function Register() {
           variant: "destructive",
         });
       } else {
+        console.error("[register] sign-up failed", error);
         toast({
           title: t("reg.createFailTitle"),
-          description: error.message || t("auth.tryAgainMoment"),
+          description: t("auth.tryAgainMoment"),
           variant: "destructive",
         });
       }
@@ -333,10 +347,17 @@ export default function Register() {
             description: t("reg.phoneTakenBody", { phone: e164 }),
             variant: "destructive",
           });
+        } else if (isBannedError(profileError)) {
+          toast({
+            title: t("reg.notAllowedTitle"),
+            description: t("reg.notAllowedBody", { email: SUPPORT_EMAIL }),
+            variant: "destructive",
+          });
         } else {
+          console.error("[register] phone save failed", profileError);
           toast({
             title: t("reg.phoneSaveFailTitle"),
-            description: profileError.message || t("auth.tryAgain"),
+            description: t("auth.tryAgain"),
             variant: "destructive",
           });
         }

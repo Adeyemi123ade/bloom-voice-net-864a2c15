@@ -277,7 +277,7 @@ export default function Contacts() {
       } else {
         toast({
           title: t("ct.importCancelled"),
-          description: err instanceof Error ? err.message : t("common.tryAgain"),
+          description: t("common.tryAgain"),
         });
       }
     } finally {

@@ -1,4 +1,5 @@
 import { tNow } from "@/lib/i18n/language";
+import { isStaleBuildError, reloadForNewVersion, reportProblem } from "@/lib/errorReport";
 import { Component, ErrorInfo, ReactNode } from "react";
 
 interface Props {
@@ -25,6 +26,12 @@ export default class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error("[ErrorBoundary] Uncaught render error:", error, info.componentStack);
+    // A piece of an older version went missing after an update: just reload.
+    if (isStaleBuildError(error.message)) {
+      reloadForNewVersion();
+      return;
+    }
+    reportProblem("crash", error, info.componentStack ?? undefined);
   }
 
   render() {
@@ -33,7 +40,7 @@ export default class ErrorBoundary extends Component<Props, State> {
         <div className="h-screen w-full flex flex-col items-center justify-center gap-4 bg-background px-6 text-center">
           <p className="text-sm font-semibold text-foreground">{tNow("eb.title")}</p>
           <p className="text-xs text-muted-foreground max-w-xs">
-            {this.state.error.message || "An unexpected error occurred."}
+            {tNow("eb.body")}
           </p>
           <button
             onClick={() => window.location.reload()}

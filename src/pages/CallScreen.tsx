@@ -1,3 +1,4 @@
+import { requestAccountCheck } from "@/lib/accountStatus";
 import { tNow } from "@/lib/i18n/language";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -424,7 +425,7 @@ export default function CallSession({
         }
         // Already on a call with this person (on this or another phone).
         failed = true;
-        endNotice("You're already on a call with this person.");
+        endNotice(tNow("cs.alreadyOnCall"));
         cleanupAndExit({ keepRoom: true });
         return;
       }
@@ -436,6 +437,15 @@ export default function CallSession({
       }
       if (savedCall.result === "blocked") {
         fail(tNow("cs.notAvailable"), tNow("cs.cantCall"));
+        return;
+      }
+      if (savedCall.result === "limited") {
+        fail(tNow("cs.notAvailable"), tNow("lim.calls"));
+        return;
+      }
+      if (savedCall.result === "suspended") {
+        fail(tNow("cs.notAvailable"), tNow("cs.cantCall"));
+        requestAccountCheck();
         return;
       }
       if (savedCall.result === "error") {

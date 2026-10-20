@@ -1,3 +1,4 @@
+import { isBannedError } from "@/lib/accountStatus";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Camera, Loader2 } from "lucide-react";
@@ -120,7 +121,9 @@ export default function Profile() {
         error.message.includes("phone_taken") ||
         error.message.includes("profiles_phone_unique")
           ? t("pr.phoneLinked")
-          : t("pr.cantSave");
+          : isBannedError(error)
+            ? t("pr.phoneNotAllowed")
+            : t("pr.cantSave");
       toast({ title: t("pr.saveFailed"), description: msg, variant: "destructive" });
     } else {
       if (normalizedPhone) setPhone(normalizedPhone);

@@ -9,6 +9,8 @@ import {
   Cloud,
   Loader2,
   LogOut,
+  MessageSquareText,
+  ShieldCheck,
   SlidersHorizontal,
   Smartphone,
   Trash2,
@@ -39,6 +41,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { getMyBackup, type BackupRow } from "@/lib/chatBackup";
+import { amIAdmin } from "@/lib/admin";
+import { APP_BUILD } from "@/lib/appBuild";
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -49,6 +53,7 @@ export default function Settings() {
 
   const [working, setWorking] = useState(false);
   const [backup, setBackup] = useState<BackupRow | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const onWeb = isWebApp();
@@ -60,6 +65,16 @@ export default function Settings() {
   useEffect(() => {
     if (!loading && !user) navigate("/login");
   }, [loading, user, navigate]);
+
+  // The Admin row only shows for admin accounts.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    void amIAdmin().then((yes) => !cancelled && setIsAdmin(yes));
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   // Load backup row (for the summary line on the Chat backup nav row)
   useEffect(() => {
@@ -215,6 +230,37 @@ export default function Settings() {
             <ChevronRight className="w-5 h-5 text-muted-foreground" />
           </button>
 
+          {/* Feedback for the ChiChat team (testers' main channel). */}
+          <button
+            onClick={() => navigate("/settings/feedback")}
+            className="w-full flex items-center gap-3 px-3 py-3.5 rounded-lg hover:bg-secondary text-left"
+          >
+            <span className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center">
+              <MessageSquareText className="w-5 h-5 text-primary" />
+            </span>
+            <div className="flex-1 min-w-0">
+              <p className="text-base font-semibold text-foreground">{t("fb.title")}</p>
+              <p className="text-sm text-muted-foreground truncate">{t("fb.rowSub")}</p>
+            </div>
+            <ChevronRight className="w-5 h-5 text-muted-foreground" />
+          </button>
+
+          {isAdmin && (
+            <button
+              onClick={() => navigate("/admin")}
+              className="w-full flex items-center gap-3 px-3 py-3.5 rounded-lg hover:bg-secondary text-left"
+            >
+              <span className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center">
+                <ShieldCheck className="w-5 h-5 text-primary" />
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-base font-semibold text-foreground">Admin</p>
+                <p className="text-sm text-muted-foreground truncate">Reports, people, feedback, problems</p>
+              </div>
+              <ChevronRight className="w-5 h-5 text-muted-foreground" />
+            </button>
+          )}
+
           {/* 3. Account — collapsible. Holds Profile setting + sign-out. */}
           <Collapsible className="rounded-lg bg-secondary/30">
             <CollapsibleTrigger className="w-full flex items-center gap-3 px-3 py-3.5 text-left group">
@@ -276,6 +322,9 @@ export default function Settings() {
               </button>
             </div>
           )}
+          <p className="text-center text-xs text-muted-foreground pt-2 pb-1">
+            {t("settings.version", { build: APP_BUILD })}
+          </p>
         </div>
 
         <AlertDialog open={deleteOpen} onOpenChange={(open) => !deleting && setDeleteOpen(open)}>
