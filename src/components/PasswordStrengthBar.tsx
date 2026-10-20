@@ -1,5 +1,6 @@
 import { Check } from "lucide-react";
 import { PASSWORD_RULES, scorePassword } from "@/lib/passwordStrength";
+import { useLanguage } from "@/lib/i18n/context";
 
 interface Props {
   password: string;
@@ -13,7 +14,8 @@ interface Props {
  *     shown from the start, each part turning green with a tick when met.
  */
 export default function PasswordStrengthBar({ password, className = "" }: Props) {
-  const { level, label } = scorePassword(password);
+  const { level } = scorePassword(password);
+  const { t } = useLanguage();
 
   const colorClass = level === 3 ? "bg-accent" : level === 2 ? "bg-warning" : "bg-destructive";
   const labelColor = level === 3 ? "text-accent" : level === 2 ? "text-warning" : "text-destructive";
@@ -31,7 +33,7 @@ export default function PasswordStrengthBar({ password, className = "" }: Props)
             ))}
           </div>
           <div className={`mt-1 flex items-center gap-1 text-xs font-semibold ${labelColor}`}>
-            <span>{label} password</span>
+            <span>{t(level === 3 ? "pw.strong" : level === 2 ? "pw.average" : "pw.weak")}</span>
             {level === 3 && <Check className="w-3.5 h-3.5" />}
           </div>
         </>
@@ -45,7 +47,7 @@ export default function PasswordStrengthBar({ password, className = "" }: Props)
                 className={`inline-flex items-center gap-0.5 transition-colors ${met ? "text-accent font-semibold" : ""}`}
               >
                 {met && <Check className="w-3 h-3" aria-hidden />}
-                {rule.hint}
+                {rule.hintKey ? t(rule.hintKey) : rule.hint}
               </span>
               {i < PASSWORD_RULES.length - 1 && ", "}
             </span>
