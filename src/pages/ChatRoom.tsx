@@ -54,6 +54,7 @@ import {
 import { useBackNavigation } from "@/hooks/useBackNavigation";
 import chatWallpaper from "@/assets/chat-wallpaper.png";
 import { loadChatCache, saveChatCache } from "@/lib/chat/chatCache";
+import { transcribeRecording } from "@/lib/transcribe";
 import { duplicateCallRecordIds, messageKind, mediaLabel, parseCallLog, selectionActions, stripQuotedReply } from "@/lib/chat/messageKinds";
 import { checkClipAvailable, copyMessages, extractTypedClip, matchPastedClip, mediaUrlOf } from "@/lib/chat/clipboard";
 import { getSignedChatMediaUrl, useSignedMediaUrl } from "@/lib/signedMedia";
@@ -1097,9 +1098,7 @@ export default function ChatRoom() {
     if (blob.size === 0 || !isVoiceTranscribeEnabled()) return;
     setTranscribing(true);
     try {
-      const { data, error } = await supabase.functions.invoke("transcribe-voice", { body: blob });
-      if (error) throw error;
-      const transcript = (data as { text?: string } | null)?.text?.trim();
+      const transcript = await transcribeRecording(blob);
       if (!transcript) {
         toast({
           title: "Couldn't hear anything",

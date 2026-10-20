@@ -39,3 +39,29 @@ export function clearChatCaches(): void {
     /* ignore */
   }
 }
+
+/**
+ * The chat list as last shown, so Chats opens at once while the latest
+ * loads. Same prefix as the chats above, so sign-out clears it too.
+ */
+const LIST_PREFIX = `${PREFIX}list:`;
+const MAX_LIST = 200;
+
+export function loadChatListCache<R>(userId: string): R[] | null {
+  try {
+    const raw = localStorage.getItem(LIST_PREFIX + userId);
+    if (!raw) return null;
+    const rows = JSON.parse(raw) as R[];
+    return Array.isArray(rows) ? rows : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveChatListCache<R>(userId: string, rows: R[]): void {
+  try {
+    localStorage.setItem(LIST_PREFIX + userId, JSON.stringify(rows.slice(0, MAX_LIST)));
+  } catch {
+    /* storage full: Chats still works, it just opens from the network */
+  }
+}

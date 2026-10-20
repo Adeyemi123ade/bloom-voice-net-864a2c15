@@ -46,6 +46,14 @@ import { ActiveRow, EmptyState, InviteRow } from "@/components/contacts/ContactR
 import { SectionList, sectionLetter } from "@/components/contacts/ContactSectionList";
 import { shareChichatInvite } from "@/components/contacts/ShareInviteCard";
 import { beginOutgoingCall, canStartAnotherCall } from "@/lib/callStart";
+import { inBatches, loadMatchCache, phonesKey, saveMatchCache, type CallStat } from "@/lib/contactMatchCache";
+
+// Long phone books: rows are added as the list is scrolled, not all at once
+// (drawing every row made the screen take seconds to appear on a phone).
+const FIRST_ROWS = 60;
+const MORE_ROWS = 200;
+// Checks against ChiChat sent at the same time (each one is up to BATCH_SIZE numbers).
+const PARALLEL_CHECKS = 4;
 
 export default function Contacts() {
   const navigate = useNavigate();
@@ -54,9 +62,13 @@ export default function Contacts() {
 
   const [contacts, setContacts] = useState<DeviceContact[]>([]);
   const [matched, setMatched] = useState<Map<string, MatchedUser>>(new Map());
-  const [stats, setStats] = useState<
-    Map<string, { call_count: number; last_called_at: string | null }>
-  >(new Map());
+  const [stats, setStats] = useState<Map<string, CallStat>>(new Map());
+  // Fingerprint of the numbers last checked against ChiChat (see runMatch).
+  const lastCheckedRef = useRef<string | null>(null);
+  const matchSeq = useRef(0);
+  const [inviteLimit, setInviteLimit] = useState(FIRST_ROWS);
+  const moreRef = useRef<HTMLDivElement | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
   const [invitedPhones, setInvitedPhones] = useState<Set<string>>(new Set());
   const [syncing, setSyncing] = useState(false);
   const [matching, setMatching] = useState(false);
@@ -84,7 +96,8 @@ export default function Contacts() {
       saveCachedContacts(list);
       const fresh = mergeContacts(list, loadManualContacts());
       setContacts(fresh);
-      if (fresh.length) await runMatch(fresh);
+      // Usually the same numbers as the copy already checked on opening.
+      if (fresh.length) await runMatch(fresh, { onlyIfChanged: true });
       return "ok";
     } catch (err) {
       const code = err instanceof Error ? err.message : String(err);
@@ -136,8 +149,13 @@ export default function Contacts() {
       const manual = loadManualContacts();
       const merged = mergeContacts(cached, manual);
       setContacts(merged);
-      if (merged.length) await runMatch(merged);
-      await loadInvited();
+      // Who was on ChiChat last time, shown at once; checked again below.
+      const saved = loadMatchCache(user.id);
+      if (saved) {
+        setMatched(new Map(saved.matches.map((m) => [m.phone, m])));
+        setStats(new Map(saved.stats));
+      }
+      await Promise.all([merged.length ? runMatch(merged) : Promise.resolve(), loadInvited()]);
 
       // On native Android: load the phone's contacts directly.
       if (isNativePlatform()) await loadPhoneContacts();
@@ -156,24 +174,26 @@ export default function Contacts() {
     setInvitedPhones(new Set((data ?? []).map((r) => r.phone)));
   };
 
-  const runMatch = async (list: DeviceContact[]) => {
+  const runMatch = async (list: DeviceContact[], opts: { onlyIfChanged?: boolean } = {}) => {
     if (!user) return;
-    setMatching(true);
     const allPhones = Array.from(
       new Set(list.flatMap((c) => c.phones).filter(Boolean)),
     );
+    const key = phonesKey(allPhones);
+    if (opts.onlyIfChanged && key === lastCheckedRef.current) return;
+    const seq = ++matchSeq.current;
+    setMatching(true);
     const matches = new Map<string, MatchedUser>();
     try {
-      for (let i = 0; i < allPhones.length; i += BATCH_SIZE) {
-        const batch = allPhones.slice(i, i + BATCH_SIZE);
+      const found = await inBatches(allPhones, BATCH_SIZE, PARALLEL_CHECKS, async (batch) => {
         const { data, error } = await supabase.rpc("match_contacts_by_phone", {
           _phones: batch,
         });
         if (error) throw error;
-        for (const m of (data ?? []) as MatchedUser[]) {
-          matches.set(m.phone, m);
-        }
-      }
+        return (data ?? []) as MatchedUser[];
+      });
+      if (seq !== matchSeq.current) return; // a newer check replaced this one
+      for (const m of found) matches.set(m.phone, m);
       setMatched(matches);
 
       const calleeIds = Array.from(matches.values()).map((m) => m.user_id);
@@ -183,10 +203,8 @@ export default function Contacts() {
           .select("callee_id, call_count, last_called_at")
           .eq("caller_id", user.id)
           .in("callee_id", calleeIds);
-        const m = new Map<
-          string,
-          { call_count: number; last_called_at: string | null }
-        >();
+        if (seq !== matchSeq.current) return;
+        const m = new Map<string, CallStat>();
         for (const r of statRows ?? []) {
           m.set(r.callee_id, {
             call_count: r.call_count,
@@ -194,14 +212,17 @@ export default function Contacts() {
           });
         }
         setStats(m);
+        saveMatchCache(user.id, { phonesKey: key, matches: [...matches.values()], stats: [...m.entries()] });
       } else {
         setStats(new Map());
+        saveMatchCache(user.id, { phonesKey: key, matches: [], stats: [] });
       }
+      lastCheckedRef.current = key;
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Could not match contacts";
       toast({ title: "Matching failed", description: msg, variant: "destructive" });
     } finally {
-      setMatching(false);
+      if (seq === matchSeq.current) setMatching(false);
     }
   };
 
@@ -323,6 +344,35 @@ export default function Contacts() {
       (c) => c.name.toLowerCase().includes(q) || c.phone.toLowerCase().includes(q),
     );
   }, [invite, query]);
+
+  // Numbers added by hand (they get a remove button), read once per change
+  // instead of once per row.
+  const manualPhones = useMemo(
+    () => new Set(loadManualContacts().map((m) => m.phones[0])),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [contacts],
+  );
+
+  // A new search starts from the top again.
+  useEffect(() => setInviteLimit(FIRST_ROWS), [query]);
+  const shownInvite = useMemo(
+    () => filteredInvite.slice(0, inviteLimit),
+    [filteredInvite, inviteLimit],
+  );
+  // Near the end of what's drawn: draw the next rows.
+  useEffect(() => {
+    const el = moreRef.current;
+    if (!el || shownInvite.length >= filteredInvite.length) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) setInviteLimit((n) => n + MORE_ROWS);
+      },
+      // Measured against the scrolling list, so rows are drawn well before they're reached.
+      { root: listRef.current, rootMargin: "800px 0px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [shownInvite.length, filteredInvite.length]);
 
   const callActive = async (c: ActiveContact) => {
     if (!user || startingCall.current) return;
@@ -458,7 +508,7 @@ export default function Contacts() {
           )}
         </div>
 
-        <div className="flex-1 overflow-y-auto pb-6">
+        <div ref={listRef} className="flex-1 overflow-y-auto pb-6">
           {/* Search */}
           <div className="px-4 pt-3 pb-2">
             <div className="relative">
@@ -589,24 +639,22 @@ export default function Contacts() {
                 </span>
               </div>
               <SectionList
-                items={filteredInvite}
+                items={shownInvite}
                 getKey={(c) => `${c.phone}|${c.name}`}
                 getSectionLabel={(c) => sectionLetter(c.name)}
-                renderItem={(c) => {
-                  const isManual = loadManualContacts().some(
-                    (m) => m.phones[0] === c.phone,
-                  );
-                  return (
-                    <InviteRow
-                      c={c}
-                      isManual={isManual}
-                      onInvite={() => inviteContact(c)}
-                      onRemove={() => handleRemoveManual(c.phone)}
-                      onLongPress={() => openInviteActions(c)}
-                    />
-                  );
-                }}
+                renderItem={(c) => (
+                  <InviteRow
+                    c={c}
+                    isManual={manualPhones.has(c.phone)}
+                    onInvite={() => inviteContact(c)}
+                    onRemove={() => handleRemoveManual(c.phone)}
+                    onLongPress={() => openInviteActions(c)}
+                  />
+                )}
               />
+              {shownInvite.length < filteredInvite.length && (
+                <div ref={moreRef} className="h-16" aria-hidden />
+              )}
             </div>
           )}
 

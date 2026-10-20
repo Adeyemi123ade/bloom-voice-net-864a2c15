@@ -20,7 +20,10 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+    <!-- Loaded without holding up the first screen: text shows in the
+         system font for a moment if Google Fonts is slow. -->
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
+    <noscript><link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" /></noscript>
     <meta property="og:title" content="ChiChat — Experience the possibilities">
   <meta name="twitter:title" content="ChiChat — Experience the possibilities">
   <meta property="og:description" content="Chichat Connect is a mobile-first secondary telecommunication app for audio and video calls.">

@@ -3,6 +3,8 @@ import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { clearChatCaches } from "@/lib/chat/chatCache";
 import { clearSafetyCache } from "@/lib/safety";
+import { clearMatchCaches } from "@/lib/contactMatchCache";
+import { keepSameUser } from "@/lib/sameUser";
 
 interface AuthState {
   session: Session | null;
@@ -36,10 +38,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // IMPORTANT: subscribe BEFORE calling getSession to avoid missing events.
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       resolved = true;
-      setState({ session, user: session?.user ?? null, loading: false, signedOut: event === "SIGNED_OUT" });
+      setState((st) => ({
+        session,
+        user: keepSameUser(st.user, session?.user),
+        loading: false,
+        signedOut: event === "SIGNED_OUT",
+      }));
       if (event === "SIGNED_OUT") {
         // Saved chats on this device go with the account.
         clearChatCaches();
+        clearMatchCaches();
         clearSafetyCache();
         try {
           localStorage.removeItem("chichat:acceptedChats");
@@ -66,7 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       resolved = true;
-      setState((st) => ({ ...st, session, user: session?.user ?? null, loading: false }));
+      setState((st) => ({ ...st, session, user: keepSameUser(st.user, session?.user), loading: false }));
     }).catch(() => {
       resolved = true;
       setState((st) => ({ ...st, session: null, user: null, loading: false }));
