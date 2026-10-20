@@ -53,9 +53,12 @@ public class ChiChatCallsPlugin extends Plugin {
     }
 
     /**
-     * "Run in background": Android's own one-tap "Allow" prompt for ChiChat;
-     * if a phone doesn't offer it, its battery list instead. No message of
-     * our own on screen.
+     * "Run in background": opens Android's battery list, where the person
+     * picks ChiChat and chooses "Don't optimise" (or "Unrestricted").
+     * Google Play doesn't allow chat and calling apps that use Firebase to
+     * ask for the one-tap exemption (ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS),
+     * so the list is used instead; if a phone has no such list, the app's
+     * own settings page opens.
      */
     @PluginMethod
     public void requestIgnoreBatteryOptimizations(PluginCall call) {
@@ -64,10 +67,10 @@ public class ChiChatCallsPlugin extends Plugin {
                     getContext().getSystemService(Context.POWER_SERVICE);
             String pkg = getContext().getPackageName();
             if (!pm.isIgnoringBatteryOptimizations(pkg)) {
-                Intent i = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
-                i.setData(Uri.parse("package:" + pkg));
-                if (!tryStart(i)) {
-                    tryStart(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
+                if (!tryStart(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))) {
+                    Intent details = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                    details.setData(Uri.parse("package:" + pkg));
+                    tryStart(details);
                 }
             }
         } catch (Exception ignored) {}

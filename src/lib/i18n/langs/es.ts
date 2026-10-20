@@ -702,6 +702,10 @@ const d: Dictionary = {
   "fb.failed": "Comentarios no enviados",
   "fb.thanks": "¡Gracias!",
   "fb.thanksBody": "Recibimos tus comentarios.",
+  "bat.title": "Que las llamadas suenen con ChiChat cerrado",
+  "bat.body": "En la siguiente pantalla, busca ChiChat y elige «No optimizar», «Sin restricciones» o similar. Las palabras dependen de tu teléfono.",
+  "bat.open": "Abrir ajustes",
+  "bat.later": "Ahora no",
 };
 
 export default d;

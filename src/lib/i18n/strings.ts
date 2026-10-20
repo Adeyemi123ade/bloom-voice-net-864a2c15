@@ -719,6 +719,10 @@ export const en = {
   "fb.failed": "Feedback not sent",
   "fb.thanks": "Thank you!",
   "fb.thanksBody": "We got your feedback.",
+  "bat.title": "Let calls ring when ChiChat is closed",
+  "bat.body": "On the next screen, find ChiChat and choose “Don't optimise”, “Unrestricted” or “No restrictions”. The words depend on your phone.",
+  "bat.open": "Open settings",
+  "bat.later": "Not now",
 } as const;
 
 export type TextKey = keyof typeof en;
@@ -1428,6 +1432,10 @@ const yo: Dictionary = {
   "fb.failed": "A kò fi èrò rẹ ránṣẹ́",
   "fb.thanks": "A dúpẹ́!",
   "fb.thanksBody": "A ti gba èrò rẹ.",
+  "bat.title": "Jẹ́ kí ìpè máa dún nígbà tí ChiChat bá ti pa",
+  "bat.body": "Ní ojú-ìwé tó kàn, wá ChiChat kí o sì yan “Don't optimise”, “Unrestricted” tàbí “No restrictions”. Ọ̀rọ̀ náà dá lórí fóònù rẹ.",
+  "bat.open": "Ṣí ètò",
+  "bat.later": "Kì í ṣe báyìí",
 };
 
 const ha: Dictionary = {
@@ -2134,6 +2142,10 @@ const ha: Dictionary = {
   "fb.failed": "Ba a aika ra'ayi ba",
   "fb.thanks": "Mun gode!",
   "fb.thanksBody": "Mun karɓi ra'ayinka.",
+  "bat.title": "Bari kira su yi ƙara ko da ChiChat a rufe yake",
+  "bat.body": "A shafi na gaba, nemo ChiChat ka zaɓi “Don't optimise”, “Unrestricted” ko “No restrictions”. Kalmomin sun dogara da wayarka.",
+  "bat.open": "Buɗe saituna",
+  "bat.later": "Ba yanzu ba",
 };
 
 const ig: Dictionary = {
@@ -2840,6 +2852,10 @@ const ig: Dictionary = {
   "fb.failed": "Ezipughị echiche",
   "fb.thanks": "Daalụ!",
   "fb.thanksBody": "Anyị nwetara echiche gị.",
+  "bat.title": "Kwe ka oku kụọ mgbe emechiri ChiChat",
+  "bat.body": "Na ihuenyo na-esote, chọta ChiChat ma họrọ “Don't optimise”, “Unrestricted” ma ọ bụ “No restrictions”. Okwu ndị ahụ dabere na ekwentị gị.",
+  "bat.open": "Mepee ntọala",
+  "bat.later": "Ọ bụghị ugbu a",
 };
 
 /**

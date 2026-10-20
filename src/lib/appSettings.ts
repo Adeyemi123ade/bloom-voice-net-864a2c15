@@ -3,7 +3,6 @@ import {
   getCallReadiness,
   isAndroidNative,
   openCallSettings,
-  requestIgnoreBatteryOptimizations,
 } from "@/lib/nativeCalls";
 
 /**
@@ -72,19 +71,19 @@ export async function changeAppSwitch(name: keyof AppSwitches, turnOn: boolean, 
     remember(AUTOSTART_KEY, turnOn);
     await openCallSettings("autostart");
   } else if (name === "background") {
-    if (turnOn) await requestIgnoreBatteryOptimizations();
-    else await openCallSettings("app");
+    // Turning on is explained first (BatteryHelpDialog on the screen).
+    if (!turnOn) await openCallSettings("app");
   }
 }
 
 /**
- * Once per install, after sign in: ask the phone to let ChiChat run in the
- * background, so calls ring with the app closed. (Notifications are asked
- * for when the app signs up for calls.) Nothing else is shown.
+ * Once per install, after sign in: true when the phone may stop ChiChat in
+ * the background (so calls might not ring with the app closed). The screen
+ * then explains the battery setting before opening it; nothing opens by itself.
  */
-export async function runFirstStartSetup(): Promise<void> {
-  if (!isAndroidNative() || remembered(FIRST_START_KEY)) return;
+export async function needsFirstStartBatteryHelp(): Promise<boolean> {
+  if (!isAndroidNative() || remembered(FIRST_START_KEY)) return false;
   remember(FIRST_START_KEY, true);
   const r = await getCallReadiness();
-  if (r && !r.battery) await requestIgnoreBatteryOptimizations();
+  return !!r && !r.battery;
 }

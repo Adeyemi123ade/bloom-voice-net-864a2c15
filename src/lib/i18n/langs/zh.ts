@@ -702,6 +702,10 @@ const d: Dictionary = {
   "fb.failed": "反馈未发送",
   "fb.thanks": "谢谢！",
   "fb.thanksBody": "我们已收到你的反馈。",
+  "bat.title": "让 ChiChat 关闭时也能响铃",
+  "bat.body": "在下一个页面找到 ChiChat，选择“不优化”“无限制”或类似选项。具体文字因手机而异。",
+  "bat.open": "打开设置",
+  "bat.later": "以后再说",
 };
 
 export default d;

@@ -702,6 +702,10 @@ const d: Dictionary = {
   "fb.failed": "送信できませんでした",
   "fb.thanks": "ありがとうございます！",
   "fb.thanksBody": "フィードバックを受け取りました。",
+  "bat.title": "ChiChat を閉じていても着信を鳴らす",
+  "bat.body": "次の画面で ChiChat を探し、「最適化しない」「制限なし」などを選んでください。表示は機種によって異なります。",
+  "bat.open": "設定を開く",
+  "bat.later": "今はしない",
 };
 
 export default d;

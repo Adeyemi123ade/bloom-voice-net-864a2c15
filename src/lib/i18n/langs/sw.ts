@@ -702,6 +702,10 @@ const d: Dictionary = {
   "fb.failed": "Maoni hayajatumwa",
   "fb.thanks": "Asante!",
   "fb.thanksBody": "Tumepokea maoni yako.",
+  "bat.title": "Ruhusu simu ziite ChiChat ikiwa imefungwa",
+  "bat.body": "Kwenye skrini inayofuata, tafuta ChiChat kisha uchague “Don't optimise”, “Unrestricted” au “No restrictions”. Maneno hutegemea simu yako.",
+  "bat.open": "Fungua mipangilio",
+  "bat.later": "Si sasa",
 };
 
 export default d;

@@ -702,6 +702,10 @@ const d: Dictionary = {
   "fb.failed": "Geri bildirim gönderilemedi",
   "fb.thanks": "Teşekkürler!",
   "fb.thanksBody": "Geri bildiriminizi aldık.",
+  "bat.title": "ChiChat kapalıyken aramaların çalmasına izin verin",
+  "bat.body": "Sonraki ekranda ChiChat'i bulun ve “Optimize etme”, “Kısıtlamasız” veya “Kısıtlama yok” seçeneğini seçin. İfadeler telefonunuza göre değişir.",
+  "bat.open": "Ayarları aç",
+  "bat.later": "Şimdi değil",
 };
 
 export default d;
