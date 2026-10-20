@@ -3,8 +3,8 @@ import { Loader2, Pause, Play, Type } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { fmtDuration } from "@/lib/chat/format";
 import { useSignedMediaUrl, getSignedChatMediaUrl } from "@/lib/signedMedia";
-import { supabase } from "@/integrations/supabase/client";
 import { isVoiceTranscribeEnabled } from "@/lib/transcriptionPrefs";
+import { transcribeVoiceNote } from "@/lib/transcribe";
 
 
 // --- Single-instance audio manager (prevents overlap & playback bugs) ---
@@ -122,25 +122,17 @@ export function VoiceBubble({ id, url, mine }: { id: string; url: string; mine: 
         if (!res.ok) throw new Error(`signed_url_fetch_failed_${res.status}`);
         return res.blob();
       };
-
-      let blob: Blob;
-      try {
-        blob = await fetchAudio(signedUrl);
-      } catch {
-        // The cached signed URL can silently expire while this tab was
-        // backgrounded — mobile browsers throttle/suspend timers, so the
-        // proactive refresh scheduled by useSignedMediaUrl can miss its
-        // window. Without this retry, fetch() still "succeeds" with a 400/403
-        // error body that isn't audio, which was previously forwarded to the
-        // transcription API as if it were — the real cause of transcription
-        // silently failing after a chat has sat backgrounded on mobile.
-        const fresh = await getSignedChatMediaUrl(url);
-        blob = await fetchAudio(fresh);
-      }
-
-      const { data, error } = await supabase.functions.invoke("transcribe-voice", { body: blob });
-      if (error) throw error;
-      const text = (data as { text?: string } | null)?.text?.trim();
+      // Only used when the note isn't in chat storage (read on the server otherwise).
+      const download = async () => {
+        try {
+          return await fetchAudio(signedUrl);
+        } catch {
+          // The cached signed URL can silently expire while this tab was
+          // backgrounded (mobile browsers suspend timers): get a fresh one.
+          return fetchAudio(await getSignedChatMediaUrl(url));
+        }
+      };
+      const text = await transcribeVoiceNote(url, download);
       if (!text) {
         toast({
           title: "Couldn't transcribe",
