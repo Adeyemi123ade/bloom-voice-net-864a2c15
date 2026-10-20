@@ -45,3 +45,8 @@ export function translate(lang: LanguageCode, key: TextKey, vars?: Record<string
 export function tNow(key: TextKey, vars?: Record<string, string | number>): string {
   return translate(initialLanguage(), key, vars);
 }
+
+/** Locale for dates and times, matching the chosen language (falls back to the phone's own). */
+export function appLocale(): string[] {
+  return [initialLanguage()];
+}

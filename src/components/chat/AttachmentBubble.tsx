@@ -1,5 +1,5 @@
 import { Download, Eye, Play, X, FileText, FileSpreadsheet, Presentation, FileArchive, FileCode, FileAudio, FileVideo, File as FileIcon, Trash2 } from "lucide-react";
-import { tNow } from "@/lib/i18n/language";
+import { tNow, appLocale } from "@/lib/i18n/language";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
@@ -98,7 +98,7 @@ function docStyle(mime: string, name: string): DocStyle {
 function formatTimestamp(iso?: string): string {
   if (!iso) return "";
   try {
-    return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    return new Date(iso).toLocaleTimeString(appLocale(), { hour: "2-digit", minute: "2-digit" });
   } catch {
     return "";
   }

@@ -1,4 +1,4 @@
-import { tNow } from "@/lib/i18n/language";
+import { tNow, appLocale } from "@/lib/i18n/language";
 /**
  * Centralized presence/last-seen formatting and privacy.
  *
@@ -24,7 +24,7 @@ export function isReallyOnline(p: PresenceProfile | null | undefined): boolean {
 }
 
 function fmtClock(d: Date): string {
-  return new Intl.DateTimeFormat([], {
+  return new Intl.DateTimeFormat(appLocale(), {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,

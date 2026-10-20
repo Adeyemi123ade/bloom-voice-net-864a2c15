@@ -1,5 +1,5 @@
 // Small formatting helpers shared across chat UI.
-import { tNow } from "@/lib/i18n/language";
+import { tNow, appLocale } from "@/lib/i18n/language";
 export function initials(name?: string | null) {
   if (!name) return "?";
   return name.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
@@ -16,7 +16,7 @@ export function timeAgo(iso: string) {
 }
 
 export function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return new Date(iso).toLocaleTimeString(appLocale(), { hour: "2-digit", minute: "2-digit" });
 }
 
 export function fmtDuration(s: number) {

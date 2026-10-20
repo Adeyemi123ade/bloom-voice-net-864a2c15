@@ -19,7 +19,7 @@ import {
 import { buildPreview } from "@/lib/chat/messageKinds";
 import { loadChatListCache, saveChatListCache } from "@/lib/chat/chatCache";
 import { useLanguage } from "@/lib/i18n/context";
-import { initialLanguage, tNow } from "@/lib/i18n/language";
+import { initialLanguage, tNow, appLocale } from "@/lib/i18n/language";
 import {
   type ChatRow as ChatListRow,
   type MessageLike,
@@ -53,7 +53,7 @@ function timeAgo(iso: string) {
     d.getMonth() === now.getMonth() &&
     d.getDate() === now.getDate();
   if (sameDay) {
-    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+    return d.toLocaleTimeString(appLocale(), { hour: "2-digit", minute: "2-digit", hour12: false });
   }
   const yesterday = new Date(now);
   yesterday.setDate(now.getDate() - 1);
