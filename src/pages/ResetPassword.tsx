@@ -12,6 +12,7 @@ import PasswordStrengthBar from "@/components/PasswordStrengthBar";
 import PasswordMatchHint from "@/components/PasswordMatchHint";
 import { firstUnmetPasswordRule } from "@/lib/passwordStrength";
 import { clearRecoveryPending } from "@/lib/recoveryPending";
+import { useLanguage } from "@/lib/i18n/context";
 
 const schema = z
   .object({
@@ -21,13 +22,13 @@ const schema = z
       // Same rules the live hint under the field shows (src/lib/passwordStrength).
       .superRefine((p, ctx) => {
         const unmet = firstUnmetPasswordRule(p);
-        if (unmet) ctx.addIssue({ code: "custom", message: unmet.message });
+        if (unmet) ctx.addIssue({ code: "custom", message: unmet.messageKey });
       }),
     confirm: z.string(),
   })
   .refine((d) => d.password === d.confirm, {
     path: ["confirm"],
-    message: "Passwords don't match",
+    message: "reg.passwordsDontMatch",
   });
 
 /**
@@ -36,6 +37,7 @@ const schema = z
  * user lands here without a session, we route them back to /forgot-password.
  */
 export default function ResetPassword() {
+  const { t, tx } = useLanguage();
   const navigate = useNavigate();
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -46,7 +48,7 @@ export default function ResetPassword() {
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    document.title = "Set new password — ChiChat";
+    document.title = `${t("rp.pageTitle")} — ChiChat`;
   }, []);
 
   useEffect(() => {
@@ -82,11 +84,11 @@ export default function ResetPassword() {
     const { data, error } = await supabase.auth.updateUser({ password: result.data.password });
     setSubmitting(false);
     if (error) {
-      toast({ title: "Couldn't reset password", description: error.message, variant: "destructive" });
+      toast({ title: t("rp.cantReset"), description: error.message, variant: "destructive" });
       return;
     }
     if (data.user?.id) clearRecoveryPending(data.user.id);
-    toast({ title: "Password updated", description: "You're signed in." });
+    toast({ title: t("rp.updated"), description: t("rp.signedIn") });
     navigate("/home");
   };
 
@@ -97,10 +99,10 @@ export default function ResetPassword() {
       <div className="h-full w-full flex flex-col px-5 pt-5 pb-5 overflow-y-auto">
         <div className="mt-2">
           <h1 className="text-xl font-bold text-foreground leading-tight">
-            Set a new password
+            {t("rp.title")}
           </h1>
           <p className="text-base text-muted-foreground mt-1">
-            Choose a strong password you haven't used before.
+            {t("rp.subtitle")}
           </p>
         </div>
 
@@ -108,7 +110,7 @@ export default function ResetPassword() {
           <div className="space-y-3">
             <div>
               <Label htmlFor="password" className="text-sm text-muted-foreground">
-                New password
+                {t("rp.new")}
               </Label>
               <div className="relative mt-1">
                 <Input
@@ -117,7 +119,7 @@ export default function ResetPassword() {
                   autoComplete="new-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="At least 8 characters"
+                  placeholder={t("reg.passwordPlaceholder")}
                   maxLength={72}
                   autoFocus
                   className="h-11 text-base bg-input border-border text-foreground placeholder:text-muted-foreground pr-10"
@@ -126,7 +128,7 @@ export default function ResetPassword() {
                 <button
                   type="button"
                   onClick={() => setShowPwd((s) => !s)}
-                  aria-label={showPwd ? "Hide password" : "Show password"}
+                  aria-label={showPwd ? t("auth.hidePassword") : t("auth.showPassword")}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
                   {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -134,13 +136,13 @@ export default function ResetPassword() {
               </div>
               <PasswordStrengthBar password={password} />
               {errors.password && (
-                <p className="text-sm text-destructive mt-1">{errors.password}</p>
+                <p className="text-sm text-destructive mt-1">{tx(errors.password)}</p>
               )}
             </div>
 
             <div>
               <Label htmlFor="confirm" className="text-sm text-muted-foreground">
-                Confirm password
+                {t("reg.confirm")}
               </Label>
               <Input
                 id="confirm"
@@ -148,13 +150,13 @@ export default function ResetPassword() {
                 autoComplete="new-password"
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
-                placeholder="Re-enter password"
+                placeholder={t("reg.confirmPlaceholder")}
                 maxLength={72}
                 className="mt-1 h-11 text-base bg-input border-border text-foreground placeholder:text-muted-foreground"
                 aria-invalid={!!errors.confirm}
               />
               {errors.confirm ? (
-                <p className="text-sm text-destructive mt-1">{errors.confirm}</p>
+                <p className="text-sm text-destructive mt-1">{tx(errors.confirm)}</p>
               ) : (
                 <PasswordMatchHint password={password} confirm={confirm} />
               )}
@@ -167,7 +169,7 @@ export default function ResetPassword() {
               disabled={submitting}
               className="w-full h-11 text-base bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg"
             >
-              {submitting ? "Updating…" : "Update password"}
+              {submitting ? t("rp.updating") : t("rp.update")}
             </Button>
           </div>
         </form>

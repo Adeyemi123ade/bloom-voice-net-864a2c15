@@ -1,3 +1,4 @@
+import { tNow } from "@/lib/i18n/language";
 import { ReactNode, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -124,18 +125,18 @@ export default function DeviceGate({ children }: { children: ReactNode }) {
   if (isExempt) return <>{children}</>;
 
   // Still figuring out auth state — render nothing rather than the protected page.
-  if (loading) return <LoadingShell label="Loading…" />;
+  if (loading) return <LoadingShell label={tNow("common.loading")} />;
 
   // No user — the effect above is already navigating to /login; render nothing
   // in the meantime rather than the protected page.
-  if (!user) return <LoadingShell label="Signing you in…" />;
+  if (!user) return <LoadingShell label={tNow("dg.signingIn")} />;
 
   // Session exists but the email OTP hasn't been confirmed yet — never render
   // the protected screen; the effect above is already navigating away.
-  if (!user.email_confirmed_at) return <LoadingShell label="Signing you in…" />;
+  if (!user.email_confirmed_at) return <LoadingShell label={tNow("dg.signingIn")} />;
 
   // Session came from an unfinished password reset — same story.
-  if (isRecoveryPending(user.id)) return <LoadingShell label="Signing you in…" />;
+  if (isRecoveryPending(user.id)) return <LoadingShell label={tNow("dg.signingIn")} />;
 
   // Render the protected screen immediately. Device verification runs silently
   // in the background; if it determines a real verification step is required,

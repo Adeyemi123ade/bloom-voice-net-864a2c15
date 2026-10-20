@@ -1,3 +1,4 @@
+import { tNow } from "@/lib/i18n/language";
 import { Component, ErrorInfo, ReactNode } from "react";
 
 interface Props {
@@ -30,7 +31,7 @@ export default class ErrorBoundary extends Component<Props, State> {
     if (this.state.error) {
       return (
         <div className="h-screen w-full flex flex-col items-center justify-center gap-4 bg-background px-6 text-center">
-          <p className="text-sm font-semibold text-foreground">Something went wrong</p>
+          <p className="text-sm font-semibold text-foreground">{tNow("eb.title")}</p>
           <p className="text-xs text-muted-foreground max-w-xs">
             {this.state.error.message || "An unexpected error occurred."}
           </p>
@@ -38,7 +39,7 @@ export default class ErrorBoundary extends Component<Props, State> {
             onClick={() => window.location.reload()}
             className="h-10 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-semibold"
           >
-            Reload
+            {tNow("eb.reload")}
           </button>
         </div>
       );

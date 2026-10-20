@@ -13,6 +13,7 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { checkEmailStatus } from "@/lib/checkEmail";
 import { markRecoveryPending } from "@/lib/recoveryPending";
+import { useLanguage } from "@/lib/i18n/context";
 
 const OTP_LENGTH = 6;
 
@@ -24,6 +25,7 @@ const OTP_LENGTH = 6;
  * back to /forgot-password to request a fresh code.
  */
 export default function VerifyResetCode() {
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
   const stateEmail = (location.state as { email?: string } | null)?.email ?? "";
@@ -36,7 +38,7 @@ export default function VerifyResetCode() {
   const autoSubmitted = useRef(false);
 
   useEffect(() => {
-    document.title = "Enter reset code — ChiChat";
+    document.title = `${t("code.pageTitleReset")} — ChiChat`;
   }, []);
 
   useEffect(() => {
@@ -60,8 +62,8 @@ export default function VerifyResetCode() {
       setCode("");
       autoSubmitted.current = false;
       toast({
-        title: "Wrong or expired code",
-        description: "Double-check the code in your email and try again.",
+        title: t("code.wrong"),
+        description: t("code.wrongBody"),
         variant: "destructive",
       });
       return;
@@ -96,8 +98,8 @@ export default function VerifyResetCode() {
     if (status && !status.exists) {
       setResending(false);
       toast({
-        title: "Account not recognized",
-        description: "Use the email you registered with.",
+        title: t("fp.notRecognized"),
+        description: t("code.useRegistered"),
         variant: "destructive",
       });
       navigate("/forgot-password", { replace: true });
@@ -107,13 +109,13 @@ export default function VerifyResetCode() {
     setResending(false);
     if (error) {
       toast({
-        title: "Couldn't send a new code",
+        title: t("code.cantResend"),
         description: error.message,
         variant: "destructive",
       });
       return;
     }
-    toast({ title: "New code sent" });
+    toast({ title: t("code.newSent") });
     setSecondsLeft(45);
   };
 
@@ -125,7 +127,7 @@ export default function VerifyResetCode() {
         <div className="px-4 pt-4">
           <button
             onClick={() => navigate("/forgot-password")}
-            aria-label="Back"
+            aria-label={t("common.back")}
             className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-secondary transition-colors -ml-1"
           >
             <ArrowLeft className="w-5 h-5 text-foreground" />
@@ -135,16 +137,14 @@ export default function VerifyResetCode() {
         <div className="flex-1 flex flex-col px-4 pt-2 pb-6 items-center">
           <BrandHero
             className="mt-1 mb-5"
-            message={`Enter the 6-digit code we sent to ${email} to set a new password.`}
+            message={t("code.resetMsg", { email })}
           />
 
           <h1 className="text-xl font-bold text-foreground text-center">
-            Enter your code
+            {t("code.enter")}
           </h1>
           <p className="text-base text-muted-foreground text-center mt-2 leading-relaxed max-w-xs">
-            Code sent to{" "}
-            <span className="text-foreground font-semibold">{email}</span>.
-            It expires in 5 minutes.
+            {t("code.sentTo", { email })}
           </p>
 
           <div className="mt-7 w-full flex justify-center">
@@ -171,13 +171,13 @@ export default function VerifyResetCode() {
           </div>
 
           <p className="text-sm text-muted-foreground mt-4 text-center">
-            {verifying ? "Verifying…" : "We'll verify it automatically when you finish typing."}
+            {verifying ? t("code.verifying") : t("code.auto")}
           </p>
 
           <div className="mt-8 text-center">
             {secondsLeft > 0 ? (
               <p className="text-sm text-muted-foreground">
-                Didn't get it? Resend in <span className="font-semibold text-foreground">{secondsLeft}s</span>
+                {t("code.resendIn", { s: secondsLeft })}
               </p>
             ) : (
               <button
@@ -186,15 +186,15 @@ export default function VerifyResetCode() {
                 disabled={resending}
                 className="text-sm font-semibold text-accent hover:underline disabled:opacity-50"
               >
-                {resending ? "Sending…" : "Resend code"}
+                {resending ? t("fp.sending") : t("code.resend")}
               </button>
             )}
           </div>
 
           <p className="text-sm text-muted-foreground mt-3 text-center">
-            Wrong email?{" "}
+            {t("code.wrongEmail")}{" "}
             <Link to="/forgot-password" className="text-accent font-semibold hover:underline">
-              Start over
+              {t("code.startOver")}
             </Link>
           </p>
 
@@ -203,7 +203,7 @@ export default function VerifyResetCode() {
             disabled={verifying || code.length !== OTP_LENGTH}
             className="w-full max-w-xs h-11 mt-8 text-base bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg"
           >
-            {verifying ? "Verifying…" : "Verify"}
+            {verifying ? t("code.verifying") : t("code.verify")}
           </Button>
         </div>
       </div>

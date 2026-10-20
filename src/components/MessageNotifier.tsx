@@ -1,3 +1,4 @@
+import { tNow } from "@/lib/i18n/language";
 import { useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -64,7 +65,7 @@ export default function MessageNotifier() {
             .maybeSingle();
 
           toast({
-            title: prof?.display_name ?? "New message",
+            title: prof?.display_name ?? tNow("mn.newMessage"),
             description: text,
             onClick: () => navigate(`/chat/${m.conversation_id}`),
           } as any);

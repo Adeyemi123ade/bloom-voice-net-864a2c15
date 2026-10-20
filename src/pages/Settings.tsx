@@ -54,7 +54,7 @@ export default function Settings() {
   const onWeb = isWebApp();
 
   useEffect(() => {
-    document.title = "Settings — Chichat";
+    document.title = `${t("settings.title")} — Chichat`;
   }, []);
 
   useEffect(() => {
@@ -81,7 +81,7 @@ export default function Settings() {
       // This device only: the default ("global") also signed the account out
       // on every other phone and computer.
       try { await supabase.auth.signOut({ scope: "local" }); } catch { /* ignore */ }
-      toast({ title: "Signed out" });
+      toast({ title: t("settings.signedOut") });
       window.location.replace("/");
     } finally {
       setWorking(false);
@@ -100,20 +100,20 @@ export default function Settings() {
       const result = data as { ok?: boolean; error?: string; detail?: string } | null;
       if (error || !result?.ok) {
         toast({
-          title: "Couldn't delete your account",
-          description: result?.detail || "Please try again in a moment.",
+          title: t("settings.deleteFail"),
+          description: result?.detail || t("auth.tryAgainMoment"),
           variant: "destructive",
         });
         setDeleting(false);
         return;
       }
       try { await supabase.auth.signOut(); } catch { /* ignore */ }
-      toast({ title: "Account deleted" });
+      toast({ title: t("settings.deleted") });
       window.location.replace("/");
     } catch {
       toast({
-        title: "Couldn't delete your account",
-        description: "Please check your connection and try again.",
+        title: t("settings.deleteFail"),
+        description: t("chat.checkConnection"),
         variant: "destructive",
       });
       setDeleting(false);

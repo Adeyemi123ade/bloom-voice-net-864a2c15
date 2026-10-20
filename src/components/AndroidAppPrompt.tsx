@@ -1,3 +1,4 @@
+import { tNow } from "@/lib/i18n/language";
 import { useState } from "react";
 import { useLocation } from "react-router-dom";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -40,12 +41,12 @@ export default function AndroidAppPrompt() {
     <Dialog open={open} onOpenChange={(o) => { if (!o) keepBrowser(); }}>
       <DialogContent className="max-w-[340px] rounded-2xl">
         <DialogHeader>
-          <DialogTitle>ChiChat works best in the app</DialogTitle>
-          <DialogDescription>On Android, ChiChat gives you the best user experience.</DialogDescription>
+          <DialogTitle>{tNow("ap.title")}</DialogTitle>
+          <DialogDescription>{tNow("ap.body")}</DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-2 mt-1">
           <Button asChild className={authStyles.primaryButton}>
-            <a href={OPEN_APP_URL}>Install or open</a>
+            <a href={OPEN_APP_URL}>{tNow("ap.cta")}</a>
           </Button>
         </div>
       </DialogContent>
