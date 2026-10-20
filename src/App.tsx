@@ -48,6 +48,7 @@ import RouteMemory from "./components/RouteMemory.tsx";
 import SendFeedback from "./pages/SendFeedback.tsx";
 import Admin from "./pages/Admin.tsx";
 import AccountSuspended from "./pages/AccountSuspended.tsx";
+import DeleteAccountInfo from "./pages/DeleteAccountInfo.tsx";
 
 const queryClient = new QueryClient();
 
@@ -100,6 +101,7 @@ const App = () => (
                   <Route path="/settings/feedback" element={<SendFeedback />} />
                   <Route path="/admin" element={<Admin />} />
                   <Route path="/account-suspended" element={<AccountSuspended />} />
+                  <Route path="/delete-account" element={<DeleteAccountInfo />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>

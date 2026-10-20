@@ -44,6 +44,8 @@ const EXEMPT_ROUTES = new Set<string>([
   "/privacy",
   // Shown after a suspended account was signed out.
   "/account-suspended",
+  // Public page for deleting an account (Google Play asks for this link).
+  "/delete-account",
 ]);
 
 export default function DeviceGate({ children }: { children: ReactNode }) {

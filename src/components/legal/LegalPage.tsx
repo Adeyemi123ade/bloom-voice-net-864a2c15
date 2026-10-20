@@ -64,8 +64,8 @@ export default function LegalPage({
               {other.label}
             </Link>
             . Questions:{" "}
-            <a href="mailto:support@chichatapp.com" className="text-primary underline underline-offset-2">
-              support@chichatapp.com
+            <a href="mailto:techpath411@gmail.com" className="text-primary underline underline-offset-2">
+              techpath411@gmail.com
             </a>
           </nav>
         </article>

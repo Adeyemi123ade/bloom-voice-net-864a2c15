@@ -39,7 +39,7 @@ Two separate paths now handle mail, and they don't share code:
   codes from `request-device-otp`) still go through the `auth_emails` /
   `transactional_emails` pgmq queues and the `process-email-queue` dispatcher,
   which now calls the Resend HTTP API directly (`api.resend.com/emails`)
-  instead of the old Lovable email API.
+  instead of the old email API.
 
 `verify-otp-code` no longer needs the `auth_otp_aliases` short-code table —
 since Supabase's native templates show the real `verifyOtp` token directly,

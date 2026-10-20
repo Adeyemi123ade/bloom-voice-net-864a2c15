@@ -41,7 +41,6 @@ secret or admin privileges.
 | `supabase/migrations/*.sql` | Postgres schema history — tables, RLS policies, functions, triggers |
 | `supabase/functions/*/index.ts` | Deno edge functions — auth flows (OTP, Google sign-in), calling (Twilio token/room/voice), Google Contacts sync, chat backup/restore, account deletion, voice transcription, email queue dispatch. One function = one deployable unit; see [docs/SECRETS.md](SECRETS.md) for exactly which secrets each one needs |
 | `supabase/functions/_shared/rateLimit.ts` | The one helper genuinely shared *among edge functions* (not with the client) |
-| `migration/` | One-off SQL export/import scripts for migrating between Supabase projects (ops tooling, not app code — see `migration/README.md`) |
 
 Edge functions run in Supabase's Deno runtime and are deployed via the
 Supabase CLI or Dashboard editor — never started as a local `npm run

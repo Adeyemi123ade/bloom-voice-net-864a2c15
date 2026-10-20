@@ -92,7 +92,7 @@ Deno.serve(async (req) => {
       }
       return removed;
     };
-    for (const bucket of ["chat-media", "avatars", "backup-media"]) {
+    for (const bucket of ["chat-media", "avatars", "backup-media", "feedback"]) {
       try {
         await removeFolder(bucket, userId);
       } catch (e) {
@@ -102,6 +102,8 @@ Deno.serve(async (req) => {
 
     // ── App data owned by this user ───────────────────────────────────────
     await safe("chat_backups", admin.from("chat_backups").delete().eq("user_id", userId));
+    await safe("feedback", admin.from("feedback").delete().eq("user_id", userId));
+    await safe("app_errors", admin.from("app_errors").delete().eq("user_id", userId));
     await safe("device_push_tokens", admin.from("device_push_tokens").delete().eq("user_id", userId));
     await safe("google_oauth_tokens", admin.from("google_oauth_tokens").delete().eq("user_id", userId));
     await safe("invites", admin.from("invites").delete().eq("inviter_id", userId));

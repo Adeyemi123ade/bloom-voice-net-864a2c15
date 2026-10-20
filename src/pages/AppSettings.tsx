@@ -6,6 +6,7 @@ import { useBackNavigation } from "@/hooks/useBackNavigation";
 import { type AppSwitches, changeAppSwitch, readAppSwitches } from "@/lib/appSettings";
 import { isVoiceTranscribeEnabled, setVoiceTranscribeEnabled } from "@/lib/transcriptionPrefs";
 import { useLanguage } from "@/lib/i18n/context";
+import BatteryHelpDialog from "@/components/BatteryHelpDialog";
 
 /** Settings > App settings: one switch per item, nothing else. */
 export default function AppSettings() {
@@ -13,13 +14,14 @@ export default function AppSettings() {
   const [switches, setSwitches] = useState<AppSwitches | null>(null);
   const [transcribe, setTranscribe] = useState(() => isVoiceTranscribeEnabled());
   const { t } = useLanguage();
+  const [batteryHelp, setBatteryHelp] = useState(false);
 
   const refresh = useCallback(async () => {
     setSwitches(await readAppSwitches());
   }, []);
 
   useEffect(() => {
-    document.title = "App settings — Chichat";
+    document.title = `${t("appSettings.title")} — Chichat`;
     void refresh();
     // Coming back from the phone's own settings: show what's set now.
     const onVisible = () => {
@@ -31,10 +33,14 @@ export default function AppSettings() {
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onVisible);
     };
-  }, [refresh]);
+  }, [refresh, t]);
 
   const flip = (name: keyof AppSwitches) => async (on: boolean) => {
     if (!switches) return;
+    if (name === "background" && on) {
+      setBatteryHelp(true);
+      return;
+    }
     if (name === "autostart") setSwitches({ ...switches, autostart: on });
     await changeAppSwitch(name, on, switches);
     void refresh();
@@ -89,6 +95,7 @@ export default function AppSettings() {
           </div>
         </div>
       </div>
+      <BatteryHelpDialog open={batteryHelp} onOpenChange={setBatteryHelp} onOpened={() => void refresh()} />
     </MobileFrame>
   );
 }
