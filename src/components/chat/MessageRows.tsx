@@ -28,7 +28,7 @@ export function CallRow({
     if (timer.current) window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => {
       fired.current = true;
-      try { (navigator as any).vibrate?.(20); } catch { /* ignore */ }
+      try { navigator.vibrate?.(20); } catch { /* ignore */ }
       onLongPress();
     }, 450);
   };
@@ -128,7 +128,7 @@ export function SwipeRow({
     longPressFired.current = true;
     triggered.current = false;
     setDx(0);
-    try { (navigator as any).vibrate?.(20); } catch { /* ignore */ }
+    try { navigator.vibrate?.(20); } catch { /* ignore */ }
     onLongPress?.();
   };
   const startLongPress = () => {
@@ -175,7 +175,7 @@ export function SwipeRow({
     setDx(clamped);
     if (clamped >= THRESHOLD && !triggered.current) {
       triggered.current = true;
-      try { (navigator as any).vibrate?.(15); } catch { /* ignore */ }
+      try { navigator.vibrate?.(15); } catch { /* ignore */ }
     }
   };
   const onTouchEnd = (e: React.TouchEvent) => {

@@ -57,7 +57,7 @@ export default function Profile() {
       const row = Array.isArray(priv) ? priv[0] : priv;
       setPhone((row as { phone?: string | null } | null)?.phone ?? "");
       // About is stored in user metadata for now (no schema change)
-      setAbout((user.user_metadata as any)?.about ?? "");
+      setAbout((user.user_metadata as { about?: string } | undefined)?.about ?? "");
     })();
   }, [user]);
 

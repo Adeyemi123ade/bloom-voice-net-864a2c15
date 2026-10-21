@@ -68,6 +68,7 @@ export function secondsUsed(rows: UsageRow[], now = Date.now()): number {
 }
 
 // deno-lint-ignore no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function loadUsage(admin: any, userId: string): Promise<number> {
   const { data, error } = await admin
     .from("outbound_calls")
@@ -79,6 +80,7 @@ export async function loadUsage(admin: any, userId: string): Promise<number> {
 }
 
 // deno-lint-ignore no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function loadAccountCreatedAt(admin: any, userId: string): Promise<string | null> {
   const { data, error } = await admin.auth.admin.getUserById(userId);
   if (error) throw new Error(`user lookup failed: ${error.message}`);

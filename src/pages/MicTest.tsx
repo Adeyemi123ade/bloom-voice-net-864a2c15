@@ -44,7 +44,7 @@ export default function MicTest() {
       setStream(s);
       setPermissionState("granted");
 
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const audioCtx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
       audioCtxRef.current = audioCtx;
       const source = audioCtx.createMediaStreamSource(s);
       const analyser = audioCtx.createAnalyser();

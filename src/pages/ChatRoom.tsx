@@ -608,7 +608,7 @@ export default function ChatRoom() {
         "postgres_changes",
         { event: "DELETE", schema: "public", table: "messages", filter: `conversation_id=eq.${conversationId}` },
         (payload) => {
-          const old: any = payload.old;
+          const old = payload.old as { id?: string };
           setMessages((prev) => prev.filter((m) => m.id !== old.id));
         },
       )
@@ -616,7 +616,7 @@ export default function ChatRoom() {
         "postgres_changes",
         { event: "*", schema: "public", table: "typing_indicators", filter: `conversation_id=eq.${conversationId}` },
         (payload) => {
-          const row: any = payload.new ?? payload.old;
+          const row = (payload.new ?? payload.old) as { user_id?: string; updated_at: string } | null;
           if (!row || row.user_id === user.id) return;
           if (payload.eventType === "DELETE") {
             setOtherTyping(false);
@@ -1262,7 +1262,7 @@ export default function ChatRoom() {
       },
     ]);
     try {
-      const safeName = f.name.replace(/[^\w.\-]+/g, "_");
+      const safeName = f.name.replace(/[^\w.-]+/g, "_");
       const path = `${user.id}/${conversationId}/${Date.now()}-${safeName}`;
       const { error: upErr } = await supabase.storage
         .from("chat-media")

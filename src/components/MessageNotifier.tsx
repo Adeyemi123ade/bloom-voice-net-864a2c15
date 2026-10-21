@@ -42,7 +42,7 @@ export default function MessageNotifier() {
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "messages" },
         async (payload) => {
-          const m: any = payload.new;
+          const m = payload.new as { id?: string; sender_id?: string; conversation_id: string; content?: string; created_at?: string };
           if (!m || m.sender_id === user.id) return;
           // Refresh memberships if conversation is unknown (new chat just created)
           if (!myConvIds.current.has(m.conversation_id)) {
@@ -68,7 +68,7 @@ export default function MessageNotifier() {
             title: prof?.display_name ?? tNow("mn.newMessage"),
             description: text,
             onClick: () => navigate(`/chat/${m.conversation_id}`),
-          } as any);
+          });
         },
       )
       .on(
