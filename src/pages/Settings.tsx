@@ -43,7 +43,7 @@ import {
 import { getMyBackup, type BackupRow } from "@/lib/chatBackup";
 import { amIAdmin } from "@/lib/admin";
 import { deleteMyAccount } from "@/lib/deleteAccount";
-import { APP_BUILD } from "@/lib/appBuild";
+import { APP_VERSION } from "@/lib/appBuild";
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -309,7 +309,7 @@ export default function Settings() {
             </div>
           )}
           <p className="text-center text-xs text-muted-foreground pt-2 pb-1">
-            {t("settings.version", { build: APP_BUILD })}
+            {t("settings.version", { build: APP_VERSION })}
           </p>
         </div>
 

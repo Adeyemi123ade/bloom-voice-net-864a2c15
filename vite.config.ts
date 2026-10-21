@@ -1,6 +1,12 @@
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
+import { readFileSync } from "fs";
+
+// The version people see in Settings ("ChiChat version 1.9"). Raise it in
+// package.json in each release; keep android/app/build.gradle versionName in
+// step when the Android app is rebuilt.
+const APP_VERSION: string = JSON.parse(readFileSync(path.resolve(__dirname, "package.json"), "utf8")).version;
 
 // One id per build. Vercel gives the commit; elsewhere the build time is used.
 const APP_BUILD =
@@ -33,6 +39,7 @@ export default defineConfig(() => ({
   },
   define: {
     __APP_BUILD__: JSON.stringify(APP_BUILD),
+    __APP_VERSION__: JSON.stringify(APP_VERSION),
   },
   plugins: [react(), versionFile()],
   resolve: {
