@@ -39,8 +39,8 @@ secret or admin privileges.
 |---|---|
 | `supabase/config.toml` | Supabase CLI/project config (must stay at repo root for the CLI to auto-discover it) |
 | `supabase/migrations/*.sql` | Postgres schema history — tables, RLS policies, functions, triggers |
-| `supabase/functions/*/index.ts` | Deno edge functions — auth flows (OTP, Google sign-in), calling (Twilio token/room/voice), Google Contacts sync, chat backup/restore, account deletion, voice transcription, email queue dispatch. One function = one deployable unit; see [docs/SECRETS.md](SECRETS.md) for exactly which secrets each one needs |
-| `supabase/functions/_shared/rateLimit.ts` | The one helper genuinely shared *among edge functions* (not with the client) |
+| `supabase/functions/*/index.ts` | Deno edge functions — auth flows (OTP, Google sign-in), calling (Agora tokens for in-app calls, Twilio for phone-number calls and older Twilio rooms, call push), chat backup/restore (signed backups), account deletion, block/report, voice transcription, email queue dispatch. The full list with request and response shapes is in [docs/openapi.yaml](openapi.yaml). One function = one deployable unit; see [docs/SECRETS.md](SECRETS.md) for exactly which secrets each one needs |
+| `supabase/functions/_shared/*.ts` | Helpers shared among edge functions (rate limits, paid call rules, backup signing), not with the client |
 
 Edge functions run in Supabase's Deno runtime and are deployed via the
 Supabase CLI or Dashboard editor — never started as a local `npm run

@@ -5,6 +5,9 @@ Capacitor for Android. Backend: Supabase (Postgres + Auth + Realtime +
 Storage + Edge Functions). In-app calls via Agora (Twilio Video for older
 rooms), phone-number calls via Twilio. Deployed on Vercel.
 
+- Project status, open work and how changes reach users (start here):
+  [docs/SESSION_STATUS.md](docs/SESSION_STATUS.md)
+- Google Play submission answers: [docs/GOOGLE_PLAY.md](docs/GOOGLE_PLAY.md)
 - Architecture (client/server split, why there's no `client/`/`server/`
   folder split): [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - Secrets/env var reference: [docs/SECRETS.md](docs/SECRETS.md)

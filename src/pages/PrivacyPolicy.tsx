@@ -28,7 +28,7 @@ export default function PrivacyPolicy() {
             "Messages and media you send through the app.",
             "Call metadata (who called whom, when, and for how long) and, only for phone/PSTN calls placed through the app, call routing information handled by our telephony provider.",
             "Device and diagnostic information (device ID, platform, push-notification token) used to deliver notifications and secure sign-in.",
-            "Phone numbers from your device contacts or Google Contacts, only if you choose to sync or import them, used solely to show you which of your contacts are already on ChiChat.",
+            "Phone numbers from your device contacts, only if you choose to import them, used solely to show you which of your contacts are already on ChiChat.",
             "Problem reports sent automatically when something goes wrong in the app: the error, the screen it happened on, the app version, your device type and language.",
             "Feedback you choose to send, including any screenshot you attach and your device type, app version and language.",
             "Reports you make about other people, and reports others make about you, including the reported message.",
@@ -46,7 +46,7 @@ export default function PrivacyPolicy() {
 
       <LegalSection title="Contacts / Phone Number Information">
         <p>
-          If you import phone or Google contacts, your device sends the phone numbers to our
+          If you import your phone contacts, your device sends the phone numbers to our
           servers only to check which ones already have a ChiChat account, so we can show you a
           match or offer to invite the rest. We do not read, store, or share the content of your
           address book beyond what's needed for this matching.
@@ -55,22 +55,11 @@ export default function PrivacyPolicy() {
 
       <LegalSection title="Google User Data">
         <p>
-          If you choose to connect your Google account, ChiChat requests access to your Google
-          Contacts and your Google account email address. We use this data only to:
-        </p>
-        <LegalList
-          items={[
-            "Show your Google contacts inside ChiChat and indicate which of them already use ChiChat.",
-            "Save a new contact to your Google Contacts when you choose \"Save to Google Contacts\".",
-            "Show which Google account is connected.",
-          ]}
-        />
-        <p>
-          The access tokens Google issues are stored with your ChiChat account so the app can
-          refresh your contacts, and are deleted when you delete your ChiChat account. You can
-          also revoke ChiChat's access at any time from your Google Account's security settings.
-          We do not sell Google user data, use it for advertising, or share it with third
-          parties, and no person at ChiChat reads it.
+          If you choose to sign in with Google, ChiChat receives your Google account's name and
+          email address. We use them only to create your ChiChat account and sign you in.
+          ChiChat does not access your Google Contacts or any other Google data. You can revoke
+          ChiChat's access at any time from your Google Account's security settings. We do not
+          sell Google user data, use it for advertising, or share it with third parties.
         </p>
         <p>
           ChiChat's use and transfer of information received from Google APIs adheres to the{" "}
@@ -141,8 +130,8 @@ export default function PrivacyPolicy() {
           ChiChat relies on a small number of service providers to operate: a
           database/authentication provider, a real-time communications provider for calls, a
           transactional email provider for verification codes, a speech-to-text provider when you
-          ask for a voice note to be transcribed, and, where you opt in, Google (for Google sign-in
-          and Google Contacts). Each only receives the minimum information needed
+          ask for a voice note to be transcribed, and, where you opt in, Google (for Google sign-in).
+          Each only receives the minimum information needed
           to perform its specific function.
         </p>
       </LegalSection>
