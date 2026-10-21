@@ -23,6 +23,7 @@ import { prefetchCallToken } from "@/lib/callToken";
 import { startCallTimeline } from "@/lib/callTimeline";
 import { tapFeedback } from "@/lib/haptics";
 import { pushCallCancelled } from "@/lib/pushNotify";
+import { isOffline, showOfflineNotice } from "@/lib/network";
 import { CALL_RING_TIMEOUT_MS } from "@/lib/callTiming";
 
 type IncomingCall = {
@@ -328,6 +329,11 @@ export default function IncomingCallScreen() {
   const accept = async () => {
     const c = incoming;
     if (accepting || acceptedRef.current === c.id) return;
+    // No network: say so; the call keeps ringing so it can still be answered.
+    if (isOffline()) {
+      showOfflineNotice();
+      return;
+    }
     acceptedRef.current = c.id;
     tapFeedback();
     // Call waiting: answering while a call is live ends that call first

@@ -19,6 +19,9 @@ const config: CapacitorConfig = {
     // Keep both addresses inside the app (if one redirects to the other,
     // the app must not jump out to the phone's browser).
     allowNavigation: ["chichatapp.com", "www.chichatapp.com"],
+    // Bundled page shown when the live site can't load (no internet), in
+    // place of Android's "Web page not available" screen. public/offline.html
+    errorPath: "offline.html",
   },
   plugins: {
     LocalNotifications: {

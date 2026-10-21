@@ -6,6 +6,7 @@ import { startCallTimeline } from "@/lib/callTimeline";
 import { tapFeedback } from "@/lib/haptics";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { isOffline, showOfflineNotice } from "@/lib/network";
 import { newRoomName } from "@/lib/callEngine";
 
 // Starting a call. The call screen opens IMMEDIATELY on the tap; the slow
@@ -59,6 +60,11 @@ export function beginOutgoingCall(call: OutgoingCall, navigate: NavigateFunction
     const same = getCallsSnapshot().calls.find((c) => c.conversationId === call.conversationId);
     if (same) navigate(activeCallPath(same), { state: { [FROM_CALL_BUBBLE]: true } });
     else toast({ title: endCurrentCallFirst(), duration: 3000 });
+    return;
+  }
+  // No network: say so, and don't open a call screen that can't connect.
+  if (isOffline()) {
+    showOfflineNotice();
     return;
   }
   const now = Date.now();

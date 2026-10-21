@@ -11,6 +11,7 @@ import { formatDisplay, toE164 } from "@/lib/phone";
 import SaveContactDialog from "@/components/SaveContactDialog";
 import { loadManualContacts, loadCachedContacts } from "@/lib/deviceContacts";
 import { startCallForegroundService, stopCallForegroundService } from "@/lib/nativeCalls";
+import { isOffline } from "@/lib/network";
 import { isCallableNumber, paidCallMessage, type PaidCallBlock } from "@/lib/paidCallRules";
 
 const callFailedText = () => tNow("oc.failed");
@@ -73,6 +74,11 @@ export default function OutboundCall() {
 
     if (!isCallableNumber(e164)) {
       refuse("country");
+      return;
+    }
+    if (isOffline()) {
+      setErrorMsg(`${tNow("login.offlineTitle")}. ${tNow("login.offlineBody")}`);
+      endLocally("failed");
       return;
     }
 

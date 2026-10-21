@@ -1,5 +1,6 @@
 import { tNow } from "@/lib/i18n/language";
 import { Phone, Video } from "lucide-react";
+import { useIsOnline } from "@/lib/network";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 type Profile = { id: string; display_name: string | null; avatar_url: string | null };
@@ -41,6 +42,8 @@ export default function CallHeader({
   belowCard = false,
   overlay = false,
 }: Props) {
+  // No network on this phone: say so plainly instead of "Ringing"/"Reconnecting".
+  const offline = !useIsOnline() && status !== "ended";
   const size = overlay ? "small" : belowCard ? "medium" : "large";
   const Icon = isVideo ? Video : Phone;
   const headerLabel =
@@ -88,9 +91,10 @@ export default function CallHeader({
         {other?.display_name ?? tNow("chat.contact")}
       </h1>
       <p className="text-sm text-muted-foreground">
-        {status === "ringing" && tNow("oc.ringing")}
-        {status === "connecting" && tNow("fb.connecting")}
-        {status === "connected" && (reconnecting ? tNow("ch.reconnecting") : onHold ? tNow("cs.onHold") : fmt(seconds))}
+        {offline && tNow("login.offlineTitle")}
+        {!offline && status === "ringing" && tNow("oc.ringing")}
+        {!offline && status === "connecting" && tNow("fb.connecting")}
+        {!offline && status === "connected" && (reconnecting ? tNow("ch.reconnecting") : onHold ? tNow("cs.onHold") : fmt(seconds))}
         {status === "ended" && tNow("cs.ended")}
       </p>
       {status === "connected" && !onHold && !reconnecting && (

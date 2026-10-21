@@ -71,19 +71,39 @@ export function installErrorReporting(): void {
   installed = true;
   window.addEventListener("error", (e) => {
     const msg = e.error instanceof Error ? e.error.message : e.message;
-    if (msg && isStaleBuildError(msg)) return reloadForNewVersion();
+    if (msg && isStaleBuildError(msg)) return handleStaleBuild();
     reportProblem("error", e.error ?? e.message);
   });
   window.addEventListener("unhandledrejection", (e) => {
     const { message } = errorParts(e.reason);
-    if (isStaleBuildError(message)) return reloadForNewVersion();
+    if (isStaleBuildError(message)) return handleStaleBuild();
     reportProblem("rejection", e.reason);
   });
   // Vite's own signal that a lazily loaded piece of the app is missing.
   window.addEventListener("vite:preloadError", (e) => {
     e.preventDefault();
-    reloadForNewVersion();
+    handleStaleBuild();
   });
+}
+
+let staleBuildHandler: (() => void) | null = null;
+
+/** appUpdate registers how to check for a new version (avoids an import loop). */
+export function setStaleBuildHandler(fn: () => void): void {
+  staleBuildHandler = fn;
+}
+
+/**
+ * A piece of the app failed to load. That means either a new version is live
+ * (old files are gone) or the network is down. Reloading with no network
+ * replaced ChiChat with the phone's "Web page not available" screen, even in
+ * the middle of starting a call. So: offline, never reload; online, reload
+ * only when a newer version really is live and nothing is in progress.
+ */
+export function handleStaleBuild(): void {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+  if (staleBuildHandler) staleBuildHandler();
+  else reloadForNewVersion();
 }
 
 const RELOAD_KEY = "chichat:staleReloadAt";

@@ -2,6 +2,7 @@ import { tNow } from "@/lib/i18n/language";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Mic, MicOff, Phone, PhoneOff, Video, VideoOff } from "lucide-react";
 import type { LocalVideoTrack, RemoteVideoTrack } from "twilio-video";
+import { useIsOnline } from "@/lib/network";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 type Profile = { id: string; display_name: string | null; avatar_url: string | null };
@@ -117,6 +118,7 @@ export default function FloatingCallBubble({
   onEndCall,
   onOpen,
 }: Props) {
+  const online = useIsOnline();
   const [vs, setVs] = useState(videoSize);
   const W = isVideo ? vs.w : 64;
   const H = isVideo ? vs.h + STRIP_H : 64;
@@ -184,6 +186,7 @@ export default function FloatingCallBubble({
   };
 
   const label =
+    !online && status !== "ended" ? tNow("login.offlineTitle") :
     status === "connected" ? (reconnecting ? tNow("ch.reconnecting") : fmt(seconds)) : status === "ended" ? tNow("fb.ended") : status === "ringing" ? tNow("fb.calling") : tNow("fb.connecting");
   const name = other?.display_name ?? tNow("chat.contact");
 
