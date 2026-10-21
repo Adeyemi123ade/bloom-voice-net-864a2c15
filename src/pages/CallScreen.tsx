@@ -48,10 +48,10 @@ import { saveNewCall } from "@/lib/callStart";
 import { clearLiveCall, liveCallRecord, saveLiveCall, touchLiveCall, type LiveCallRecord } from "@/lib/liveCallRecord";
 
 /**
- * How long a call waits for the other person (or for this phone's own
- * connection) to come back before it counts as lost. A dropped connection,
- * a phone switching networks, or the other app restarting all come back
- * within this; only then is the call ended for both.
+ * While the other person is gone from the call, how often to check whether
+ * they actually hung up. A bad network never ends a call by itself: it shows
+ * "Reconnecting…" (their side) or "Poor network connection" (this phone)
+ * until the connection is back or someone taps End.
  */
 const RECONNECT_GRACE_MS = 60_000;
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -103,6 +103,9 @@ export default function CallSession({
   // The connection dropped (or the other person's did) and is coming back.
   // The call is still on: nothing is ended while this shows.
   const [reconnecting, setReconnecting] = useState(false);
+  // This phone's own connection is the problem (shown as "Poor network
+  // connection"); otherwise "Reconnecting…" means the other person's side.
+  const [selfReconnecting, setSelfReconnecting] = useState(false);
   const [isVideo, setIsVideo] = useState(initialIsVideo);
   const [muted, setMuted] = useState(false);
   // The other person put this call on hold (they're on another call).
@@ -551,6 +554,7 @@ export default function CallSession({
     endedRef.current = true;
     setStatus("ended");
     setReconnecting(false);
+    setSelfReconnecting(false);
     stopLostGrace();
     clearLiveCall(callId);
     if (tickTimer.current) window.clearInterval(tickTimer.current);
@@ -747,9 +751,10 @@ export default function CallSession({
         handleCallStatus(data.status);
         return;
       }
-      // Gone for the whole grace period: the call is lost.
-      endNotice(tNow("cs.disconnected"));
-      void endCallRef.current();
+      // Still gone: the call stays on ("Reconnecting…") until someone taps
+      // End (owner's decision: a bad network never ends a call by itself).
+      // Keep checking whether they hung up meanwhile.
+      startLostGrace();
     }, RECONNECT_GRACE_MS);
   };
 
@@ -762,10 +767,12 @@ export default function CallSession({
     if (rejoiningRef.current || endedRef.current) return;
     rejoiningRef.current = true;
     setReconnecting(true);
-    const deadline = Date.now() + RECONNECT_GRACE_MS;
+    setSelfReconnecting(true);
     let delay = 1500;
     try {
-      while (!endedRef.current && Date.now() < deadline) {
+      // No time limit: a bad network never ends the call by itself; it
+      // keeps trying until it's back or someone taps End.
+      while (!endedRef.current) {
         await wait(delay);
         if (endedRef.current) return;
         delay = Math.min(Math.round(delay * 1.5), 5000);
@@ -778,10 +785,6 @@ export default function CallSession({
           return;
         }
         if (await joinRoom({ rejoin: true })) return;
-      }
-      if (!endedRef.current) {
-        endNotice(tNow("cs.disconnected"));
-        void endCallRef.current();
       }
     } finally {
       rejoiningRef.current = false;
@@ -859,6 +862,7 @@ export default function CallSession({
         // Back in, but the other person isn't (yet): wait for them.
         if (connectedRef.current || opts.resume) startLostGrace();
       }
+      if (opts.rejoin) setSelfReconnecting(false);
       if (!otherHere && opts.rejoin && !connectedRef.current) setReconnecting(false);
       // Put on hold before it connected (e.g. a call came in while ringing).
       if (heldRef.current) {
@@ -877,9 +881,13 @@ export default function CallSession({
       });
       // Twilio is getting this phone's connection back by itself.
       room.on("reconnecting", () => {
-        if (!endedRef.current) setReconnecting(true);
+        if (!endedRef.current) {
+          setReconnecting(true);
+          setSelfReconnecting(true);
+        }
       });
       room.on("reconnected", () => {
+        setSelfReconnecting(false);
         if (!endedRef.current && room.participants.size > 0) setReconnecting(false);
       });
       room.on("disconnected", (_r: Room, error?: { code?: number }) => {
@@ -933,6 +941,7 @@ export default function CallSession({
   const markConnected = () => {
     stopLostGrace();
     setReconnecting(false);
+    setSelfReconnecting(false);
     if (endedRef.current) return;
     if (connectedRef.current) {
       setStatus("connected");
@@ -1263,6 +1272,7 @@ export default function CallSession({
           other={other}
           status={status}
           reconnecting={reconnecting && status === "connected"}
+          poorNetwork={selfReconnecting}
           seconds={seconds}
           remoteVideoTrack={remoteVideoTrack}
           localVideoTrack={localVideoTrack}
@@ -1296,6 +1306,7 @@ export default function CallSession({
         other,
         status,
         reconnecting,
+        selfReconnecting,
         seconds,
         role,
         onHold,

@@ -482,6 +482,7 @@ const d: Dictionary = {
   "ch.incoming": "Входящий звонок",
   "ch.calling": "Вызов",
   "ch.reconnecting": "Переподключение…",
+  "ch.poorNetwork": "Слабое подключение к сети",
   "ch.connected": "Соединено",
   "fb.ended": "Завершён",
   "fb.calling": "Вызов…",

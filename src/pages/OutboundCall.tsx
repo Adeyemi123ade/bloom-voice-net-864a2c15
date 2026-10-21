@@ -11,7 +11,7 @@ import { formatDisplay, toE164 } from "@/lib/phone";
 import SaveContactDialog from "@/components/SaveContactDialog";
 import { loadManualContacts, loadCachedContacts } from "@/lib/deviceContacts";
 import { startCallForegroundService, stopCallForegroundService } from "@/lib/nativeCalls";
-import { isOffline } from "@/lib/network";
+import { isOffline, useIsOnline } from "@/lib/network";
 import { isCallableNumber, paidCallMessage, type PaidCallBlock } from "@/lib/paidCallRules";
 
 const callFailedText = () => tNow("oc.failed");
@@ -24,6 +24,8 @@ export default function OutboundCall() {
   const { user, loading } = useAuth();
 
   const [status, setStatus] = useState<Status>("connecting");
+  const [poorNetwork, setPoorNetwork] = useState(false);
+  const online = useIsOnline();
   const [muted, setMuted] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [errorMsg, setErrorMsgState] = useState<string | null>(null);
@@ -133,6 +135,9 @@ export default function OutboundCall() {
             1000,
           );
         });
+        // Twilio is trying to restore this phone's audio: say so, keep the call.
+        call.on("reconnecting", () => setPoorNetwork(true));
+        call.on("reconnected", () => setPoorNetwork(false));
         call.on("disconnect", () => endLocally("ended"));
         call.on("cancel", () => endLocally("ended"));
         call.on("reject", () => endLocally("ended"));
@@ -207,7 +212,11 @@ export default function OutboundCall() {
   const dur = `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, "0")}`;
 
   const statusText =
-    status === "connecting"
+    !online && status !== "ended" && status !== "failed"
+      ? tNow("login.offlineTitle")
+      : poorNetwork && status === "connected"
+        ? tNow("ch.poorNetwork")
+        : status === "connecting"
       ? tNow("fb.connecting")
       : status === "ringing"
         ? tNow("oc.ringing")
@@ -258,8 +267,7 @@ export default function OutboundCall() {
             <button
               onClick={hangUp}
               aria-label={tNow("cc.endCall")}
-              className="w-16 h-16 rounded-full flex items-center justify-center"
-              style={{ backgroundColor: "hsl(var(--brand-deep))", color: "#FFFFFF" }}
+              className="w-16 h-16 rounded-full flex items-center justify-center bg-destructive hover:bg-destructive/90 text-destructive-foreground active:scale-95 transition-transform"
             >
               <PhoneOff className="w-6 h-6" />
             </button>

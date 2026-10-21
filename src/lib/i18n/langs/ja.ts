@@ -482,6 +482,7 @@ const d: Dictionary = {
   "ch.incoming": "着信",
   "ch.calling": "発信中",
   "ch.reconnecting": "再接続中…",
+  "ch.poorNetwork": "ネットワーク接続が不安定です",
   "ch.connected": "接続済み",
   "fb.ended": "終了",
   "fb.calling": "発信中…",

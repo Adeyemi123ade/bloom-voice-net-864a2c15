@@ -35,6 +35,7 @@ export interface CallFullScreenProps {
   other: { id: string; display_name: string | null; avatar_url: string | null } | null;
   status: "connecting" | "ringing" | "connected" | "ended";
   reconnecting: boolean;
+  selfReconnecting: boolean;
   seconds: number;
   role: ActiveCallParams["role"];
   onHold: boolean;
@@ -74,6 +75,7 @@ export default function CallFullScreen({
   other,
   status,
   reconnecting,
+  selfReconnecting,
   seconds,
   role,
   onHold,
@@ -129,6 +131,7 @@ export default function CallFullScreen({
             other={other}
             status={status}
             reconnecting={reconnecting && status === "connected"}
+            poorNetwork={selfReconnecting}
             seconds={seconds}
             role={role}
             onHold={onHold}

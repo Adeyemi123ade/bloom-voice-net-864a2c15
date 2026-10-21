@@ -11,6 +11,8 @@ type Props = {
   status: "connecting" | "ringing" | "connected" | "ended";
   /** The connection dropped and is coming back; the call is still on. */
   reconnecting?: boolean;
+  /** This phone's own connection is poor (not the other person's). */
+  poorNetwork?: boolean;
   seconds: number;
   role?: "caller" | "callee";
   /** You put this call on hold, or the other person did. */
@@ -36,6 +38,7 @@ export default function CallHeader({
   other,
   status,
   reconnecting = false,
+  poorNetwork = false,
   seconds,
   role = "caller",
   onHold = false,
@@ -94,7 +97,7 @@ export default function CallHeader({
         {offline && tNow("login.offlineTitle")}
         {!offline && status === "ringing" && tNow("oc.ringing")}
         {!offline && status === "connecting" && tNow("fb.connecting")}
-        {!offline && status === "connected" && (reconnecting ? tNow("ch.reconnecting") : onHold ? tNow("cs.onHold") : fmt(seconds))}
+        {!offline && status === "connected" && (reconnecting ? (poorNetwork ? tNow("ch.poorNetwork") : tNow("ch.reconnecting")) : onHold ? tNow("cs.onHold") : fmt(seconds))}
         {status === "ended" && tNow("cs.ended")}
       </p>
       {status === "connected" && !onHold && !reconnecting && (
