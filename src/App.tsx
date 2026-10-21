@@ -48,6 +48,7 @@ import RouteMemory from "./components/RouteMemory.tsx";
 import SendFeedback from "./pages/SendFeedback.tsx";
 import Admin from "./pages/Admin.tsx";
 import AccountSuspended from "./pages/AccountSuspended.tsx";
+import OfflineBanner from "@/components/OfflineBanner";
 import DeleteAccountInfo from "./pages/DeleteAccountInfo.tsx";
 
 const queryClient = new QueryClient();
@@ -65,6 +66,7 @@ const App = () => (
             <AccountGuard />
             <RouteMemory />
             <GoogleOAuthReturnListener />
+            <OfflineBanner />
             <NativeNavigateBridge />
             <DeviceGate>
               <BackButtonGuard />

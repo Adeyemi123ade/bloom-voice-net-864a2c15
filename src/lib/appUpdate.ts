@@ -1,7 +1,7 @@
 import { App as CapacitorApp } from "@capacitor/app";
 import { APP_BUILD } from "@/lib/appBuild";
 import { getCallsSnapshot } from "@/lib/activeCall";
-import { reloadForNewVersion } from "@/lib/errorReport";
+import { reloadForNewVersion, setStaleBuildHandler } from "@/lib/errorReport";
 
 /**
  * Picks up a new version of ChiChat by itself. When the app comes back to
@@ -50,6 +50,7 @@ export function isSafeToReload(doc: Document = document): boolean {
 
 async function check(force = false): Promise<void> {
   if (document.visibilityState !== "visible") return;
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return;
   if (!pending) {
     if (!force && Date.now() - lastCheck < CHECK_GAP_MS) return;
     lastCheck = Date.now();
@@ -64,6 +65,9 @@ let started = false;
 export function startAppUpdates(): void {
   if (started || typeof window === "undefined") return;
   started = true;
+  // A missing piece of the app: reload only if a newer version is live and
+  // it's safe (never mid-call, never offline).
+  setStaleBuildHandler(() => void check(true));
   document.addEventListener("visibilitychange", () => void check());
   window.addEventListener("focus", () => void check());
   window.addEventListener("online", () => void check(true));

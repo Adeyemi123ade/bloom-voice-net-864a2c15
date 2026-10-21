@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>ChiChat</title>
+<!--
+  Shown by the Android app (capacitor.config.ts server.errorPath) when the
+  live site can't be loaded, usually because the phone has no internet.
+  It is bundled inside the app, so it works offline. It replaces the
+  phone's own "Web page not available" screen. Text follows the phone's
+  language; the wording is the same as the app's own offline message.
+-->
+<style>
+  :root { --bg: hsl(165 22% 96%); --fg: #10221c; --muted: #5b6b66; --primary: hsl(161 79% 28%); --card: #fff; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: hsl(0 0% 7%); --fg: #eef3f1; --muted: #9aa8a3; --primary: hsl(161 79% 32%); --card: #1a1d1c; }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg);
+    font-family: 'DM Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+  main { min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 16px; padding: 24px; text-align: center; }
+  img { width: 72px; height: 72px; border-radius: 18px; }
+  h1 { font-size: 20px; margin: 8px 0 0; }
+  p { font-size: 15px; line-height: 1.45; color: var(--muted); margin: 0; max-width: 300px; }
+  button { margin-top: 8px; height: 48px; min-width: 200px; padding: 0 24px; border: 0; border-radius: 12px;
+    background: var(--primary); color: #fff; font-size: 16px; font-weight: 600; font-family: inherit; }
+  button:active { opacity: .85; }
+</style>
+</head>
+<body>
+<main>
+  <img src="chichat-logo.png" alt="ChiChat" />
+  <h1 id="title">No internet connection</h1>
+  <p id="body">Check your connection and try again.</p>
+  <button id="retry" type="button">Try again</button>
+</main>
+<script>
+  var TEXT = {"en": ["No internet connection", "Check your connection and try again.", "Try again"], "de": ["Keine Internetverbindung", "Prüfe deine Verbindung und versuche es erneut.", "Erneut versuchen"], "es": ["Sin conexión a internet", "Revisa tu conexión e inténtalo de nuevo.", "Reintentar"], "zh": ["无网络连接", "请检查网络连接后重试。", "重试"], "tr": ["İnternet bağlantısı yok", "Bağlantınızı kontrol edip tekrar deneyin.", "Tekrar dene"], "ja": ["インターネットに接続されていません", "接続を確認してもう一度お試しください。", "再試行"], "ru": ["Нет подключения к интернету", "Проверьте подключение и попробуйте снова.", "Повторить"], "hi": ["इंटरनेट कनेक्शन नहीं है", "अपना कनेक्शन जाँचें और फिर कोशिश करें।", "फिर कोशिश करें"], "fr": ["Pas de connexion Internet", "Vérifiez votre connexion et réessayez.", "Réessayer"], "ar": ["لا يوجد اتصال بالإنترنت", "تحقق من اتصالك وحاول مرة أخرى.", "حاول مرة أخرى"], "sw": ["Hakuna muunganisho wa intaneti", "Angalia muunganisho wako na ujaribu tena.", "Jaribu tena"], "pt": ["Sem conexão com a internet", "Verifique sua conexão e tente novamente.", "Tentar novamente"], "yo": ["Kò sí ìsopọ̀ íntánẹ́ẹ̀tì", "Ṣàyẹ̀wò ìsopọ̀ rẹ kí o gbìyànjú lẹ́ẹ̀kan sí i.", "Gbìyànjú lẹ́ẹ̀kan sí i"], "ha": ["Babu haɗin intanet", "Duba haɗinka ka sake gwadawa.", "Sake gwadawa"], "ig": ["Enweghị njikọ ịntanetị", "Lelee njikọ gị ma nwaa ọzọ.", "Nwaa ọzọ"]};
+  var APP = "https://www.chichatapp.com/";
+  (function () {
+    var langs = (navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || "en"]);
+    var pick = "en";
+    for (var i = 0; i < langs.length; i++) {
+      var code = String(langs[i] || "").toLowerCase().split("-")[0];
+      if (TEXT[code]) { pick = code; break; }
+    }
+    var t = TEXT[pick];
+    document.documentElement.lang = pick;
+    if (pick === "ar") document.documentElement.dir = "rtl";
+    document.getElementById("title").textContent = t[0];
+    document.getElementById("body").textContent = t[1];
+    document.getElementById("retry").textContent = t[2];
+  })();
+  function retry() { location.replace(APP); }
+  document.getElementById("retry").addEventListener("click", retry);
+  // Back online: go straight back into ChiChat.
+  window.addEventListener("online", function () { setTimeout(retry, 500); });
+</script>
+</body>
+</html>

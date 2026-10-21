@@ -482,6 +482,7 @@ const d: Dictionary = {
   "ch.incoming": "Simu inayoingia",
   "ch.calling": "Inapiga",
   "ch.reconnecting": "Inaunganisha tena…",
+  "ch.poorNetwork": "Muunganisho dhaifu wa mtandao",
   "ch.connected": "Imeunganishwa",
   "fb.ended": "Imeisha",
   "fb.calling": "Inapiga…",

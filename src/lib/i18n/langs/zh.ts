@@ -482,6 +482,7 @@ const d: Dictionary = {
   "ch.incoming": "来电",
   "ch.calling": "正在呼叫",
   "ch.reconnecting": "正在重新连接…",
+  "ch.poorNetwork": "网络连接不佳",
   "ch.connected": "已接通",
   "fb.ended": "已结束",
   "fb.calling": "正在呼叫…",

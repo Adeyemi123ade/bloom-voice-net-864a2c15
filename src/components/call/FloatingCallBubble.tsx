@@ -2,6 +2,7 @@ import { tNow } from "@/lib/i18n/language";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Mic, MicOff, Phone, PhoneOff, Video, VideoOff } from "lucide-react";
 import type { LocalVideoTrack, RemoteVideoTrack } from "twilio-video";
+import { useIsOnline } from "@/lib/network";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 type Profile = { id: string; display_name: string | null; avatar_url: string | null };
@@ -13,6 +14,7 @@ type Props = {
   status: "connecting" | "ringing" | "connected" | "ended";
   /** The connection dropped and is coming back; the call is still on. */
   reconnecting?: boolean;
+  poorNetwork?: boolean;
   seconds: number;
   remoteVideoTrack: RemoteVideoTrack | null;
   localVideoTrack: LocalVideoTrack | null;
@@ -108,6 +110,7 @@ export default function FloatingCallBubble({
   other,
   status,
   reconnecting = false,
+  poorNetwork = false,
   seconds,
   remoteVideoTrack,
   localVideoTrack,
@@ -117,6 +120,7 @@ export default function FloatingCallBubble({
   onEndCall,
   onOpen,
 }: Props) {
+  const online = useIsOnline();
   const [vs, setVs] = useState(videoSize);
   const W = isVideo ? vs.w : 64;
   const H = isVideo ? vs.h + STRIP_H : 64;
@@ -184,7 +188,8 @@ export default function FloatingCallBubble({
   };
 
   const label =
-    status === "connected" ? (reconnecting ? tNow("ch.reconnecting") : fmt(seconds)) : status === "ended" ? tNow("fb.ended") : status === "ringing" ? tNow("fb.calling") : tNow("fb.connecting");
+    !online && status !== "ended" ? tNow("login.offlineTitle") :
+    status === "connected" ? (reconnecting ? (poorNetwork ? tNow("ch.poorNetwork") : tNow("ch.reconnecting")) : fmt(seconds)) : status === "ended" ? tNow("fb.ended") : status === "ringing" ? tNow("fb.calling") : tNow("fb.connecting");
   const name = other?.display_name ?? tNow("chat.contact");
 
   // Buttons in the strip must not start a drag or reopen the call.

@@ -482,6 +482,7 @@ const d: Dictionary = {
   "ch.incoming": "Gelen arama",
   "ch.calling": "Aranıyor",
   "ch.reconnecting": "Yeniden bağlanıyor…",
+  "ch.poorNetwork": "Zayıf ağ bağlantısı",
   "ch.connected": "Bağlandı",
   "fb.ended": "Bitti",
   "fb.calling": "Aranıyor…",

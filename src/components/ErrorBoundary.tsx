@@ -27,8 +27,9 @@ export default class ErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error("[ErrorBoundary] Uncaught render error:", error, info.componentStack);
     // A piece of an older version went missing after an update: just reload.
+    // With no network, don't reload (that shows the phone's error page).
     if (isStaleBuildError(error.message)) {
-      reloadForNewVersion();
+      if (typeof navigator === "undefined" || navigator.onLine !== false) reloadForNewVersion();
       return;
     }
     reportProblem("crash", error, info.componentStack ?? undefined);
