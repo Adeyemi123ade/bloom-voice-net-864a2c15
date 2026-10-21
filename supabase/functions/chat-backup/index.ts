@@ -1,5 +1,8 @@
 // Snapshots the user's chats (messages + media references) into the backup-media bucket.
+// The file is signed (see _shared/backupManifest.ts) so chat-restore can tell
+// a real backup from an edited one.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
+import { manifestPathFor, signManifest } from "../_shared/backupManifest.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -63,12 +66,15 @@ Deno.serve(async (req) => {
       media_count: mediaCount,
       messages,
     };
-    const manifestPath = `${user.id}/manifest.json`;
-    const blob = new Blob([JSON.stringify(manifest)], { type: "application/json" });
+    const manifestPath = manifestPathFor(user.id);
+    const blob = new Blob([await signManifest(manifest)], { type: "application/json" });
     const { error: upErr } = await admin.storage
       .from("backup-media")
       .upload(manifestPath, blob, { upsert: true, contentType: "application/json" });
-    if (upErr) return json({ error: upErr.message }, 500);
+    if (upErr) {
+      console.error("[chat-backup] upload failed", upErr.message);
+      return json({ error: "Backup failed" }, 500);
+    }
 
     await admin.from("chat_backups").upsert({
       user_id: user.id,
@@ -82,7 +88,8 @@ Deno.serve(async (req) => {
 
     return json({ ok: true, message_count: messages.length, media_count: mediaCount });
   } catch (e) {
-    return json({ error: String(e) }, 500);
+    console.error("[chat-backup]", e);
+    return json({ error: "Backup failed" }, 500);
   }
 });
 

@@ -1,22 +1,22 @@
-// Restores chats from the user's backup manifest.
+// Restores missing messages from the user's own backup.
+//
+// Safety rules (see _shared/backupManifest.ts):
+// - the backup is always read from backup-media/<user id>/manifest.json,
+//   never from a path stored in the database;
+// - restore never creates chats and never adds the user to a chat: it only
+//   puts messages back into chats the user is in right now;
+// - each message's sender must be a current member of that chat;
+// - a file whose signature does not check (an older backup, or one that was
+//   edited) can only restore the user's own messages;
+// - messages that already exist are left untouched.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
+import { manifestPathFor, pickRestorableMessages, readManifest } from "../_shared/backupManifest.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
 };
-
-interface MsgRow {
-  id: string;
-  conversation_id: string;
-  sender_id: string;
-  content: string;
-  created_at: string;
-  edited_at?: string | null;
-  read_at?: string | null;
-  deleted_for_everyone?: boolean | null;
-}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -31,7 +31,7 @@ Deno.serve(async (req) => {
     const token = auth.replace("Bearer ", "");
     const { data: claims, error: claimsErr } = await userClient.auth.getClaims(token);
     if (claimsErr || !claims?.claims?.sub) return json({ error: "Unauthorized" }, 401);
-    const user = { id: claims.claims.sub as string };
+    const userId = claims.claims.sub as string;
 
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -39,55 +39,61 @@ Deno.serve(async (req) => {
     );
 
     const { data: backup } = await admin
-      .from("chat_backups").select("*").eq("user_id", user.id).maybeSingle();
+      .from("chat_backups").select("user_id").eq("user_id", userId).maybeSingle();
     if (!backup) return json({ error: "No backup found" }, 404);
 
     const { data: file, error: dErr } = await admin.storage
-      .from("backup-media").download(backup.manifest_path);
-    if (dErr || !file) return json({ error: dErr?.message ?? "Manifest missing" }, 500);
+      .from("backup-media").download(manifestPathFor(userId));
+    if (dErr || !file) return json({ error: "No backup found" }, 404);
 
-    const manifest = JSON.parse(await file.text());
-    const messages: MsgRow[] = manifest.messages ?? [];
+    const read = await readManifest(await file.text());
+    if (!read.manifest) return json({ error: "Backup file can't be read" }, 422);
+    // A signed backup must belong to this user.
+    const signed = read.signed && read.manifest.user_id === userId;
+    const rawMessages = read.manifest.messages;
 
-    // Group by conversation. Re-create conversations the user no longer participates in.
-    const convosToEnsure = new Set<string>();
-    for (const m of messages) convosToEnsure.add(m.conversation_id);
-
-    const { data: existingParts } = await admin
-      .from("conversation_participants")
-      .select("conversation_id").eq("user_id", user.id);
-    const existing = new Set((existingParts ?? []).map((p) => p.conversation_id));
-
-    let restored = 0;
-    for (const convId of convosToEnsure) {
-      // ensure conversation row + participant row
-      await admin.from("conversations").upsert({ id: convId }, { onConflict: "id" });
-      if (!existing.has(convId)) {
-        await admin.from("conversation_participants").insert({
-          conversation_id: convId, user_id: user.id,
-        });
+    // Chats the user is in now, with their current members.
+    const { data: myParts, error: pErr } = await admin
+      .from("conversation_participants").select("conversation_id").eq("user_id", userId);
+    if (pErr) return json({ error: "Restore failed" }, 500);
+    const myChats = [...new Set((myParts ?? []).map((p: { conversation_id: string }) => p.conversation_id))];
+    const membersByChat = new Map<string, Set<string>>();
+    for (let i = 0; i < myChats.length; i += 200) {
+      const slice = myChats.slice(i, i + 200);
+      const { data: parts, error } = await admin
+        .from("conversation_participants").select("conversation_id, user_id").in("conversation_id", slice);
+      if (error) return json({ error: "Restore failed" }, 500);
+      for (const p of (parts ?? []) as { conversation_id: string; user_id: string }[]) {
+        const set = membersByChat.get(p.conversation_id) ?? new Set<string>();
+        set.add(p.user_id);
+        membersByChat.set(p.conversation_id, set);
       }
     }
 
-    // Insert messages that don't exist yet (only ones the user originally sent — others may
-    // not be re-creatable due to RLS; we still insert all using service role for fidelity)
-    const ids = messages.map((m) => m.id);
-    let existingMsgIds = new Set<string>();
+    const candidates = pickRestorableMessages(rawMessages, { userId, signed, membersByChat });
+    const total = Array.isArray(rawMessages) ? rawMessages.length : 0;
+
+    // Only messages that don't exist yet.
+    const existing = new Set<string>();
+    const ids = candidates.map((m) => m.id);
     for (let i = 0; i < ids.length; i += 500) {
-      const slice = ids.slice(i, i + 500);
-      const { data } = await admin.from("messages").select("id").in("id", slice);
-      (data ?? []).forEach((r) => existingMsgIds.add(r.id));
+      const { data } = await admin.from("messages").select("id").in("id", ids.slice(i, i + 500));
+      (data ?? []).forEach((r: { id: string }) => existing.add(r.id));
     }
-    const toInsert = messages.filter((m) => !existingMsgIds.has(m.id));
+    const toInsert = candidates.filter((m) => !existing.has(m.id));
+
+    let restored = 0;
     for (let i = 0; i < toInsert.length; i += 500) {
       const slice = toInsert.slice(i, i + 500);
       const { error } = await admin.from("messages").insert(slice);
       if (!error) restored += slice.length;
+      else console.error("[chat-restore] insert failed", error.message);
     }
 
-    return json({ ok: true, restored, total: messages.length });
+    return json({ ok: true, restored, total, skipped: total - restored, verified: signed });
   } catch (e) {
-    return json({ error: String(e) }, 500);
+    console.error("[chat-restore]", e);
+    return json({ error: "Restore failed" }, 500);
   }
 });
 

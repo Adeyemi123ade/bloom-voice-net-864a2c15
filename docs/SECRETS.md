@@ -61,8 +61,8 @@ the code the user types is passed straight through.
 | `request-device-otp` | Sends a device-verification OTP on new/unknown device sign-in | `false` | — |
 | `verify-device-otp` | Verifies the device OTP, binds the trusted device | `false` | — |
 | `delete-account` | Permanently deletes a user + all associated data | `true` | — |
-| `chat-backup` | Snapshots chats/media into the backup-media bucket | `true` | — |
-| `chat-restore` | Restores chats from a backup manifest | `true` | — |
+| `chat-backup` | Snapshots chats/media into the backup-media bucket, signed | `true` | Optional `BACKUP_SIGNING_SECRET` (else signs with `SUPABASE_SERVICE_ROLE_KEY`) |
+| `chat-restore` | Restores missing messages from the user's own signed backup | `true` | Same key as `chat-backup` (both must use the same one) |
 | `call-action` | Declines a ringing call from the Android lock screen (HMAC token from `send-call-push`) | `false` | — (signs with `SUPABASE_SERVICE_ROLE_KEY`) |
 | `agora-token` | Mints an Agora pass for an in-app call (default call engine) | `true` (default) | `AGORA_APP_ID`, `AGORA_APP_CERTIFICATE` |
 | `submit-report` | Saves a report and emails the support inbox | `true` (default) | `RESEND_API_KEY`; optional `REPORTS_TO`, `REPORTS_FROM` |

@@ -1288,7 +1288,10 @@ paths:
       description: |
         Writes every message in the user's chats to
         `backup-media/<user id>/manifest.json` (replacing the previous
-        backup) and updates `chat_backups`. Media files are counted, not
+        backup) and updates `chat_backups`. The file is signed
+        (`{v: 2, signature, payload}`, HMAC-SHA256 of `payload` with
+        `BACKUP_SIGNING_SECRET` or the service role key) so `chat-restore`
+        can tell it from an edited file. Media files are counted, not
         copied. No request body is read.
       x-verify-jwt: true
       x-source: supabase/functions/chat-backup/index.ts
@@ -1311,7 +1314,7 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "500":
-          description: Storage or unexpected error message.
+          description: "`Backup failed` (details in the function log)."
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -1322,8 +1325,13 @@ paths:
       tags: [Account]
       summary: Restore chats from the user's last backup
       description: |
-        Re-creates missing chats and participant rows and inserts messages
-        from the backup that are not already present (batches of 500).
+        Puts back messages from the user's own backup
+        (`backup-media/<user id>/manifest.json`, never a stored path) that
+        are not already present (batches of 500). Never creates chats or
+        adds the user to a chat: only chats the user is in now, and only
+        senders who are current members. A file whose signature does not
+        check (older backups, edited files) restores only the user's own
+        messages. Messages deleted for everyone are never restored.
         No request body is read.
       x-verify-jwt: true
       x-source: supabase/functions/chat-restore/index.ts
@@ -1345,6 +1353,12 @@ paths:
                   total:
                     type: integer
                     description: Messages in the backup.
+                  skipped:
+                    type: integer
+                    description: Messages not restored (already present, or refused by the rules above).
+                  verified:
+                    type: boolean
+                    description: True when the backup's signature checked.
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
@@ -1352,8 +1366,13 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: "`Backup file can't be read`."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
         "500":
-          description: Storage or unexpected error message.
+          description: "`Restore failed` (details in the function log)."
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }

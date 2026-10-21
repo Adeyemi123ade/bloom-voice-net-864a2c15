@@ -115,15 +115,16 @@ checked by reading the function when it changes.
 
 ## Findings from the 2026-10-21 audit
 
-Found while reading the code for this documentation. None of these were
-changed in this pull request.
+Found while reading the code for this documentation. Item 1 is fixed;
+the others are still open.
 
-1. **`chat-restore` trusts a file the user can write.** The backup file is in
-   the user's own `backup-media` folder, which the storage rules let the user
-   overwrite, and `chat-restore` then adds the user to every chat named in
-   that file and inserts its messages with full rights. Fix before many
-   people use backups: only the server writes backups, and restore only
-   messages from chats the user is already in.
+1. **Fixed: `chat-restore` trusted a file the user can write.** Backups are
+   now signed by `chat-backup`; restore reads only the user's own path, never
+   adds anyone to a chat, only restores senders who are current members, and
+   from an unsigned or edited file only the user's own messages. Migration
+   `20261021120000_backups_server_only.sql` makes backup files and the
+   `chat_backups` row server-written (users keep read access and the auto
+   backup switch).
 2. **No current caller, still public**: `sign-in-with-identifier` (password
    sign-in with no rate limit of its own) and `check-user-exists`. If the live
    project has them deployed, delete them there and remove the folders.
