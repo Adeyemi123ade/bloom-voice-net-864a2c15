@@ -130,7 +130,8 @@ export default function PrivacyPolicy() {
           ChiChat relies on a small number of service providers to operate: a
           database/authentication provider, a real-time communications provider for calls, a
           transactional email provider for verification codes, a speech-to-text provider when you
-          ask for a voice note to be transcribed, and, where you opt in, Google (for Google sign-in).
+          ask for a voice note to be transcribed, a crash-reporting service for the Android app
+          (Firebase Crashlytics), and, where you opt in, Google (for Google sign-in).
           Each only receives the minimum information needed
           to perform its specific function.
         </p>

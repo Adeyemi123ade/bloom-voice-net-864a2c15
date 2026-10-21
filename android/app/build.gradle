@@ -64,6 +64,9 @@ dependencies {
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation platform('com.google.firebase:firebase-bom:33.1.2')
     implementation "com.google.firebase:firebase-messaging:25.0.1"
+    // Native Android crash reports (crashes outside the web view). Version from the BoM above.
+    // Web-side errors are reported separately through log_app_error.
+    implementation "com.google.firebase:firebase-crashlytics"
     implementation project(':capacitor-android')
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
@@ -77,7 +80,8 @@ try {
     def servicesJSON = file('google-services.json')
     if (servicesJSON.text) {
         apply plugin: 'com.google.gms.google-services'
+        apply plugin: 'com.google.firebase.crashlytics'
     }
 } catch(Exception e) {
-    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+    logger.info("google-services.json not found, google-services and Crashlytics plugins not applied. Push Notifications and crash reports won't work")
 }
