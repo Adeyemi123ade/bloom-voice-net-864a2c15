@@ -5,7 +5,12 @@ import { App as CapacitorApp } from "@capacitor/app";
 import { Browser } from "@capacitor/browser";
 import { supabase } from "@/integrations/supabase/client";
 import { NATIVE_GOOGLE_RETURN_URL } from "@/lib/googleAuth";
-import { markGoogleSignInFinished } from "@/lib/appGoogleHandoff";
+import {
+  appGoogleStartUrl,
+  markGoogleSignInFinished,
+  markGoogleSignInStarted,
+  SUPABASE_CALLBACK_PREFIX,
+} from "@/lib/appGoogleHandoff";
 import { parseGoogleReturn } from "@/lib/googleReturn";
 import { toast } from "@/hooks/use-toast";
 import { tNow } from "@/lib/i18n/language";
@@ -41,7 +46,22 @@ export default function GoogleOAuthReturnListener() {
     };
 
     const handle = (url: string | undefined) => {
-      if (!url || !url.startsWith(NATIVE_GOOGLE_RETURN_URL) || url === lastHandled) return;
+      if (!url || url === lastHandled) return;
+      // Android gave the app Google's answer meant for Supabase (a link rule
+      // in APKs up to 1.9). Without this, Supabase never got it and people
+      // were left on the sign-in screen. Hand it back to the browser, marked
+      // as an app sign-in, so the result comes back to the app.
+      if (url.startsWith(`${SUPABASE_CALLBACK_PREFIX}?`)) {
+        lastHandled = url;
+        reportProblem("google-return", "Google answer reached the app; passed back to the browser");
+        markGoogleSignInStarted();
+        void Browser.open({ url: appGoogleStartUrl(url) }).catch((e) => {
+          reportProblem("google-return", e);
+          fail();
+        });
+        return;
+      }
+      if (!url.startsWith(NATIVE_GOOGLE_RETURN_URL)) return;
       lastHandled = url;
       markGoogleSignInFinished();
       void (async () => {

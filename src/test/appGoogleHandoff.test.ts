@@ -107,3 +107,15 @@ describe("Google sign-in in progress in the app", () => {
     expect(isSafeToReload()).toBe(true);
   });
 });
+
+describe("Google's answer caught by the app (APKs up to 1.9)", () => {
+  it("may be passed back through the start page, and only Supabase's own callback", () => {
+    const cb = "https://pnpabtxvsrkrldpfmtaz.supabase.co/auth/v1/callback?code=g1&state=s1";
+    expect(isAllowedGoogleUrl(cb)).toBe(true);
+    expect(isAllowedGoogleUrl("https://pnpabtxvsrkrldpfmtaz.supabase.co/auth/v1/user")).toBe(false);
+    const store = memoryStore();
+    const loc = fakeLocation(appGoogleStartUrl(cb));
+    expect(runAppGoogleStart(loc, store)).toBe(true);
+    expect(loc.replace).toHaveBeenCalledWith(cb);
+  });
+});

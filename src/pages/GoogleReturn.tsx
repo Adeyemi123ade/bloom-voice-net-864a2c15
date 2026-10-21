@@ -47,7 +47,8 @@ async function checkGoogleAccount(): Promise<Outcome> {
     }
     lastError = error;
   }
-  reportProblem("google-check", lastError ?? "check-google-signup failed");
+  const status = (lastError as { context?: { status?: number } } | null)?.context?.status;
+  reportProblem("google-check", `check-google-signup failed${status ? ` (${status})` : ""}`);
   return { kind: "unreachable" };
 }
 

@@ -26,6 +26,10 @@
 export const APP_GOOGLE_START_PATH = "/auth/app-google";
 const SITE = "https://www.chichatapp.com";
 const AUTHORIZE_PREFIX = "https://pnpabtxvsrkrldpfmtaz.supabase.co/auth/v1/authorize?";
+// Google's answer to Supabase. APKs up to 1.9 have a link rule for this
+// address, so Android can hand it to the app instead of the browser; the app
+// then passes it back to the browser (see GoogleOAuthReturnListener).
+export const SUPABASE_CALLBACK_PREFIX = "https://pnpabtxvsrkrldpfmtaz.supabase.co/auth/v1/callback";
 const MARK_KEY = "chichat:appGoogleAt";
 const MARK_MAX_AGE_MS = 15 * 60 * 1000;
 const RESULT_KEYS = ["access_token", "refresh_token", "expires_in", "token_type", "code", "error", "error_code", "error_description"];
@@ -35,9 +39,9 @@ export function appGoogleStartUrl(googleUrl: string): string {
   return `${SITE}${APP_GOOGLE_START_PATH}?u=${encodeURIComponent(googleUrl)}`;
 }
 
-/** Only Supabase's own Google sign-in address may be passed through (no open redirect). */
+/** Only Supabase's own Google sign-in addresses may be passed through (no open redirect). */
 export function isAllowedGoogleUrl(url: string | null | undefined): url is string {
-  return !!url && url.startsWith(AUTHORIZE_PREFIX);
+  return !!url && (url.startsWith(AUTHORIZE_PREFIX) || url.startsWith(`${SUPABASE_CALLBACK_PREFIX}?`));
 }
 
 /** Step 1, in the browser tab: remember this tab signs in for the app, then go to Google. */
