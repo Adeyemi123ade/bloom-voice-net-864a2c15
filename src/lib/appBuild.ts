@@ -1,7 +1,14 @@
 import { Capacitor } from "@capacitor/core";
 
-/** Which build of the website is running (commit on Vercel). */
+/** Which build of the website is running (commit on Vercel). An internal
+ *  code for update checks and problem reports, not a version number. */
 export const APP_BUILD: string = typeof __APP_BUILD__ === "string" ? __APP_BUILD__ : "dev";
+
+/** The version people see, from package.json: "1.9.0" shows as "1.9". */
+export function displayVersion(raw: string): string {
+  return raw.replace(/\.0$/, "");
+}
+export const APP_VERSION: string = displayVersion(typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "");
 
 /** "android", "ios" or "web" (web also covers a phone browser). */
 export function appPlatform(): string {
