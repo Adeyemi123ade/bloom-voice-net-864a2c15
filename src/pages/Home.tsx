@@ -31,8 +31,6 @@ import {
   updateMatters,
 } from "@/lib/chat/chatList";
 import Dialpad from "@/components/Dialpad";
-import { needsFirstStartBatteryHelp } from "@/lib/appSettings";
-import BatteryHelpDialog from "@/components/BatteryHelpDialog";
 import { syncNativeRingtone } from "@/lib/nativeRingtone";
 
 type Profile = {
@@ -88,7 +86,6 @@ export default function Home() {
   const [query, setQuery] = useState("");
   const [people, setPeople] = useState<Profile[]>([]);
   const [openNew, setOpenNew] = useState(false);
-  const [batteryHelp, setBatteryHelp] = useState(false);
   const [dialpadOpen, setDialpadOpen] = useState(false);
   const [fetching, setFetching] = useState(true);
 
@@ -113,11 +110,10 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state]);
 
-  // First start on Android: explain once how to let ChiChat run in the
-  // background, so calls ring with the app closed.
+  // No battery pop-up on start (owner's decision): the battery setting is
+  // offered only in Settings > App settings.
   useEffect(() => {
     if (!user) return;
-    void needsFirstStartBatteryHelp().then((needed) => needed && setBatteryHelp(true));
     // The phone app needs its own copy of the chosen ringtone.
     void syncNativeRingtone();
   }, [user]);
@@ -495,7 +491,6 @@ export default function Home() {
         </div>
       </div>
       <Dialpad open={dialpadOpen} onOpenChange={setDialpadOpen} />
-      <BatteryHelpDialog open={batteryHelp} onOpenChange={setBatteryHelp} />
     </MobileFrame>
   );
 }
