@@ -1,0 +1,1574 @@
+openapi: 3.1.0
+info:
+  title: ChiChat API
+  version: "2026-10-21"
+  summary: HTTP endpoints of ChiChat's own backend code.
+  description: |
+    ChiChat has no standalone server. Its backend is a hosted Supabase project
+    (Postgres, Auth, Realtime, Storage) plus the Supabase Edge Functions
+    (Deno) in `supabase/functions/`, and one Vercel Edge Function in `api/`.
+
+    This file documents **only the endpoints whose code lives in this
+    repository**. It was written by reading that code on 2026-10-21 (main at
+    7b15c0d). It does not describe:
+
+    - The Supabase data API (tables, database functions called with
+      `supabase.rpc`, Realtime, Storage). Supabase generates and runs those;
+      see `docs/api/README.md` for the list ChiChat uses.
+    - Supabase Auth's own endpoints (sign up, password sign-in, refresh).
+    - Third-party APIs ChiChat calls (see `docs/api/integrations.md`).
+
+    Conventions that apply to every function:
+
+    - The app calls functions through the Supabase JS SDK
+      (`supabase.functions.invoke`), which always sends `POST`, a JSON body,
+      `Authorization: Bearer <token>` and `apikey: <public key>`. Most
+      functions do not check the HTTP method, so other methods are not
+      refused; only POST is supported.
+    - Every function answers `OPTIONS` (CORS preflight) with
+      `Access-Control-Allow-Origin: *`.
+    - "Gateway JWT check" (`x-verify-jwt`) is the per-function setting in
+      `supabase/config.toml`. Functions not listed there use Supabase's
+      default (on). When it is on, Supabase refuses a request without a
+      valid JWT before the function runs. The setting on the live project
+      can differ if a function was redeployed from the dashboard; it has
+      not been checked against the live project.
+    - Error bodies are JSON `{ "error": "<code>" }` unless a function says
+      otherwise. Some functions return an error code with HTTP 200 on
+      purpose; each operation lists which. See `docs/api/error-codes.md`.
+  contact:
+    name: ChiChat support
+    email: techpath411@gmail.com
+servers:
+  - url: https://pnpabtxvsrkrldpfmtaz.supabase.co/functions/v1
+    description: Production Supabase Edge Functions (the only environment; there is no staging project yet)
+
+tags:
+  - name: Registration and sign-in
+    description: Checks and steps used before or during sign-in.
+  - name: Device verification
+    description: Emailed codes when an account signs in on a new device.
+  - name: In-app calls
+    description: Passes and rooms for app-to-app voice and video calls (Agora by default, Twilio Video for older rooms).
+  - name: Paid phone calls
+    description: Dial pad calls to real phone numbers through Twilio Programmable Voice.
+  - name: Notifications
+    description: Push notifications to the Android app through Firebase Cloud Messaging.
+  - name: Messages and media
+    description: Voice note transcription.
+  - name: Safety
+    description: Reporting people and messages.
+  - name: Account
+    description: Account deletion and chat backup.
+  - name: Web pages
+    description: Pages served by the Vercel deployment of chichatapp.com.
+  - name: Internal
+    x-internal: true
+    description: Called by a scheduled database job or a third party, never by the app. Removed from the public build of this file.
+
+paths:
+  # ───────────────────────── Registration and sign-in ─────────────────────────
+  /verify-otp-code:
+    post:
+      operationId: verifyOtpCode
+      tags: [Registration and sign-in]
+      summary: Check a 6-digit email code and sign the user in
+      description: |
+        Verifies the code from a Supabase Auth email (sign-up, password
+        reset and others) with `auth.verifyOtp`, and returns the new
+        session. Called from the Verify email and Verify reset code screens.
+
+        Rate limits (database `check_rate_limit`, fails open if the database
+        check errors): 10 attempts per 5 minutes per email and code type,
+        30 per 5 minutes per IP address.
+      x-verify-jwt: false
+      x-source: supabase/functions/verify-otp-code/index.ts
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, code, type]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: Trimmed and lowercased by the server.
+                code:
+                  type: string
+                  description: Non-digits are removed before checking.
+                  examples: ["482915"]
+                type:
+                  type: string
+                  enum: [signup, recovery, magiclink, invite, email_change, email]
+            example:
+              email: person@example.com
+              code: "482915"
+              type: signup
+      responses:
+        "200":
+          description: Code accepted. The session is a standard Supabase Auth session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResponse"
+        "400":
+          description: "`Wrong or expired code` (also for missing fields or an unknown type), or `Invalid request` for a body that is not JSON."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: Wrong or expired code }
+        "405":
+          description: Method other than POST.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "429":
+          description: Too many attempts.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: Too many attempts. Please request a new code. }
+        "500":
+          description: Server configuration missing.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: Please try again }
+
+  /check-email-exists:
+    post:
+      operationId: checkEmailExists
+      tags: [Registration and sign-in]
+      summary: Is this email registered, or was it deleted?
+      description: |
+        Returns only booleans, never account data. `deleted` is true when no
+        live account has the email but `deleted_accounts` has a record of it.
+        Called from `src/lib/checkEmail.ts`.
+
+        Rate limit: 5 requests per minute per IP address (fails open).
+      x-verify-jwt: false
+      x-source: supabase/functions/check-email-exists/index.ts
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmailOnly"
+            example: { email: person@example.com }
+      responses:
+        "200":
+          description: Lookup done.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [exists, deleted]
+                properties:
+                  exists: { type: boolean }
+                  deleted: { type: boolean }
+              example: { exists: false, deleted: true }
+        "400":
+          description: "`invalid_email` (missing, malformed or over 255 characters) or `bad_request` (body not JSON)."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: invalid_email }
+        "429":
+          description: "`rate_limited`."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: "`lookup_failed`."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /check-user-exists:
+    post:
+      operationId: checkUserExists
+      tags: [Registration and sign-in]
+      summary: Is this email registered? (no current caller)
+      description: |
+        Same lookup as `check-email-exists` without the `deleted` flag.
+        **No code in the current app calls this function.** Kept documented
+        because it is in the repository and may still be deployed.
+
+        Rate limit: 5 requests per minute per IP address (fails open).
+      x-verify-jwt: false
+      x-source: supabase/functions/check-user-exists/index.ts
+      x-callers: none
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmailOnly"
+      responses:
+        "200":
+          description: Lookup done.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [exists]
+                properties:
+                  exists: { type: boolean }
+        "400":
+          description: "`invalid_email` or `bad_request`."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "429":
+          description: "`rate_limited`."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: "`lookup_failed`."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /check-registration-availability:
+    post:
+      operationId: checkRegistrationAvailability
+      tags: [Registration and sign-in]
+      summary: Are this email and phone number free to register?
+      description: |
+        Called from the Register screen before sign-up. Not rate limited.
+      x-verify-jwt: false
+      x-source: supabase/functions/check-registration-availability/index.ts
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, phone]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  maxLength: 255
+                phone:
+                  $ref: "#/components/schemas/E164Phone"
+            example: { email: person@example.com, phone: "+971501234567" }
+      responses:
+        "200":
+          description: |
+            Either the availability result, or `{ "error": "invalid_details" }`
+            when the email or phone fails validation (returned with 200).
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    required: [email_exists, phone_exists]
+                    properties:
+                      email_exists: { type: boolean }
+                      phone_exists: { type: boolean }
+                  - $ref: "#/components/schemas/Error"
+              examples:
+                available:
+                  value: { email_exists: false, phone_exists: false }
+                invalid:
+                  value: { error: invalid_details }
+        "400":
+          description: "`bad_request`."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "405":
+          description: "`invalid_request` (method other than POST)."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: "`service_unavailable` or `lookup_failed`."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /sign-in-with-identifier:
+    post:
+      operationId: signInWithIdentifier
+      tags: [Registration and sign-in]
+      summary: Sign in with email or phone number and password (no current caller)
+      description: |
+        Looks up the email for a phone number (or checks the email exists),
+        then signs in with `auth.signInWithPassword`. The current Sign in
+        screen uses email only and calls Supabase Auth directly;
+        **no code in the current app calls this function.**
+
+        Not rate limited by the function itself. Failures are returned with
+        HTTP 200 and an `error` code.
+      x-verify-jwt: false
+      x-source: supabase/functions/sign-in-with-identifier/index.ts
+      x-callers: none
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [identifier, password]
+              properties:
+                identifier:
+                  type: string
+                  description: An email address, an E.164 phone number, or a phone number of 7 or more digits.
+                password:
+                  type: string
+                  maxLength: 72
+      responses:
+        "200":
+          description: |
+            A session, or an `error` code: `missing_details`,
+            `phone_not_registered`, `phone_ambiguous`, `email_not_registered`,
+            `invalid_identifier`, `email_not_verified`, `wrong_password`.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/SessionResponse"
+                  - $ref: "#/components/schemas/Error"
+        "400":
+          description: "`bad_request`."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "405":
+          description: "`invalid_request`."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: "`service_unavailable` or `lookup_failed`."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /check-google-signup:
+    post:
+      operationId: checkGoogleSignup
+      tags: [Registration and sign-in]
+      summary: After Google sign-in, is registration finished?
+      description: |
+        Called right after Google OAuth returns. `allowed: true` means the
+        account already has a phone number (registration finished), or the
+        session is not a Google one. `allowed: false` means a new Google
+        user who must finish the Register form; the email and name are
+        returned so the form can be pre-filled. No request body is read.
+      x-verify-jwt: false
+      x-source: supabase/functions/check-google-signup/index.ts
+      security:
+        - userJwt: []
+      responses:
+        "200":
+          description: Result.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    required: [allowed, is_google]
+                    properties:
+                      allowed: { const: true }
+                      is_google: { type: boolean }
+                  - type: object
+                    required: [allowed, pending_registration, email, full_name]
+                    properties:
+                      allowed: { const: false }
+                      pending_registration: { const: true }
+                      email: { type: string, format: email }
+                      full_name: { type: string }
+              examples:
+                finished:
+                  value: { allowed: true, is_google: true }
+                newUser:
+                  value: { allowed: false, pending_registration: true, email: person@example.com, full_name: Ada Person }
+        "400":
+          description: "`bad_request`."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /complete-google-registration:
+    post:
+      operationId: completeGoogleRegistration
+      tags: [Registration and sign-in]
+      summary: Finish registration for a new Google user
+      description: |
+        Sets the password, marks the email confirmed, and saves the name and
+        phone on the profile. The session must come from a Google sign-in.
+      x-verify-jwt: true
+      x-source: supabase/functions/complete-google-registration/index.ts
+      security:
+        - userJwt: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, phone, password]
+              properties:
+                name:
+                  type: string
+                  minLength: 2
+                  maxLength: 60
+                phone:
+                  $ref: "#/components/schemas/E164Phone"
+                password:
+                  type: string
+                  minLength: 8
+                  maxLength: 72
+                  description: Must contain at least one capital letter and one digit.
+                  format: password
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ok" }
+        "400":
+          description: "`not_google_session`, `invalid_name`, `invalid_phone`, `invalid_password` or `bad_request`."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          description: "`phone_taken`: another account uses this phone number."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: "`update_failed` or `profile_failed`."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  # ───────────────────────── Device verification ─────────────────────────
+  /request-device-otp:
+    post:
+      operationId: requestDeviceOtp
+      tags: [Device verification]
+      summary: Email a code to confirm a sign-in on a new device
+      description: |
+        Decides whether this device needs a code and, unless `dry_run` is
+        true, creates a challenge (valid 10 minutes, stored as a SHA-256
+        hash) and queues the email through `process-email-queue`.
+
+        - Mobile devices already trusted for this user get `reason: trusted`
+          and no code.
+        - Web always needs a code.
+        - `device_takeover`: another account is bound to this phone.
+        - `web_mobile_active`: this account is signed in on a phone, which
+          continuing on the web will sign out.
+
+        Called from `src/components/DeviceGate.tsx` and the Verify device
+        screen. The function checks the JWT itself even though the gateway
+        check is off.
+      x-verify-jwt: false
+      x-source: supabase/functions/request-device-otp/index.ts
+      security:
+        - userJwt: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [device_id]
+              properties:
+                device_id:
+                  type: string
+                  maxLength: 128
+                  description: Random id stored on the device (`src/lib/deviceId.ts`).
+                device_label:
+                  type: string
+                  description: Accepted but not used by this function.
+                platform:
+                  type: string
+                  enum: [mobile, web]
+                  default: web
+                dry_run:
+                  type: boolean
+                  default: false
+                  description: When true, only report the reason; no code is created or emailed.
+      responses:
+        "200":
+          description: Reason for the prompt (and the code was emailed unless trusted or dry run).
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [reason]
+                properties:
+                  reason:
+                    type: string
+                    enum: [trusted, new_device, device_takeover, web_mobile_active]
+                  other_display_name:
+                    type: [string, "null"]
+                    description: Name of the other account on this phone, or the label of this account's phone.
+              example: { reason: new_device, other_display_name: null }
+        "400":
+          description: "`invalid_device`, `email_required` or `bad_request`."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          description: "`challenge_failed`."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /verify-device-otp:
+    post:
+      operationId: verifyDeviceOtp
+      tags: [Device verification]
+      summary: Check the device code and trust this device
+      description: |
+        Five wrong attempts end the challenge. On success: a mobile device is
+        unbound from any other account, a web sign-in removes this account's
+        mobile bindings (`mobile_signed_out: true`), and the device is saved
+        as trusted.
+      x-verify-jwt: false
+      x-source: supabase/functions/verify-device-otp/index.ts
+      security:
+        - userJwt: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [device_id, code]
+              properties:
+                device_id: { type: string }
+                code:
+                  type: string
+                  description: 6 digits; other characters are removed.
+                device_label:
+                  type: string
+                  maxLength: 80
+                  description: Longer labels are cut to 80 characters.
+                platform:
+                  type: string
+                  enum: [mobile, web]
+                  default: web
+      responses:
+        "200":
+          description: Device trusted.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, mobile_signed_out]
+                properties:
+                  ok: { const: true }
+                  mobile_signed_out: { type: boolean }
+        "400":
+          description: "`invalid_input`, `expired`, `too_many_attempts`, `wrong_code` or `bad_request`."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: wrong_code }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ───────────────────────── In-app calls ─────────────────────────
+  /agora-token:
+    post:
+      operationId: getAgoraCallPass
+      tags: [In-app calls]
+      summary: Get an Agora pass to join one call
+      description: |
+        Used for rooms whose name starts with `ag-` (the default since
+        PR #75; see `src/lib/callEngine.ts`). The caller must be the caller
+        or callee of the `calls` row with this `room_name`; the lookup runs
+        with the caller's own JWT, so database row rules apply as well.
+        The pass is a publisher token valid for 4 hours.
+      x-verify-jwt: true
+      x-source: supabase/functions/agora-token/index.ts
+      security:
+        - userJwt: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoomNameAgora"
+            example: { roomName: ag-6a0c1d1e-8f3b-4b7a-9d1e-2b9b7f0e1c11-1760000000000 }
+      responses:
+        "200":
+          description: Pass issued.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [appId, token, uid]
+                properties:
+                  appId:
+                    type: string
+                    description: Agora App ID (public identifier, not a secret).
+                  token: { type: string }
+                  uid:
+                    type: string
+                    format: uuid
+                    description: The ChiChat user id, used as the Agora user account.
+        "400":
+          description: "`Invalid roomName`."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: "`Unauthorized`: not a participant of this call."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: "`Could not start the call` (Agora not configured or token error)."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /twilio-token:
+    post:
+      operationId: getTwilioVideoPass
+      tags: [In-app calls]
+      summary: Get a Twilio Video pass to join one call
+      description: |
+        Used for older rooms named `chichat-…`, and for all new calls when
+        the Vercel variable `VITE_CALL_ENGINE=twilio` is set. Same
+        participant check as `agora-token`. Token valid 1 hour.
+      x-verify-jwt: false
+      x-source: supabase/functions/twilio-token/index.ts
+      security:
+        - userJwt: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoomName"
+      responses:
+        "200":
+          description: Pass issued.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TwilioPass"
+        "400":
+          description: "`Invalid roomName`."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: "`Unauthorized`: not a participant of this call."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Raw error message, for example `Twilio credentials not configured`.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /twilio-room:
+    post:
+      operationId: manageTwilioRoom
+      tags: [In-app calls]
+      summary: Create or close a Twilio Video room
+      description: |
+        Only for Twilio rooms (the app skips this for `ag-` rooms).
+        `create` makes a group room with 5-minute empty and unused timeouts;
+        an existing room with the same name counts as success. It is not
+        checked against a `calls` row, because the room is created before
+        that row exists; joining still needs a pass from `twilio-token`.
+        `complete` closes the room and requires the caller to be on the call;
+        a room that no longer exists counts as success.
+      x-verify-jwt: true
+      x-source: supabase/functions/twilio-room/index.ts
+      security:
+        - userJwt: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action, roomName]
+              properties:
+                action:
+                  type: string
+                  enum: [create, complete]
+                roomName:
+                  type: string
+                  minLength: 1
+                  maxLength: 128
+            example: { action: complete, roomName: chichat-6a0c1d1e-8f3b-4b7a-9d1e-2b9b7f0e1c11-1760000000000 }
+      responses:
+        "200":
+          description: "`{ ok: true }`; `create` also returns Twilio's room resource as `room`."
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok: { const: true }
+                  room:
+                    type: object
+                    description: Twilio Video Room resource, passed through unchanged.
+        "400":
+          description: "`Invalid params`."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: "`Unauthorized` (complete only): not a participant."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Twilio's error message, or a configuration error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /call-action:
+    post:
+      operationId: declineCallFromNotification
+      tags: [In-app calls]
+      summary: Decline a ringing call from the Android lock screen
+      description: |
+        Called by the native Android app (`CallActionReceiver.java`) when
+        the person taps Decline on the incoming call screen, without a user
+        session. Authorised by `token`, an HMAC that `send-call-push` puts in
+        the incoming call push for this call id and callee id only. Sets the
+        call to `declined` if it is still ringing; returns `ok` either way.
+
+        The native app sends the public key as both `apikey` and
+        `Authorization: Bearer`, so it also works if the gateway JWT check
+        is on.
+      x-verify-jwt: false
+      x-source: supabase/functions/call-action/index.ts
+      x-callers: android/app/src/main/java/com/bloomvoicenet/chat/CallActionReceiver.java
+      security:
+        - publicKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action, callId, calleeId, token]
+              properties:
+                action:
+                  const: decline
+                callId: { type: string, format: uuid }
+                calleeId: { type: string, format: uuid }
+                token:
+                  type: string
+                  description: The `actionToken` from the incoming call push.
+      responses:
+        "200":
+          description: Handled.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ok" }
+        "400":
+          description: "`missing fields`."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "403":
+          description: "`invalid token`."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Database error message.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  # ───────────────────────── Paid phone calls ─────────────────────────
+  /twilio-voice-token:
+    post:
+      operationId: getTwilioVoicePass
+      tags: [Paid phone calls]
+      summary: Get a Twilio Voice pass for a dial pad call
+      description: |
+        Checks the paid call rules before issuing a pass (they are checked
+        again in `twilio-voice-twiml`, the only place a number is dialled):
+        account not suspended, account at least 24 hours old, under 30
+        minutes of paid calls today (UTC). A refusal is returned with
+        **HTTP 200** and a `blocked` reason so the app can explain it.
+        No request body is read. Token valid 1 hour.
+      x-verify-jwt: true
+      x-source: supabase/functions/twilio-voice-token/index.ts
+      security:
+        - userJwt: []
+      responses:
+        "200":
+          description: A pass, or a refusal.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/TwilioPass"
+                  - type: object
+                    required: [blocked]
+                    properties:
+                      blocked:
+                        type: string
+                        enum: [suspended, too_new, daily_limit]
+              examples:
+                refused:
+                  value: { blocked: too_new }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          description: Raw error message, for example `Twilio Voice credentials not configured` or a usage lookup failure.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /twilio-voice-twiml:
+    post:
+      operationId: twilioVoiceWebhook
+      tags: [Internal]
+      summary: Twilio webhook that places (or refuses) a dial pad call
+      x-internal: true
+      description: |
+        Called by Twilio, never by the app. Configured as the Voice Request
+        URL of the TwiML App. Every request must carry a valid
+        `X-Twilio-Signature` (HMAC-SHA1 with the Twilio auth token over the
+        URL and sorted form fields); without `TWILIO_AUTH_TOKEN` the function
+        refuses everything.
+
+        First call (no `event` query): checks the number (Nigeria and UAE
+        only, no premium ranges), suspension, account age and today's
+        minutes, records the call in `outbound_calls` (refuses if it cannot),
+        and returns `<Dial>` with `timeLimit` set to the minutes left (30
+        minutes at most). Refusals are spoken with `<Say>` and `<Hangup/>`.
+
+        End of call (`?event=done&id=<outbound_calls id>`): stores
+        `DialCallDuration` and `DialCallStatus`.
+      x-verify-jwt: false
+      x-source: supabase/functions/twilio-voice-twiml/index.ts
+      x-callers: Twilio (TwiML App Voice Request URL)
+      security:
+        - twilioSignature: []
+      parameters:
+        - name: event
+          in: query
+          required: false
+          schema:
+            const: done
+          description: Present only on the end-of-call report.
+        - name: id
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+          description: The `outbound_calls` row id, with `event=done`.
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              description: Standard Twilio voice webhook fields; the ones read are listed.
+              properties:
+                From:
+                  type: string
+                  description: "`client:<ChiChat user id>`."
+                Caller:
+                  type: string
+                  description: Used if `From` is missing.
+                To:
+                  type: string
+                  description: Number to dial.
+                CallSid: { type: string }
+                DialCallDuration:
+                  type: string
+                  description: End-of-call report only.
+                DialCallStatus:
+                  type: string
+                  description: End-of-call report only.
+      responses:
+        "200":
+          description: TwiML. Also returned for refusals and for unexpected errors (`<Say>Server error.</Say>`).
+          content:
+            text/xml:
+              schema: { type: string }
+              examples:
+                dial:
+                  value: '<?xml version="1.0" encoding="UTF-8"?><Response><Dial callerId="+10000000000" answerOnBridge="true" timeLimit="1800" action="https://pnpabtxvsrkrldpfmtaz.supabase.co/functions/v1/twilio-voice-twiml?event=done&amp;id=00000000-0000-0000-0000-000000000000" method="POST"><Number>+2348012345678</Number></Dial></Response>'
+                refused:
+                  value: '<?xml version="1.0" encoding="UTF-8"?><Response><Say>Calls to this number are not available.</Say><Hangup/></Response>'
+        "400":
+          description: "`Unsupported content type` (plain text)."
+          content:
+            text/plain:
+              schema: { type: string }
+        "403":
+          description: "`Invalid signature` (plain text)."
+          content:
+            text/plain:
+              schema: { type: string }
+        "500":
+          description: "`Server misconfigured` (plain text): `TWILIO_AUTH_TOKEN` not set."
+          content:
+            text/plain:
+              schema: { type: string }
+
+  # ───────────────────────── Notifications ─────────────────────────
+  /send-call-push:
+    post:
+      operationId: sendPush
+      tags: [Notifications]
+      summary: Send a call, cancel, message or test push to the Android app
+      description: |
+        High-priority, data-only Firebase Cloud Messaging push to every
+        registered phone of one user. Tokens Firebase rejects (400, 404) are
+        deleted. Each action checks the signed-in user is entitled to it:
+
+        - `call` (default): caller of the `calls` row, and `calleeId` must
+          match. The push includes an HMAC `actionToken` for `call-action`.
+          Firebase time to live 45 s.
+        - `cancel`: caller or callee of the call; pushed to the callee.
+          Time to live 60 s.
+        - `message`: sender of the message; pushed to the other people in
+          the chat. Deleted messages and call records send nothing.
+          Time to live 24 h.
+        - `test`: rings the user's own phones after `delaySeconds` (0 to 20,
+          default 10). **No code in the current app sends this action** (the
+          Call setup screen that used it is no longer in `src/pages`).
+      x-verify-jwt: true
+      x-source: supabase/functions/send-call-push/index.ts
+      security:
+        - userJwt: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              description: One of four shapes, chosen by `action` (missing `action` means `call`).
+              anyOf:
+                - title: call
+                  type: object
+                  required: [calleeId, callId]
+                  properties:
+                    action: { const: call }
+                    calleeId: { type: string, format: uuid }
+                    callId: { type: string, format: uuid }
+                    callType:
+                      type: string
+                      enum: [voice, video]
+                      default: voice
+                    conversationId: { type: string, format: uuid }
+                    roomName: { type: string }
+                - title: cancel
+                  type: object
+                  required: [action, callId, reason]
+                  properties:
+                    action: { const: cancel }
+                    callId: { type: string, format: uuid }
+                    reason:
+                      type: string
+                      enum: [missed, cancelled, answered, declined]
+                - title: message
+                  type: object
+                  required: [action, messageId]
+                  properties:
+                    action: { const: message }
+                    messageId: { type: string, format: uuid }
+                - title: test
+                  type: object
+                  required: [action]
+                  properties:
+                    action: { const: test }
+                    delaySeconds:
+                      type: number
+                      minimum: 0
+                      maximum: 20
+                      default: 10
+            examples:
+              message:
+                value: { action: message, messageId: 6a0c1d1e-8f3b-4b7a-9d1e-2b9b7f0e1c11 }
+              cancel:
+                value: { action: cancel, callId: 6a0c1d1e-8f3b-4b7a-9d1e-2b9b7f0e1c11, reason: missed }
+      responses:
+        "200":
+          description: |
+            Delivery report. `call`, `cancel` and `test` return the
+            per-user result; `message` returns only `ok` and `sent`.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok: { const: true }
+                  sent:
+                    type: integer
+                    description: Pushes Firebase accepted.
+                  failed: { type: integer }
+                  reason:
+                    type: string
+                    description: "`no tokens` when the user has no registered phone."
+                  error:
+                    type: string
+                    description: First Firebase error, up to 300 characters.
+              example: { ok: true, sent: 1, failed: 0 }
+        "400":
+          description: "`missing fields`."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: "`unauthorized`: not entitled to this call or message."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Raw error message, for example `FCM_SERVICE_ACCOUNT_JSON not configured`.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  # ───────────────────────── Messages and media ─────────────────────────
+  /transcribe-voice:
+    post:
+      operationId: transcribeVoice
+      tags: [Messages and media]
+      summary: Turn a voice recording into text
+      description: |
+        Two forms of request body:
+
+        - The audio itself, with its audio content type (dictating before
+          sending). Content type defaults to `audio/webm`.
+        - JSON `{ "path": "<chat-media path>" }` for a voice note already
+          sent. The file is read with the caller's own JWT, so storage rules
+          decide access (only people in that chat).
+
+        Audio must be 1 byte to 15 MB. Model: `TRANSCRIBE_MODEL` secret,
+        default `gpt-4o-mini-transcribe`, falls back to `whisper-1` if the
+        model is refused. Rate limit: 30 per hour per user (fails open).
+      x-verify-jwt: true
+      x-source: supabase/functions/transcribe-voice/index.ts
+      security:
+        - userJwt: []
+      requestBody:
+        required: true
+        content:
+          audio/*:
+            schema:
+              type: string
+              contentMediaType: audio/*
+              maxLength: 15728640
+          application/json:
+            schema:
+              type: object
+              required: [path]
+              properties:
+                path:
+                  type: string
+                  description: Object path in the `chat-media` bucket. Must not contain `..`.
+            example: { path: 2b9b7f0e-1c11-4b7a-9d1e-6a0c1d1e8f3b/6a0c1d1e-8f3b-4b7a-9d1e-2b9b7f0e1c11/1760000000000.webm }
+      responses:
+        "200":
+          description: Transcript.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [text, model, timings]
+                properties:
+                  text: { type: string }
+                  model: { type: string }
+                  timings:
+                    $ref: "#/components/schemas/Timings"
+              example: { text: See you at six., model: gpt-4o-mini-transcribe, timings: { receive: 40, auth: 12, limit: 30, openai: 900, total: 1010 } }
+        "400":
+          description: "`bad_request`, `empty_audio` or `audio_too_large`."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: "`not_found`: the stored voice note could not be read with this user's access."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "405":
+          description: "`invalid_request`."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "429":
+          description: Too many transcriptions in the last hour.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: "`transcription_unavailable`: `OPENAI_API_KEY` not set."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "502":
+          description: "`transcription_failed`, with `timings`."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  # ───────────────────────── Safety ─────────────────────────
+  /submit-report:
+    post:
+      operationId: submitReport
+      tags: [Safety]
+      summary: Report a person, optionally one of their messages
+      description: |
+        Saves a row in `reports` and emails the support inbox through
+        Resend. If `conversationId` is given, both people must be in that
+        chat. If `messageId` is given, it must be in that chat and sent by
+        the reported person; the server stores its own copy of the message,
+        and a 7-day signed link if it has an attachment. An email failure is
+        logged but the report still counts as received.
+        Rate limit: 20 per hour per reporter (fails open).
+      x-verify-jwt: true
+      x-source: supabase/functions/submit-report/index.ts
+      security:
+        - userJwt: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reportedUserId, reason]
+              properties:
+                reportedUserId:
+                  type: string
+                  format: uuid
+                  description: Must not be the reporter.
+                conversationId: { type: string, format: uuid }
+                messageId:
+                  type: string
+                  format: uuid
+                  description: Requires `conversationId`.
+                reason:
+                  type: string
+                  enum: [spam, harassment, inappropriate, scam, violence, other]
+                details:
+                  type: string
+                  maxLength: 1000
+                  description: Longer text is cut to 1000 characters.
+                alsoBlocked:
+                  type: boolean
+                  default: false
+            example:
+              reportedUserId: 2b9b7f0e-1c11-4b7a-9d1e-6a0c1d1e8f3b
+              conversationId: 6a0c1d1e-8f3b-4b7a-9d1e-2b9b7f0e1c11
+              reason: spam
+              alsoBlocked: true
+      responses:
+        "200":
+          description: Report saved.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ok" }
+        "400":
+          description: "`bad_request`: invalid id, own id, or unknown reason."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: "`not_allowed`: not in that chat together, or the message does not match."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "405":
+          description: "`method_not_allowed`."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "429":
+          description: "`too_many`."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: "`save_failed` or `server_error`."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  # ───────────────────────── Account ─────────────────────────
+  /delete-account:
+    post:
+      operationId: deleteAccount
+      tags: [Account]
+      summary: Permanently delete the signed-in account
+      description: |
+        Removes the user's files (`chat-media`, `avatars`, `backup-media`,
+        `feedback` folders named after the user id), their rows in app
+        tables, messages they sent, calls on either side, device bindings,
+        email records, the profile, and finally the Auth user. Records the
+        email in `deleted_accounts`. Cannot be undone. No request body is read.
+
+        Each step is best effort; failures are listed in `partial_failures`.
+        Only a failure to delete the Auth user returns an error.
+      x-verify-jwt: true
+      x-source: supabase/functions/delete-account/index.ts
+      security:
+        - userJwt: []
+      responses:
+        "200":
+          description: Account deleted.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, partial_failures, email_cleanup_incomplete]
+                properties:
+                  ok: { const: true }
+                  partial_failures:
+                    type: array
+                    items: { type: string }
+                    description: "`<step>: <message>` for each step that failed."
+                  email_cleanup_incomplete:
+                    type: boolean
+                    description: True if email suppression records could not be removed (could block emails if the person registers again).
+              example: { ok: true, partial_failures: [], email_cleanup_incomplete: false }
+        "401":
+          description: "`missing_authorization` or `invalid_session`."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: "`auth_user_delete_failed` (with `detail` and `partial_failures`) or `unexpected` (with `detail`)."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /chat-backup:
+    post:
+      operationId: backUpChats
+      tags: [Account]
+      summary: Save a backup of the user's chats
+      description: |
+        Writes every message in the user's chats to
+        `backup-media/<user id>/manifest.json` (replacing the previous
+        backup) and updates `chat_backups`. Media files are counted, not
+        copied. No request body is read.
+      x-verify-jwt: true
+      x-source: supabase/functions/chat-backup/index.ts
+      security:
+        - userJwt: []
+      responses:
+        "200":
+          description: Backup saved.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, message_count, media_count]
+                properties:
+                  ok: { const: true }
+                  message_count: { type: integer }
+                  media_count:
+                    type: integer
+                    description: Files listed at the top of the user's `chat-media` folder (first 1000).
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          description: Storage or unexpected error message.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /chat-restore:
+    post:
+      operationId: restoreChats
+      tags: [Account]
+      summary: Restore chats from the user's last backup
+      description: |
+        Re-creates missing chats and participant rows and inserts messages
+        from the backup that are not already present (batches of 500).
+        No request body is read.
+      x-verify-jwt: true
+      x-source: supabase/functions/chat-restore/index.ts
+      security:
+        - userJwt: []
+      responses:
+        "200":
+          description: Restore done.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, restored, total]
+                properties:
+                  ok: { const: true }
+                  restored:
+                    type: integer
+                    description: Messages inserted.
+                  total:
+                    type: integer
+                    description: Messages in the backup.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: "`No backup found`."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Storage or unexpected error message.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  # ───────────────────────── Internal ─────────────────────────
+  /process-email-queue:
+    post:
+      operationId: processEmailQueue
+      tags: [Internal]
+      summary: Send queued emails through Resend
+      x-internal: true
+      description: |
+        Run by a `pg_cron` job every few seconds with the service role key
+        (stored in Supabase Vault). Reads the `auth_emails` queue first,
+        then `transactional_emails`, sends through Resend, logs to
+        `email_send_log`, retries up to 5 times, and moves messages past
+        their time to live or retry limit to a dead letter queue. Stops the
+        batch on a Resend 429 or 403. Refuses any token whose role is not
+        `service_role`. Currently only device verification codes go through
+        this queue; Supabase Auth emails use Resend SMTP directly.
+      x-verify-jwt: true
+      x-source: supabase/functions/process-email-queue/index.ts
+      x-callers: pg_cron job (database)
+      security:
+        - serviceRole: []
+      responses:
+        "200":
+          description: Batch result.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  processed: { type: integer }
+                  stopped:
+                    type: string
+                    enum: [rate_limited, forbidden]
+                  skipped:
+                    const: true
+                    description: Present while Resend's rate-limit cool-down is active.
+                  reason:
+                    const: rate_limited
+        "401":
+          description: "`Unauthorized`."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "403":
+          description: "`Forbidden`: not the service role."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: "`Server configuration error`."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  # ───────────────────────── Web pages (Vercel) ─────────────────────────
+  /i/{name}:
+    servers:
+      - url: https://www.chichatapp.com
+        description: Vercel production (chichatapp.com)
+    get:
+      operationId: getInvitePage
+      tags: [Web pages]
+      summary: Personal invite page with a link preview card
+      description: |
+        Vercel Edge Function `api/invite.js`, reached through the rewrite
+        `/i/:name` → `/api/invite?name=:name` in `vercel.json` (also `/i`
+        with no name). Returns an HTML page whose Open Graph tags make chat
+        apps show "<name> invited you to ChiChat". Names that are not 1 to
+        30 letters (any language), apostrophes, dots or hyphens fall back to
+        "A friend". Cached 5 minutes in browsers, 1 day at the edge.
+      x-source: api/invite.js
+      security: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 30
+          example: Sulaimon
+      responses:
+        "200":
+          description: Invite page.
+          headers:
+            Cache-Control:
+              schema:
+                const: public, max-age=300, s-maxage=86400
+          content:
+            text/html:
+              schema: { type: string }
+
+components:
+  securitySchemes:
+    userJwt:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        The signed-in user's Supabase access token
+        (`supabase.auth.getSession()` → `access_token`). The Supabase SDK
+        adds it automatically, together with the `apikey` header.
+    publicKey:
+      type: apiKey
+      in: header
+      name: apikey
+      description: The project's public (anon) key, which is already in the web app. Not a secret; it identifies the project, it does not grant access to data.
+    serviceRole:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: The service role key. Server-side only. Never put it in the app, a document or a request you share.
+    twilioSignature:
+      type: apiKey
+      in: header
+      name: X-Twilio-Signature
+      description: Signature Twilio adds to each webhook request.
+
+  responses:
+    Unauthorized:
+      description: |
+        No valid user token. Either the Supabase gateway refuses the request
+        (when the gateway JWT check is on) or the function does, with
+        `unauthorized`, `Unauthorized` or a similar code.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          example: { error: unauthorized }
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          description: Error code or message. See `docs/api/error-codes.md`.
+        detail:
+          type: string
+          description: Extra detail (delete-account only).
+        partial_failures:
+          type: array
+          items: { type: string }
+          description: delete-account only.
+        timings:
+          $ref: "#/components/schemas/Timings"
+      additionalProperties: true
+    Ok:
+      type: object
+      required: [ok]
+      properties:
+        ok: { const: true }
+    EmailOnly:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 255
+    E164Phone:
+      type: string
+      pattern: "^\\+[1-9]\\d{6,14}$"
+      description: Phone number in international format, for example +2348012345678.
+    RoomName:
+      type: object
+      required: [roomName]
+      properties:
+        roomName:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: The `room_name` of a row in `calls`.
+    RoomNameAgora:
+      type: object
+      required: [roomName]
+      properties:
+        roomName:
+          type: string
+          minLength: 1
+          maxLength: 63
+          description: The `room_name` of a row in `calls`. Agora channel names must be under 64 characters.
+    TwilioPass:
+      type: object
+      required: [token, identity]
+      properties:
+        token:
+          type: string
+          description: Twilio access token (JWT), valid 1 hour.
+        identity:
+          type: string
+          format: uuid
+          description: The ChiChat user id.
+    SessionResponse:
+      type: object
+      required: [session, user]
+      description: Supabase Auth session and user, passed through unchanged. Treat the tokens as secrets.
+      properties:
+        session:
+          type: object
+          properties:
+            access_token: { type: string }
+            refresh_token: { type: string }
+            expires_in: { type: integer }
+            expires_at: { type: integer }
+            token_type: { type: string }
+            user: { type: object }
+        user:
+          type: object
+          description: Supabase Auth user.
+    Timings:
+      type: object
+      description: Milliseconds per stage (receive, auth, limit, download, openai, total).
+      additionalProperties:
+        type: integer

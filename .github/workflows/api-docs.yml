@@ -1,0 +1,36 @@
+name: API docs
+
+on:
+  pull_request:
+    paths:
+      - "supabase/**"
+      - "api/**"
+      - "src/**"
+      - "docs/**"
+      - "redocly.yaml"
+      - ".redocly.lint-ignore.yaml"
+      - "scripts/check-api-docs.mjs"
+  push:
+    branches: [main]
+    paths:
+      - "supabase/**"
+      - "api/**"
+      - "docs/**"
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Spec matches the code
+        run: node scripts/check-api-docs.mjs
+      - name: Spec is valid OpenAPI
+        run: npx --yes @redocly/cli@2.66.0 lint
+      - name: Public copy builds
+        run: npx --yes @redocly/cli@2.66.0 bundle public -o docs/api/viewer/openapi.yaml

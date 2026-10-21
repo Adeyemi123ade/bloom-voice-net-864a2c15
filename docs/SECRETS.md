@@ -57,21 +57,25 @@ the code the user types is passed straight through.
 | `check-registration-availability` | Public: checks email + phone availability before signup | `false` | — |
 | `sign-in-with-identifier` | Sign-in by phone/username identifier | `false` | — |
 | `complete-google-registration` | Finishes profile for a Google-signup user (phone + password) | `true` | — |
-| `google-oauth-callback` | Exchanges Google OAuth code for tokens, stores per-user | `true` | `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` |
-| `google-contacts-sync` | Fetches the user's Google Contacts | `true` | (reuses stored Google OAuth tokens) |
-| `google-contacts-create` | Creates a Google Contact for the user | `true` | (reuses stored Google OAuth tokens) |
+| `google-oauth-callback`, `google-contacts-sync`, `google-contacts-create` | Google Contacts (older feature). **No source in this repo** as of 2026-10-21; listed because they were deployed | — | `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` |
 | `request-device-otp` | Sends a device-verification OTP on new/unknown device sign-in | `false` | — |
 | `verify-device-otp` | Verifies the device OTP, binds the trusted device | `false` | — |
 | `delete-account` | Permanently deletes a user + all associated data | `true` | — |
 | `chat-backup` | Snapshots chats/media into the backup-media bucket | `true` | — |
 | `chat-restore` | Restores chats from a backup manifest | `true` | — |
-| `call-action` | Server-side actions for in-app voice/video calls | `true` | (Twilio secrets, see below) |
-| `twilio-token` | Mints a Twilio Video access token | `false` | `TWILIO_ACCOUNT_SID`, `TWILIO_API_KEY_SID`, `TWILIO_API_KEY_SECRET` |
+| `call-action` | Declines a ringing call from the Android lock screen (HMAC token from `send-call-push`) | `false` | — (signs with `SUPABASE_SERVICE_ROLE_KEY`) |
+| `agora-token` | Mints an Agora pass for an in-app call (default call engine) | `true` (default) | `AGORA_APP_ID`, `AGORA_APP_CERTIFICATE` |
+| `submit-report` | Saves a report and emails the support inbox | `true` (default) | `RESEND_API_KEY`; optional `REPORTS_TO`, `REPORTS_FROM` |
+| `twilio-token` | Mints a Twilio Video access token (older `chichat-` rooms, or when `VITE_CALL_ENGINE=twilio`) | `false` | `TWILIO_ACCOUNT_SID`, `TWILIO_API_KEY_SID`, `TWILIO_API_KEY_SECRET` |
 | `twilio-room` | Creates/completes Twilio Video rooms | `true` | `TWILIO_ACCOUNT_SID`, `TWILIO_API_KEY_SID`, `TWILIO_API_KEY_SECRET` |
 | `twilio-voice-token` | Mints a Twilio Voice SDK token for outbound PSTN calls | `true` | `TWILIO_ACCOUNT_SID`, `TWILIO_API_KEY_SID`, `TWILIO_API_KEY_SECRET`, `TWILIO_TWIML_APP_SID` |
 | `twilio-voice-twiml` | TwiML webhook Twilio calls when placing an outbound call | `false` (hit directly by Twilio, not the app) | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`, `TWILIO_VOICE_TWIML_URL` |
 | `send-call-push` | Sends an FCM push to wake the callee's device for an incoming call | `true` | `FCM_SERVICE_ACCOUNT_JSON` |
-| `transcribe-voice` | Transcribes a recorded voice note to text (dictate instead of type) via OpenAI's transcription API | `true` | `OPENAI_API_KEY` |
+| `transcribe-voice` | Transcribes a recorded voice note to text (dictate instead of type) via OpenAI's transcription API | `true` | `OPENAI_API_KEY`; optional `TRANSCRIBE_MODEL` |
+
+"`true` (default)" means the function is not listed in `supabase/config.toml`, so
+Supabase's default gateway JWT check applies. The full request and response
+reference for every function is in [`docs/openapi.yaml`](openapi.yaml).
 
 ## Vault secrets (SQL / pg_cron only, not edge-function env vars)
 

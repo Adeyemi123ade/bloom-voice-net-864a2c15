@@ -1,0 +1,32 @@
+# Render Blueprint: OPTIONAL static site that publishes the API reference
+# (Swagger UI) from docs/api/viewer. It is not the ChiChat backend and does
+# not run any server code. See docs/DEPLOYMENT.md before connecting it.
+#
+# Nothing here is secret and no environment variables are needed.
+services:
+  - type: web
+    runtime: static
+    name: chichat-api-docs
+    buildCommand: npx --yes @redocly/cli@2.66.0 bundle public -o docs/api/viewer/openapi.yaml
+    staticPublishPath: ./docs/api/viewer
+    buildFilter:
+      paths:
+        - docs/openapi.yaml
+        - docs/api/viewer/**
+        - redocly.yaml
+        - render.yaml
+    previews:
+      generation: manual
+    headers:
+      - path: /*
+        name: X-Robots-Tag
+        value: noindex
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: Referrer-Policy
+        value: no-referrer
+      - path: /openapi.yaml
+        name: Cache-Control
+        value: no-cache

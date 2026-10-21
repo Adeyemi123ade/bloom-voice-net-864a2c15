@@ -1,0 +1,19 @@
+# OpenAPI lint and bundle settings for docs/openapi.yaml.
+# Run with: npm run api:lint   /   npm run api:bundle
+apis:
+  chichat:
+    root: docs/openapi.yaml
+  public:
+    root: docs/openapi.yaml
+    decorators:
+      remove-x-internal: on
+      remove-unused-components: on
+      filter-out:
+        property: x-internal
+        value: true
+extends:
+  - recommended
+rules:
+  operation-4xx-response: warn
+  info-license: off
+  no-server-example.com: error

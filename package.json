@@ -11,7 +11,11 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "api:check": "node scripts/check-api-docs.mjs",
+    "api:lint": "npx --yes @redocly/cli@2.66.0 lint",
+    "api:bundle": "npx --yes @redocly/cli@2.66.0 bundle public -o docs/api/viewer/openapi.yaml",
+    "api:docs": "npm run api:bundle && vite docs/api/viewer --port 8090 --strictPort"
   },
   "dependencies": {
     "@capacitor-community/contacts": "^7.2.0",
