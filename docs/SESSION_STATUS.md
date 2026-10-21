@@ -72,7 +72,7 @@ Local run: `npm install`, `npm run dev` (http://localhost:8080). Tests:
 | "Message request" label on the chat list; typing indicator visible to a blocked person | `src/pages/Home.tsx`, `typing_indicators` rules | Open |
 | Code splitting: main bundle is 2.3 MB and includes Twilio although calls use Agora | `src/App.tsx`, call files | Open |
 | Split `ChatRoom.tsx` and `CallScreen.tsx` | PR #89 | Screens split (ChatRoom 2,268 to 1,387 lines; CallScreen 1,427 to 1,330). Next, after two-phone call tests: move message loading and sending into hooks, and split the call connection logic |
-| Native Android crash reports (Firebase Crashlytics) | `android/` | Before the release build |
+| Native Android crash reports (Firebase Crashlytics) | branch `feat/android-crashlytics` | Ready; merge before the release build, then enable Crashlytics in the Firebase console |
 | Native speaker check of the 14 translations | `src/lib/i18n/` | Before public launch |
 | Tester guide with acceptance criteria | owner | Waiting |
 | Release build (signed .aab) and Google Play Console account | owner | After the items above |

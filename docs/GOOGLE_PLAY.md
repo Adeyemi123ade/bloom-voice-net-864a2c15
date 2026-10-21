@@ -71,4 +71,4 @@ Calls: audio and video are carried live by the calling providers and are not rec
 1. **Deletion by email within 7 days:** /delete-account promises that an emailed request is handled within 7 days. Confirm, or set the number of days you can keep.
 2. **Ringing service type:** if Google rejects the media playback declaration for ringing, the fix is to make ringing a phone-call type, which needs a self-managed ConnectionService (a bigger Android change, then a rebuild). Recommendation: submit as is, change only if Google asks.
 3. **Personal or organisation developer account?**
-4. **Android crash reports:** crashes outside the web view (native Android) aren't captured yet. Firebase Crashlytics would cover them; it needs a rebuild, so it fits best with the first release build.
+4. **Android crash reports:** done. Firebase Crashlytics reports native Android crashes from the first release build on (`android/app/build.gradle`). It is Google's own service, so the Data safety answers above (crash logs, diagnostics, device IDs) stay the same.
