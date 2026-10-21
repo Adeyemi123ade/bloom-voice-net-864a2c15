@@ -4,7 +4,6 @@ import type { Dictionary } from "../strings";
 const d: Dictionary = {
   "lang.title": "اللغة",
   "lang.choose": "اختر لغتك",
-  "lang.note": "بعض الشاشات لا تزال بالإنجليزية ريثما نترجمها.",
   "nav.calls": "المكالمات",
   "nav.messages": "الرسائل",
   "nav.contacts": "جهات الاتصال",

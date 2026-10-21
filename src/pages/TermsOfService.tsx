@@ -125,7 +125,7 @@ export default function TermsOfService() {
       <LegalSection title="Third-Party Services">
         <p>
           ChiChat relies on third-party providers for hosting, sign-in, calling, email and, if you
-          choose, Google sign-in and Google Contacts. Your use of a Google account is also subject
+          choose, Google sign-in. Your use of a Google account is also subject
           to Google's own terms.
         </p>
       </LegalSection>

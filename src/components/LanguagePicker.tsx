@@ -15,7 +15,7 @@ export default function LanguagePicker({ open, onOpenChange }: { open: boolean; 
       <DialogContent className="max-w-[340px] rounded-2xl max-h-[85dvh] flex flex-col">
         <DialogHeader>
           <DialogTitle>{t("lang.choose")}</DialogTitle>
-          <DialogDescription>{t("lang.note")}</DialogDescription>
+          <DialogDescription className="sr-only">{t("lang.title")}</DialogDescription>
         </DialogHeader>
         <ul className="mt-1 rounded-xl border border-border overflow-y-auto min-h-0">
           {LANGUAGES.map((l, i) => (

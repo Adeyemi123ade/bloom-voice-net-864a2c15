@@ -10,7 +10,6 @@ export const en = {
   // Language picker
   "lang.title": "Language",
   "lang.choose": "Choose your language",
-  "lang.note": "Some screens are still in English while we translate them.",
 
   // Bottom bar
   "nav.calls": "Calls",
@@ -751,7 +750,6 @@ export type Dictionary = Partial<Record<TextKey, string>>;
 const yo: Dictionary = {
   "lang.title": "Èdè",
   "lang.choose": "Yan èdè rẹ",
-  "lang.note": "Àwọn ojú-ìwé kan ṣì wà ní èdè Gẹ̀ẹ́sì bí a ṣe ń túmọ̀ wọn.",
   "nav.calls": "Ìpè",
   "nav.messages": "Ìfiránṣẹ́",
   "nav.contacts": "Olùbásọ̀rọ̀",
@@ -1481,7 +1479,6 @@ const yo: Dictionary = {
 const ha: Dictionary = {
   "lang.title": "Harshe",
   "lang.choose": "Zaɓi harshenka",
-  "lang.note": "Wasu shafuka suna cikin Turanci har yanzu yayin da muke fassara su.",
   "nav.calls": "Kira",
   "nav.messages": "Saƙonni",
   "nav.contacts": "Lambobi",
@@ -2211,7 +2208,6 @@ const ha: Dictionary = {
 const ig: Dictionary = {
   "lang.title": "Asụsụ",
   "lang.choose": "Họrọ asụsụ gị",
-  "lang.note": "Ụfọdụ ihuenyo ka dị n'asụsụ Bekee ka anyị na-asụgharị ha.",
   "nav.calls": "Oku",
   "nav.messages": "Ozi",
   "nav.contacts": "Kọntaktị",
