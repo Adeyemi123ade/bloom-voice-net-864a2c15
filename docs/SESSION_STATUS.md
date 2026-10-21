@@ -26,7 +26,7 @@ More detail: `docs/ARCHITECTURE.md`, `docs/DEPLOYMENT.md`, `docs/SECRETS.md`,
 
 ## Features in the app today
 
-- Accounts: register with email code, sign in, Google sign-in, forgot password with code, delete account (in the app and at `/delete-account`).
+- Accounts: register with email code, sign in, Google sign-in (account chooser; returning accounts go straight in, new ones finish the pre-filled form), forgot password with code, delete account (in the app and at `/delete-account`).
 - Chats: text, photos, videos, files, voice notes with transcription, reply, edit, copy and paste of media, forward, delete for me, delete for everyone, search, read ticks, typing, unread badges, chat backup.
 - Calls: voice and video, call waiting with hold and swap, floating call window, call records in the chat, ringing on a locked phone, dial pad to phone numbers.
 - Safety: block, report (person, chat, message), message requests from people not in your contacts, account suspension and ban list, limits for new accounts, admin page at `/admin` (admins only).
@@ -64,6 +64,7 @@ Local run: `npm install`, `npm run dev` (http://localhost:8080). Tests:
 
 | Item | Where | State |
 | --- | --- | --- |
+| Google sign-in on Android: after Continue, people were left on the sign-in screen | `src/lib/appGoogleHandoff.ts`, `src/lib/googleAuth.ts`, `src/pages/GoogleReturn.tsx`, `AndroidManifest.xml` | Fix in PR `fix/google-signin-android`. Web part works on merge; the manifest change needs the next APK. Test on a phone with both a returning and a new Google account |
 | Chat restore hole (backups could be edited to join chats or forge messages) | PR #86 | Merged. Confirm `chat-backup` and `chat-restore` are deployed and `20261021120000_backups_server_only.sql` was run |
 | PR checks and branch protection | PR #87 | Check merged. Branch protection on main still to turn on in GitHub settings |
 | Unused public functions `sign-in-with-identifier`, `check-user-exists` | `supabase/functions/` | Delete from the live project and the repo |

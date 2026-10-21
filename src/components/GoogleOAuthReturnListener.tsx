@@ -5,9 +5,11 @@ import { App as CapacitorApp } from "@capacitor/app";
 import { Browser } from "@capacitor/browser";
 import { supabase } from "@/integrations/supabase/client";
 import { NATIVE_GOOGLE_RETURN_URL } from "@/lib/googleAuth";
+import { markGoogleSignInFinished } from "@/lib/appGoogleHandoff";
 import { parseGoogleReturn } from "@/lib/googleReturn";
 import { toast } from "@/hooks/use-toast";
 import { tNow } from "@/lib/i18n/language";
+import { reportProblem } from "@/lib/errorReport";
 
 /**
  * Catches the Android return leg of "Sign in with Google" (see
@@ -41,6 +43,7 @@ export default function GoogleOAuthReturnListener() {
     const handle = (url: string | undefined) => {
       if (!url || !url.startsWith(NATIVE_GOOGLE_RETURN_URL) || url === lastHandled) return;
       lastHandled = url;
+      markGoogleSignInFinished();
       void (async () => {
         try {
           await Browser.close().catch(() => {});
@@ -55,13 +58,18 @@ export default function GoogleOAuthReturnListener() {
             const { error } = await supabase.auth.exchangeCodeForSession(ret.code);
             if (error) throw error;
           } else {
-            console.error("[google-return] no session in return link", ret.kind === "error" ? ret.message : "");
+            // Closing Google's screen is a choice, not a problem: just go back.
+            if (ret.kind === "error" && /access_denied|cancel/i.test(ret.message)) {
+              navigate("/login", { replace: true });
+              return;
+            }
+            reportProblem("google-return", ret.kind === "error" ? ret.message : "no session in return link");
             fail();
             return;
           }
           navigate("/auth/google-return", { replace: true });
         } catch (e) {
-          console.error("[google-return] could not finish sign in", e);
+          reportProblem("google-return", e);
           fail();
         }
       })();

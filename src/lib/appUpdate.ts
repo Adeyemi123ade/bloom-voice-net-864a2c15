@@ -2,6 +2,7 @@ import { App as CapacitorApp } from "@capacitor/app";
 import { APP_BUILD } from "@/lib/appBuild";
 import { getCallsSnapshot } from "@/lib/activeCall";
 import { reloadForNewVersion, setStaleBuildHandler } from "@/lib/errorReport";
+import { googleSignInInProgress } from "@/lib/appGoogleHandoff";
 
 /**
  * Picks up a new version of ChiChat by itself. When the app comes back to
@@ -37,6 +38,8 @@ export function isNewerBuild(live: string | null, running = APP_BUILD): boolean 
 export function isSafeToReload(doc: Document = document): boolean {
   const { calls, waiting } = getCallsSnapshot();
   if (calls.length > 0 || waiting) return false;
+  // Google is open in the browser; reloading would lose the sign-in coming back.
+  if (googleSignInInProgress()) return false;
   if (location.pathname.startsWith("/call/") || location.pathname.startsWith("/dial/")) return false;
   const el = doc.activeElement as HTMLInputElement | HTMLTextAreaElement | null;
   if (el && (el.tagName === "TEXTAREA" || el.tagName === "INPUT") && el.value) return false;

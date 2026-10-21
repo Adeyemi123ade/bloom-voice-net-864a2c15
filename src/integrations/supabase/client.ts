@@ -5,8 +5,12 @@ import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 import { captureRecoveryLink } from '@/lib/recoveryLink';
 import { markRecoveryPending } from '@/lib/recoveryPending';
+import { captureAppGoogleReturn, runAppGoogleStart } from '@/lib/appGoogleHandoff';
 
 // Must run before createClient, which reads and clears the address bar.
+// Google sign-in started in the Android app: hand the result back to the app
+// instead of signing in this browser tab (see appGoogleHandoff.ts).
+if (!runAppGoogleStart()) captureAppGoogleReturn();
 captureRecoveryLink();
 
 const SUPABASE_URL = "https://pnpabtxvsrkrldpfmtaz.supabase.co";
