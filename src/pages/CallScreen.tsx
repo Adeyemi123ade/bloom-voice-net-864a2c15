@@ -48,12 +48,13 @@ import { saveNewCall } from "@/lib/callStart";
 import { clearLiveCall, liveCallRecord, saveLiveCall, touchLiveCall, type LiveCallRecord } from "@/lib/liveCallRecord";
 
 /**
- * While the other person is gone from the call, how often to check whether
- * they actually hung up. A bad network never ends a call by itself: it shows
- * "Reconnecting…" (their side) or "Poor network connection" (this phone)
- * until the connection is back or someone taps End.
+ * How long a call stays on through a network problem (this phone's or the
+ * other person's) before it ends with "Call disconnected". Meanwhile it shows
+ * "No internet connection" / "Poor network connection" (this phone) or
+ * "Reconnecting…" (the other person), and carries on if the network comes
+ * back in time. Owner's decision: 120 seconds.
  */
-const RECONNECT_GRACE_MS = 60_000;
+const RECONNECT_GRACE_MS = 120_000;
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const MEDIA_ERRORS = new Set(["NotAllowedError", "NotFoundError", "NotReadableError", "OverconstrainedError", "SecurityError"]);
 const isMediaError = (e: unknown) =>
@@ -751,10 +752,9 @@ export default function CallSession({
         handleCallStatus(data.status);
         return;
       }
-      // Still gone: the call stays on ("Reconnecting…") until someone taps
-      // End (owner's decision: a bad network never ends a call by itself).
-      // Keep checking whether they hung up meanwhile.
-      startLostGrace();
+      // Gone for the whole grace period: the call is lost.
+      endNotice(tNow("cs.disconnected"));
+      void endCallRef.current();
     }, RECONNECT_GRACE_MS);
   };
 
@@ -768,11 +768,11 @@ export default function CallSession({
     rejoiningRef.current = true;
     setReconnecting(true);
     setSelfReconnecting(true);
+    const deadline = Date.now() + RECONNECT_GRACE_MS;
     let delay = 1500;
     try {
-      // No time limit: a bad network never ends the call by itself; it
-      // keeps trying until it's back or someone taps End.
-      while (!endedRef.current) {
+      // Keeps trying for RECONNECT_GRACE_MS, then the call ends.
+      while (!endedRef.current && Date.now() < deadline) {
         await wait(delay);
         if (endedRef.current) return;
         delay = Math.min(Math.round(delay * 1.5), 5000);
@@ -785,6 +785,10 @@ export default function CallSession({
           return;
         }
         if (await joinRoom({ rejoin: true })) return;
+      }
+      if (!endedRef.current) {
+        endNotice(tNow("cs.disconnected"));
+        void endCallRef.current();
       }
     } finally {
       rejoiningRef.current = false;
