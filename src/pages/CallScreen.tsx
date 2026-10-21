@@ -13,12 +13,6 @@ import {
   type RemoteTrackPublication,
   type RemoteVideoTrack,
 } from "twilio-video";
-import { ChevronDown, Volume2 } from "lucide-react";
-import MobileFrame from "@/components/MobileFrame";
-import CallHeader from "@/components/call/CallHeader";
-import CallControls from "@/components/call/CallControls";
-import RemoteMedia from "@/components/call/RemoteMedia";
-import VideoUpgradePrompt from "@/components/call/VideoUpgradePrompt";
 import FloatingCallBubble from "@/components/call/FloatingCallBubble";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useAuth } from "@/hooks/useAuth";
@@ -38,7 +32,6 @@ import { getCallToken, prefetchCallToken, renewCallToken } from "@/lib/callToken
 import { connectCall, roomNeedsTwilioSetup } from "@/lib/callEngine";
 import { markCall, startCallTimeline } from "@/lib/callTimeline";
 import { startCallForegroundService, stopCallForegroundService } from "@/lib/nativeCalls";
-import { isLockedCall } from "@/lib/lockedCall";
 import {
   FROM_CALL_BUBBLE,
   activeCallPath,
@@ -46,14 +39,11 @@ import {
   getCallsSnapshot,
   minimizeTarget,
   registerEndHandler,
-  requestEndCall,
-  setCallHeld,
-  swapToCall,
   setCallPeer,
   useCalls,
   type ActiveCallParams,
 } from "@/lib/activeCall";
-import HeldCallCard from "@/components/call/HeldCallCard";
+import CallFullScreen from "@/components/call/CallFullScreen";
 import { saveNewCall } from "@/lib/callStart";
 import { clearLiveCall, liveCallRecord, saveLiveCall, touchLiveCall, type LiveCallRecord } from "@/lib/liveCallRecord";
 
@@ -1294,134 +1284,47 @@ export default function CallSession({
   return (
     <>
     {remoteAudio}
-    <MobileFrame key="full">
-      <div
-        className={`h-full w-full flex flex-col ${
-          videoFullscreen ? "bg-black" : "bg-gradient-to-b from-secondary to-background"
-        }`}
-      >
-        <RemoteMedia
-          showVideo={videoFullscreen}
-          localVideoTrack={localVideoTrack}
-          remoteVideoTrack={remoteVideoTrack}
-          swapped={videoSwapped}
-          onSwap={() => setVideoSwapped((s) => !s)}
-        />
-
-        <div
-          className={
-            videoFullscreen
-              ? "fixed top-0 inset-x-0 z-20 bg-gradient-to-b from-black/70 via-black/40 to-transparent text-white pointer-events-none"
-              : ""
-          }
-        >
-          <CallHeader
-            isVideo={isVideo}
-            other={other}
-            status={status}
-            reconnecting={reconnecting && status === "connected"}
-            seconds={seconds}
-            role={role}
-            onHold={onHold}
-            // A call-waiting or held-call card sits in the top part of the
-            // screen: start this call's details just below it.
-            belowCard={!videoFullscreen && (!!callsSnap.waiting || otherCalls.length > 0)}
-            overlay={videoFullscreen}
-          />
-        </div>
-        {/* Caller details stay in the upper part; the space goes here,
-            above the controls (it used to sit above the details and push
-            them down to the middle of the screen). */}
-        {!videoFullscreen && <div className="flex-1 min-h-4" />}
-
-        {videoFullscreen && onHold && (
-          <div className="fixed inset-0 z-10 bg-black/60 flex items-center justify-center pointer-events-none">
-            <span className="px-4 py-2 rounded-full bg-white/15 text-white text-sm font-semibold">{tNow("cs.onHold")}</span>
-          </div>
-        )}
-
-        {otherCalls.map((c) => {
-          const peer = callsSnap.info[c.callId];
-          return (
-            <HeldCallCard
-              key={c.callId}
-              name={peer?.name ?? tNow("chat.contact")}
-              avatarUrl={peer?.avatarUrl ?? null}
-              onSwap={() => {
-                swapToCall(c.callId);
-                navigate(activeCallPath(c), { replace: true });
-              }}
-              onEnd={() => requestEndCall(c.callId)}
-            />
-          );
-        })}
-
-        {status !== "ended" && !isLockedCall(callId) && (
-          <button
-            type="button"
-            onClick={minimize}
-            aria-label={tNow("cs.minimise")}
-            title={tNow("cs.minimise")}
-            className={`fixed z-30 left-3 top-[calc(env(safe-area-inset-top)+12px)] w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-              videoFullscreen
-                ? "bg-black/40 text-white hover:bg-black/60"
-                : "bg-secondary/80 text-foreground hover:bg-secondary"
-            }`}
-          >
-            <ChevronDown className="w-5 h-5" />
-          </button>
-        )}
-
-        {needsTapForSound && status === "connected" && (
-          <button
-            onClick={tryPlayRemoteAudio}
-            className={`${
-              videoFullscreen ? "fixed bottom-44 left-1/2 -translate-x-1/2 z-30" : "mx-6 mb-2"
-            } px-4 py-2 rounded-full bg-primary text-primary-foreground text-xs font-medium flex items-center justify-center gap-2 animate-pulse`}
-          >
-            <Volume2 className="w-4 h-4" />
-            {tNow("cs.tapSound")}
-          </button>
-        )}
-
-        <div
-          className={
-            videoFullscreen
-              ? "fixed bottom-0 inset-x-0 z-20 pb-2 bg-gradient-to-t from-black/70 via-black/30 to-transparent"
-              : ""
-          }
-        >
-        {upgradeRequest && status === "connected" && (
-          <VideoUpgradePrompt
-            mode={upgradeRequest}
-            fromName={other?.display_name}
-            onAccept={acceptVideoUpgrade}
-            onDecline={declineVideoUpgrade}
-            onCancel={cancelVideoUpgrade}
-          />
-        )}
-        <CallControls
-          muted={muted}
-          videoEnabled={videoEnabled}
-          isVideo={isVideo}
-          speakerOn={speakerOn}
-          canSwitchCamera={canSwitchCamera}
-          onToggleMute={toggleMute}
-          onToggleVideo={toggleVideo}
-          onToggleSpeaker={toggleSpeaker}
-          onSwitchCamera={switchCamera}
-          onUpgradeToVideo={upgradeToVideo}
-          onEndCall={endCall}
-          // Straight to the chat with this person; the call keeps going
-          // (bubble and chat strip lead back). Not over the lock screen.
-          onOpenChat={isLockedCall(callId) ? undefined : () => navigate(`/chat/${conversationId}`, { replace: true })}
-          showHold={showHold && status !== "ended"}
-          held={held}
-          onToggleHold={() => setCallHeld(callId, !held)}
-        />
-        </div>
-      </div>
-    </MobileFrame>
+    <CallFullScreen
+      key="full"
+      {...{
+        videoFullscreen,
+        localVideoTrack,
+        remoteVideoTrack,
+        videoSwapped,
+        setVideoSwapped,
+        isVideo,
+        other,
+        status,
+        reconnecting,
+        seconds,
+        role,
+        onHold,
+        callsSnap,
+        otherCalls,
+        navigate,
+        callId,
+        minimize,
+        needsTapForSound,
+        tryPlayRemoteAudio,
+        upgradeRequest,
+        acceptVideoUpgrade,
+        declineVideoUpgrade,
+        cancelVideoUpgrade,
+        muted,
+        videoEnabled,
+        speakerOn,
+        canSwitchCamera,
+        toggleMute,
+        toggleVideo,
+        toggleSpeaker,
+        switchCamera,
+        upgradeToVideo,
+        endCall,
+        conversationId,
+        held,
+        showHold,
+      }}
+    />
     </>
   );
 }

@@ -1,193 +1,58 @@
-import { tNow } from "@/lib/i18n/language";
 import { isLimitError, isSuspendedError, requestAccountCheck } from "@/lib/accountStatus";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import {
-  ArrowLeft, Send, Check, CheckCheck, Mic, Trash2, Pencil, X,
-  Paperclip, Copy, Share2, Forward, Phone, Video, Smile, MoreVertical, Search, Info,
-  Type, Loader2, Flag, Ban,
-} from "lucide-react";
-import ForwardSheet, { type ForwardResult } from "@/components/chat/ForwardSheet";
-import EmojiPicker, { Theme as EmojiTheme } from "emoji-picker-react";
+import { Phone, Video } from "lucide-react";
+import { type ForwardResult } from "@/components/chat/ForwardSheet";
 import type { EmojiClickData } from "emoji-picker-react";
 import { useTheme } from "next-themes";
 import MobileFrame from "@/components/MobileFrame";
-import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import ContactInfoSheet from "@/components/chat/ContactInfoSheet";
-import { BlockDialog, ReportDialog } from "@/components/chat/SafetyDialogs";
-import { acceptChat, isBlockedError, isMessageRequest, useIsBlocked } from "@/lib/safety";
+import { isBlockedError, isMessageRequest, useIsBlocked } from "@/lib/safety";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { FROM_CALL_BUBBLE, activeCallPath, swapToCall, useCalls } from "@/lib/activeCall";
-import { isReallyOnline } from "@/lib/presence";
-import { pickRecordingMimeType, extensionForMimeType, baseMimeType } from "@/lib/audioMime";
-import { checkMicPrerequisites, describeMicError } from "@/lib/micPermission";
-import { isVoiceTranscribeEnabled } from "@/lib/transcriptionPrefs";
+import { extensionForMimeType } from "@/lib/audioMime";
 import { beginOutgoingCall } from "@/lib/callStart";
-import {
-  AttachmentBubble,
-  FILE_PREFIX,
-  encodeFileMessage,
-  parseFileMessage,
-  isBareAttachment,
-} from "@/components/chat/AttachmentBubble";
-import CallBackSheet from "@/components/call/CallBackSheet";
-import { VoiceBubble } from "@/components/chat/VoiceBubble";
-import { VoiceRecorderBar } from "@/components/chat/VoiceRecorderBar";
-import { CallSystemBubble } from "@/components/chat/CallSystemBubble";
-import { CallRow, SwipeRow } from "@/components/chat/MessageRows";
-import {
-  CALL_PREFIX,
-  VOICE_PREFIX,
-  fmtDuration,
-  formatTime,
-  initials,
-  loadHidden,
-  saveHidden,
-} from "@/lib/chat/format";
+import { encodeFileMessage, parseFileMessage } from "@/components/chat/AttachmentBubble";
+import { CALL_PREFIX, VOICE_PREFIX, loadHidden, saveHidden } from "@/lib/chat/format";
 import { useBackNavigation } from "@/hooks/useBackNavigation";
-import chatWallpaper from "@/assets/chat-wallpaper.png";
 import { loadChatCache, saveChatCache } from "@/lib/chat/chatCache";
-import { transcribeRecording } from "@/lib/transcribe";
 import { useLanguage } from "@/lib/i18n/context";
-import { duplicateCallRecordIds, messageKind, mediaLabel, parseCallLog, selectionActions, stripQuotedReply } from "@/lib/chat/messageKinds";
-import { checkClipAvailable, copyMessages, extractTypedClip, matchPastedClip, mediaUrlOf } from "@/lib/chat/clipboard";
-import { getSignedChatMediaUrl, useSignedMediaUrl } from "@/lib/signedMedia";
+import {
+  duplicateCallRecordIds,
+  messageKind,
+  mediaLabel,
+  selectionActions,
+  stripQuotedReply,
+} from "@/lib/chat/messageKinds";
+import {
+  checkClipAvailable,
+  copyMessages,
+  extractTypedClip,
+  matchPastedClip,
+  mediaUrlOf,
+} from "@/lib/chat/clipboard";
+import { getSignedChatMediaUrl } from "@/lib/signedMedia";
 import { Capacitor } from "@capacitor/core";
 import { pushNewMessage } from "@/lib/pushNotify";
-
-// A row coming from Supabase (initial fetch or realtime payload) is only
-// guaranteed to match the DB schema, not this shape — content in particular
-// has been observed null on some rows, and every render/handler below calls
-// string methods on it directly, which throws (blanking the whole app, no
-// error boundary) the instant such a row reaches state. Normalize on the way in.
-// A message row's `content` is never legitimately empty — every send path
-// (text/voice/attachment) always writes a non-empty, prefixed string before
-// insert. If a realtime payload — or an immediate re-fetch of the same row —
-// ever comes back with blank content, that's a transient read-after-write
-// race (the client observes the row before a lagging connection/replica has
-// caught up with the write it was just notified about), not a real state.
-// A single-shot re-fetch can still lose that race; retry with backoff so a
-// message doesn't get stuck rendering as an empty "timestamp only" bubble
-// with delete/copy/forward silently no-op'ing on it until a full reload.
-async function fetchMessageRowWithRetry(
-  id: string,
-  attempts = 5,
-): Promise<Record<string, unknown> | null> {
-  for (let i = 0; i < attempts; i++) {
-    const { data } = await supabase.from("messages").select("*").eq("id", id).maybeSingle();
-    const content = (data as Record<string, unknown> | null)?.content;
-    // A message deleted for everyone is empty on purpose: that's final.
-    if (data && ((typeof content === "string" && content) || (data as Record<string, unknown>).deleted_for_everyone)) {
-      return data as Record<string, unknown>;
-    }
-    if (i < attempts - 1) await new Promise((r) => setTimeout(r, 300 * (i + 1)));
-  }
-  return null;
-}
-
-// The realtime INSERT/UPDATE handlers below retry a blank-content row via
-// fetchMessageRowWithRetry — but a plain bulk `select("*")` (the initial
-// conversation load, and resync() after a reconnect) reads the exact same
-// replication-lag-affected rows with no such protection, so a message that
-// hasn't finished replicating yet gets normalized straight into a
-// blank-content bubble with no retry at all. Apply the same per-row retry
-// here so every path that can observe a freshly-inserted row is protected,
-// not just the realtime echo. A message's content is never legitimately
-// empty (see normalizeMessage above), so this only ever fires for the rare
-// lagging row, not on every load.
-/**
- * Rows ready to show now, and the rare blank ones that need re-fetching.
- * Showing the list only after those retries (up to about 3 s, more on a
- * slow network) made a chat take seconds to open whenever its latest page
- * held one such message; now they are fixed in the background.
- */
-function splitBlankRows(rows: Record<string, unknown>[]): { ready: Message[]; blank: Record<string, unknown>[] } {
-  const blank = rows.filter(
-    (r) => !r.deleted_for_everyone && !(typeof r.content === "string" && r.content),
-  );
-  return { ready: rows.map(normalizeMessage), blank };
-}
-
-async function reconcileBlankRows(rows: Record<string, unknown>[]): Promise<Message[]> {
-  const fixed = await Promise.all(
-    rows.map(async (row) => {
-      if (typeof row.content === "string" && row.content && !row.deleted_for_everyone) {
-        return normalizeMessage(row);
-      }
-      if (row.deleted_for_everyone) return normalizeMessage(row);
-      console.warn("[realtime] bulk-fetched row arrived with blank content, retrying", row.id);
-      const retried = await fetchMessageRowWithRetry(String(row.id));
-      if (retried) return normalizeMessage(retried);
-      console.error("[realtime] bulk-fetched row still blank after retries", row.id);
-      return normalizeMessage(row);
-    }),
-  );
-  return fixed;
-}
-
-/** Messages loaded at a time: the latest page on open, older pages on scroll up. */
-const PAGE_SIZE = 50;
-
-function normalizeMessage(raw: Record<string, unknown>): Message {
-  return {
-    id: String(raw.id),
-    conversation_id: String(raw.conversation_id),
-    sender_id: String(raw.sender_id),
-    content: typeof raw.content === "string" ? raw.content : "",
-    // String(undefined) is the literal text "undefined", which then fails to
-    // parse as a date and renders as "Invalid Date" — fall back to "now"
-    // instead of ever handing the UI an unparseable timestamp.
-    created_at:
-      typeof raw.created_at === "string" && !Number.isNaN(Date.parse(raw.created_at))
-        ? raw.created_at
-        : new Date().toISOString(),
-    delivered_at: (raw.delivered_at as string | null) ?? null,
-    read_at: (raw.read_at as string | null) ?? null,
-    edited_at: (raw.edited_at as string | null) ?? null,
-    deleted_for_everyone: Boolean(raw.deleted_for_everyone),
-  };
-}
-
-type Message = {
-  id: string;
-  conversation_id: string;
-  sender_id: string;
-  content: string;
-  created_at: string;
-  delivered_at: string | null;
-  read_at: string | null;
-  edited_at: string | null;
-  deleted_for_everyone: boolean;
-};
-
-type Profile = {
-  id: string;
-  display_name: string | null;
-  avatar_url: string | null;
-  is_online: boolean;
-  last_seen_at: string;
-  show_last_seen?: boolean | null;
-};
-
-/** Plain words for why a message couldn't be sent. */
-function sendRefusalText(err: unknown): string {
-  if (isBlockedError(err)) return tNow("chat.cantMessage");
-  if (isLimitError(err)) return tNow("lim.chats");
-  if (isSuspendedError(err)) {
-    requestAccountCheck();
-    return tNow("chat.cantMessage");
-  }
-  return tNow("chat.checkConnection");
-}
+import {
+  PAGE_SIZE,
+  fetchMessageRowWithRetry,
+  normalizeMessage,
+  reconcileBlankRows,
+  sendRefusalText,
+  splitBlankRows,
+  type Message,
+  type Profile,
+} from "@/lib/chat/chatRoomData";
+import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
+import ChatSearchBar from "@/components/chat/room/ChatSearchBar";
+import SelectionBar from "@/components/chat/room/SelectionBar";
+import ChatHeader from "@/components/chat/room/ChatHeader";
+import MessageList from "@/components/chat/room/MessageList";
+import ComposerBanners from "@/components/chat/room/ComposerBanners";
+import ChatComposer from "@/components/chat/room/ChatComposer";
+import ChatRoomDialogs from "@/components/chat/room/ChatRoomDialogs";
 
 export default function ChatRoom() {
   const { id: conversationId } = useParams();
@@ -236,21 +101,6 @@ export default function ChatRoom() {
   const highlightTimer = useRef<number | null>(null);
   const [clearChatOpen, setClearChatOpen] = useState(false);
   const [callSheet, setCallSheet] = useState<"voice" | "video" | null>(null);
-  const [recording, setRecording] = useState(false);
-  const [transcribing, setTranscribing] = useState(false);
-  const [recSec, setRecSec] = useState(0);
-  const recorderRef = useRef<MediaRecorder | null>(null);
-  // Lets the automatic update wait until a voice note is finished.
-  useEffect(() => {
-    document.body.dataset.recording = recording ? "true" : "false";
-    return () => {
-      document.body.dataset.recording = "false";
-    };
-  }, [recording]);
-  const recStreamRef = useRef<MediaStream | null>(null);
-  const recChunks = useRef<Blob[]>([]);
-  const recTimer = useRef<number | null>(null);
-  const recMimeTypeRef = useRef<string>("audio/webm");
   const fileRef = useRef<HTMLInputElement>(null);
   const composerInputRef = useRef<HTMLTextAreaElement>(null);
   // Phones (coarse pointer): Enter adds a new line and the Send button sends,
@@ -1078,75 +928,11 @@ export default function ChatRoom() {
   const cancelReply = () => setReplyTo(null);
 
   // Voice notes
-  const startRecording = async () => {
-    const prereqError = checkMicPrerequisites();
-    if (prereqError) {
-      toast({ title: t("chat.cantRecord"), description: prereqError, variant: "destructive" });
-      return;
-    }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mimeType = pickRecordingMimeType();
-      const rec = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-      // Store the bare type (no ";codecs=..." parameter) — that parameter is
-      // only meaningful to MediaRecorder for picking a codec, not to the
-      // Blob that gets uploaded and later played back/transcribed.
-      recMimeTypeRef.current = baseMimeType(rec.mimeType || mimeType || "audio/webm");
-      recChunks.current = [];
-      rec.ondataavailable = (e) => e.data.size > 0 && recChunks.current.push(e.data);
-      // onstop is (re)assigned by stopRecording right before it's called, based
-      // on which button ended the recording — send as a voice note, transcribe
-      // to text, or discard. No default handler needed here.
-      rec.start();
-      recorderRef.current = rec;
-      recStreamRef.current = stream;
-      setRecording(true);
-      setRecSec(0);
-      recTimer.current = window.setInterval(() => setRecSec((s) => s + 1), 1000);
-    } catch (e) {
-      const { title, description } = describeMicError(e);
-      toast({ title, description, variant: "destructive" });
-    }
-  };
-  const stopRecording = (mode: "send" | "cancel" | "transcribe" = "send") => {
-    const r = recorderRef.current;
-    if (!r) return;
-    r.onstop = async () => {
-      r.stream.getTracks().forEach((t) => t.stop());
-      recStreamRef.current = null;
-      if (recTimer.current) window.clearInterval(recTimer.current);
-      const blob = new Blob(recChunks.current, { type: recMimeTypeRef.current });
-      setRecSec(0);
-      if (mode === "send") await uploadVoice(blob);
-      else if (mode === "transcribe") await transcribeAndFill(blob);
-    };
-    r.stop();
-    setRecording(false);
-  };
-  const transcribeAndFill = async (blob: Blob) => {
-    if (blob.size === 0 || !isVoiceTranscribeEnabled()) return;
-    setTranscribing(true);
-    try {
-      const transcript = await transcribeRecording(blob);
-      if (!transcript) {
-        toast({
-          title: t("chat.heardNothing"),
-          description: t("chat.recordCloser"),
-          variant: "destructive",
-        });
-        return;
-      }
-      setText((prev) => (prev.trim() ? `${prev.trim()} ${transcript}` : transcript));
-    } catch (e) {
-      toast({
-        title: t("chat.transcribeFailed"),
-        description: t("auth.tryAgain"),
-        variant: "destructive",
-      });
-    } finally {
-      setTranscribing(false);
-    }
-  };
+  // Voice notes (recording lives in useVoiceRecorder; sending stays here)
+  const { recording, transcribing, recSec, recStreamRef, startRecording, stopRecording } = useVoiceRecorder({
+    uploadVoice: (blob) => uploadVoice(blob),
+    setText,
+  });
   const uploadVoice = async (blob: Blob) => {
     if (!user || !conversationId) return;
     console.debug("[voice-send] start", { size: blob.size, type: blob.type });
@@ -1425,195 +1211,46 @@ export default function ChatRoom() {
       <div className="h-full w-full flex flex-col bg-background" onClick={clearSelection}>
         {/* Header OR Search bar OR Selection action bar */}
         {searchOpen ? (
-          <div
-            className="px-2 pt-4 pb-3 flex items-center gap-1 border-b border-border bg-card"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              aria-label={t("chat.closeSearch")}
-              onClick={() => { setSearchOpen(false); setSearchQuery(""); }}
-              className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-secondary shrink-0"
-            >
-              <ArrowLeft className="w-5 h-5 text-foreground" />
-            </button>
-            <Input
-              autoFocus
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={t("chat.searchHere")}
-              className="h-9 text-xs bg-input border-border flex-1"
-            />
-          </div>
+          <ChatSearchBar
+            {...{
+              searchQuery,
+              setSearchQuery,
+              setSearchOpen,
+            }}
+          />
         ) : selectionCount > 0 ? (
-          <div
-            className="px-2 pt-4 pb-3 flex items-center gap-1 border-b border-border bg-card"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              aria-label={t("common.cancel")}
-              onClick={clearSelection}
-              className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
-            >
-              <X className="w-4 h-4 text-foreground" />
-            </button>
-            <span className="text-xs font-semibold text-foreground ml-1">
-              {selectionCount}
-            </span>
-            <div className="flex-1" />
-            {actions.canCopy && (
-              <button
-                aria-label={t("chat.copy")}
-                onClick={() => copyMsgs(actionable)}
-                className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
-              >
-                <Copy className="w-4 h-4 text-foreground" />
-              </button>
-            )}
-            {actions.canShare && (
-              <button
-                aria-label={t("chat.share")}
-                onClick={() => shareMsgs(actionable)}
-                className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
-              >
-                <Share2 className="w-4 h-4 text-foreground" />
-              </button>
-            )}
-            {actions.canForward && forwardContents.length > 0 && (
-              <button
-                aria-label={t("chat.forward")}
-                onClick={() => setForwardOpen(true)}
-                className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
-              >
-                <Forward className="w-4 h-4 text-foreground" />
-              </button>
-            )}
-            {actions.canReport && onlySelected && (
-              <button
-                aria-label={t("chat.report")}
-                onClick={() => {
-                  setReport({ messageId: onlySelected.id });
-                  clearSelection();
-                }}
-                className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
-              >
-                <Flag className="w-4 h-4 text-foreground" />
-              </button>
-            )}
-            {actions.canEdit && (
-              <button
-                aria-label={t("chat.edit")}
-                onClick={() => onlySelected && startEdit(onlySelected)}
-                className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
-              >
-                <Pencil className="w-4 h-4 text-foreground" />
-              </button>
-            )}
-            <button
-              aria-label={t("chat.deleteSelected")}
-              onClick={() => setDeleteOpen(true)}
-              className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary"
-            >
-              <Trash2 className="w-4 h-4 text-destructive" />
-            </button>
-          </div>
+          <SelectionBar
+            {...{
+              clearSelection,
+              selectionCount,
+              actions,
+              copyMsgs,
+              actionable,
+              shareMsgs,
+              forwardContents,
+              setForwardOpen,
+              onlySelected,
+              setReport,
+              startEdit,
+              setDeleteOpen,
+            }}
+          />
         ) : (
-          <div className="px-3 pt-4 pb-3 flex items-center gap-2 border-b border-border">
-            {showBackArrow && (
-              <button
-                aria-label={t("common.back")}
-                onClick={(e) => { e.stopPropagation(); goBack(); }}
-                className="w-9 h-9 -ml-1 rounded-full flex items-center justify-center hover:bg-secondary shrink-0"
-              >
-                <ArrowLeft className="w-5 h-5 text-foreground" />
-              </button>
-            )}
-            <div className="relative">
-              <Avatar className="w-9 h-9">
-                <AvatarImage src={other?.avatar_url ?? undefined} />
-                <AvatarFallback className="bg-primary/20 text-foreground text-xs font-semibold">
-                  {initials(other?.display_name)}
-                </AvatarFallback>
-              </Avatar>
-              {other && (() => {
-                const ageMs = Date.now() - new Date(other.last_seen_at).getTime();
-                return other.is_online && ageMs < 5 * 60 * 1000;
-              })() && (
-                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-accent border-2 border-background" />
-              )}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-foreground truncate leading-tight">
-                {other?.display_name ?? t("chat.chichatUser")}
-              </p>
-              {/* Fixed-height status row — never changes header height */}
-              <div className="h-[14px] flex items-center">
-                {otherTyping ? (
-                  <span className="text-xs text-primary truncate flex items-center gap-1">
-                    <span className="flex gap-0.5">
-                      <span className="w-1 h-1 rounded-full bg-primary animate-bounce [animation-delay:-0.3s]" />
-                      <span className="w-1 h-1 rounded-full bg-primary animate-bounce [animation-delay:-0.15s]" />
-                      <span className="w-1 h-1 rounded-full bg-primary animate-bounce" />
-                    </span>
-                    typing
-                  </span>
-                ) : isReallyOnline(other) ? (
-                  <span className="text-xs text-muted-foreground truncate">{t("common.online")}</span>
-                ) : null}
-              </div>
-            </div>
-            <button
-              aria-label={t("call.voice")}
-              onClick={(e) => { e.stopPropagation(); startCall("voice"); }}
-              className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-secondary active:bg-secondary active:scale-90 transition-transform"
-            >
-              <Phone className="w-5 h-5 text-foreground" />
-            </button>
-            <button
-              aria-label={t("call.video")}
-              onClick={(e) => { e.stopPropagation(); startCall("video"); }}
-              className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-secondary active:bg-secondary active:scale-90 transition-transform"
-            >
-              <Video className="w-5 h-5 text-foreground" />
-            </button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  aria-label={t("chat.moreOptions")}
-                  onClick={(e) => e.stopPropagation()}
-                  className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-secondary"
-                >
-                  <MoreVertical className="w-5 h-5 text-foreground" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                <DropdownMenuItem onClick={() => setContactInfoOpen(true)}>
-                  <Info className="w-4 h-4 mr-2" /> {t("chat.viewContact")}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setSearchOpen(true)}>
-                  <Search className="w-4 h-4 mr-2" /> {t("chat.search")}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setClearChatOpen(true)}
-                  className="text-destructive focus:text-destructive"
-                >
-                  <Trash2 className="w-4 h-4 mr-2" /> {t("chat.clearChat")}
-                </DropdownMenuItem>
-                {other && (
-                  <>
-                    <DropdownMenuItem onClick={() => setBlockOpen(true)}>
-                      <Ban className="w-4 h-4 mr-2" /> {blockedByMe ? t("chat.unblock") : t("chat.block")}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => setReport({ messageId: null })}
-                      className="text-destructive focus:text-destructive"
-                    >
-                      <Flag className="w-4 h-4 mr-2" /> {t("chat.report")}
-                    </DropdownMenuItem>
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+          <ChatHeader
+            {...{
+              showBackArrow,
+              goBack,
+              other,
+              otherTyping,
+              startCall,
+              setContactInfoOpen,
+              setSearchOpen,
+              setClearChatOpen,
+              setBlockOpen,
+              blockedByMe,
+              setReport,
+            }}
+          />
         )}
 
         {chatCall && (
@@ -1633,636 +1270,118 @@ export default function ChatRoom() {
         {/* Faint repeating ChiChat logos behind the messages (the approved
             wallpaper preview: 7%, 26 px logos, 88 px staggered grid). One
             small tile; it stays put while the messages scroll over it. */}
-        <div
-          ref={scrollRef}
-          onScroll={onMessagesScroll}
-          data-testid="chat-wallpaper"
-          className="flex-1 overflow-y-auto px-3 py-3 space-y-2"
-          style={{ backgroundImage: `url(${chatWallpaper})`, backgroundSize: "176px 176px", backgroundRepeat: "repeat" }}
-        >
-          {loadingOlder && !searchOpen && (
-            <p className="text-2xs text-muted-foreground text-center py-1" role="status">
-              {t("chat.loadingEarlier")}
-            </p>
-          )}
-          {searchOpen && searchQuery.trim() && searchResults.length === 0 && (
-            <p className="text-xs text-muted-foreground text-center mt-6">{t("common.noMatches")}</p>
-          )}
-          {!searchOpen && visible.length === 0 && (
-            <p className="text-xs text-muted-foreground text-center mt-6">{t("chat.sayHello")}</p>
-          )}
-          {(searchOpen && searchQuery.trim() ? searchResults : visible).map((m) => {
-            const mine = m.sender_id === user?.id;
-            const isVoice = m.content.startsWith(VOICE_PREFIX);
-            const isCall = m.content.startsWith(CALL_PREFIX);
-            const isFile = m.content.startsWith(FILE_PREFIX);
-            const voiceUrl = isVoice ? m.content.slice(VOICE_PREFIX.length) : "";
-            const fileMeta = isFile ? parseFileMessage(m.content) : null;
-            const isDeleted = m.deleted_for_everyone;
-            const isSelected = selectedIds.has(m.id);
+        <MessageList
+          {...{
+            scrollRef,
+            onMessagesScroll,
+            loadingOlder,
+            searchOpen,
+            searchQuery,
+            searchResults,
+            visible,
+            user,
+            selectedIds,
+            messageRefs,
+            highlightId,
+            selectionCount,
+            jumpToMessage,
+            toggleSelect,
+            setCallSheet,
+            selectFromLongPress,
+            replyMsg,
+            bubbleTapsBlocked,
+            setSelectedIds,
+            setDeleteOpen,
+            otherTyping,
+          }}
+        />
 
-            if (isCall) {
-              return (
-                <div
-                  key={m.id}
-                  ref={(el) => {
-                    if (el) messageRefs.current.set(m.id, el);
-                    else messageRefs.current.delete(m.id);
-                  }}
-                  className={`transition-colors rounded-2xl ${highlightId === m.id ? "bg-accent/25" : ""}`}
-                >
-                  <CallRow
-                    mine={mine}
-                    isSelected={isSelected}
-                    onTap={() => {
-                      if (searchOpen) jumpToMessage(m.id);
-                      else if (selectionCount > 0) toggleSelect(m.id);
-                      // Outside selection mode a tap offers to call back,
-                      // always behind a confirmation (never calls directly).
-                      else setCallSheet(parseCallLog(m.content)?.callType ?? "voice");
-                    }}
-                    onLongPress={() => selectFromLongPress(m.id)}
-                  >
-                    <CallSystemBubble m={m} mine={mine} />
-                  </CallRow>
-                </div>
-              );
-            }
-
-            // Parse quoted reply prefix: lines starting with "> " followed by message
-            let quoted: string | null = null;
-            let body = m.content;
-            if (!isVoice && !isFile && !isDeleted && body.startsWith("> ")) {
-              const nl = body.indexOf("\n");
-              if (nl > -1) {
-                quoted = body.slice(2, nl);
-                body = body.slice(nl + 1);
-              }
-            }
-
-            const bareAttachment = isFile && fileMeta && isBareAttachment(fileMeta);
-
-            return (
-              <div
-                key={m.id}
-                ref={(el) => {
-                  if (el) messageRefs.current.set(m.id, el);
-                  else messageRefs.current.delete(m.id);
-                }}
-                className={`transition-colors rounded-2xl ${highlightId === m.id ? "bg-accent/25" : ""}`}
-              >
-              <SwipeRow
-                mine={mine}
-                onReply={() => replyMsg(m)}
-                onTap={(e) => {
-                  e.stopPropagation();
-                  if (searchOpen) {
-                    jumpToMessage(m.id);
-                    return;
-                  }
-                  // In selection mode, tap toggles. Otherwise tap does nothing
-                  // (selection requires long-press to avoid accidental opens).
-                  if (selectionCount > 0) toggleSelect(m.id);
-                }}
-                onLongPress={() => selectFromLongPress(m.id)}
-              >
-                <div
-                  className={`max-w-[92%] select-none transition-shadow ${
-                    bubbleTapsBlocked ? "pointer-events-none" : ""
-                  } ${
-                    bareAttachment
-                      ? `rounded-2xl ${isSelected ? "ring-2 ring-accent" : ""}`
-                      : `px-4 py-2.5 rounded-2xl shadow-sm ${
-                          mine
-                            ? "bg-primary text-primary-foreground rounded-br-sm"
-                            : "bg-card text-foreground rounded-bl-sm"
-                        } ${isDeleted ? "italic opacity-70" : ""} ${
-                          isSelected ? "ring-2 ring-accent" : ""
-                        }`
-                  }`}
-                >
-                  {quoted && !bareAttachment && (
-                    <div
-                      dir="auto"
-                      className={`mb-1 px-2 py-1 rounded-md border-l-2 text-xs line-clamp-4 whitespace-pre-wrap break-words ${
-                        mine
-                          ? "bg-primary-foreground/10 border-primary-foreground/60 text-primary-foreground/85"
-                          : "bg-foreground/5 border-primary text-muted-foreground"
-                      }`}
-                    >
-                      {quoted}
-                    </div>
-                  )}
-                  {isDeleted ? (
-                    <p className="text-[12px]">🚫 {t("chat.deletedMsg")}</p>
-                  ) : isVoice ? (
-                    <VoiceBubble id={m.id} url={voiceUrl} mine={mine} />
-                  ) : isFile && fileMeta ? (
-                    <AttachmentBubble
-                      meta={fileMeta}
-                      mine={mine}
-                      timestamp={m.created_at}
-                      onDelete={() => {
-                        setSelectedIds(new Set([m.id]));
-                        setDeleteOpen(true);
-                      }}
-                    />
-                  ) : (
-                    <p dir="auto" className="text-base whitespace-pre-wrap break-words leading-snug">
-                      {body}
-                      <span
-                        className={`float-right inline-flex items-center gap-1 ml-2 mt-1 text-[10px] leading-none whitespace-nowrap ${
-                          mine ? "text-primary-foreground/70" : "text-muted-foreground"
-                        }`}
-                      >
-                        {m.edited_at && <span>{t("chat.edited")}</span>}
-                        <span>{formatTime(m.created_at)}</span>
-                        {mine && (
-                          m.read_at ? (
-                            <CheckCheck className="w-3 h-3 text-sky-400" />
-                          ) : m.delivered_at ? (
-                            <CheckCheck className="w-3 h-3 text-primary-foreground/70" />
-                          ) : (
-                            <Check className="w-3 h-3 text-primary-foreground/70" />
-                          )
-                        )}
-                      </span>
-                    </p>
-                  )}
-                  {!bareAttachment && (isDeleted || isVoice || isFile) && (
-                    <div className={`flex items-center gap-1 mt-0.5 ${mine ? "justify-end" : "justify-start"}`}>
-                      {m.edited_at && !isDeleted && (
-                        <span className={`text-[9px] ${mine ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
-                          edited
-                        </span>
-                      )}
-                      <span className={`text-[9px] ${mine ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
-                        {formatTime(m.created_at)}
-                      </span>
-                      {mine && !isDeleted && (
-                        m.read_at ? (
-                          <CheckCheck className="w-3 h-3 text-sky-400" />
-                        ) : m.delivered_at ? (
-                          <CheckCheck className={`w-3 h-3 ${mine ? "text-primary-foreground/70" : "text-muted-foreground"}`} />
-                        ) : (
-                          <Check className={`w-3 h-3 ${mine ? "text-primary-foreground/70" : "text-muted-foreground"}`} />
-                        )
-                      )}
-                    </div>
-                  )}
-                </div>
-              </SwipeRow>
-              </div>
-            );
-          })}
-          {otherTyping && (
-            <div className="flex justify-start">
-              <div className="bg-card text-foreground px-3 py-2 rounded-2xl rounded-bl-sm shadow-sm">
-                <div className="flex gap-1 items-center h-3">
-                  <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:-0.3s]" />
-                  <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:-0.15s]" />
-                  <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce" />
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Editing banner */}
-        {editing && (
-          <div
-            className="px-3 py-1.5 bg-secondary border-t border-border flex items-center gap-2"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Pencil className="w-3 h-3 text-primary" />
-            <span className="text-2xs text-muted-foreground flex-1 truncate">
-              Editing: {editing.content}
-            </span>
-            <button onClick={cancelEdit} className="text-muted-foreground hover:text-foreground">
-              <X className="w-3 h-3" />
-            </button>
-          </div>
-        )}
-
-        {/* Reply preview banner (WhatsApp-style) */}
-        {replyTo && !editing && (
-          <div
-            className="px-3 py-2 bg-secondary border-t border-border flex items-center gap-2"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="w-1 self-stretch rounded bg-primary" />
-            <div className="flex-1 min-w-0">
-              <p className="text-2xs font-semibold text-primary">
-                {t("chat.replyingTo", { name: replyTo.sender_id === user?.id ? t("chat.yourself") : other?.display_name ?? t("chat.them") })}
-              </p>
-              <p className="text-xs text-muted-foreground truncate">
-                {replyTo.content.startsWith(VOICE_PREFIX)
-                  ? `🎤 ${t("msg.voiceNote")}`
-                  : replyTo.content.startsWith(FILE_PREFIX)
-                    ? `📎 ${parseFileMessage(replyTo.content)?.name ?? t("msg.attachment")}`
-                    : replyTo.content}
-              </p>
-            </div>
-            <button onClick={cancelReply} aria-label={t("chat.cancelReply")} className="text-muted-foreground hover:text-foreground">
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        )}
-
-        {/* Pending attachment preview (shown above composer) */}
-        {pendingFile && (
-          <div
-            className="px-3 py-2 bg-secondary/60 border-t border-border flex items-center gap-2"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="w-12 h-12 rounded-lg overflow-hidden bg-background flex items-center justify-center flex-shrink-0">
-              {pendingFile.file.type.startsWith("image/") ? (
-                <img
-                  src={pendingFile.previewUrl}
-                  alt={pendingFile.file.name}
-                  className="w-full h-full object-cover"
-                />
-              ) : pendingFile.file.type.startsWith("video/") ? (
-                <video src={pendingFile.previewUrl} className="w-full h-full object-cover" />
-              ) : (
-                <Paperclip className="w-5 h-5 text-muted-foreground" />
-              )}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-[12px] font-medium text-foreground truncate">
-                {pendingFile.file.name}
-              </p>
-              <p className="text-2xs text-muted-foreground">
-                {(pendingFile.file.size / 1024).toFixed(1)} KB
-              </p>
-            </div>
-            <button
-              onClick={cancelPending}
-              aria-label={t("chat.removeAttachment")}
-              className="w-7 h-7 rounded-full hover:bg-background flex items-center justify-center text-muted-foreground"
-              disabled={uploading}
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        )}
-
-        {/* Pasted voice note / photo / video / document (from an in-app copy) */}
-        {pendingClip && !pendingFile && (
-          <div
-            className="px-3 py-2 bg-secondary/60 border-t border-border flex items-center gap-2"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <PastedClipPreview content={pendingClip} />
-            <button
-              onClick={cancelClip}
-              aria-label={t("chat.removePasted")}
-              className="w-7 h-7 rounded-full hover:bg-background flex items-center justify-center text-muted-foreground"
-              disabled={uploading}
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        )}
+        <ComposerBanners
+          {...{
+            editing,
+            cancelEdit,
+            replyTo,
+            user,
+            other,
+            cancelReply,
+            pendingFile,
+            cancelPending,
+            uploading,
+            pendingClip,
+            cancelClip,
+          }}
+        />
 
         {/* Composer — lifted above bottom edge */}
-        {blockedByMe && other ? (
-          <div
-            className="px-4 pt-3 pb-5 border-t border-border bg-background text-center"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <p className="text-sm text-muted-foreground">
-              {t("chat.youBlocked", { name: otherName })}
-            </p>
-            <button
-              onClick={() => setBlockOpen(true)}
-              className="mt-2 text-sm font-semibold text-primary"
-            >
-              {t("chat.unblock")}
-            </button>
-          </div>
-        ) : requestState === "yes" && other ? (
-          <div
-            className="px-4 pt-3 pb-5 border-t border-border bg-background"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <p className="text-sm text-foreground text-center">
-              {t("chat.notInContacts", { name: otherName })}
-            </p>
-            <p className="text-xs text-muted-foreground text-center mt-1">
-              {t("chat.wontKnowSeen")}
-            </p>
-            <div className="grid grid-cols-3 gap-2 mt-3">
-              <button
-                onClick={() => setBlockOpen(true)}
-                className="h-11 rounded-xl border border-border text-sm font-medium text-destructive"
-              >
-                {t("chat.block")}
-              </button>
-              <button
-                onClick={() => setReport({ messageId: null })}
-                className="h-11 rounded-xl border border-border text-sm font-medium text-foreground"
-              >
-                {t("chat.report")}
-              </button>
-              <button
-                onClick={() => {
-                  setRequest("no");
-                  void acceptChat(conversationId!);
-                  void markConversationRead();
-                }}
-                className="h-11 rounded-xl bg-primary text-primary-foreground text-sm font-semibold"
-              >
-                {t("chat.accept")}
-              </button>
-            </div>
-          </div>
-        ) : (
-        <div
-          className="px-3 pt-2 pb-4 border-t border-border flex items-end gap-2 bg-background"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {transcribing ? (
-            <div className="flex-1 flex items-center gap-2 px-3 h-9 rounded-md bg-input border border-border">
-              <Loader2 className="w-4 h-4 text-primary animate-spin" />
-              <span className="text-xs text-muted-foreground">{t("chat.transcribing")}</span>
-            </div>
-          ) : recording ? (
-            <>
-              <button
-                onClick={() => stopRecording("cancel")}
-                aria-label={t("chat.cancelRecording")}
-                className="w-9 h-9 rounded-full bg-secondary hover:bg-secondary/80 flex items-center justify-center"
-              >
-                <X className="w-4 h-4 text-foreground" />
-              </button>
-              <div className="flex-1 flex items-center gap-2 px-2 h-9 rounded-md bg-input border border-border overflow-hidden">
-                <span className="w-2 h-2 rounded-full bg-destructive animate-pulse shrink-0" />
-                <span className="text-xs text-foreground shrink-0 tabular-nums">{fmtDuration(recSec)}</span>
-                <VoiceRecorderBar stream={recStreamRef.current} />
-              </div>
-              {isVoiceTranscribeEnabled() && (
-                <button
-                  onClick={() => stopRecording("transcribe")}
-                  aria-label={t("chat.convertText")}
-                  title={t("chat.convertText")}
-                  className="w-9 h-9 rounded-full bg-secondary hover:bg-secondary/80 flex items-center justify-center"
-                >
-                  <Type className="w-4 h-4 text-foreground" />
-                </button>
-              )}
-              <button
-                onClick={() => stopRecording("send")}
-                aria-label={t("chat.sendVoice")}
-                className="w-9 h-9 rounded-full bg-primary hover:bg-primary/90 flex items-center justify-center"
-              >
-                <Send className="w-4 h-4 text-primary-foreground" />
-              </button>
-            </>
-          ) : (
-            <>
-              <input
-                ref={fileRef}
-                type="file"
-                accept="*/*"
-                className="hidden"
-                onChange={onPickFile}
-              />
-              {!pendingFile && !pendingClip && (
-                <button
-                  onClick={() => fileRef.current?.click()}
-                  aria-label={t("chat.attachFile")}
-                  className="w-9 h-9 rounded-full hover:bg-secondary flex items-center justify-center"
-                >
-                  <Paperclip className="w-4 h-4 text-foreground" />
-                </button>
-              )}
-              <textarea
-                dir="auto"
-                ref={composerInputRef}
-                rows={1}
-                value={text}
-                onChange={(e) => onComposerChange(e.target.value)}
-                onPaste={onComposerPaste}
-                onFocus={() => setEmojiOpen(false)}
-                onKeyDown={(e) => {
-                  if (e.key !== "Enter" || e.shiftKey || enterAddsNewLine) return;
-                  // Don't send while an input method (e.g. predictive text) is composing.
-                  if (e.nativeEvent.isComposing) return;
-                  e.preventDefault();
-                  if (pendingFile) sendPending();
-                  else if (pendingClip) void sendClip();
-                  else send();
-                }}
-                placeholder={
-                  pendingFile || (pendingClip && messageKind(pendingClip) !== "voice")
-                    ? t("chat.captionPh")
-                    : editing
-                      ? t("chat.editMessage")
-                      : t("chat.typeMessage")
-                }
-                disabled={uploading}
-                aria-label={t("chat.message")}
-                className="flex-1 min-w-0 min-h-10 resize-none rounded-lg border-[1.5px] border-border bg-input px-3.5 py-[7px] text-base leading-6 text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:border-primary disabled:opacity-50"
-              />
-              {!pendingFile && (
-                <button
-                  onClick={() => {
-                    composerInputRef.current?.blur();
-                    setEmojiOpen((v) => !v);
-                  }}
-                  aria-label={t("chat.emoji")}
-                  className="w-9 h-9 rounded-full hover:bg-secondary flex items-center justify-center"
-                >
-                  <Smile className="w-4 h-4 text-foreground" />
-                </button>
-              )}
-              {pendingFile || pendingClip ? (
-                <button
-                  onClick={() => (pendingFile ? sendPending() : void sendClip())}
-                  aria-label={t("chat.sendAttachment")}
-                  disabled={uploading}
-                  className="w-9 h-9 rounded-full bg-primary hover:bg-primary/90 flex items-center justify-center disabled:opacity-50"
-                >
-                  <Send className="w-4 h-4 text-primary-foreground" />
-                </button>
-              ) : text.trim() || editing ? (
-                <button
-                  onClick={send}
-                  aria-label={t("chat.send")}
-                  className="w-9 h-9 rounded-full bg-primary hover:bg-primary/90 flex items-center justify-center disabled:opacity-50"
-                  disabled={!text.trim()}
-                >
-                  <Send className="w-4 h-4 text-primary-foreground" />
-                </button>
-              ) : (
-                <button
-                  onClick={startRecording}
-                  aria-label={t("chat.recordVoice")}
-                  className="w-9 h-9 rounded-full bg-primary hover:bg-primary/90 flex items-center justify-center"
-                >
-                  <Mic className="w-4 h-4 text-primary-foreground" />
-                </button>
-              )}
-            </>
-          )}
-        </div>
-        )}
-        {emojiOpen && (
-          <div className="border-t border-border bg-background h-[300px] overflow-hidden shrink-0">
-            <EmojiPicker
-              onEmojiClick={onEmojiClick}
-              theme={resolvedTheme === "dark" ? EmojiTheme.DARK : EmojiTheme.LIGHT}
-              width="100%"
-              height={300}
-              searchDisabled
-              skinTonesDisabled
-              previewConfig={{ showPreview: false }}
-            />
-          </div>
-        )}
+        <ChatComposer
+          {...{
+            blockedByMe,
+            other,
+            otherName,
+            setBlockOpen,
+            requestState,
+            setReport,
+            setRequest,
+            conversationId,
+            markConversationRead,
+            transcribing,
+            recording,
+            stopRecording,
+            recSec,
+            recStreamRef,
+            fileRef,
+            onPickFile,
+            pendingFile,
+            pendingClip,
+            composerInputRef,
+            text,
+            onComposerChange,
+            onComposerPaste,
+            setEmojiOpen,
+            enterAddsNewLine,
+            sendPending,
+            sendClip,
+            send,
+            editing,
+            uploading,
+            startRecording,
+            emojiOpen,
+            onEmojiClick,
+            resolvedTheme,
+          }}
+        />
       </div>
-      {forwardOpen && user && (
-        <ForwardSheet
-          userId={user.id}
-          contents={forwardContents}
-          onClose={() => setForwardOpen(false)}
-          onDone={finishForward}
-        />
-      )}
-      {deleteOpen && (
-        <>
-          <div
-            className="fixed inset-0 z-[60] bg-black/30"
-            onClick={() => setDeleteOpen(false)}
-          />
-          <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[61] w-[260px] rounded-xl bg-background border border-border shadow-lg overflow-hidden">
-            {actions.canDeleteForEveryone && (
-              <button
-                onClick={async () => {
-                  setDeleteOpen(false);
-                  await deleteForEveryone(selectedList);
-                }}
-                className="w-full h-11 text-sm text-foreground hover:bg-secondary border-b border-border"
-              >
-                {t("chat.deleteEveryone")}
-              </button>
-            )}
-            <button
-              onClick={() => {
-                setDeleteOpen(false);
-                deleteForMe(selectedList);
-              }}
-              className="w-full h-11 text-sm text-foreground hover:bg-secondary border-b border-border"
-            >
-              {t("chat.deleteMe")}
-            </button>
-            <button
-              onClick={() => setDeleteOpen(false)}
-              className="w-full h-11 text-sm text-foreground hover:bg-secondary"
-            >
-              {t("common.cancel")}
-            </button>
-          </div>
-        </>
-      )}
-      <CallBackSheet
-        open={!!callSheet}
-        onOpenChange={(o) => !o && setCallSheet(null)}
-        name={other?.display_name ?? t("chat.contact")}
-        type={callSheet ?? "voice"}
-        onConfirm={() => callSheet && startCall(callSheet)}
-      />
-      {clearChatOpen && (
-        <>
-          <div
-            className="fixed inset-0 z-[60] bg-black/30"
-            onClick={() => setClearChatOpen(false)}
-          />
-          <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[61] w-[280px] rounded-xl bg-background border border-border shadow-lg overflow-hidden">
-            <div className="px-4 py-3 border-b border-border">
-              <p className="text-sm font-semibold text-foreground">{t("chat.clearTitle")}</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {t("chat.clearBody", { name: other?.display_name ?? t("chat.otherPerson") })}
-              </p>
-            </div>
-            <button
-              onClick={clearChat}
-              className="w-full h-11 text-sm text-destructive hover:bg-secondary border-b border-border"
-            >
-              {t("chat.clearChat")}
-            </button>
-            <button
-              onClick={() => setClearChatOpen(false)}
-              className="w-full h-11 text-sm text-foreground hover:bg-secondary"
-            >
-              {t("common.cancel")}
-            </button>
-          </div>
-        </>
-      )}
-      {other && (
-        <BlockDialog
-          open={blockOpen}
-          onOpenChange={setBlockOpen}
-          userId={other.id}
-          name={otherName}
-          blocked={blockedByMe}
-        />
-      )}
-      {other && (
-        <ReportDialog
-          open={!!report}
-          onOpenChange={(o) => !o && setReport(null)}
-          userId={other.id}
-          name={otherName}
-          conversationId={conversationId}
-          messageId={report?.messageId ?? null}
-          alreadyBlocked={blockedByMe}
-        />
-      )}
-      <ContactInfoSheet
-        open={contactInfoOpen}
-        onOpenChange={setContactInfoOpen}
-        contact={other}
-        blocked={blockedByMe}
-        onBlock={() => {
-          setContactInfoOpen(false);
-          setBlockOpen(true);
-        }}
-        onReport={() => {
-          setContactInfoOpen(false);
-          setReport({ messageId: null });
+      <ChatRoomDialogs
+        {...{
+          forwardOpen,
+          user,
+          forwardContents,
+          setForwardOpen,
+          finishForward,
+          deleteOpen,
+          setDeleteOpen,
+          actions,
+          deleteForEveryone,
+          selectedList,
+          deleteForMe,
+          callSheet,
+          setCallSheet,
+          other,
+          startCall,
+          clearChatOpen,
+          setClearChatOpen,
+          clearChat,
+          blockOpen,
+          setBlockOpen,
+          otherName,
+          blockedByMe,
+          report,
+          setReport,
+          conversationId,
+          contactInfoOpen,
+          setContactInfoOpen,
         }}
       />
     </MobileFrame>
-  );
-}
-
-function PastedClipPreview({ content }: { content: string }) {
-  const kind = messageKind(content);
-  const meta = parseFileMessage(content);
-  const url = useSignedMediaUrl(kind === "image" || kind === "video" ? mediaUrlOf(content) : null);
-  const { t } = useLanguage();
-  const title = kind === "voice" ? t("msg.voiceNote") : meta?.name ?? mediaLabel(content);
-  const sub = kind === "voice" ? t("chat.pastedVoice") : kind === "image" ? t("chat.pastedPhoto") : kind === "video" ? t("chat.pastedVideo") : t("chat.pastedDoc");
-  return (
-    <>
-      <div className="w-12 h-12 rounded-lg overflow-hidden bg-background flex items-center justify-center flex-shrink-0">
-        {kind === "image" && url ? (
-          <img src={url} alt={title} className="w-full h-full object-cover" />
-        ) : kind === "video" && url ? (
-          <video src={url} className="w-full h-full object-cover" muted preload="metadata" />
-        ) : kind === "voice" ? (
-          <Mic className="w-5 h-5 text-primary" />
-        ) : (
-          <Paperclip className="w-5 h-5 text-muted-foreground" />
-        )}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-[12px] font-medium text-foreground truncate">{title}</p>
-        <p className="text-2xs text-muted-foreground">{sub}</p>
-      </div>
-    </>
   );
 }

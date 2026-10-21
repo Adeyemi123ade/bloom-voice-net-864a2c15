@@ -64,14 +64,14 @@ Local run: `npm install`, `npm run dev` (http://localhost:8080). Tests:
 
 | Item | Where | State |
 | --- | --- | --- |
-| Chat restore hole (backups could be edited to join chats or forge messages) | PR #86 | Fix ready. Needs: deploy `chat-backup` and `chat-restore`, run `20261021120000_backups_server_only.sql`, merge |
-| PR checks and branch protection | PR #87 | Ready |
+| Chat restore hole (backups could be edited to join chats or forge messages) | PR #86 | Merged. Confirm `chat-backup` and `chat-restore` are deployed and `20261021120000_backups_server_only.sql` was run |
+| PR checks and branch protection | PR #87 | Check merged. Branch protection on main still to turn on in GitHub settings |
 | Unused public functions `sign-in-with-identifier`, `check-user-exists` | `supabase/functions/` | Delete from the live project and the repo |
 | No rate limit on `check-registration-availability`, `request-device-otp` | same | Open |
 | 10 functions missing from `supabase/config.toml` | same | Open |
 | "Message request" label on the chat list; typing indicator visible to a blocked person | `src/pages/Home.tsx`, `typing_indicators` rules | Open |
 | Code splitting: main bundle is 2.3 MB and includes Twilio although calls use Agora | `src/App.tsx`, call files | Open |
-| Split `ChatRoom.tsx` (2,268 lines) and `CallScreen.tsx` (1,427 lines) | `src/pages/` | Planned before the tester round |
+| Split `ChatRoom.tsx` and `CallScreen.tsx` | PR #89 | Screens split (ChatRoom 2,268 to 1,387 lines; CallScreen 1,427 to 1,330). Next, after two-phone call tests: move message loading and sending into hooks, and split the call connection logic |
 | Native Android crash reports (Firebase Crashlytics) | `android/` | Before the release build |
 | Native speaker check of the 14 translations | `src/lib/i18n/` | Before public launch |
 | Tester guide with acceptance criteria | owner | Waiting |
