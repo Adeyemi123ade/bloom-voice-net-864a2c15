@@ -19,7 +19,6 @@ export type AppSwitches = {
 };
 
 const AUTOSTART_KEY = "chichat.autostart_on";
-const FIRST_START_KEY = "chichat.first_start_setup_done";
 
 function remembered(key: string): boolean | null {
   try {
@@ -76,14 +75,3 @@ export async function changeAppSwitch(name: keyof AppSwitches, turnOn: boolean, 
   }
 }
 
-/**
- * Once per install, after sign in: true when the phone may stop ChiChat in
- * the background (so calls might not ring with the app closed). The screen
- * then explains the battery setting before opening it; nothing opens by itself.
- */
-export async function needsFirstStartBatteryHelp(): Promise<boolean> {
-  if (!isAndroidNative() || remembered(FIRST_START_KEY)) return false;
-  remember(FIRST_START_KEY, true);
-  const r = await getCallReadiness();
-  return !!r && !r.battery;
-}
