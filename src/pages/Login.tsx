@@ -127,7 +127,10 @@ export default function Login() {
       const signedIn = await signInDirect(normalizedIdentifier, result.data.password);
       return { data: signedIn.errorCode ? { error: signedIn.errorCode } : signedIn.data, error: null };
     })();
-    const { data, error } = (await Promise.race([signInPromise, timeoutPromise])) as { data?: any; error: Error | null };
+    const { data, error } = (await Promise.race([signInPromise, timeoutPromise])) as {
+      data?: { session?: { access_token?: string; refresh_token?: string; user?: { id?: string } } | null } | null;
+      error: Error | null;
+    };
     setSubmitting(false);
     const errorCode = (data as { error?: string } | null)?.error;
     if (error || errorCode) {
