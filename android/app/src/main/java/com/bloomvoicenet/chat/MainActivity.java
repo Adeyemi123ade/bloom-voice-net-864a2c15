@@ -50,6 +50,8 @@ public class MainActivity extends BridgeActivity {
         // was), ChiChatCalls never loaded, so the full-screen-call permission
         // prompt, the battery prompt and the call foreground service never ran.
         registerPlugin(ChiChatCallsPlugin.class);
+        // Native "Continue with Google" (Android account picker, no browser).
+        registerPlugin(ChiChatGooglePlugin.class);
         super.onCreate(savedInstanceState);
         FirebaseApp.initializeApp(this);
         applySystemBarColors();

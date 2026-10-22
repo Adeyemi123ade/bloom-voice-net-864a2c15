@@ -64,7 +64,7 @@ Local run: `npm install`, `npm run dev` (http://localhost:8080). Tests:
 
 | Item | Where | State |
 | --- | --- | --- |
-| Google sign-in on Android: after Continue, people were left on the sign-in screen | `src/lib/appGoogleHandoff.ts`, `src/lib/googleAuth.ts`, `src/pages/GoogleReturn.tsx`, `AndroidManifest.xml` | Fix in PR `fix/google-signin-android`. Web part works on merge; the manifest change needs the next APK. Test on a phone with both a returning and a new Google account |
+| Google sign-in on Android (browser flow fails at Supabase: "Unable to exchange external code") | `ChiChatGooglePlugin.java`, `src/lib/googleAuth.ts`, `docs/GOOGLE_SIGN_IN.md` | Native picker in PR `feat/native-google-signin`. Needs the Android OAuth client (package + SHA-1) in Google Cloud and a new APK |
 | Chat restore hole (backups could be edited to join chats or forge messages) | PR #86 | Merged. Confirm `chat-backup` and `chat-restore` are deployed and `20261021120000_backups_server_only.sql` was run |
 | PR checks and branch protection | PR #87 | Check merged. Branch protection on main still to turn on in GitHub settings |
 | Unused public functions `sign-in-with-identifier`, `check-user-exists` | `supabase/functions/` | Delete from the live project and the repo |

@@ -148,7 +148,17 @@ export default function Register() {
 
   const handleGoogle = async () => {
     setGoogleLoading(true);
-    const { error } = await startGoogleAuth();
+    const { error, signedIn, cancelled } = await startGoogleAuth();
+    if (signedIn) {
+      // Native picker: already signed in. The account check sends a
+      // returning account to the chats and a new one to the form.
+      navigate("/auth/google-return", { replace: true });
+      return;
+    }
+    if (cancelled) {
+      setGoogleLoading(false);
+      return;
+    }
     if (error) {
       setGoogleLoading(false);
       toast({
