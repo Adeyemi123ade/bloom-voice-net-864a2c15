@@ -33,6 +33,10 @@ import { reportProblem } from "@/lib/errorReport";
  * instead of silently going back to sign in.
  */
 let lastHandled = "";
+// When the app last finished a Google sign-in. A failure that arrives just
+// after (the same Google answer used a second time) must not undo it.
+let signedInAt = 0;
+const LATE_FAILURE_MS = 2 * 60 * 1000;
 
 export default function GoogleOAuthReturnListener() {
   const navigate = useNavigate();
@@ -53,7 +57,7 @@ export default function GoogleOAuthReturnListener() {
       // as an app sign-in, so the result comes back to the app.
       if (url.startsWith(`${SUPABASE_CALLBACK_PREFIX}?`)) {
         lastHandled = url;
-        reportProblem("google-return", "Google answer reached the app; passed back to the browser");
+        reportProblem("google-trace", "app: Google answer reached the app; passed back to the browser");
         markGoogleSignInStarted();
         void Browser.open({ url: appGoogleStartUrl(url) }).catch((e) => {
           reportProblem("google-return", e);
@@ -74,10 +78,21 @@ export default function GoogleOAuthReturnListener() {
               refresh_token: ret.refreshToken,
             });
             if (error) throw error;
+            signedInAt = Date.now();
+            reportProblem("google-trace", "app: signed in with tokens");
           } else if (ret.kind === "code") {
             const { error } = await supabase.auth.exchangeCodeForSession(ret.code);
             if (error) throw error;
+            signedInAt = Date.now();
+            reportProblem("google-trace", "app: signed in with code");
           } else {
+            // Already signed in a moment ago: this failure is a second use of
+            // the same Google answer. Keep the sign-in.
+            const { data: current } = await supabase.auth.getSession();
+            if (current.session && Date.now() - signedInAt < LATE_FAILURE_MS) {
+              reportProblem("google-trace", `app: late failure ignored (${ret.kind === "error" ? ret.message : "empty"})`);
+              return;
+            }
             // Closing Google's screen is a choice, not a problem: just go back.
             if (ret.kind === "error" && /access_denied|cancel/i.test(ret.message)) {
               navigate("/login", { replace: true });
@@ -89,6 +104,11 @@ export default function GoogleOAuthReturnListener() {
           }
           navigate("/auth/google-return", { replace: true });
         } catch (e) {
+          const { data: current } = await supabase.auth.getSession().catch(() => ({ data: { session: null } }));
+          if (current.session && Date.now() - signedInAt < LATE_FAILURE_MS) {
+            reportProblem("google-trace", "app: late failure ignored (exchange)");
+            return;
+          }
           reportProblem("google-return", e);
           fail();
         }
