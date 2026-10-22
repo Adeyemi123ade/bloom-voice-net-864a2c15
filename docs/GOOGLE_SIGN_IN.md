@@ -62,3 +62,13 @@ as the web client above; package name exactly `com.bloomvoicenet.chat`; SHA-1
 equals the key of the APK on the phone (Android Studio Run/Build APK = the
 laptop's debug key; signed release = upload key; Play = app signing key);
 Google needs a few minutes after a change.
+
+## Seen on 2026-10-22: "Unable to exchange external code"
+
+Google sign-in failed on the website and the Android app while email
+sign-in worked. Cause: the Client Secret saved in Supabase (Authentication,
+Providers, Google) had an extra space, so Supabase could not swap Google's
+code for a token. Fixed by pasting the secret again with no spaces. If this
+error appears again, check that field first: Client ID
+`293491364977-tjb6vl7f5nkej0ed8ogf6kj4eikc8c4d.apps.googleusercontent.com`,
+secret copied exactly from that web client in Google Cloud.
