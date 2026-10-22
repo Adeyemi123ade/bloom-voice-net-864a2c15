@@ -21,7 +21,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { unregisterCallPush } from "@/lib/fcmRegistration";
 import { toast } from "@/hooks/use-toast";
-import { isWebApp } from "@/lib/platform";
 import LanguagePicker from "@/components/LanguagePicker";
 import { useLanguage } from "@/lib/i18n/context";
 import { LANGUAGES } from "@/lib/i18n/strings";
@@ -57,7 +56,6 @@ export default function Settings() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const onWeb = isWebApp();
 
   useEffect(() => {
     document.title = `${t("settings.title")} — Chichat`;
@@ -83,8 +81,14 @@ export default function Settings() {
     (async () => setBackup(await getMyBackup()))();
   }, [user]);
 
-  // Web "Sign out": just end the session on this browser.
-  const signOutWeb = async () => {
+  // "Sign out" (web and Android): ends the session on THIS device only and
+  // goes to the sign-in screen. The account and everything in it (profile,
+  // chats, contacts, calls, settings) stay on the server untouched, so
+  // signing in again brings it all back. Removed here: this phone's push
+  // registration (so it stops ringing for this account) and the saved
+  // copies of chats on this phone (they load again after sign-in).
+  // Deleting the account is separate (below) and never happens here.
+  const signOut = async () => {
     setWorking(true);
     try {
       // Signing out is a deliberate end to any call that is on.
@@ -98,7 +102,7 @@ export default function Settings() {
       // on every other phone and computer.
       try { await supabase.auth.signOut({ scope: "local" }); } catch { /* ignore */ }
       toast({ title: t("settings.signedOut") });
-      window.location.replace("/");
+      window.location.replace("/login");
     } finally {
       setWorking(false);
     }
@@ -277,37 +281,33 @@ export default function Settings() {
               </button>
 
               <button
-                onClick={() => setDeleteOpen(true)}
-                className="w-full flex items-center gap-3 px-3 py-3 rounded-md bg-background border border-destructive/30 text-left"
+                onClick={() => void signOut()}
+                disabled={working}
+                data-testid="sign-out"
+                className="w-full flex items-center gap-3 px-3 py-3 rounded-md bg-background border border-border text-left disabled:opacity-60"
               >
-                <Trash2 className="w-4 h-4 text-destructive" />
+                {working ? <Loader2 className="w-4 h-4 animate-spin text-primary" /> : <LogOut className="w-4 h-4 text-primary" />}
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-destructive">{t("settings.delete")}</p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {t("settings.deleteSub")}
+                  <p className="text-sm font-semibold text-foreground">
+                    {working ? t("settings.signingOut") : t("settings.signOut")}
                   </p>
                 </div>
-                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+              </button>
+
+              {/* Permanent and separate from Sign out. Kept in the app
+                  because Google Play requires account deletion in the app. */}
+              <button
+                onClick={() => setDeleteOpen(true)}
+                className="self-start flex items-center gap-1.5 px-1 pt-2 text-xs font-medium text-destructive"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                {t("settings.delete")}
               </button>
             </CollapsibleContent>
           </Collapsible>
 
           <div className="flex-1" />
 
-          {/* Bottom action — Web only shows "Sign out". Mobile has no button;
-              users uninstall the app natively through Android. */}
-          {onWeb && (
-            <div className="pt-10 pb-4">
-              <button
-                onClick={signOutWeb}
-                disabled={working}
-                className="w-full h-16 rounded-xl bg-secondary text-foreground text-lg font-bold flex items-center justify-center gap-3 border border-border transition hover:bg-destructive/10 hover:text-destructive hover:border-destructive/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-secondary disabled:hover:text-foreground"
-              >
-                {working ? <Loader2 className="w-6 h-6 animate-spin" /> : <LogOut className="w-6 h-6" />}
-                {working ? t("settings.signingOut") : t("settings.signOut")}
-              </button>
-            </div>
-          )}
           <p className="text-center text-xs text-muted-foreground pt-2 pb-1">
             {t("settings.version", { build: APP_VERSION })}
           </p>
