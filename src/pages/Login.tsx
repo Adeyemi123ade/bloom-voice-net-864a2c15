@@ -14,6 +14,7 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { clearRecoveryPending, isRecoveryPending } from "@/lib/recoveryPending";
 import { startGoogleAuth } from "@/lib/googleAuth";
+import { googleErrorText } from "@/lib/googleErrorText";
 import { useLanguage } from "@/lib/i18n/context";
 
 
@@ -96,7 +97,7 @@ export default function Login() {
       setGoogleLoading(false);
       toast({
         title: t("login.googleFailTitle"),
-        description: t("login.googleFailBody"),
+        description: googleErrorText(error, "login.googleFailBody").description,
         variant: "destructive",
       });
     }

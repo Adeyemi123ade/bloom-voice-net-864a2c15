@@ -1,6 +1,7 @@
 package com.bloomvoicenet.chat;
 
 import android.os.CancellationSignal;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.core.content.ContextCompat;
@@ -36,8 +37,14 @@ import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential;
  * of every key that signs the APK (debug key, upload key, and later the
  * Google Play app signing key).
  *
- * Errors come back as codes the web side understands:
+ * Errors come back as codes the web side understands, always with Google's
+ * own message (also written to logcat, tag ChiChatGoogle):
  *   "cancelled"   the person closed the picker
+ *   "setup"       Google refused this app: the Android OAuth client is
+ *                 missing or its package name / SHA-1 doesn't match the key
+ *                 that signed this APK. Google reports this as a
+ *                 *cancellation* ("[16] Account reauth failed"), which is
+ *                 why it used to look like the person closed the picker.
  *   "no_account"  no Google account on the phone (or none allowed)
  *   "failed"      anything else (message says what)
  */
@@ -79,15 +86,28 @@ public class ChiChatGooglePlugin extends Plugin {
 
                     @Override
                     public void onError(@NonNull GetCredentialException e) {
-                        if (e instanceof GetCredentialCancellationException) {
-                            call.reject("cancelled", "cancelled");
-                        } else if (e instanceof NoCredentialException) {
-                            call.reject("no_account", "no_account");
-                        } else {
-                            call.reject(e.getType() + ": " + e.getMessage(), "failed");
-                        }
+                        String detail = e.getType() + ": " + e.getMessage();
+                        Log.w(TAG, "sign in failed: " + detail, e);
+                        call.reject(detail, errorCode(e));
                     }
                 });
+    }
+
+    private static final String TAG = "ChiChatGoogle";
+
+    /** Maps Credential Manager's exception to a code (see the class comment). */
+    static String errorCode(GetCredentialException e) {
+        String msg = String.valueOf(e.getMessage()).toLowerCase();
+        if (looksLikeSetupProblem(msg)) return "setup";
+        if (e instanceof GetCredentialCancellationException) return "cancelled";
+        if (e instanceof NoCredentialException) return "no_account";
+        return "failed";
+    }
+
+    /** Google's messages for "this app isn't allowed to ask for a token". */
+    static boolean looksLikeSetupProblem(String msg) {
+        return msg.contains("[16]") || msg.contains("reauth") || msg.contains("[10]")
+                || msg.contains("28444") || msg.contains("developer console");
     }
 
     private void handle(PluginCall call, Credential credential) {

@@ -38,6 +38,27 @@ client above, which is the client Supabase already uses. Supabase needs no
 change (Authentication, Providers, Google keeps the web client id; leave
 "Skip nonce check" off).
 
-Without the Android client, the picker reports an error; the app then
-records it in `app_errors` (kind `google-native`) and falls back to the
-browser flow.
+## When it doesn't work
+
+If the Android client is missing, or its package name or SHA-1 doesn't match
+the key that signed the installed APK, Google shows the account picker, the
+person picks an account, and the picker closes with
+`GetCredentialCancellationException: [16] Account reauth failed`. That is a
+*cancellation* type, the same as the person closing the picker, so the app
+used to stop silently with no record.
+
+Now:
+- Every picker failure, cancellations included, is recorded in `app_errors`
+  (kind `google-native`, e.g. `cancelled after 3.1s: ...`).
+- APK 1.10+ (this plugin version) sends `setup` for these, and the screen
+  says Google sign-in isn't set up for this version, with Google's reason.
+- Failures no longer fall back to the browser (that path is what failed on
+  Android before); the screen explains instead. Only APKs without the picker
+  use the browser.
+- logcat tag `ChiChatGoogle` has the full exception.
+
+Check, in this order: the Android client is in the SAME Google Cloud project
+as the web client above; package name exactly `com.bloomvoicenet.chat`; SHA-1
+equals the key of the APK on the phone (Android Studio Run/Build APK = the
+laptop's debug key; signed release = upload key; Play = app signing key);
+Google needs a few minutes after a change.

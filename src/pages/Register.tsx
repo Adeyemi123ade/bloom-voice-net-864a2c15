@@ -25,6 +25,7 @@ import { checkEmailExists } from "@/lib/checkEmail";
 import { isRecoveryPending } from "@/lib/recoveryPending";
 import { markVerifyEmailPending, getVerifyEmailPending } from "@/lib/verifyEmailPending";
 import { startGoogleAuth } from "@/lib/googleAuth";
+import { googleErrorText } from "@/lib/googleErrorText";
 import { useLanguage } from "@/lib/i18n/context";
 
 const baseSchema = z.object({
@@ -163,7 +164,8 @@ export default function Register() {
       setGoogleLoading(false);
       toast({
         title: t("reg.googleFailTitle"),
-        description: t("reg.googleFailBody"),
+        description: googleErrorText(error, "reg.googleFailBody").description,
+        variant: "destructive",
       });
     }
   };
