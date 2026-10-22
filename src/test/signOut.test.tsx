@@ -64,16 +64,32 @@ beforeEach(() => {
 
 async function tapSignOut() {
   render(<MemoryRouter><Settings /></MemoryRouter>);
-  fireEvent.click(screen.getByText(/^Account$/));
   fireEvent.click(await screen.findByTestId("sign-out"));
   await waitFor(() => expect(replace).toHaveBeenCalled());
 }
 
 describe("Sign out", () => {
-  it("is in Settings > Account, where Delete used to be, on Android too", async () => {
+  it("is in the Account card, open from the start, on Android too", async () => {
     render(<MemoryRouter><Settings /></MemoryRouter>);
-    fireEvent.click(screen.getByText(/^Account$/));
     expect(await screen.findByTestId("sign-out")).toHaveTextContent(/sign out/i);
+  });
+
+  it("Delete account is its own card, apart from Account, with a compact button", async () => {
+    render(<MemoryRouter><Settings /></MemoryRouter>);
+    const card = await screen.findByTestId("delete-card");
+    const signOut = screen.getByTestId("sign-out");
+    expect(card.contains(signOut)).toBe(false);
+    const btn = screen.getByTestId("delete-account");
+    expect(btn).toHaveTextContent(/delete my account/i);
+    expect(btn.className).toMatch(/inline-flex/);
+    expect(btn.className).not.toMatch(/w-full/);
+  });
+
+  it("every existing setting is still on the screen", async () => {
+    render(<MemoryRouter><Settings /></MemoryRouter>);
+    for (const label of ["Profile settings", "Privacy and account", "Phone settings", "App settings", "Language", "Blocked", "Chat backup"]) {
+      expect(await screen.findByText(label)).toBeInTheDocument();
+    }
   });
 
   it("ends only this device's session and goes straight to the sign-in screen", async () => {
@@ -94,8 +110,7 @@ describe("Sign out", () => {
 
   it("deleting the account is still a separate, confirmed action", async () => {
     render(<MemoryRouter><Settings /></MemoryRouter>);
-    fireEvent.click(screen.getByText(/^Account$/));
-    fireEvent.click(await screen.findByText(/^Delete account$/));
+    fireEvent.click(await screen.findByTestId("delete-account"));
     expect(server.deleteMyAccount).not.toHaveBeenCalled();
     expect(await screen.findByRole("alertdialog")).toBeInTheDocument();
   });

@@ -1,9 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { getCallsSnapshot, requestEndCall } from "@/lib/activeCall";
 import { useNavigate } from "react-router-dom";
 import {
   Ban,
   Globe,
+  Settings as Gear,
+  Shield,
+  ShieldAlert,
+  UserCog,
   ChevronDown,
   ChevronRight,
   Cloud,
@@ -128,183 +132,91 @@ export default function Settings() {
   return (
     <MobileFrame bottomNav="settings">
       <div className="h-full w-full flex flex-col bg-background overflow-y-auto">
-        <div className="px-4 pt-5 pb-4 border-b border-border sticky top-0 bg-background z-10">
-          <h1 className="text-lg font-bold text-foreground">{t("settings.title")}</h1>
+        <div className="px-4 pt-5 pb-3 sticky top-0 bg-background z-10">
+          <h1 className="text-2xl font-bold text-foreground">{t("settings.title")}</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">{t("settings.subtitle")}</p>
         </div>
 
-        <div className="flex-1 px-4 py-4 flex flex-col gap-2">
-          {/* 1. Phone settings — Theme, Ringtone. */}
-          <button
-            onClick={() => navigate("/settings/phone")}
-            className="w-full flex items-center gap-3 px-3 py-3.5 rounded-lg hover:bg-secondary text-left"
-          >
-            <span className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center">
-              <Smartphone className="w-5 h-5 text-primary" />
-            </span>
-            <div className="flex-1 min-w-0">
-              <p className="text-base font-semibold text-foreground">{t("settings.phone")}</p>
-              <p className="text-sm text-muted-foreground truncate">
-                {t("settings.phoneSub")}
-              </p>
-            </div>
-            <ChevronRight className="w-5 h-5 text-muted-foreground" />
-          </button>
+        <div className="flex-1 px-4 pb-4 flex flex-col gap-3">
+          {/* Account: profile, sign out, privacy. Open by default. */}
+          <SettingsGroup icon={UserIcon} title={t("settings.account")} subtitle={t("settings.accountSub")}>
+            <SettingsRow
+              icon={UserCog}
+              title={t("settings.profileSetting")}
+              subtitle={t("settings.profileSub")}
+              onClick={() => navigate("/profile")}
+            />
+            <SettingsRow
+              icon={working ? Loader2 : LogOut}
+              iconSpin={working}
+              title={working ? t("settings.signingOut") : t("settings.signOut")}
+              subtitle={t("settings.signOutSub")}
+              onClick={() => void signOut()}
+              disabled={working}
+              testId="sign-out"
+            />
+            <SettingsRow
+              icon={Shield}
+              title={t("settings.privacyAccount")}
+              subtitle={t("settings.privacyAccountSub")}
+              onClick={() => navigate("/privacy")}
+            />
+          </SettingsGroup>
 
-          {/* App settings: notifications, autostart, battery, transcription. */}
-          <button
-            onClick={() => navigate("/settings/app")}
-            className="w-full flex items-center gap-3 px-3 py-3.5 rounded-lg hover:bg-secondary text-left"
-          >
-            <span className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center">
-              <SlidersHorizontal className="w-5 h-5 text-primary" />
-            </span>
-            <div className="flex-1 min-w-0">
-              <p className="text-base font-semibold text-foreground">{t("settings.app")}</p>
-              <p className="text-sm text-muted-foreground truncate">
-                {t("settings.appSub")}
-              </p>
-            </div>
-            <ChevronRight className="w-5 h-5 text-muted-foreground" />
-          </button>
-
-          {/* Language: shown in the chosen language's own name. */}
-          <button
-            onClick={() => setLangOpen(true)}
-            className="w-full flex items-center gap-3 px-3 py-3.5 rounded-lg hover:bg-secondary text-left"
-          >
-            <span className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center">
-              <Globe className="w-5 h-5 text-primary" />
-            </span>
-            <div className="flex-1 min-w-0">
-              <p className="text-base font-semibold text-foreground">{t("settings.language")}</p>
-              <p className="text-sm text-muted-foreground truncate">{languageName}</p>
-            </div>
-            <ChevronRight className="w-5 h-5 text-muted-foreground" />
-          </button>
-          <LanguagePicker open={langOpen} onOpenChange={setLangOpen} />
-
-          {/* Blocked people. */}
-          <button
-            onClick={() => navigate("/settings/blocked")}
-            className="w-full flex items-center gap-3 px-3 py-3.5 rounded-lg hover:bg-secondary text-left"
-          >
-            <span className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center">
-              <Ban className="w-5 h-5 text-primary" />
-            </span>
-            <div className="flex-1 min-w-0">
-              <p className="text-base font-semibold text-foreground">{t("settings.blocked")}</p>
-              <p className="text-sm text-muted-foreground truncate">{t("settings.blockedSub")}</p>
-            </div>
-            <ChevronRight className="w-5 h-5 text-muted-foreground" />
-          </button>
-
-          {/* 2. Chat backup — opens a dedicated page (no longer collapsible). */}
-          <button
-            onClick={() => navigate("/settings/backup")}
-            className="w-full flex items-center gap-3 px-3 py-3.5 rounded-lg hover:bg-secondary text-left"
-          >
-            <span className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center">
-              <Cloud className="w-5 h-5 text-primary" />
-            </span>
-            <div className="flex-1 min-w-0">
-              <p className="text-base font-semibold text-foreground">{t("settings.backup")}</p>
-              <p className="text-sm text-muted-foreground truncate">
-                {backup
+          {/* Preferences: everything else, unchanged. Open by default. */}
+          <SettingsGroup icon={Gear} title={t("settings.preferences")} subtitle={t("settings.preferencesSub")}>
+            <SettingsRow icon={Smartphone} title={t("settings.phone")} subtitle={t("settings.phoneSub")} onClick={() => navigate("/settings/phone")} />
+            <SettingsRow icon={SlidersHorizontal} title={t("settings.app")} subtitle={t("settings.appSub")} onClick={() => navigate("/settings/app")} />
+            {/* Language: shown in the chosen language's own name. */}
+            <SettingsRow icon={Globe} title={t("settings.language")} subtitle={languageName} onClick={() => setLangOpen(true)} />
+            <SettingsRow icon={Ban} title={t("settings.blocked")} subtitle={t("settings.blockedSub")} onClick={() => navigate("/settings/blocked")} />
+            <SettingsRow
+              icon={Cloud}
+              title={t("settings.backup")}
+              subtitle={
+                backup
                   ? t("settings.lastBackup", {
                       date: new Date(backup.last_backup_at).toLocaleDateString(language),
                       count: backup.message_count,
                     })
-                  : t("settings.noBackup")}
-              </p>
-            </div>
-            <ChevronRight className="w-5 h-5 text-muted-foreground" />
-          </button>
+                  : t("settings.noBackup")
+              }
+              onClick={() => navigate("/settings/backup")}
+            />
+            {/* Feedback for the ChiChat team (testers' main channel). */}
+            <SettingsRow icon={MessageSquareText} title={t("fb.title")} subtitle={t("fb.rowSub")} onClick={() => navigate("/settings/feedback")} />
+            {isAdmin && (
+              <SettingsRow icon={ShieldCheck} title="Admin" subtitle="Reports, people, feedback, problems" onClick={() => navigate("/admin")} />
+            )}
+          </SettingsGroup>
+          <LanguagePicker open={langOpen} onOpenChange={setLangOpen} />
 
-          {/* Feedback for the ChiChat team (testers' main channel). */}
-          <button
-            onClick={() => navigate("/settings/feedback")}
-            className="w-full flex items-center gap-3 px-3 py-3.5 rounded-lg hover:bg-secondary text-left"
+          {/* Delete account: its own pale red card, separate from Sign out.
+              Permanent, always behind the confirmation below. Kept in the
+              app because Google Play requires deletion inside the app. */}
+          <div
+            data-testid="delete-card"
+            className="rounded-2xl border border-destructive/20 bg-destructive/[0.06] px-3 pt-3 pb-3.5 flex flex-col items-center gap-3"
           >
-            <span className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center">
-              <MessageSquareText className="w-5 h-5 text-primary" />
-            </span>
-            <div className="flex-1 min-w-0">
-              <p className="text-base font-semibold text-foreground">{t("fb.title")}</p>
-              <p className="text-sm text-muted-foreground truncate">{t("fb.rowSub")}</p>
-            </div>
-            <ChevronRight className="w-5 h-5 text-muted-foreground" />
-          </button>
-
-          {isAdmin && (
-            <button
-              onClick={() => navigate("/admin")}
-              className="w-full flex items-center gap-3 px-3 py-3.5 rounded-lg hover:bg-secondary text-left"
-            >
-              <span className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center">
-                <ShieldCheck className="w-5 h-5 text-primary" />
+            <button onClick={() => setDeleteOpen(true)} className="w-full flex items-center gap-3 text-left">
+              <span className="w-11 h-11 shrink-0 rounded-full bg-destructive/15 flex items-center justify-center">
+                <ShieldAlert className="w-5 h-5 text-destructive" />
               </span>
               <div className="flex-1 min-w-0">
-                <p className="text-base font-semibold text-foreground">Admin</p>
-                <p className="text-sm text-muted-foreground truncate">Reports, people, feedback, problems</p>
+                <p className="text-[15px] font-semibold text-destructive leading-tight">{t("settings.delete")}</p>
+                <p className="text-[13px] text-muted-foreground leading-snug mt-0.5">{t("settings.deleteSub")}</p>
               </div>
-              <ChevronRight className="w-5 h-5 text-muted-foreground" />
+              <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" />
             </button>
-          )}
-
-          {/* 3. Account — collapsible. Holds Profile setting + sign-out. */}
-          <Collapsible className="rounded-lg bg-secondary/30">
-            <CollapsibleTrigger className="w-full flex items-center gap-3 px-3 py-3.5 text-left group">
-              <span className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center">
-                <UserIcon className="w-5 h-5 text-primary" />
-              </span>
-              <div className="flex-1 min-w-0">
-                <p className="text-base font-semibold text-foreground">{t("settings.account")}</p>
-                <p className="text-sm text-muted-foreground truncate">
-                  {t("settings.profile")} · {user?.email ?? t("settings.thisDevice")}
-                </p>
-              </div>
-              <ChevronDown className="w-5 h-5 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
-            </CollapsibleTrigger>
-            <CollapsibleContent className="px-3 pb-3 pt-1 flex flex-col gap-2">
-              <button
-                onClick={() => navigate("/profile")}
-                className="w-full flex items-center gap-3 px-3 py-3 rounded-md bg-background border border-border text-left"
-              >
-                <UserIcon className="w-4 h-4 text-primary" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-foreground">{t("settings.profileSetting")}</p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {t("settings.profileSub")}
-                  </p>
-                </div>
-                <ChevronRight className="w-4 h-4 text-muted-foreground" />
-              </button>
-
-              <button
-                onClick={() => void signOut()}
-                disabled={working}
-                data-testid="sign-out"
-                className="w-full flex items-center gap-3 px-3 py-3 rounded-md bg-background border border-border text-left disabled:opacity-60"
-              >
-                {working ? <Loader2 className="w-4 h-4 animate-spin text-primary" /> : <LogOut className="w-4 h-4 text-primary" />}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-foreground">
-                    {working ? t("settings.signingOut") : t("settings.signOut")}
-                  </p>
-                </div>
-              </button>
-
-              {/* Permanent and separate from Sign out. Kept in the app
-                  because Google Play requires account deletion in the app. */}
-              <button
-                onClick={() => setDeleteOpen(true)}
-                className="self-start flex items-center gap-1.5 px-1 pt-2 text-xs font-medium text-destructive"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                {t("settings.delete")}
-              </button>
-            </CollapsibleContent>
-          </Collapsible>
+            <button
+              onClick={() => setDeleteOpen(true)}
+              data-testid="delete-account"
+              className="inline-flex items-center gap-2 h-9 px-5 rounded-full border border-destructive/40 bg-background/70 text-destructive text-sm font-semibold active:scale-95 transition-transform"
+            >
+              <Trash2 className="w-4 h-4" />
+              {t("settings.deleteMine")}
+            </button>
+          </div>
 
           <div className="flex-1" />
 
@@ -342,5 +254,73 @@ export default function Settings() {
         </AlertDialog>
       </div>
     </MobileFrame>
+  );
+}
+
+type IconType = typeof UserIcon;
+
+/** A card with a header that opens and closes (open to start). */
+function SettingsGroup({
+  icon: Icon,
+  title,
+  subtitle,
+  children,
+}: {
+  icon: IconType;
+  title: string;
+  subtitle: string;
+  children: ReactNode;
+}) {
+  return (
+    <Collapsible defaultOpen className="rounded-2xl border border-border bg-card overflow-hidden">
+      <CollapsibleTrigger className="w-full flex items-center gap-3 px-3 py-3 text-left bg-primary/[0.06] group">
+        <span className="w-11 h-11 shrink-0 rounded-full bg-primary/15 flex items-center justify-center">
+          <Icon className="w-5 h-5 text-primary" />
+        </span>
+        <div className="flex-1 min-w-0">
+          <p className="text-[15px] font-semibold text-foreground leading-tight">{title}</p>
+          <p className="text-[13px] text-muted-foreground leading-snug mt-0.5">{subtitle}</p>
+        </div>
+        <ChevronDown className="w-5 h-5 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+      </CollapsibleTrigger>
+      <CollapsibleContent className="divide-y divide-border">{children}</CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+/** One row inside a group: icon, title, one line under it, arrow. */
+function SettingsRow({
+  icon: Icon,
+  iconSpin = false,
+  title,
+  subtitle,
+  onClick,
+  disabled = false,
+  testId,
+}: {
+  icon: IconType;
+  iconSpin?: boolean;
+  title: string;
+  subtitle: string;
+  onClick: () => void;
+  disabled?: boolean;
+  testId?: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      data-testid={testId}
+      className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-secondary/60 active:bg-secondary disabled:opacity-60"
+    >
+      <span className="w-11 h-11 shrink-0 rounded-full bg-primary/10 flex items-center justify-center">
+        <Icon className={`w-5 h-5 text-primary ${iconSpin ? "animate-spin" : ""}`} />
+      </span>
+      <div className="flex-1 min-w-0">
+        <p className="text-[15px] font-semibold text-foreground leading-tight">{title}</p>
+        <p className="text-[13px] text-muted-foreground leading-snug mt-0.5">{subtitle}</p>
+      </div>
+      <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" />
+    </button>
   );
 }
