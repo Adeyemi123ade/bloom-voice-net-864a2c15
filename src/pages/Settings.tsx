@@ -6,7 +6,6 @@ import {
   Globe,
   Settings as Gear,
   Shield,
-  ShieldAlert,
   UserCog,
   ChevronDown,
   ChevronRight,
@@ -196,22 +195,13 @@ export default function Settings() {
               app because Google Play requires deletion inside the app. */}
           <div
             data-testid="delete-card"
-            className="rounded-2xl border border-destructive/20 bg-destructive/[0.06] px-3 pt-3 pb-3.5 flex flex-col items-center gap-3"
+            className="rounded-2xl border border-destructive/20 bg-destructive/[0.06] px-4 py-3.5 flex flex-col items-center gap-3"
           >
-            <button onClick={() => setDeleteOpen(true)} className="w-full flex items-center gap-3 text-left">
-              <span className="w-11 h-11 shrink-0 rounded-full bg-destructive/15 flex items-center justify-center">
-                <ShieldAlert className="w-5 h-5 text-destructive" />
-              </span>
-              <div className="flex-1 min-w-0">
-                <p className="text-[15px] font-semibold text-destructive leading-tight">{t("settings.delete")}</p>
-                <p className="text-[13px] text-muted-foreground leading-snug mt-0.5">{t("settings.deleteSub")}</p>
-              </div>
-              <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" />
-            </button>
+            <p className="text-[13px] text-muted-foreground text-center leading-snug">{t("settings.deleteSub")}</p>
             <button
               onClick={() => setDeleteOpen(true)}
               data-testid="delete-account"
-              className="inline-flex items-center gap-2 h-9 px-5 rounded-full border border-destructive/40 bg-background/70 text-destructive text-sm font-semibold active:scale-95 transition-transform"
+              className="inline-flex items-center gap-2 h-9 px-5 rounded-full border border-destructive/40 bg-background/70 text-destructive text-sm font-bold transition-colors hover:bg-destructive hover:text-white hover:border-destructive active:bg-destructive active:text-white active:border-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/50"
             >
               <Trash2 className="w-4 h-4" />
               {t("settings.deleteMine")}
