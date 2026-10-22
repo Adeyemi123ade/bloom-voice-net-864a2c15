@@ -50,8 +50,15 @@ import Admin from "./pages/Admin.tsx";
 import AccountSuspended from "./pages/AccountSuspended.tsx";
 import OfflineBanner from "@/components/OfflineBanner";
 import DeleteAccountInfo from "./pages/DeleteAccountInfo.tsx";
+import AppGoogleHandoff from "./components/AppGoogleHandoff.tsx";
+import { isAppGoogleStart, pendingAppGoogleReturn } from "@/lib/appGoogleHandoff";
 
 const queryClient = new QueryClient();
+
+// Browser tab signing in to Google for the Android app (appGoogleHandoff.ts):
+// it only passes through to Google, or hands the result back to the app.
+const appGoogleResult = pendingAppGoogleReturn();
+const appGooglePassThrough = !appGoogleResult && isAppGoogleStart();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -61,6 +68,9 @@ const App = () => (
         <TooltipProvider>
           <Toaster />
           <Sonner />
+          {appGoogleResult ? (
+            <AppGoogleHandoff result={appGoogleResult} />
+          ) : appGooglePassThrough ? null : (
           <BrowserRouter>
             <AndroidAppPrompt />
             <AccountGuard />
@@ -116,6 +126,7 @@ const App = () => (
             </ErrorBoundary>
             <CallRecovery />
           </BrowserRouter>
+          )}
         </TooltipProvider>
       </AuthProvider>
       </LanguageProvider>

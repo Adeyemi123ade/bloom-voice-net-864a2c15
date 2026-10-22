@@ -23,15 +23,11 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <intent-filter android:autoVerify="true">
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https"
-                    android:host="pnpabtxvsrkrldpfmtaz.supabase.co"
-                    android:pathPrefix="/auth/v1/callback" />
-            </intent-filter>
-
+            <!-- No link rule for the Supabase sign-in address here: Google must
+                 hand its answer to Supabase in the browser. Catching that
+                 address in the app took the answer away from Supabase and
+                 left people on the sign-in screen. The app gets the result
+                 through the com.bloomvoicenet.chat link below. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />

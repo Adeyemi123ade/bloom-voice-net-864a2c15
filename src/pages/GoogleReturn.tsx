@@ -1,10 +1,13 @@
-import { tNow } from "@/lib/i18n/language";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import MobileFrame from "@/components/MobileFrame";
 import BrandHero from "@/components/BrandHero";
+import { Button } from "@/components/ui/button";
+import { authStyles } from "@/components/auth/authStyles";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { useLanguage } from "@/lib/i18n/context";
+import { reportProblem } from "@/lib/errorReport";
 
 type GoogleSignupCheck = {
   allowed?: boolean;
@@ -13,65 +16,105 @@ type GoogleSignupCheck = {
   full_name?: string;
 };
 
+type Outcome =
+  | { kind: "existing" }
+  | { kind: "new"; email: string; name: string }
+  | { kind: "no-session" }
+  | { kind: "unreachable" };
+
+const RETRY_DELAYS_MS = [0, 1200, 2500];
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Asks which kind of Google account this is. A short network hiccup must not
+ * throw a person who really signed in back to the sign-in screen, so the
+ * check is tried a few times before giving up.
+ */
+async function checkGoogleAccount(): Promise<Outcome> {
+  // getSession() waits for the session being set up (address-bar tokens on
+  // the web, or the app's setSession/exchange), so the check has it attached.
+  const { data: s } = await supabase.auth.getSession();
+  if (!s.session) return { kind: "no-session" };
+  let lastError: unknown = null;
+  for (const delay of RETRY_DELAYS_MS) {
+    if (delay) await wait(delay);
+    const { data, error } = await supabase.functions.invoke<GoogleSignupCheck>("check-google-signup");
+    if (!error && data) {
+      if (data.allowed === false && data.pending_registration) {
+        return { kind: "new", email: data.email ?? "", name: data.full_name ?? "" };
+      }
+      return { kind: "existing" };
+    }
+    lastError = error;
+  }
+  const status = (lastError as { context?: { status?: number } } | null)?.context?.status;
+  reportProblem("google-check", `check-google-signup failed${status ? ` (${status})` : ""}`);
+  return { kind: "unreachable" };
+}
+
+/**
+ * After Google: returning people go straight to their chats; new people go
+ * to the registration form with their Google name and email filled in, to
+ * add their phone and a password. If the account can't be checked, the
+ * person stays signed in and can try again, or choose another way.
+ */
 export default function GoogleReturn() {
   const navigate = useNavigate();
-  const checked = useRef(false);
+  const { t } = useLanguage();
+  const [stuck, setStuck] = useState(false);
+  const running = useRef(false);
+
+  const run = useCallback(async () => {
+    if (running.current) return;
+    running.current = true;
+    setStuck(false);
+    const outcome = await checkGoogleAccount();
+    running.current = false;
+
+    if (outcome.kind === "existing") {
+      navigate("/home", { replace: true });
+      return;
+    }
+    if (outcome.kind === "new") {
+      toast({ title: t("gr.almost"), description: t("gr.almostBody") });
+      navigate("/register", {
+        replace: true,
+        state: { prefill: { email: outcome.email, name: outcome.name, googleVerified: true } },
+      });
+      return;
+    }
+    if (outcome.kind === "no-session") {
+      reportProblem("google-check", "no session after Google");
+      toast({ title: t("gr.failTitle"), description: t("gr.failBody"), variant: "destructive" });
+      navigate("/login", { replace: true });
+      return;
+    }
+    setStuck(true);
+  }, [navigate, t]);
 
   useEffect(() => {
-    if (checked.current) return;
-    checked.current = true;
+    void run();
+  }, [run]);
 
-    (async () => {
-      // getSession() queues behind the client's own in-flight session
-      // hydration (URL-hash parsing on web, or the setSession() call
-      // GoogleOAuthReturnListener already awaited on native) rather than
-      // just reading whatever's in memory right now — awaiting it first
-      // closes the race where check-google-signup could otherwise fire
-      // with no session yet attached and get treated as a hard failure.
-      await supabase.auth.getSession();
-      const { data, error } = await supabase.functions.invoke<GoogleSignupCheck>("check-google-signup");
-
-      if (error) {
-        await supabase.auth.signOut();
-        toast({
-          title: tNow("gr.failTitle"),
-          description: tNow("gr.failBody"),
-          variant: "destructive",
-        });
-        navigate("/login", { replace: true });
-        return;
-      }
-
-      // Pending registration: keep the Google session alive and send the user
-      // to /register pre-filled. They finish phone + password and we call
-      // complete-google-registration on submit. No email OTP.
-      if (data?.allowed === false && data.pending_registration) {
-        toast({
-          title: tNow("gr.almost"),
-          description: tNow("gr.almostBody"),
-        });
-        navigate("/register", {
-          replace: true,
-          state: {
-            prefill: {
-              email: data.email ?? "",
-              name: data.full_name ?? "",
-              googleVerified: true,
-            },
-          },
-        });
-        return;
-      }
-
-      // Existing user — straight in.
-      navigate("/home", { replace: true });
-    })();
-  }, [navigate]);
+  const otherWay = async () => {
+    await supabase.auth.signOut({ scope: "local" });
+    navigate("/login", { replace: true });
+  };
 
   return (
     <MobileFrame>
-      <div className="h-full w-full flex items-center justify-center bg-background px-6">
-        <BrandHero message={tNow("gr.checking")} />
+      <div className="h-full w-full flex flex-col items-stretch justify-center gap-4 bg-background px-6">
+        <BrandHero message={stuck ? t("gr.failTitle") : t("gr.checking")} />
+        {stuck ? (
+          <>
+            <Button className={authStyles.primaryButton} onClick={() => void run()}>
+              {t("common.tryAgain")}
+            </Button>
+            <Button variant="outline" className={authStyles.secondaryButton} onClick={() => void otherWay()}>
+              {t("gr.other")}
+            </Button>
+          </>
+        ) : null}
       </div>
     </MobileFrame>
   );
