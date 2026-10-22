@@ -14,6 +14,8 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { clearRecoveryPending, isRecoveryPending } from "@/lib/recoveryPending";
 import { startGoogleAuth } from "@/lib/googleAuth";
+import { googleErrorText } from "@/lib/googleErrorText";
+import { reportProblem } from "@/lib/errorReport";
 import { useLanguage } from "@/lib/i18n/context";
 
 
@@ -41,7 +43,13 @@ async function signInDirect(email: string, password: string) {
   if (!error) return { data, errorCode: "" };
   const msg = (error.message || "").toLowerCase();
   if (msg.includes("confirm") || msg.includes("verified")) return { data: null, errorCode: "email_not_verified" };
-  return { data: null, errorCode: "wrong_password" };
+  // Only Supabase's own "wrong email or password" answer means that. Anything
+  // else (server down, API key refused, network, rate limit) used to show as
+  // "wrong password" too, which hid the real cause: pass it on as it is.
+  const code = (error as { code?: string }).code ?? "";
+  if (code === "invalid_credentials" || msg.includes("invalid login credentials")) return { data: null, errorCode: "wrong_password" };
+  reportProblem("login", `signInWithPassword: ${error.status ?? ""} ${code} ${error.message}`.trim());
+  return { data: null, errorCode: error.message || "unknown_error" };
 }
 
 export default function Login() {
@@ -96,7 +104,7 @@ export default function Login() {
       setGoogleLoading(false);
       toast({
         title: t("login.googleFailTitle"),
-        description: t("login.googleFailBody"),
+        description: googleErrorText(error, "login.googleFailBody").description,
         variant: "destructive",
       });
     }
@@ -176,6 +184,10 @@ export default function Login() {
       } else if (raw.includes("network") || raw.includes("fetch")) {
         title = t("login.offlineTitle");
         description = t("login.offlineBody");
+      } else {
+        // Not one we know: show the real reason instead of guessing.
+        title = t("eb.title");
+        description = `${t("auth.tryAgain")} ${t("google.detail", { detail: (errorCode || error?.message || "").slice(0, 80) })}`;
       }
 
       toast({ title, description, variant: "destructive" });
