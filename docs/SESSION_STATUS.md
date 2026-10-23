@@ -34,7 +34,7 @@ More detail: `docs/ARCHITECTURE.md`, `docs/DEPLOYMENT.md`, `docs/SECRETS.md`,
 
 ## Version
 
-1.9 (Android versionCode 10). Web version comes from `package.json`; keep
+1.10 (Android versionCode 11). Web version comes from `package.json`; keep
 `android/app/build.gradle` `versionName` the same when the Android app is
 rebuilt. Raise `versionCode` for every Play upload.
 

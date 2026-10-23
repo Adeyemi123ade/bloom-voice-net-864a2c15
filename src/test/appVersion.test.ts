@@ -9,7 +9,7 @@ describe("app version shown in Settings", () => {
     expect(displayVersion("2.0.0")).toBe("2.0");
   });
   it("is a short version number, not a build code", () => {
-    expect(APP_VERSION).toBe("1.9");
+    expect(APP_VERSION).toBe("1.10");
     expect(pkg.version).toMatch(/^\d+\.\d+\.\d+$/);
   });
 });
