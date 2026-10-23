@@ -6,6 +6,8 @@ type Props = {
   videoEnabled: boolean;
   isVideo: boolean;
   speakerOn: boolean;
+  /** False where the loudspeaker can't be chosen (website): no button. */
+  speakerAvailable?: boolean;
   canSwitchCamera: boolean;
   onToggleMute: () => void;
   onToggleVideo: () => void;
@@ -26,6 +28,7 @@ export default function CallControls({
   videoEnabled,
   isVideo,
   speakerOn,
+  speakerAvailable = true,
   canSwitchCamera,
   onToggleMute,
   onToggleVideo,
@@ -41,6 +44,7 @@ export default function CallControls({
   return (
     <div className="px-6 pb-6">
       <div className="flex items-center justify-around">
+        {speakerAvailable && (
         <button
           onClick={onToggleSpeaker}
           className={`w-12 h-12 rounded-full flex items-center justify-center active:scale-90 transition-transform ${
@@ -53,6 +57,7 @@ export default function CallControls({
         >
           {speakerOn ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
         </button>
+        )}
 
         {isVideo ? (
           <button
@@ -84,7 +89,8 @@ export default function CallControls({
               ? "bg-destructive text-destructive-foreground"
               : "bg-secondary text-foreground hover:bg-secondary/80"
           }`}
-          aria-label={tNow("cc.mute")}
+          aria-label={muted ? tNow("cc.unmute") : tNow("cc.mute")}
+          aria-pressed={muted}
         >
           {muted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
         </button>

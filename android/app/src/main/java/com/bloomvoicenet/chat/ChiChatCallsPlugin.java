@@ -22,6 +22,37 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 @CapacitorPlugin(name = "ChiChatCalls")
 public class ChiChatCallsPlugin extends Plugin {
 
+    @Override
+    public void load() {
+        // Headset or Bluetooth connected/disconnected, or the route changed:
+        // the call screen keeps its loudspeaker button in step.
+        try {
+            CallAudioRoute.watch(getContext(), state -> notifyListeners("audioRouteChanged", state));
+        } catch (Throwable ignored) {}
+    }
+
+    /** Loudspeaker on/off during a call. Answers with the route actually in use. */
+    @PluginMethod
+    public void setSpeakerphone(PluginCall call) {
+        boolean on = Boolean.TRUE.equals(call.getBoolean("on", false));
+        try {
+            CallAudioRoute.setSpeaker(getContext(), on);
+            call.resolve(CallAudioRoute.state(getContext()));
+        } catch (Throwable t) {
+            call.reject("Could not change the audio route: " + t.getMessage());
+        }
+    }
+
+    /** Where call audio plays right now: { speaker, headset, bluetooth, inCall }. */
+    @PluginMethod
+    public void getAudioRoute(PluginCall call) {
+        try {
+            call.resolve(CallAudioRoute.state(getContext()));
+        } catch (Throwable t) {
+            call.reject("Could not read the audio route: " + t.getMessage());
+        }
+    }
+
     // ── FIX 1: minSdk > API 26, so startForegroundService() is always reachable.
     //           The SDK_INT branch is dropped entirely.
     @PluginMethod

@@ -53,6 +53,7 @@ export interface CallFullScreenProps {
   muted: boolean;
   videoEnabled: boolean;
   speakerOn: boolean;
+  speakerAvailable: boolean;
   canSwitchCamera: boolean;
   toggleMute: () => void;
   toggleVideo: () => void;
@@ -93,6 +94,7 @@ export default function CallFullScreen({
   muted,
   videoEnabled,
   speakerOn,
+  speakerAvailable,
   canSwitchCamera,
   toggleMute,
   toggleVideo,
@@ -217,6 +219,7 @@ export default function CallFullScreen({
           videoEnabled={videoEnabled}
           isVideo={isVideo}
           speakerOn={speakerOn}
+          speakerAvailable={speakerAvailable}
           canSwitchCamera={canSwitchCamera}
           onToggleMute={toggleMute}
           onToggleVideo={toggleVideo}

@@ -33,6 +33,14 @@ import { connectCall, roomNeedsTwilioSetup } from "@/lib/callEngine";
 import { markCall, startCallTimeline } from "@/lib/callTimeline";
 import { startCallForegroundService, stopCallForegroundService } from "@/lib/nativeCalls";
 import {
+  getAudioRoute,
+  initialSpeakerSupport,
+  onAudioRouteChange,
+  setLoudspeaker,
+  SpeakerUnsupportedError,
+  type SpeakerSupport,
+} from "@/lib/audioRoute";
+import {
   FROM_CALL_BUBBLE,
   activeCallPath,
   finishActiveCall,
@@ -108,6 +116,13 @@ export default function CallSession({
   // connection"); otherwise "Reconnecting…" means the other person's side.
   const [selfReconnecting, setSelfReconnecting] = useState(false);
   const [isVideo, setIsVideo] = useState(initialIsVideo);
+  // Current value for code that runs from an older render (the room's
+  // "disconnected" handler calls rejoin long after the call turned to video).
+  const isVideoRef = useRef(initialIsVideo);
+  isVideoRef.current = isVideo;
+  // One camera start at a time (accepting and the other side's answer can
+  // both ask for it at once).
+  const startingVideoRef = useRef(false);
   const [muted, setMuted] = useState(false);
   // The other person put this call on hold (they're on another call).
   const [remoteHeld, setRemoteHeld] = useState(false);
@@ -118,8 +133,17 @@ export default function CallSession({
   const handoverRef = useRef(false);
   const callsSnap = useCalls();
   const [videoEnabled, setVideoEnabled] = useState(initialIsVideo);
-  const [speakerOn, setSpeakerOn] = useState(true);
+  // Shows the route actually in use (read back from Android), never just the
+  // last tap. Video calls start on the loudspeaker, voice calls on the earpiece.
+  const [speakerOn, setSpeakerOn] = useState(initialIsVideo);
+  const [speakerSupport, setSpeakerSupport] = useState<SpeakerSupport>(initialSpeakerSupport);
+  // Set once the person chooses: kept across reconnects and the switch to video.
+  const speakerChoiceRef = useRef<boolean | null>(null);
+  // Our own release of the mic/camera (page closing): not a failure to recover from.
+  const releasingRef = useRef(false);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
+  const facingModeRef = useRef(facingMode);
+  facingModeRef.current = facingMode;
   const [canSwitchCamera, setCanSwitchCamera] = useState(false);
   const [seconds, setSeconds] = useState(() =>
     resume ? Math.max(0, Math.floor((Date.now() - resume.connectedAt) / 1000)) : 0,
@@ -130,7 +154,12 @@ export default function CallSession({
   // child re-attaches whenever a track is added, replaced, or removed.
   const [localVideoTrack, setLocalVideoTrack] = useState<LocalVideoTrack | null>(null);
   const [remoteVideoTrack, setRemoteVideoTrack] = useState<RemoteVideoTrack | null>(null);
+  // The other person's camera is actually sending (it can be switched off
+  // mid-call). Only then is their video drawn, never a frozen last frame.
+  const [remoteVideoOn, setRemoteVideoOn] = useState(false);
   const [upgradeRequest, setUpgradeRequest] = useState<"incoming" | "outgoing" | null>(null);
+  const upgradeRequestRef = useRef(upgradeRequest);
+  upgradeRequestRef.current = upgradeRequest;
   const callChannelRef = useRef<RealtimeChannel | null>(null);
   const upgradeTimeoutRef = useRef<number | null>(null);
 
@@ -286,7 +315,19 @@ export default function CallSession({
         },
       )
       .on("broadcast", { event: "video-upgrade-request" }, () => {
-        if (isVideo || endedRef.current) return;
+        if (isVideoRef.current || endedRef.current) return;
+        // Both asked at the same moment: that's a yes from both sides.
+        if (upgradeRequestRef.current === "outgoing") {
+          if (upgradeTimeoutRef.current) window.clearTimeout(upgradeTimeoutRef.current);
+          setUpgradeRequest(null);
+          void callChannelRef.current?.send({
+            type: "broadcast",
+            event: "video-upgrade-response",
+            payload: { accepted: true, fromUserId: user?.id },
+          });
+          void publishLocalVideoRef.current();
+          return;
+        }
         setUpgradeRequest("incoming");
       })
       .on("broadcast", { event: "video-upgrade-response" }, ({ payload }) => {
@@ -294,7 +335,7 @@ export default function CallSession({
         if (upgradeTimeoutRef.current) window.clearTimeout(upgradeTimeoutRef.current);
         setUpgradeRequest(null);
         if (accepted) {
-          void publishLocalVideo();
+          void publishLocalVideoRef.current();
         } else {
           toast({ title: tNow("cs.videoDeclined") });
         }
@@ -806,6 +847,7 @@ export default function CallSession({
     if (roomRef.current) return true;
     if (joiningRef.current || endedRef.current) return false;
     joiningRef.current = true;
+    releasingRef.current = false;
     if (!opts.early && !opts.rejoin) setStatus((s) => (s === "connected" ? s : "connecting"));
     try {
       // On Android native, the voice audio route must be active before
@@ -840,10 +882,16 @@ export default function CallSession({
       const audio = keptAudio ?? preparedMedia?.audioTrack ?? await createLocalAudioTrack();
       localAudioRef.current = audio;
       if (mutedRef.current) audio.disable();
+      watchLocalTrack(audio);
       const tracks: (LocalAudioTrack | LocalVideoTrack)[] = [audio];
-      if (isVideo) {
+      // isVideoRef, not isVideo: on a rejoin this runs from the render that
+      // first joined, which may predate switching the call to video.
+      const wantVideo = isVideoRef.current;
+      if (wantVideo) {
         const video = keptVideo ?? preparedMedia?.videoTrack ?? await createLocalVideoTrack({ width: 640 });
         localVideoRef.current = video;
+        if (!videoEnabledRef.current || heldRef.current) video.disable();
+        watchLocalTrack(video);
         tracks.push(video);
         setLocalVideoTrack(video);
       } else if (preparedMedia?.videoTrack) {
@@ -910,6 +958,8 @@ export default function CallSession({
 
       // Make sure audio element is unmuted + ready.
       void tryPlayRemoteAudio();
+      // Loudspeaker or earpiece, now that Android is in call mode.
+      void applyCallAudioRoute(isVideoRef.current);
       return true;
     } catch (err) {
       if (opts.early) {
@@ -926,7 +976,7 @@ export default function CallSession({
         void rejoin();
         return false;
       }
-      const msg = formatCallMediaError(err, isVideo);
+      const msg = formatCallMediaError(err, isVideoRef.current);
       endNotice(tNow("call.failed"), { description: msg, destructive: true });
       // Tell the other side too, so they aren't left waiting on "Connecting".
       void supabase
@@ -975,24 +1025,139 @@ export default function CallSession({
     setVideoEnabled(!videoEnabled);
   };
 
-  // Speaker toggle. On the web we can only route to a different output device
-  // via setSinkId() where supported; otherwise we just bump/cut volume so the
-  // user gets a perceptible change.
-  const toggleSpeaker = async () => {
-    const next = !speakerOn;
-    setSpeakerOn(next);
-    const el = remoteAudioEl.current;
-    if (!el) return;
+  /**
+   * Puts call audio where it should be: the person's own choice if they made
+   * one, otherwise loudspeaker for video and earpiece for voice. A connected
+   * headset or Bluetooth device always wins over the loudspeaker default.
+   */
+  const applyCallAudioRoute = async (video: boolean) => {
+    if (speakerSupport === "none") return;
     try {
-      const elAny = el as HTMLAudioElement & {
-        setSinkId?: (id: string) => Promise<void>;
-      };
-      if (typeof elAny.setSinkId === "function") {
-        // "" = default (loudspeaker on mobile browsers); "communications" = earpiece on some.
-        await elAny.setSinkId(next ? "" : "communications").catch(() => {});
+      const route = await getAudioRoute();
+      const personal = route.headset || route.bluetooth;
+      const want = speakerChoiceRef.current ?? (video && !personal);
+      const now = route.speaker === want ? route : await setLoudspeaker(want);
+      if (!endedRef.current) setSpeakerOn(now.speaker);
+    } catch (e) {
+      if (e instanceof SpeakerUnsupportedError) {
+        // Older app: Android keeps it on the earpiece.
+        setSpeakerSupport("update");
+        setSpeakerOn(false);
+      } else {
+        console.warn("[call] audio route", e);
       }
-      el.volume = next ? 1 : 0.4;
-    } catch { /* ignore */ }
+    }
+  };
+
+  const toggleSpeaker = async () => {
+    if (speakerSupport === "update") {
+      toast({ title: tNow("cs.speakerNeedsUpdate") });
+      return;
+    }
+    if (speakerSupport !== "native") return;
+    const want = !speakerOn;
+    speakerChoiceRef.current = want;
+    try {
+      const route = await setLoudspeaker(want);
+      setSpeakerOn(route.speaker);
+    } catch (e) {
+      if (e instanceof SpeakerUnsupportedError) {
+        setSpeakerSupport("update");
+        setSpeakerOn(false);
+        toast({ title: tNow("cs.speakerNeedsUpdate") });
+      } else {
+        console.warn("[call] audio route", e);
+        // Show where the sound really is, whatever happened.
+        void getAudioRoute().then((r) => setSpeakerOn(r.speaker)).catch(() => {});
+      }
+    }
+  };
+
+  // Headset or Bluetooth plugged in or out, or another app moved the sound:
+  // the button follows the real route.
+  useEffect(() => {
+    if (speakerSupport !== "native") return;
+    return onAudioRouteChange((route) => {
+      if (!endedRef.current && route.inCall !== false) setSpeakerOn(route.speaker);
+    });
+  }, [speakerSupport]);
+
+  // The other person's camera on or off (they can switch it off mid-call).
+  useEffect(() => {
+    const track = remoteVideoTrack as unknown as {
+      isEnabled?: boolean;
+      on?: (e: string, fn: () => void) => void;
+      off?: (e: string, fn: () => void) => void;
+    } | null;
+    if (!track) {
+      setRemoteVideoOn(false);
+      return;
+    }
+    const sync = () => setRemoteVideoOn(track.isEnabled !== false);
+    sync();
+    track.on?.("enabled", sync);
+    track.on?.("disabled", sync);
+    return () => {
+      track.off?.("enabled", sync);
+      track.off?.("disabled", sync);
+    };
+  }, [remoteVideoTrack]);
+
+  /**
+   * The microphone or camera stopped by itself (unplugged, taken by another
+   * app, permission removed): get it back and send it again. If it can't
+   * come back, the call goes on: muted, or with the camera off, and the
+   * buttons say so.
+   */
+  const watchLocalTrack = (track: LocalAudioTrack | LocalVideoTrack) => {
+    track.once("stopped", () => {
+      if (endedRef.current || releasingRef.current) return;
+      const current = track.kind === "audio" ? localAudioRef.current : localVideoRef.current;
+      if (current !== track) return; // replaced on purpose (camera switch)
+      void recoverLocalTrack(track.kind);
+    });
+  };
+
+  const recoverLocalTrack = async (kind: "audio" | "video") => {
+    const room = roomRef.current;
+    try {
+      if (kind === "audio") {
+        const next = await createLocalAudioTrack();
+        if (endedRef.current) {
+          next.stop();
+          return;
+        }
+        if (mutedRef.current || heldRef.current) next.disable();
+        localAudioRef.current = next;
+        watchLocalTrack(next);
+        if (room) await room.localParticipant.publishTrack(next);
+      } else {
+        const next = await createLocalVideoTrack({ facingMode: { ideal: facingModeRef.current }, width: 640 });
+        if (endedRef.current) {
+          next.stop();
+          return;
+        }
+        if (!videoEnabledRef.current || heldRef.current) next.disable();
+        localVideoRef.current = next;
+        watchLocalTrack(next);
+        setLocalVideoTrack(next);
+        if (room) await room.localParticipant.publishTrack(next);
+      }
+    } catch (err) {
+      console.warn("[call] couldn't get the " + kind + " back", err);
+      if (endedRef.current) return;
+      if (kind === "audio") {
+        mutedRef.current = true;
+        setMuted(true);
+        callNotice(tNow("cs.micLost"), { destructive: true });
+      } else {
+        localVideoRef.current = null;
+        videoEnabledRef.current = false;
+        setVideoEnabled(false);
+        setLocalVideoTrack(null);
+        callNotice(tNow("cs.cameraLost"), { destructive: true });
+      }
+    }
   };
 
   // Detect whether more than one camera exists so we can enable/disable the switch button.
@@ -1015,13 +1180,16 @@ export default function CallSession({
         width: 640,
       });
       const oldTrack = localVideoRef.current;
+      // The new camera becomes "the" camera first, so stopping the old one
+      // isn't taken for the camera failing.
+      localVideoRef.current = newTrack;
+      watchLocalTrack(newTrack);
       // Republish: unpublish old, publish new.
       if (oldTrack) {
         room.localParticipant.unpublishTrack(oldTrack);
         oldTrack.stop();
       }
       await room.localParticipant.publishTrack(newTrack);
-      localVideoRef.current = newTrack;
       // Refresh local preview.
       setLocalVideoTrack(newTrack);
       setFacingMode(next);
@@ -1038,33 +1206,59 @@ export default function CallSession({
   // Actually publish a local camera track and flip UI to video mode.
   const publishLocalVideo = async () => {
     const room = roomRef.current;
-    if (!room || isVideo) return;
+    // Current values: this also runs from the call channel's handlers.
+    if (!room || isVideoRef.current || startingVideoRef.current) return;
+    startingVideoRef.current = true;
     try {
       const newTrack = await createLocalVideoTrack({
         facingMode: { ideal: "user" },
         width: 640,
       });
+      if (endedRef.current || roomRef.current !== room) {
+        newTrack.stop();
+        return;
+      }
+      // On hold: the camera starts but sends nothing until the call resumes.
+      if (heldRef.current) newTrack.disable();
       await room.localParticipant.publishTrack(newTrack);
       localVideoRef.current = newTrack;
+      watchLocalTrack(newTrack);
+      // Show the own preview in the same render as the switch to video.
       setLocalVideoTrack(newTrack);
+      isVideoRef.current = true;
       setIsVideo(true);
       setVideoEnabled(true);
+      videoEnabledRef.current = true;
       setFacingMode("user");
+      // Video calls go to the loudspeaker, unless a headset is in use.
+      void applyCallAudioRoute(true);
     } catch (err) {
       toast({
         title: tNow("cs.cantSwitchVideo"),
         description: formatCallMediaError(err, true),
         variant: "destructive",
       });
+    } finally {
+      startingVideoRef.current = false;
     }
   };
+
+  const publishLocalVideoRef = useRef(publishLocalVideo);
+  publishLocalVideoRef.current = publishLocalVideo;
 
   // Request the other party's consent before switching to video. Both sides
   // must enable their camera so the call is truly video on both ends.
   const upgradeToVideo = () => {
     const room = roomRef.current;
     const ch = callChannelRef.current;
-    if (!room || isVideo || !ch || upgradeRequest) return;
+    if (!room || isVideo || upgradeRequest) return;
+    // Their video is already on (they accepted, but this phone's camera
+    // didn't start then): no need to ask again, start it now.
+    if (remoteVideoOn) {
+      void publishLocalVideo();
+      return;
+    }
+    if (!ch) return;
     setUpgradeRequest("outgoing");
     void ch.send({
       type: "broadcast",
@@ -1076,6 +1270,13 @@ export default function CallSession({
       setUpgradeRequest((curr) => {
         if (curr === "outgoing") {
           toast({ title: tNow("cs.noVideoResponse") });
+          // Take the question off their screen too, so a late "Accept"
+          // doesn't switch on a camera here after "No response".
+          void callChannelRef.current?.send({
+            type: "broadcast",
+            event: "video-upgrade-cancel",
+            payload: { fromUserId: user?.id },
+          });
           return null;
         }
         return curr;
@@ -1173,6 +1374,7 @@ export default function CallSession({
   useEffect(() => {
     return () => {
       if (endedRef.current) return;
+      releasingRef.current = true;
       stopLostGrace();
       try {
         localAudioRef.current?.stop();
@@ -1188,6 +1390,7 @@ export default function CallSession({
   useEffect(() => {
     const onPageHide = () => {
       if (endedRef.current) return;
+      releasingRef.current = true;
       try {
         localAudioRef.current?.stop();
         localVideoRef.current?.stop();
@@ -1241,7 +1444,12 @@ export default function CallSession({
     else navigate(t.to, { replace: true });
   };
 
-  const videoFullscreen = isVideo && status === "connected";
+  // Video screen when either camera is on: if this phone's camera couldn't
+  // start, the other person's video is still shown (and the button below
+  // starts this camera without asking them again).
+  const videoFullscreen = (isVideo || remoteVideoOn) && status === "connected";
+  // Their video only while their camera is actually on, never a frozen frame.
+  const shownRemoteVideo = remoteVideoOn ? remoteVideoTrack : null;
 
   // The remote <audio> element must stay in the document for the whole call:
   // a media element removed from the page is paused, which would silence the
@@ -1278,7 +1486,7 @@ export default function CallSession({
           reconnecting={reconnecting && status === "connected"}
           poorNetwork={selfReconnecting}
           seconds={seconds}
-          remoteVideoTrack={remoteVideoTrack}
+          remoteVideoTrack={shownRemoteVideo}
           localVideoTrack={localVideoTrack}
           localVideoEnabled={videoEnabled}
           muted={muted}
@@ -1303,7 +1511,7 @@ export default function CallSession({
       {...{
         videoFullscreen,
         localVideoTrack,
-        remoteVideoTrack,
+        remoteVideoTrack: shownRemoteVideo,
         videoSwapped,
         setVideoSwapped,
         isVideo,
@@ -1328,6 +1536,7 @@ export default function CallSession({
         muted,
         videoEnabled,
         speakerOn,
+        speakerAvailable: speakerSupport !== "none",
         canSwitchCamera,
         toggleMute,
         toggleVideo,

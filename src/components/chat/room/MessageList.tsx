@@ -1,5 +1,5 @@
-import type React from "react";
-import { Check, CheckCheck } from "lucide-react";
+import React from "react";
+import { Check, CheckCheck, ChevronsDown } from "lucide-react";
 import { AttachmentBubble, FILE_PREFIX, parseFileMessage, isBareAttachment } from "@/components/chat/AttachmentBubble";
 import { VoiceBubble } from "@/components/chat/VoiceBubble";
 import { CallSystemBubble } from "@/components/chat/CallSystemBubble";
@@ -9,6 +9,8 @@ import { parseCallLog } from "@/lib/chat/messageKinds";
 import chatWallpaper from "@/assets/chat-wallpaper.png";
 import { useLanguage } from "@/lib/i18n/context";
 import type { Message } from "@/lib/chat/chatRoomData";
+import { dayKey, dayLabel } from "@/lib/chat/dayLabels";
+import { useChatScrollAids } from "@/components/chat/room/useChatScrollAids";
 
 /** The scrolling list of messages (and call records) with the logo wallpaper behind it. */
 export interface MessageListProps {
@@ -58,11 +60,22 @@ export default function MessageList({
   setDeleteOpen,
   otherTyping,
 }: MessageListProps) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const rows = searchOpen && searchQuery.trim() ? searchResults : visible;
+  const { activeDay, pillVisible, showJump, onScroll, jumpToLatest } = useChatScrollAids(scrollRef, rows);
+  const labelFor = (key: string) =>
+    // English dates as "13 October 2026" (day first), as in Nigeria and the UAE.
+    dayLabel(key, { today: t("time.today"), yesterday: t("time.yesterday"), locale: language === "en" ? "en-GB" : language });
+  // Rows are in time order; a date pill goes before the first row of each day.
+  let prevDay = "";
   return (
+    <div className="relative flex-1 min-h-0 flex flex-col">
     <div
       ref={scrollRef}
-      onScroll={onMessagesScroll}
+      onScroll={() => {
+        onMessagesScroll();
+        onScroll();
+      }}
       data-testid="chat-wallpaper"
       className="flex-1 overflow-y-auto px-3 py-3 space-y-2"
       style={{ backgroundImage: `url(${chatWallpaper})`, backgroundSize: "176px 176px", backgroundRepeat: "repeat" }}
@@ -78,7 +91,17 @@ export default function MessageList({
       {!searchOpen && visible.length === 0 && (
         <p className="text-xs text-muted-foreground text-center mt-6">{t("chat.sayHello")}</p>
       )}
-      {(searchOpen && searchQuery.trim() ? searchResults : visible).map((m) => {
+      {rows.map((m) => {
+        const day = dayKey(m.created_at);
+        const newDay = day !== prevDay;
+        prevDay = day;
+        const separator = newDay ? (
+          <div key={`day-${day}`} data-day={day} data-testid="day-separator" className="flex justify-center py-1">
+            <span className="px-3 py-1 rounded-lg bg-card/95 text-muted-foreground text-xs font-medium shadow-sm">
+              {labelFor(day)}
+            </span>
+          </div>
+        ) : null;
         const mine = m.sender_id === user?.id;
         const isVoice = m.content.startsWith(VOICE_PREFIX);
         const isCall = m.content.startsWith(CALL_PREFIX);
@@ -90,8 +113,10 @@ export default function MessageList({
 
         if (isCall) {
           return (
+            <React.Fragment key={m.id}>
+            {separator}
             <div
-              key={m.id}
+              data-day={day}
               ref={(el) => {
                 if (el) messageRefs.current.set(m.id, el);
                 else messageRefs.current.delete(m.id);
@@ -113,6 +138,7 @@ export default function MessageList({
                 <CallSystemBubble m={m} mine={mine} />
               </CallRow>
             </div>
+            </React.Fragment>
           );
         }
 
@@ -130,8 +156,10 @@ export default function MessageList({
         const bareAttachment = isFile && fileMeta && isBareAttachment(fileMeta);
 
         return (
+          <React.Fragment key={m.id}>
+          {separator}
           <div
-            key={m.id}
+            data-day={day}
             ref={(el) => {
               if (el) messageRefs.current.set(m.id, el);
               else messageRefs.current.delete(m.id);
@@ -240,6 +268,7 @@ export default function MessageList({
             </div>
           </SwipeRow>
           </div>
+          </React.Fragment>
         );
       })}
       {otherTyping && (
@@ -253,6 +282,38 @@ export default function MessageList({
           </div>
         </div>
       )}
+    </div>
+
+    {/* Floating date while scrolling: the day of what is at the top of the
+        view. Fades out shortly after scrolling stops; the date pills in the
+        list stay. */}
+    {activeDay && (
+      <div
+        aria-hidden="true"
+        data-testid="floating-day"
+        className={`pointer-events-none absolute top-2 left-1/2 -translate-x-1/2 z-10 transition-opacity duration-300 ${
+          pillVisible ? "opacity-100" : "opacity-0"
+        }`}
+      >
+        <span className="px-3 py-1 rounded-lg bg-card/95 text-muted-foreground text-xs font-medium shadow-sm">
+          {labelFor(activeDay)}
+        </span>
+      </div>
+    )}
+
+    {/* Back to the newest message. */}
+    {showJump && (
+      <button
+        type="button"
+        onClick={jumpToLatest}
+        aria-label={t("chat.toLatest")}
+        title={t("chat.toLatest")}
+        data-testid="jump-latest"
+        className="absolute bottom-3 right-3 z-10 w-10 h-10 rounded-full bg-card text-muted-foreground shadow-md border border-border flex items-center justify-center active:scale-95 transition"
+      >
+        <ChevronsDown className="w-5 h-5" />
+      </button>
+    )}
     </div>
   );
 }

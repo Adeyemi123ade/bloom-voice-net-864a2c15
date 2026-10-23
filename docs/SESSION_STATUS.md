@@ -27,8 +27,8 @@ More detail: `docs/ARCHITECTURE.md`, `docs/DEPLOYMENT.md`, `docs/SECRETS.md`,
 ## Features in the app today
 
 - Accounts: register with email code, sign in, Google sign-in (account chooser; returning accounts go straight in, new ones finish the pre-filled form), forgot password with code, delete account (in the app and at `/delete-account`).
-- Chats: text, photos, videos, files, voice notes with transcription, reply, edit, copy and paste of media, forward, delete for me, delete for everyone, search, read ticks, typing, unread badges, chat backup.
-- Calls: voice and video, call waiting with hold and swap, floating call window, call records in the chat, ringing on a locked phone, dial pad to phone numbers.
+- Chats: text, photos, videos, files, voice notes with transcription, reply, edit, copy and paste of media, forward, delete for me, delete for everyone, search, read ticks, typing, unread badges, chat backup, date pills between days with a floating date while scrolling, jump-to-latest button.
+- Calls: voice and video (switch to video either way; camera and microphone come back by themselves if they stop), loudspeaker/earpiece with headset and Bluetooth following (Android app; needs the APK with `CallAudioRoute.java`), call waiting with hold and swap, floating call window, call records in the chat, ringing on a locked phone, dial pad to phone numbers.
 - Safety: block, report (person, chat, message), message requests from people not in your contacts, account suspension and ban list, contact privacy ("Start a new chat" shows only people you chat with and your own contacts; phone numbers are visible only to their owner), limits for new accounts, admin page at `/admin` (admins only).
 - App: 15 languages (Arabic right to left), dark mode, automatic update when a new web version is live, problem reports, Send feedback, version shown in Settings.
 
@@ -75,6 +75,7 @@ Local run: `npm install`, `npm run dev` (http://localhost:8080). Tests:
 | "Message request" label on the chat list; typing indicator visible to a blocked person | `src/pages/Home.tsx`, `typing_indicators` rules | Open |
 | Code splitting: main bundle is 2.3 MB and includes Twilio although calls use Agora | `src/App.tsx`, call files | Open |
 | Split `ChatRoom.tsx` and `CallScreen.tsx` | PR #89 | Screens split (ChatRoom 2,268 to 1,387 lines; CallScreen 1,427 to 1,330). Next, after two-phone call tests: move message loading and sending into hooks, and split the call connection logic |
+| Chat dates, jump button, video switch, mic and loudspeaker fixes | branch `feat/chat-dates-call-fixes` | Web changes live on merge. Loudspeaker needs a new APK (new native `CallAudioRoute.java` and two plugin methods); older APKs show "Update the ChiChat app to use the loudspeaker". Two-phone test still to do |
 | Native Android crash reports (Firebase Crashlytics) | branch `feat/android-crashlytics` | Ready; merge before the release build, then enable Crashlytics in the Firebase console |
 | Native speaker check of the 14 translations | `src/lib/i18n/` | Before public launch |
 | Tester guide with acceptance criteria | owner | Waiting |
