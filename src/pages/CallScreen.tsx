@@ -109,6 +109,8 @@ export default function CallSession({
   const [status, setStatus] = useState<"connecting" | "ringing" | "connected" | "ended">(
     resume ? "connecting" : role === "caller" ? "ringing" : "connecting",
   );
+  const statusRef = useRef(status);
+  statusRef.current = status;
   // The connection dropped (or the other person's did) and is coming back.
   // The call is still on: nothing is ended while this shows.
   const [reconnecting, setReconnecting] = useState(false);
@@ -203,10 +205,16 @@ export default function CallSession({
   };
 
   const handleCallStatus = (nextStatus: string) => {
-    if (nextStatus === "accepted" && status === "ringing") {
+    // statusRef, not status: this also runs from the status poll and the
+    // realtime listener of an earlier render. With a stale "ringing" it used
+    // to set "Connecting" again after the call had connected, and nothing
+    // ever set it back (the other person had already arrived).
+    if (nextStatus === "accepted" && statusRef.current === "ringing" && !connectedRef.current) {
       // Usually the caller is already in the call (joined while ringing):
       // just wait for the other person to arrive. Otherwise join now.
-      if (roomRef.current) setStatus("connecting");
+      const room = roomRef.current;
+      if (room && room.participants.size > 0) markConnected();
+      else if (room) setStatus((s) => (s === "ringing" ? "connecting" : s));
       else void joinRoom();
       return;
     }
@@ -373,6 +381,18 @@ export default function CallSession({
 
     return () => window.clearInterval(pollId);
   }, [callId, status, role]);
+
+  // Safety net: showing "Connecting" while the other person is already in
+  // the call (their arrival was missed): it is connected.
+  useEffect(() => {
+    if (status !== "connecting") return;
+    const id = window.setInterval(() => {
+      if (endedRef.current) return;
+      if ((roomRef.current?.participants.size ?? 0) > 0) markConnected();
+    }, 1000);
+    return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]);
 
   // Caller-side 45s ring timeout — if callee doesn't accept, mark as "no answer".
   useEffect(() => {

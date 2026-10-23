@@ -127,24 +127,7 @@ export default function Home() {
 
   // Note: backup-restore prompt removed — restore is now manual from Settings.
 
-  // Mark online + heartbeat
-  useEffect(() => {
-    if (!user) return;
-    const setOnline = (online: boolean) =>
-      supabase
-        .from("profiles")
-        .update({ is_online: online, last_seen_at: new Date().toISOString() })
-        .eq("id", user.id);
-    setOnline(true);
-    const interval = setInterval(() => setOnline(true), 30000);
-    const onUnload = () => setOnline(false);
-    window.addEventListener("beforeunload", onUnload);
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener("beforeunload", onUnload);
-      setOnline(false);
-    };
-  }, [user]);
+  // Online status and last seen: PresenceHeartbeat (every screen, not only this one).
 
   // Full reloads are rare now (first open, a new chat, coming back to the
   // app); only the newest one may write state, so a slower earlier reload
