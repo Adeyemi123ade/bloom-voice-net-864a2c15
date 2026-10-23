@@ -27,7 +27,7 @@ type Props = {
  * PiP shows the other one. Tap the PiP to swap; drag to reposition.
  */
 const RemoteMedia = forwardRef<HTMLDivElement, Props>(
-  ({ showVideo, localVideoTrack, remoteVideoTrack, remoteAudioRef, swapped = false, onSwap }, _ref) => {
+  ({ showVideo, localVideoTrack, remoteVideoTrack, remoteAudioRef, swapped: swappedWanted = false, onSwap }, _ref) => {
     const PIP_W = 150;
     const PIP_H = 200;
     const MARGIN = 8;
@@ -42,6 +42,8 @@ const RemoteMedia = forwardRef<HTMLDivElement, Props>(
       px: 0, py: 0, ox: 0, oy: 0,
     });
 
+    // Swapping only makes sense with both videos on.
+    const swapped = swappedWanted && !!localVideoTrack && !!remoteVideoTrack;
     // Decide which track goes where.
     const bigTrack = swapped ? localVideoTrack : remoteVideoTrack;
     const pipTrack = swapped ? remoteVideoTrack : localVideoTrack;
@@ -144,7 +146,7 @@ const RemoteMedia = forwardRef<HTMLDivElement, Props>(
           <>
             {/* Full-bleed big stage */}
             <div className="fixed inset-0 z-0 bg-black">
-              <div ref={bigRef} className="absolute inset-0" />
+              <div ref={bigRef} data-testid="video-stage" className="absolute inset-0" />
             </div>
             {/* Draggable PiP tile — drag to reposition, tap to swap */}
             <div
@@ -154,13 +156,15 @@ const RemoteMedia = forwardRef<HTMLDivElement, Props>(
               onPointerMove={onPointerMove}
               onPointerUp={onPointerUp}
               onPointerCancel={onPointerUp}
+              data-testid="video-pip"
               style={{
                 left: pos?.x ?? 0,
                 top: pos?.y ?? 0,
                 width: PIP_W,
                 height: PIP_H,
                 touchAction: "none",
-                visibility: pos ? "visible" : "hidden",
+                // No empty box when this phone's camera is off or couldn't start.
+                visibility: pos && pipTrack ? "visible" : "hidden",
               }}
               className="fixed z-30 rounded-xl bg-secondary border border-border overflow-hidden shadow-lg cursor-grab active:cursor-grabbing select-none"
             >

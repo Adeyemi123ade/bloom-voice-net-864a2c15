@@ -112,6 +112,8 @@ public class CallForegroundService extends Service {
     private void restoreAudio() {
         if (!audioConfigured || audioManager == null) return;
         try {
+            // Loudspeaker/headset choice made during the call goes with it.
+            CallAudioRoute.reset(this);
             audioManager.setMode(previousMode);
             audioManager.setSpeakerphoneOn(previousSpeakerOn);
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && focusRequest != null) {
