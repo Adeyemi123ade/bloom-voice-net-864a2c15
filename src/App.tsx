@@ -34,6 +34,7 @@ import MicTest from "./pages/MicTest.tsx";
 import PrivacyPolicy from "./pages/PrivacyPolicy.tsx";
 import TermsOfService from "./pages/TermsOfService.tsx";
 import MessageNotifier from "./components/MessageNotifier.tsx";
+import PresenceHeartbeat from "./components/PresenceHeartbeat.tsx";
 import IncomingCallScreen from "./components/IncomingCallScreen.tsx";
 import DeviceGate from "./components/DeviceGate.tsx";
 import ErrorBoundary from "./components/ErrorBoundary.tsx";
@@ -81,6 +82,7 @@ const App = () => (
             <DeviceGate>
               <BackButtonGuard />
               <MessageNotifier />
+              <PresenceHeartbeat />
               <IncomingCallScreen />
               <ErrorBoundary>
                 <Routes>
