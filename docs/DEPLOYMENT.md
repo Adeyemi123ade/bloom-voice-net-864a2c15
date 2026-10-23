@@ -98,8 +98,8 @@ logs. The usual cause is an invalid `docs/openapi.yaml`; run
 ## Deploying Edge Functions
 
 The dashboard editor uploads one file, so functions that import from
-`_shared/` (`verify-otp-code`, `check-email-exists`, `check-user-exists`,
-`submit-report`, `twilio-voice-token`, `twilio-voice-twiml`) must be
+`_shared/` (`verify-otp-code`, `check-email-exists`,
+`check-registration-availability`, `request-device-otp`, `submit-report`, `twilio-voice-token`, `twilio-voice-twiml`) must be
 deployed with the CLI:
 
 ```bash

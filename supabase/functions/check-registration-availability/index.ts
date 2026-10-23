@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
+import { withinLookupLimits } from "../_shared/rateLimit.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -34,19 +35,20 @@ Deno.serve(async (req) => {
 
     const admin = createClient(url, serviceKey);
 
-    let emailExists = false;
-    let page = 1;
-    const perPage = 1000;
-    for (let i = 0; i < 20; i++) {
-      const { data, error } = await admin.auth.admin.listUsers({ page, perPage });
-      if (error) return json({ error: "lookup_failed" }, 500);
-      if (data.users.some((u) => (u.email || "").toLowerCase() === email)) {
-        emailExists = true;
-        break;
-      }
-      if (data.users.length < perPage) break;
-      page += 1;
+    // Limits per network, per email and per phone: see LOOKUP_LIMITS in
+    // _shared/rateLimit.ts. The app goes on to sign-up without this answer.
+    if (!(await withinLookupLimits(admin, req, "check-registration-availability", { email, phone }))) {
+      return json({ error: "rate_limited" }, 429);
     }
+
+    // One indexed lookup in the database (email_registered, server only)
+    // instead of paging through the account list.
+    const { data: registered, error: emailErr } = await admin.rpc("email_registered", { _email: email });
+    if (emailErr) {
+      console.error("[check-registration-availability] email lookup failed:", emailErr.message);
+      return json({ error: "lookup_failed" }, 500);
+    }
+    const emailExists = registered === true;
 
     const { data: phoneOwner, error: phoneErr } = await admin
       .from("profiles")

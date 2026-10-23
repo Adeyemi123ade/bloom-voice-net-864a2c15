@@ -32,6 +32,7 @@ import {
 } from "@/lib/chat/chatList";
 import Dialpad from "@/components/Dialpad";
 import { syncNativeRingtone } from "@/lib/nativeRingtone";
+import { filterContactMatches, mergeNewChatPeople, myContactMatches } from "@/lib/newChatPeople";
 
 type Profile = {
   id: string;
@@ -272,18 +273,20 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
+  // Only people the user already chats with (server) plus their own
+  // contacts on this device; never the whole list of ChiChat users.
+  const peopleSeq = useRef(0);
   const loadPeople = async (search?: string) => {
     if (!user) return;
+    const seq = ++peopleSeq.current;
     const q = (search ?? "").trim();
-    const { data, error } = await supabase.rpc("search_users", {
-      _query: q,
-      _limit: 100,
-    });
-    if (error) {
-      setPeople([]);
-      return;
-    }
-    setPeople((data ?? []) as Profile[]);
+    const [partnersRes, contacts] = await Promise.all([
+      supabase.rpc("search_users", { _query: q, _limit: 100 }),
+      myContactMatches(user.id).catch(() => []),
+    ]);
+    if (seq !== peopleSeq.current) return;
+    const partners = partnersRes.error ? [] : ((partnersRes.data ?? []) as Profile[]);
+    setPeople(mergeNewChatPeople(partners, filterContactMatches(contacts, q), user.id));
   };
 
   const startChat = async (otherId: string) => {
@@ -353,7 +356,7 @@ export default function Home() {
               <div className="max-h-[300px] overflow-y-auto -mx-2 mt-1">
                 {filteredPeople.length === 0 && (
                   <p className="text-xs text-muted-foreground px-2 py-3 text-center">
-                    {people.length === 0 ? t("chats.noUsers") : t("chats.noMatchContacts")}
+                    {people.length === 0 ? t("ct.noneOnChichat") : t("chats.noMatchContacts")}
                   </p>
                 )}
                 {filteredPeople.map((p) => (

@@ -390,6 +390,8 @@ const d: Dictionary = {
   "ct.newContact": "Новый контакт",
   "ct.importing": "Импорт…",
   "ct.importPhone": "Импорт из телефона",
+  "ct.importGoogle": "Импорт из Google",
+  "ct.googleFailed": "Не удалось загрузить контакты Google",
   "ct.inviteFriend": "Пригласить друга",
   "ct.accessNeeded": "Нужен доступ к контактам",
   "ct.accessBody": "Разрешите ChiChat доступ к контактам, чтобы видеть, кто из друзей уже в приложении.",

@@ -8,7 +8,7 @@ export default function PrivacyPolicy() {
   return (
     <LegalPage
       title="Privacy Policy"
-      lastUpdated="2026-10-21"
+      lastUpdated="2026-10-23"
       other={{ to: "/terms", label: "Terms of Service" }}
     >
       <LegalSection title="Introduction">
@@ -57,9 +57,20 @@ export default function PrivacyPolicy() {
         <p>
           If you choose to sign in with Google, ChiChat receives your Google account's name and
           email address. We use them only to create your ChiChat account and sign you in.
-          ChiChat does not access your Google Contacts or any other Google data. You can revoke
-          ChiChat's access at any time from your Google Account's security settings. We do not
-          sell Google user data, use it for advertising, or share it with third parties.
+        </p>
+        <p>
+          On the ChiChat website you can also choose Contacts, Import from Google. Only when you
+          tap it and agree on Google's screen, ChiChat reads the names and phone numbers in your
+          Google Contacts (read only). Your browser uses them to show which of your contacts are
+          on ChiChat: the phone numbers are checked against ChiChat accounts, and the list is
+          kept in that browser until you sign out. ChiChat does not store your Google Contacts on
+          its servers, does not change them, and does not keep Google's access pass after the
+          import. The ChiChat Android app does not use Google Contacts.
+        </p>
+        <p>
+          ChiChat does not access any other Google data. You can revoke ChiChat's access at any
+          time from your Google Account's security settings. We do not sell Google user data, use
+          it for advertising, or share it with third parties.
         </p>
         <p>
           ChiChat's use and transfer of information received from Google APIs adheres to the{" "}

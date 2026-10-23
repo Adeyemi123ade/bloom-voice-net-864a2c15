@@ -390,6 +390,8 @@ const d: Dictionary = {
   "ct.newContact": "جهة اتصال جديدة",
   "ct.importing": "جارٍ الاستيراد…",
   "ct.importPhone": "استيراد من الهاتف",
+  "ct.importGoogle": "استيراد من Google",
+  "ct.googleFailed": "تعذّر تحميل جهات اتصال Google",
   "ct.inviteFriend": "دعوة صديق",
   "ct.accessNeeded": "مطلوب الوصول إلى جهات الاتصال",
   "ct.accessBody": "اسمح لـ ChiChat بالوصول إلى جهات اتصالك لترى أي أصدقائك يستخدم التطبيق بالفعل.",

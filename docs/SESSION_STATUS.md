@@ -1,7 +1,7 @@
 # ChiChat: project status
 
 Current state of the project for anyone picking it up (developers, testers,
-reviewers). Updated 2026-10-21. Update this file in the same pull request
+reviewers). Updated 2026-10-23. Update this file in the same pull request
 as any change that makes it wrong.
 
 ## What ChiChat is
@@ -29,7 +29,7 @@ More detail: `docs/ARCHITECTURE.md`, `docs/DEPLOYMENT.md`, `docs/SECRETS.md`,
 - Accounts: register with email code, sign in, Google sign-in (account chooser; returning accounts go straight in, new ones finish the pre-filled form), forgot password with code, delete account (in the app and at `/delete-account`).
 - Chats: text, photos, videos, files, voice notes with transcription, reply, edit, copy and paste of media, forward, delete for me, delete for everyone, search, read ticks, typing, unread badges, chat backup.
 - Calls: voice and video, call waiting with hold and swap, floating call window, call records in the chat, ringing on a locked phone, dial pad to phone numbers.
-- Safety: block, report (person, chat, message), message requests from people not in your contacts, account suspension and ban list, limits for new accounts, admin page at `/admin` (admins only).
+- Safety: block, report (person, chat, message), message requests from people not in your contacts, account suspension and ban list, contact privacy ("Start a new chat" shows only people you chat with and your own contacts; phone numbers are visible only to their owner), limits for new accounts, admin page at `/admin` (admins only).
 - App: 15 languages (Arabic right to left), dark mode, automatic update when a new web version is live, problem reports, Send feedback, version shown in Settings.
 
 ## Version
@@ -67,8 +67,10 @@ Local run: `npm install`, `npm run dev` (http://localhost:8080). Tests:
 | Google sign-in on Android (browser flow fails at Supabase: "Unable to exchange external code") | `ChiChatGooglePlugin.java`, `src/lib/googleAuth.ts`, `docs/GOOGLE_SIGN_IN.md` | Native picker in PR `feat/native-google-signin`. Needs the Android OAuth client (package + SHA-1) in Google Cloud and a new APK |
 | Chat restore hole (backups could be edited to join chats or forge messages) | PR #86 | Merged. Confirm `chat-backup` and `chat-restore` are deployed and `20261021120000_backups_server_only.sql` was run |
 | PR checks and branch protection | PR #87 | Check merged. Branch protection on main still to turn on in GitHub settings |
-| Unused public functions `sign-in-with-identifier`, `check-user-exists` | `supabase/functions/` | Delete from the live project and the repo |
-| No rate limit on `check-registration-availability`, `request-device-otp` | same | Open |
+| Unused public functions `sign-in-with-identifier`, `check-user-exists` | `supabase/functions/` | Removed from the repo (branch `fix/contact-privacy`). Delete them from the live project too |
+| Contact privacy and limits (open user directory, readable phone numbers, signed-out phone to email lookup, bulk number checks) | `20261023090000_contact_privacy.sql`, `20261023120000_contact_match_limits.sql`, `src/lib/newChatPeople.ts` | Branch `fix/contact-privacy`. Run both SQL files in order, deploy `check-registration-availability`, `check-email-exists`, `request-device-otp`, then merge |
+| Rate limit hardening (audit items 1 to 5) | `20261023150000_rate_limit_hardening.sql`, `supabase/functions/_shared/rateLimit.ts` | Branch `fix/contact-privacy`. Limit function server only, real client IP, indexed email lookup, per email/phone limits, looser per-network limits, hourly clean-up. Items 7 (delete unused functions live) and 8 (device code function) still to decide |
+| Google Contacts on web | `src/lib/googleContacts.ts`, Contacts screen "Import from Google" | Built on `fix/contact-privacy` (website only; Android keeps the phone book). Needs in Google Cloud: People API on, contacts.readonly on the consent screen, chichatapp.com as a JavaScript origin on the web client (`docs/GOOGLE_SIGN_IN.md`). The old deployed `google-oauth-callback`, `google-contacts-sync`, `google-contacts-create` are not used and can be deleted |
 | 10 functions missing from `supabase/config.toml` | same | Open |
 | "Message request" label on the chat list; typing indicator visible to a blocked person | `src/pages/Home.tsx`, `typing_indicators` rules | Open |
 | Code splitting: main bundle is 2.3 MB and includes Twilio although calls use Agora | `src/App.tsx`, call files | Open |

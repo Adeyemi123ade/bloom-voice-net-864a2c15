@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 // A fake server whose answers the test releases by hand.
@@ -107,5 +107,43 @@ describe("Contacts screen opening", () => {
     expect(screen.queryByText("Person 0999")).not.toBeInTheDocument();
     // The count still says how many can be invited.
     expect(screen.getByText(String(N - N / 10))).toBeInTheDocument();
+  });
+
+  it("on the website, Import from Google loads Google contacts and checks them like phone contacts", async () => {
+    localStorage.removeItem("chichat:contacts:v1");
+    const requested: string[] = [];
+    vi.stubGlobal("google", {
+      accounts: {
+        oauth2: {
+          initTokenClient: (cfg: { scope: string; callback: (r: { access_token: string }) => void }) => ({
+            requestAccessToken: () => {
+              requested.push(cfg.scope);
+              cfg.callback({ access_token: "tok" });
+            },
+          }),
+          hasGrantedAllScopes: () => true,
+        },
+      },
+    });
+    const realFetch = globalThis.fetch;
+    vi.stubGlobal("fetch", async () =>
+      new Response(JSON.stringify({ connections: [
+        { names: [{ displayName: "Google Friend" }], phoneNumbers: [{ canonicalForm: "+2348030000010" }] },
+        { names: [{ displayName: "Not On App" }], phoneNumbers: [{ canonicalForm: "+2348030000011" }] },
+      ] }), { status: 200 }),
+    );
+    try {
+      renderScreen();
+      fireEvent.click(await screen.findByText("Import from Google"));
+      await waitFor(() => expect(server.rpcCalls.flat()).toEqual(["+2348030000010", "+2348030000011"]));
+      await releaseAll();
+      expect(requested).toEqual(["https://www.googleapis.com/auth/contacts.readonly"]);
+      expect(await screen.findByText("Fresh +2348030000010")).toBeInTheDocument();
+      expect(await screen.findByText("Not On App")).toBeInTheDocument();
+    } finally {
+      vi.stubGlobal("fetch", realFetch);
+      vi.unstubAllGlobals();
+      vi.stubGlobal("IntersectionObserver", IO);
+    }
   });
 });

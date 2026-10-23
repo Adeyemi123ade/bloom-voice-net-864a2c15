@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { clearChatCaches } from "@/lib/chat/chatCache";
 import { clearSafetyCache } from "@/lib/safety";
 import { clearMatchCaches } from "@/lib/contactMatchCache";
+import { clearContactsCache, isNativePlatform } from "@/lib/deviceContacts";
 import { keepSameUser } from "@/lib/sameUser";
 
 interface AuthState {
@@ -49,6 +50,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         clearChatCaches();
         clearMatchCaches();
         clearSafetyCache();
+        // On the website the saved contacts came from this person's Google
+        // account; on Android they are the phone's own and stay.
+        if (!isNativePlatform()) clearContactsCache();
         try {
           localStorage.removeItem("chichat:acceptedChats");
         } catch {

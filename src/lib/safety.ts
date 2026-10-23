@@ -8,6 +8,7 @@ import type { TextKey } from "@/lib/i18n/strings";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { loadCachedContacts, loadManualContacts } from "@/lib/deviceContacts";
+import { loadMatchCache } from "@/lib/contactMatchCache";
 
 // ── Blocks ──────────────────────────────────────────────────────────────
 
@@ -173,8 +174,13 @@ export async function loadContactUserIds(): Promise<Set<string>> {
     if (phones.length === 0) return new Set<string>();
     const { data, error } = await supabase.rpc("match_contacts_by_phone", { _phones: phones });
     if (error) {
+      // e.g. too many checks in an hour: fall back to the last saved match so
+      // known contacts don't suddenly show as message requests.
       console.error("[safety] contact match failed", error);
-      return new Set<string>();
+      const { data: auth } = await supabase.auth.getSession();
+      const me = auth.session?.user.id;
+      const saved = me ? loadMatchCache(me) : null;
+      return new Set<string>((saved?.matches ?? []).map((m) => m.user_id));
     }
     contactIds = new Set((data ?? []).map((m: { user_id: string }) => m.user_id));
     return contactIds;

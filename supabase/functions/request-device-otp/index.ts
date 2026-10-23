@@ -5,6 +5,7 @@
 // Returns: { reason: 'new_device' | 'device_takeover' | 'trusted', other_display_name?: string }
 // 'trusted' means no challenge is needed — the client can proceed.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
+import { checkRateLimit } from "../_shared/rateLimit.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -123,6 +124,16 @@ Deno.serve(async (req) => {
         JSON.stringify({ reason, other_display_name: otherDisplayName }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
+    }
+
+    // Each call emails a new code: 5 per 15 minutes and 20 a day per person.
+    const sendAllowed =
+      (await checkRateLimit(admin, "request-device-otp:15m", user.id, 5, 900)) &&
+      (await checkRateLimit(admin, "request-device-otp:1d", user.id, 20, 86400));
+    if (!sendAllowed) {
+      return new Response(JSON.stringify({ error: "rate_limited" }), {
+        status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Create the challenge.

@@ -3,7 +3,7 @@
 // because it's used during signup/login before the user is authenticated.
 // Only returns a boolean — never any user data.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
-import { checkRateLimit, clientIp } from "../_shared/rateLimit.ts";
+import { withinLookupLimits } from "../_shared/rateLimit.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -36,41 +36,25 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    // Public, unauthenticated email-enumeration surface — cap at 5 req/min/IP.
-    const ip = clientIp(req);
-    const withinLimit = await checkRateLimit(admin, "check-email-exists", ip, 5, 60);
-    if (!withinLimit) {
+    // Limits per network and per email: see LOOKUP_LIMITS in _shared/rateLimit.ts.
+    if (!(await withinLookupLimits(admin, req, "check-email-exists", { email: normalized }))) {
       return new Response(JSON.stringify({ error: "rate_limited" }), {
         status: 429,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Page through users and look for a matching email. The user list is small
-    // for this app; for very large bases you'd want a DB function, but the
-    // admin API is the safe path here.
-    let exists = false;
-    let page = 1;
-    const perPage = 1000;
-    // Cap iterations defensively.
-    for (let i = 0; i < 20; i++) {
-      const { data, error } = await admin.auth.admin.listUsers({ page, perPage });
-      if (error) {
-        return new Response(JSON.stringify({ error: "lookup_failed" }), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const found = data.users.some(
-        (u) => (u.email || "").toLowerCase() === normalized,
-      );
-      if (found) {
-        exists = true;
-        break;
-      }
-      if (data.users.length < perPage) break;
-      page += 1;
+    // One indexed lookup in the database (email_registered, server only)
+    // instead of paging through the account list.
+    const { data: registered, error: lookupErr } = await admin.rpc("email_registered", { _email: normalized });
+    if (lookupErr) {
+      console.error("[check-email-exists] lookup failed:", lookupErr.message);
+      return new Response(JSON.stringify({ error: "lookup_failed" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
+    const exists = registered === true;
 
     // If no live account, check deletion log so the UI can say "this account
     // was deleted" instead of a generic "no account found".

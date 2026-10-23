@@ -4,6 +4,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { loadCachedContacts, loadManualContacts } from "@/lib/deviceContacts";
+import { loadMatchCache } from "@/lib/contactMatchCache";
 import { formatDisplay } from "@/lib/phone";
 import { initials, timeAgo } from "@/lib/chat/format";
 import { Ban, Flag } from "lucide-react";
@@ -48,6 +49,12 @@ export default function ContactInfoSheet({
     (async () => {
       setLoading(true);
       try {
+        // The Contacts screen's last check already knows most numbers, so the
+        // whole phone book isn't sent again every time this sheet opens.
+        const { data: auth } = await supabase.auth.getSession();
+        const me = auth.session?.user.id;
+        const known = me ? loadMatchCache(me)?.matches.find((m) => m.user_id === contact.id) : undefined;
+        if (known) { if (!cancelled) setPhone(known.phone); return; }
         const local = [...(loadCachedContacts() ?? []), ...loadManualContacts()];
         const phones = Array.from(new Set(local.flatMap((c) => c.phones).filter(Boolean)));
         if (phones.length === 0) { setPhone(null); return; }

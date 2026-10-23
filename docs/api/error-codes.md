@@ -30,7 +30,6 @@ can show a plain message. Always check for `error` or `blocked`:
 | Endpoint | 200 body that means refused |
 |---|---|
 | `check-registration-availability` | `{ "error": "invalid_details" }` |
-| `sign-in-with-identifier` | `{ "error": "missing_details" \| "phone_not_registered" \| "phone_ambiguous" \| "email_not_registered" \| "invalid_identifier" \| "email_not_verified" \| "wrong_password" }` |
 | `twilio-voice-token` | `{ "blocked": "suspended" \| "too_new" \| "daily_limit" }` |
 | `twilio-voice-twiml` | Spoken refusal (`<Say>…</Say><Hangup/>`) |
 
@@ -39,7 +38,7 @@ can show a plain message. Always check for `error` or `blocked`:
 | Status | Code | Endpoints | Meaning |
 |---|---|---|---|
 | 400 | `bad_request` | most | Body not JSON, or an unexpected error caught as a bad request |
-| 400 | `invalid_email` | check-email-exists, check-user-exists | Missing, malformed or over 255 characters |
+| 400 | `invalid_email` | check-email-exists | Missing, malformed or over 255 characters |
 | 400 | `Wrong or expired code` | verify-otp-code | Code wrong, expired, or fields missing |
 | 400 | `Invalid request` | verify-otp-code | Body not JSON |
 | 400 | `not_google_session`, `invalid_name`, `invalid_phone`, `invalid_password` | complete-google-registration | Validation |
