@@ -76,7 +76,8 @@ Local run: `npm install`, `npm run dev` (http://localhost:8080). Tests:
 | Code splitting: main bundle is 2.3 MB and includes Twilio although calls use Agora | `src/App.tsx`, call files | Open |
 | Split `ChatRoom.tsx` and `CallScreen.tsx` | PR #89 | Screens split (ChatRoom 2,268 to 1,387 lines; CallScreen 1,427 to 1,330). Next, after two-phone call tests: move message loading and sending into hooks, and split the call connection logic |
 | Chat dates, jump button, video switch, mic and loudspeaker fixes | branch `feat/chat-dates-call-fixes` | Web changes live on merge. Loudspeaker needs a new APK (new native `CallAudioRoute.java` and two plugin methods); older APKs show "Update the ChiChat app to use the loudspeaker". Two-phone test still to do |
-| Native Android crash reports (Firebase Crashlytics) | branch `feat/android-crashlytics` | Ready; merge before the release build, then enable Crashlytics in the Firebase console |
+| Native Android crash reports (Firebase Crashlytics) | `android/build.gradle`, `android/app/build.gradle` | Merged as PR #90 (in every APK built from main with `google-services.json`). Still to do: open Crashlytics in the Firebase console once so reports appear |
+| Chat membership hole (anyone could add themselves to a chat whose id they knew) | `20261024090000_chat_membership_rule.sql` | Branch `fix/chat-membership-rule`. Run the SQL; no app change |
 | Native speaker check of the 14 translations | `src/lib/i18n/` | Before public launch |
 | Tester guide with acceptance criteria | owner | Waiting |
 | Release build (signed .aab) and Google Play Console account | owner | After the items above |

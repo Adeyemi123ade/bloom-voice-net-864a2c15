@@ -1,0 +1,21 @@
+-- Chat membership: only the server adds people to chats.
+--
+-- Why: the rule "Add self to conversation" let any signed-in person insert a
+-- row into conversation_participants for any chat whose id they knew (adding
+-- themselves to someone else's chat, and so reading its messages), and let
+-- anyone already in a chat add a third person to it.
+--
+-- Nothing in the app adds members directly: new chats are made by
+-- start_direct_conversation(), which runs with the owner's rights and is
+-- not affected by this rule. Edge functions use the service role and are not
+-- affected either. Reading and leaving work as before.
+--
+-- How to apply: Supabase Dashboard > SQL Editor, paste this file, Run.
+-- Safe to run twice. No app rebuild needed.
+--
+-- How to undo (puts the hole back):
+--   CREATE POLICY "Add self to conversation" ON public.conversation_participants
+--     FOR INSERT TO authenticated
+--     WITH CHECK (user_id = auth.uid() OR public.is_conversation_participant(conversation_id, auth.uid()));
+
+DROP POLICY IF EXISTS "Add self to conversation" ON public.conversation_participants;
