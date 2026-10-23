@@ -390,6 +390,8 @@ const d: Dictionary = {
   "ct.newContact": "Nuevo contacto",
   "ct.importing": "Importando…",
   "ct.importPhone": "Importar del teléfono",
+  "ct.importGoogle": "Importar de Google",
+  "ct.googleFailed": "No se pudieron cargar tus contactos de Google",
   "ct.inviteFriend": "Invitar a un amigo",
   "ct.accessNeeded": "Se necesita acceso a contactos",
   "ct.accessBody": "Permite que ChiChat acceda a tus contactos para ver qué amigos ya usan la app.",

@@ -188,53 +188,6 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
 
-  /check-user-exists:
-    post:
-      operationId: checkUserExists
-      tags: [Registration and sign-in]
-      summary: Is this email registered? (no current caller)
-      description: |
-        Same lookup as `check-email-exists` without the `deleted` flag.
-        **No code in the current app calls this function.** Kept documented
-        because it is in the repository and may still be deployed.
-
-        Rate limit: 5 requests per minute per IP address (fails open).
-      x-verify-jwt: false
-      x-source: supabase/functions/check-user-exists/index.ts
-      x-callers: none
-      security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/EmailOnly"
-      responses:
-        "200":
-          description: Lookup done.
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [exists]
-                properties:
-                  exists: { type: boolean }
-        "400":
-          description: "`invalid_email` or `bad_request`."
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/Error" }
-        "429":
-          description: "`rate_limited`."
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/Error" }
-        "500":
-          description: "`lookup_failed`."
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/Error" }
-
   /check-registration-availability:
     post:
       operationId: checkRegistrationAvailability
@@ -287,65 +240,6 @@ paths:
               schema: { $ref: "#/components/schemas/Error" }
         "405":
           description: "`invalid_request` (method other than POST)."
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/Error" }
-        "500":
-          description: "`service_unavailable` or `lookup_failed`."
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/Error" }
-
-  /sign-in-with-identifier:
-    post:
-      operationId: signInWithIdentifier
-      tags: [Registration and sign-in]
-      summary: Sign in with email or phone number and password (no current caller)
-      description: |
-        Looks up the email for a phone number (or checks the email exists),
-        then signs in with `auth.signInWithPassword`. The current Sign in
-        screen uses email only and calls Supabase Auth directly;
-        **no code in the current app calls this function.**
-
-        Not rate limited by the function itself. Failures are returned with
-        HTTP 200 and an `error` code.
-      x-verify-jwt: false
-      x-source: supabase/functions/sign-in-with-identifier/index.ts
-      x-callers: none
-      security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [identifier, password]
-              properties:
-                identifier:
-                  type: string
-                  description: An email address, an E.164 phone number, or a phone number of 7 or more digits.
-                password:
-                  type: string
-                  maxLength: 72
-      responses:
-        "200":
-          description: |
-            A session, or an `error` code: `missing_details`,
-            `phone_not_registered`, `phone_ambiguous`, `email_not_registered`,
-            `invalid_identifier`, `email_not_verified`, `wrong_password`.
-          content:
-            application/json:
-              schema:
-                oneOf:
-                  - $ref: "#/components/schemas/SessionResponse"
-                  - $ref: "#/components/schemas/Error"
-        "400":
-          description: "`bad_request`."
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/Error" }
-        "405":
-          description: "`invalid_request`."
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }

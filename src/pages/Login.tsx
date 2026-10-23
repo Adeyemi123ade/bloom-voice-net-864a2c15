@@ -20,10 +20,9 @@ import { useLanguage } from "@/lib/i18n/context";
 
 
 const loginSchema = z.object({
-  // Phone-number sign-in removed from this form — email only, to avoid
-  // confusing users with two different identifier formats. The backend
-  // (sign-in-with-identifier) still supports phone lookups for anything
-  // else that might use it; this page just no longer offers it.
+  // Email only. Phone-number sign-in was removed, and so was the backend
+  // lookup that turned a phone number into an account (it told anyone
+  // whether a number was registered).
   // Messages are keys of translated text (src/lib/i18n), shown with tx().
   identifier: z.string().trim().min(1, { message: "err.enterEmail" }).max(255),
   password: z.string().min(1, { message: "err.passwordRequired" }).max(72),

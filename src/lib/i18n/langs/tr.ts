@@ -390,6 +390,8 @@ const d: Dictionary = {
   "ct.newContact": "Yeni Kişi",
   "ct.importing": "İçe aktarılıyor…",
   "ct.importPhone": "Telefondan içe aktar",
+  "ct.importGoogle": "Google'dan içe aktar",
+  "ct.googleFailed": "Google kişilerin yüklenemedi",
   "ct.inviteFriend": "Arkadaş davet et",
   "ct.accessNeeded": "Kişilere erişim gerekli",
   "ct.accessBody": "Hangi arkadaşlarınızın uygulamada olduğunu görmek için ChiChat'in kişilerinize erişmesine izin verin.",

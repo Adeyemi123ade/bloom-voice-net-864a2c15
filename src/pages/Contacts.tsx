@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { openCallSettings } from "@/lib/nativeCalls";
 import { useNavigate } from "react-router-dom";
 import {
+  BookUser,
   Edit3,
   Heart,
   Loader2,
@@ -47,6 +48,7 @@ import { SectionList, sectionLetter } from "@/components/contacts/ContactSection
 import { shareChichatInvite } from "@/components/contacts/ShareInviteCard";
 import { beginOutgoingCall, canStartAnotherCall } from "@/lib/callStart";
 import { useLanguage } from "@/lib/i18n/context";
+import { GoogleContactsError, googleContactsAvailable, importGoogleContacts, preloadGoogleContacts } from "@/lib/googleContacts";
 import { inBatches, loadMatchCache, phonesKey, saveMatchCache, type CallStat } from "@/lib/contactMatchCache";
 
 // Long phone books: rows are added as the list is scrolled, not all at once
@@ -221,8 +223,9 @@ export default function Contacts() {
       }
       lastCheckedRef.current = key;
     } catch (err) {
-      const msg = err instanceof Error ? err.message : t("ct.matchFailedMsg");
-      toast({ title: t("ct.matchFailed"), description: msg, variant: "destructive" });
+      // Plain words for people; the details go to the logs.
+      console.warn("[contacts] match failed", err);
+      toast({ title: t("ct.matchFailed"), description: t("ct.matchFailedMsg"), variant: "destructive" });
     } finally {
       if (seq === matchSeq.current) setMatching(false);
     }
@@ -242,6 +245,46 @@ export default function Contacts() {
   };
 
   const canPickWebContacts = isWebContactPickerSupported() && !isNativePlatform();
+  const canUseGoogleContacts = googleContactsAvailable();
+  const [importingGoogle, setImportingGoogle] = useState(false);
+
+  // Website only: get Google's window ready so the tap opens it at once.
+  useEffect(() => {
+    if (canUseGoogleContacts) preloadGoogleContacts().catch(() => undefined);
+  }, [canUseGoogleContacts]);
+
+  /**
+   * Website only. The person shares their Google contacts (read only); the
+   * list replaces the previous Google import in this browser and is checked
+   * against ChiChat like phone contacts. Nothing is kept on the server.
+   */
+  const importFromGoogle = async () => {
+    if (importingGoogle) return;
+    setImportingGoogle(true);
+    try {
+      const list = await importGoogleContacts(user?.email ?? undefined);
+      if (!list.length) {
+        toast({ title: t("ct.noneFound") });
+        return;
+      }
+      saveCachedContacts(list);
+      const merged = mergeContacts(list, loadManualContacts());
+      setContacts(merged);
+      await runMatch(merged);
+      toast({
+        title: list.length === 1 ? t("ct.importedOne") : t("ct.importedMany", { n: list.length }),
+      });
+    } catch (err) {
+      const code = err instanceof GoogleContactsError ? err.code : "failed";
+      if (code === "cancelled") {
+        toast({ title: t("ct.importCancelled"), description: t("common.tryAgain") });
+      } else {
+        toast({ title: t("ct.googleFailed"), description: t("common.tryAgain"), variant: "destructive" });
+      }
+    } finally {
+      setImportingGoogle(false);
+    }
+  };
 
   const importFromPhone = async () => {
     setSyncing(true);
@@ -555,6 +598,16 @@ export default function Contacts() {
                   icon={Smartphone}
                   label={syncing ? t("ct.importing") : t("ct.importPhone")}
                   onClick={importFromPhone}
+                />
+              </>
+            )}
+            {canUseGoogleContacts && (
+              <>
+                <Divider />
+                <ActionRow
+                  icon={BookUser}
+                  label={importingGoogle ? t("ct.importing") : t("ct.importGoogle")}
+                  onClick={importFromGoogle}
                 />
               </>
             )}

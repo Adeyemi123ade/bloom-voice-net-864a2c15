@@ -254,6 +254,13 @@ export default function Register() {
       body: { email: parsed.data.email, phone: e164 },
     });
     const availErrCode = (availability as { error?: string } | null)?.error;
+    // Too many checks from this network: say so plainly instead of guessing.
+    const availStatus = (availabilityError as { context?: { status?: number } } | null)?.context?.status;
+    if (availStatus === 429 || availErrCode === "rate_limited") {
+      setSubmitting(false);
+      toast({ title: t("login.tooManyTitle"), description: t("login.tooManyBody"), variant: "destructive" });
+      return;
+    }
     if (availErrCode === "invalid_details") {
       // The backend's stricter E.164 check rejected the number even though it
       // passed client-side parsing — surface this as a phone problem, not a

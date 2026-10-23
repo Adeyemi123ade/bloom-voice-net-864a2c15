@@ -4,7 +4,7 @@
 
 | Caller | Credential sent | Endpoints |
 |---|---|---|
-| Anyone (before sign in) | Public key only | `verify-otp-code`, `check-email-exists`, `check-user-exists`, `check-registration-availability`, `sign-in-with-identifier`, `GET /i/{name}` |
+| Anyone (before sign in) | Public key only | `verify-otp-code`, `check-email-exists`, `check-registration-availability`, `GET /i/{name}` |
 | Signed-in user | `Authorization: Bearer <access token>` and `apikey: <public key>` | Every other app endpoint |
 | Android lock screen (no session) | Public key, plus a per-call `token` in the body | `call-action` |
 | Twilio | `X-Twilio-Signature` header | `twilio-voice-twiml` |
@@ -62,7 +62,10 @@ request is allowed (fails open), so a database problem does not block sign in.
 | Endpoint | Limit |
 |---|---|
 | `verify-otp-code` | 10 per 5 min per email and code type; 30 per 5 min per IP |
-| `check-email-exists`, `check-user-exists` | 5 per min per IP |
+| `check-email-exists` | 5 per min and 100 per day per IP |
+| `check-registration-availability` | 10 per 10 min and 50 per day per IP |
+| `request-device-otp` (code emails) | 5 per 15 min and 20 per day per person |
+| `match_contacts_by_phone` (database) | 30,000 numbers per hour and 100,000 per day per person |
 | `submit-report` | 20 per hour per user |
 | `transcribe-voice` | 30 per hour per user |
 | `verify-device-otp` | 5 wrong codes per challenge |

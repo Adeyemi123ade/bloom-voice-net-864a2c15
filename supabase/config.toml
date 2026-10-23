@@ -11,10 +11,6 @@ project_id = "pnpabtxvsrkrldpfmtaz"
     verify_jwt = false
   [functions.check-email-exists]
     verify_jwt = false
-  [functions.check-user-exists]
-    verify_jwt = false
-  [functions.sign-in-with-identifier]
-    verify_jwt = false
   [functions.check-registration-availability]
     verify_jwt = false
   [functions.request-device-otp]

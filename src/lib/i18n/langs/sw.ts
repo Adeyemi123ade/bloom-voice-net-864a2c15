@@ -390,6 +390,8 @@ const d: Dictionary = {
   "ct.newContact": "Anwani Mpya",
   "ct.importing": "Inaingiza…",
   "ct.importPhone": "Ingiza kutoka kwenye simu",
+  "ct.importGoogle": "Ingiza kutoka Google",
+  "ct.googleFailed": "Imeshindikana kupakia anwani zako za Google",
   "ct.inviteFriend": "Alika rafiki",
   "ct.accessNeeded": "Ruhusa ya anwani inahitajika",
   "ct.accessBody": "Ruhusu ChiChat kufikia anwani zako ili uone marafiki gani tayari wako kwenye programu.",

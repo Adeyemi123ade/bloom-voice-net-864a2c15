@@ -52,10 +52,8 @@ the code the user types is passed straight through.
 | `verify-otp-code` | Verifies a 6-digit signup/recovery OTP via `supabase.auth.verifyOtp` | `false` (public — used pre-auth) | — |
 | `process-email-queue` | Dispatches queued app-triggered emails (device-verification codes) via Resend, rate-limit aware | `true` | `RESEND_API_KEY` |
 | `check-email-exists` | Public: is this email already registered? | `false` | — |
-| `check-user-exists` | Public: does this email/Google account already exist? | `false` | — |
 | `check-google-signup` | Post-Google-OAuth: tells client new vs. existing user | `false` | — |
 | `check-registration-availability` | Public: checks email + phone availability before signup | `false` | — |
-| `sign-in-with-identifier` | Sign-in by phone/username identifier | `false` | — |
 | `complete-google-registration` | Finishes profile for a Google-signup user (phone + password) | `true` | — |
 | `google-oauth-callback`, `google-contacts-sync`, `google-contacts-create` | Google Contacts (older feature). **No source in this repo** as of 2026-10-21; listed because they were deployed | — | `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` |
 | `request-device-otp` | Sends a device-verification OTP on new/unknown device sign-in | `false` | — |

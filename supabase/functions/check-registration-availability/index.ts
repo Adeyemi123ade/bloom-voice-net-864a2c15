@@ -12,6 +12,33 @@ function json(body: unknown, status = 200) {
   });
 }
 
+// Rate limit (kept in this file so it deploys from the dashboard as one file;
+// same logic as _shared/rateLimit.ts). This endpoint tells anyone whether an
+// email or phone number is registered, so it is capped per IP.
+function clientIp(req: Request): string {
+  const fwd = req.headers.get("x-forwarded-for");
+  if (fwd) return fwd.split(",")[0].trim();
+  return req.headers.get("cf-connecting-ip") ?? "unknown";
+}
+
+type RpcClient = {
+  rpc: (fn: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { message: string } | null }>;
+};
+
+async function withinLimit(admin: RpcClient, key: string, max: number, windowSeconds: number): Promise<boolean> {
+  const { data, error } = await admin.rpc("check_rate_limit", {
+    _key: key,
+    _max_count: max,
+    _window_seconds: windowSeconds,
+  });
+  if (error) {
+    // A database hiccup must not block sign-up.
+    console.error("check_rate_limit error:", error.message);
+    return true;
+  }
+  return data === true;
+}
+
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const E164 = /^\+[1-9]\d{6,14}$/;
 
@@ -33,6 +60,12 @@ Deno.serve(async (req) => {
     if (!url || !serviceKey) return json({ error: "service_unavailable" }, 500);
 
     const admin = createClient(url, serviceKey);
+
+    const ip = clientIp(req);
+    const allowed =
+      (await withinLimit(admin, `check-registration-availability:10m:${ip}`, 10, 600)) &&
+      (await withinLimit(admin, `check-registration-availability:1d:${ip}`, 50, 86400));
+    if (!allowed) return json({ error: "rate_limited" }, 429);
 
     let emailExists = false;
     let page = 1;

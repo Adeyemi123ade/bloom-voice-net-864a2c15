@@ -390,6 +390,8 @@ const d: Dictionary = {
   "ct.newContact": "新しい連絡先",
   "ct.importing": "インポート中…",
   "ct.importPhone": "端末からインポート",
+  "ct.importGoogle": "Google からインポート",
+  "ct.googleFailed": "Google の連絡先を読み込めませんでした",
   "ct.inviteFriend": "友だちを招待",
   "ct.accessNeeded": "連絡先へのアクセスが必要です",
   "ct.accessBody": "ChiChat に連絡先へのアクセスを許可すると、既にアプリを使っている友だちがわかります。",

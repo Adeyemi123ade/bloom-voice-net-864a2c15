@@ -28,7 +28,7 @@ function folder is added without a path in the spec, or the other way round.
 
 | Group | Endpoints | Called by |
 |---|---|---|
-| Registration and sign-in | `verify-otp-code`, `check-email-exists`, `check-registration-availability`, `check-google-signup`, `complete-google-registration`, `check-user-exists`*, `sign-in-with-identifier`* | App |
+| Registration and sign-in | `verify-otp-code`, `check-email-exists`, `check-registration-availability`, `check-google-signup`, `complete-google-registration` | App |
 | Device verification | `request-device-otp`, `verify-device-otp` | App |
 | In-app calls | `agora-token`, `twilio-token`, `twilio-room`, `call-action` | App; `call-action` by the Android lock screen |
 | Paid phone calls | `twilio-voice-token`, `twilio-voice-twiml` | App; `twilio-voice-twiml` by Twilio |
@@ -125,15 +125,14 @@ the others are still open.
    `20261021120000_backups_server_only.sql` makes backup files and the
    `chat_backups` row server-written (users keep read access and the auto
    backup switch).
-2. **No current caller, still public**: `sign-in-with-identifier` (password
-   sign-in with no rate limit of its own) and `check-user-exists`. If the live
-   project has them deployed, delete them there and remove the folders.
-3. **No rate limit**: `check-registration-availability` (tells anyone whether
-   an email or phone number is registered) and `request-device-otp` (each call
-   emails a new code, and each code allows 5 guesses).
+2. **Fixed 2026-10-23: unused public lookups removed.** `sign-in-with-identifier`
+   and `check-user-exists` are gone from the repo. Delete them from the live
+   project too (Edge Functions, each one, Delete).
+3. **Fixed 2026-10-23: rate limits.** `check-registration-availability`,
+   `request-device-otp` and the `match_contacts_by_phone` database function
+   now have limits (see `authentication.md`).
 4. **Email lookups stop at 20,000 accounts.** `check-email-exists`,
-   `check-user-exists`, `check-registration-availability` and
-   `sign-in-with-identifier` page through at most 20 x 1000 users. Past that,
+   and `check-registration-availability` page through at most 20 x 1000 users. Past that,
    a registered email is reported as free. A database function lookup would
    remove the limit.
 5. **Raw error text returned**: `twilio-token`, `twilio-room`,

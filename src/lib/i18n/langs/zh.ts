@@ -390,6 +390,8 @@ const d: Dictionary = {
   "ct.newContact": "新建联系人",
   "ct.importing": "正在导入…",
   "ct.importPhone": "从手机导入",
+  "ct.importGoogle": "从 Google 导入",
+  "ct.googleFailed": "无法加载你的 Google 联系人",
   "ct.inviteFriend": "邀请好友",
   "ct.accessNeeded": "需要通讯录权限",
   "ct.accessBody": "允许 ChiChat 访问你的通讯录，即可查看哪些好友已在使用本应用。",

@@ -36,9 +36,12 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    // Public, unauthenticated email-enumeration surface — cap at 5 req/min/IP.
+    // Public, unauthenticated email-enumeration surface: 5 a minute and
+    // 100 a day per IP.
     const ip = clientIp(req);
-    const withinLimit = await checkRateLimit(admin, "check-email-exists", ip, 5, 60);
+    const withinLimit =
+      (await checkRateLimit(admin, "check-email-exists", ip, 5, 60)) &&
+      (await checkRateLimit(admin, "check-email-exists:1d", ip, 100, 86400));
     if (!withinLimit) {
       return new Response(JSON.stringify({ error: "rate_limited" }), {
         status: 429,

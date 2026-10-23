@@ -72,3 +72,34 @@ code for a token. Fixed by pasting the secret again with no spaces. If this
 error appears again, check that field first: Client ID
 `293491364977-tjb6vl7f5nkej0ed8ogf6kj4eikc8c4d.apps.googleusercontent.com`,
 secret copied exactly from that web client in Google Cloud.
+
+## Google Contacts (website only)
+
+Contacts, "Import from Google" (`src/lib/googleContacts.ts`). Not in the
+Android app, which reads the phone's own contacts.
+
+How it works: the browser loads Google's sign-in script, Google asks the
+person to share their contacts (read only, scope
+`https://www.googleapis.com/auth/contacts.readonly`) using the same web
+client as sign-in, and the browser reads names and numbers from the People
+API (`people/me/connections`). The list is kept in that browser only (like
+the phone book on Android, cleared on sign-out) and checked against ChiChat
+with `match_contacts_by_phone`. No access pass, contact or number is stored
+on ChiChat's servers. The old server functions `google-oauth-callback`,
+`google-contacts-sync` and `google-contacts-create` are not used.
+
+One-time setup in Google Cloud, same project as the web client:
+
+1. APIs & Services, Library: enable **Google People API**.
+2. OAuth consent screen (Google Auth Platform), Data access: add the scope
+   `.../auth/contacts.readonly`. It is a sensitive scope: Google reviews it
+   separately from sign-in, even when the app is already verified. Until it
+   is approved, people see an "unverified app" warning and the app is capped
+   at 100 people for this scope.
+3. Credentials, the web client, Authorized JavaScript origins:
+   `https://www.chichatapp.com` and `https://chichatapp.com`. Vercel preview
+   links only work if their exact address is added here too.
+
+If something is missing, the person sees "Couldn't load your Google contacts"
+and the reason is saved in `app_errors` (kind `google-contacts`).
+

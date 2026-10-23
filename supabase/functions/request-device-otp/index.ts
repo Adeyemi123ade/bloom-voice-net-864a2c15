@@ -21,6 +21,25 @@ async function sha256(s: string) {
   return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+// Rate limit (kept in this file so it deploys from the dashboard as one file;
+// same logic as _shared/rateLimit.ts).
+type RpcClient = {
+  rpc: (fn: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { message: string } | null }>;
+};
+
+async function withinLimit(admin: RpcClient, key: string, max: number, windowSeconds: number): Promise<boolean> {
+  const { data, error } = await admin.rpc("check_rate_limit", {
+    _key: key,
+    _max_count: max,
+    _window_seconds: windowSeconds,
+  });
+  if (error) {
+    console.error("check_rate_limit error:", error.message);
+    return true;
+  }
+  return data === true;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
@@ -123,6 +142,16 @@ Deno.serve(async (req) => {
         JSON.stringify({ reason, other_display_name: otherDisplayName }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
+    }
+
+    // Each call emails a new code: 5 per 15 minutes and 20 a day per person.
+    const sendAllowed =
+      (await withinLimit(admin, `request-device-otp:15m:${user.id}`, 5, 900)) &&
+      (await withinLimit(admin, `request-device-otp:1d:${user.id}`, 20, 86400));
+    if (!sendAllowed) {
+      return new Response(JSON.stringify({ error: "rate_limited" }), {
+        status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Create the challenge.
