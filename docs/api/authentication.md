@@ -56,14 +56,22 @@ The admin database functions check `is_app_admin()`.
 
 ## Rate limits
 
-Stored in the database (`check_rate_limit`). If that check itself fails, the
-request is allowed (fails open), so a database problem does not block sign in.
+Stored in the database (`check_rate_limit`, callable by the server only). Keys
+are hashed: the table never holds a raw IP, email or phone number. Rows older
+than 2 days are deleted every hour (`cleanup-rate-limits` job). If the check
+itself fails, the request is allowed (fails open), so a database problem does
+not block sign in.
+
+"Per IP" means the caller's public address: the right-most public entry of
+`x-forwarded-for` (the one the platform's proxy adds), not the first entry,
+which the caller can fake. Each call logs `[client-ip] used=... entries=...
+cf=...` (no address) so this can be checked in the function logs.
 
 | Endpoint | Limit |
 |---|---|
 | `verify-otp-code` | 10 per 5 min per email and code type; 30 per 5 min per IP |
-| `check-email-exists` | 5 per min and 100 per day per IP |
-| `check-registration-availability` | 10 per 10 min and 50 per day per IP |
+| `check-email-exists` | 60 per 10 min and 500 per day per IP; 10 per hour per email (shared with the next row) |
+| `check-registration-availability` | 60 per 10 min and 500 per day per IP; 10 per hour per email and per phone (shared with the row above) |
 | `request-device-otp` (code emails) | 5 per 15 min and 20 per day per person |
 | `match_contacts_by_phone` (database) | 30,000 numbers per hour and 100,000 per day per person |
 | `submit-report` | 20 per hour per user |

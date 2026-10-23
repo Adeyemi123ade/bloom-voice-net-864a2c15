@@ -5,6 +5,7 @@
 // Returns: { reason: 'new_device' | 'device_takeover' | 'trusted', other_display_name?: string }
 // 'trusted' means no challenge is needed — the client can proceed.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
+import { checkRateLimit } from "../_shared/rateLimit.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -19,25 +20,6 @@ function sixDigit() {
 async function sha256(s: string) {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
   return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-// Rate limit (kept in this file so it deploys from the dashboard as one file;
-// same logic as _shared/rateLimit.ts).
-type RpcClient = {
-  rpc: (fn: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { message: string } | null }>;
-};
-
-async function withinLimit(admin: RpcClient, key: string, max: number, windowSeconds: number): Promise<boolean> {
-  const { data, error } = await admin.rpc("check_rate_limit", {
-    _key: key,
-    _max_count: max,
-    _window_seconds: windowSeconds,
-  });
-  if (error) {
-    console.error("check_rate_limit error:", error.message);
-    return true;
-  }
-  return data === true;
 }
 
 Deno.serve(async (req) => {
@@ -146,8 +128,8 @@ Deno.serve(async (req) => {
 
     // Each call emails a new code: 5 per 15 minutes and 20 a day per person.
     const sendAllowed =
-      (await withinLimit(admin, `request-device-otp:15m:${user.id}`, 5, 900)) &&
-      (await withinLimit(admin, `request-device-otp:1d:${user.id}`, 20, 86400));
+      (await checkRateLimit(admin, "request-device-otp:15m", user.id, 5, 900)) &&
+      (await checkRateLimit(admin, "request-device-otp:1d", user.id, 20, 86400));
     if (!sendAllowed) {
       return new Response(JSON.stringify({ error: "rate_limited" }), {
         status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },

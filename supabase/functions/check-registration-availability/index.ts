@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
+import { withinLookupLimits } from "../_shared/rateLimit.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -10,33 +11,6 @@ function json(body: unknown, status = 200) {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
-}
-
-// Rate limit (kept in this file so it deploys from the dashboard as one file;
-// same logic as _shared/rateLimit.ts). This endpoint tells anyone whether an
-// email or phone number is registered, so it is capped per IP.
-function clientIp(req: Request): string {
-  const fwd = req.headers.get("x-forwarded-for");
-  if (fwd) return fwd.split(",")[0].trim();
-  return req.headers.get("cf-connecting-ip") ?? "unknown";
-}
-
-type RpcClient = {
-  rpc: (fn: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { message: string } | null }>;
-};
-
-async function withinLimit(admin: RpcClient, key: string, max: number, windowSeconds: number): Promise<boolean> {
-  const { data, error } = await admin.rpc("check_rate_limit", {
-    _key: key,
-    _max_count: max,
-    _window_seconds: windowSeconds,
-  });
-  if (error) {
-    // A database hiccup must not block sign-up.
-    console.error("check_rate_limit error:", error.message);
-    return true;
-  }
-  return data === true;
 }
 
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -61,25 +35,20 @@ Deno.serve(async (req) => {
 
     const admin = createClient(url, serviceKey);
 
-    const ip = clientIp(req);
-    const allowed =
-      (await withinLimit(admin, `check-registration-availability:10m:${ip}`, 10, 600)) &&
-      (await withinLimit(admin, `check-registration-availability:1d:${ip}`, 50, 86400));
-    if (!allowed) return json({ error: "rate_limited" }, 429);
-
-    let emailExists = false;
-    let page = 1;
-    const perPage = 1000;
-    for (let i = 0; i < 20; i++) {
-      const { data, error } = await admin.auth.admin.listUsers({ page, perPage });
-      if (error) return json({ error: "lookup_failed" }, 500);
-      if (data.users.some((u) => (u.email || "").toLowerCase() === email)) {
-        emailExists = true;
-        break;
-      }
-      if (data.users.length < perPage) break;
-      page += 1;
+    // Limits per network, per email and per phone: see LOOKUP_LIMITS in
+    // _shared/rateLimit.ts. The app goes on to sign-up without this answer.
+    if (!(await withinLookupLimits(admin, req, "check-registration-availability", { email, phone }))) {
+      return json({ error: "rate_limited" }, 429);
     }
+
+    // One indexed lookup in the database (email_registered, server only)
+    // instead of paging through the account list.
+    const { data: registered, error: emailErr } = await admin.rpc("email_registered", { _email: email });
+    if (emailErr) {
+      console.error("[check-registration-availability] email lookup failed:", emailErr.message);
+      return json({ error: "lookup_failed" }, 500);
+    }
+    const emailExists = registered === true;
 
     const { data: phoneOwner, error: phoneErr } = await admin
       .from("profiles")

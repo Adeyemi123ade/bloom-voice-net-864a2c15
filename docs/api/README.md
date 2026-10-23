@@ -131,10 +131,9 @@ the others are still open.
 3. **Fixed 2026-10-23: rate limits.** `check-registration-availability`,
    `request-device-otp` and the `match_contacts_by_phone` database function
    now have limits (see `authentication.md`).
-4. **Email lookups stop at 20,000 accounts.** `check-email-exists`,
-   and `check-registration-availability` page through at most 20 x 1000 users. Past that,
-   a registered email is reported as free. A database function lookup would
-   remove the limit.
+4. **Fixed 2026-10-23: email lookups.** `check-email-exists` and
+   `check-registration-availability` use the `email_registered` database
+   function (one indexed lookup) instead of paging through 20 x 1000 users.
 5. **Raw error text returned**: `twilio-token`, `twilio-room`,
    `twilio-voice-token`, `send-call-push`, `call-action`, `chat-backup` and
    `chat-restore` return internal error messages to the caller.

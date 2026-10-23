@@ -99,7 +99,7 @@ logs. The usual cause is an invalid `docs/openapi.yaml`; run
 
 The dashboard editor uploads one file, so functions that import from
 `_shared/` (`verify-otp-code`, `check-email-exists`,
-`submit-report`, `twilio-voice-token`, `twilio-voice-twiml`) must be
+`check-registration-availability`, `request-device-otp`, `submit-report`, `twilio-voice-token`, `twilio-voice-twiml`) must be
 deployed with the CLI:
 
 ```bash
