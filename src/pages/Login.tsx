@@ -17,6 +17,7 @@ import { startGoogleAuth } from "@/lib/googleAuth";
 import { googleErrorText } from "@/lib/googleErrorText";
 import { reportProblem } from "@/lib/errorReport";
 import { useLanguage } from "@/lib/i18n/context";
+import { markVerifyEmailPending } from "@/lib/verifyEmailPending";
 
 
 const loginSchema = z.object({
@@ -150,6 +151,20 @@ export default function Login() {
     };
     setSubmitting(false);
     const errorCode = (data as { error?: string } | null)?.error;
+    // Right password, but the email code from sign-up was never entered
+    // (for example the app was closed on the code screen). Send a new code
+    // and open the code screen, instead of a dead end: Register says the
+    // email is taken and Sign in refused it.
+    if (errorCode === "email_not_verified") {
+      const email = normalizedIdentifier;
+      const { error: resendError } = await supabase.auth.resend({ type: "signup", email });
+      // Too soon after the last code: the last one still works, so carry on.
+      if (resendError) reportProblem("login", `resend signup code: ${resendError.message}`);
+      markVerifyEmailPending(email);
+      toast({ title: t("login.notVerifiedTitle"), description: t("login.notVerifiedBody") });
+      navigate("/verify-email", { replace: true, state: { email } });
+      return;
+    }
     if (error || errorCode) {
       const raw = (errorCode || error?.message || "").toLowerCase();
       let title = t("login.notRecognizedTitle");
@@ -174,7 +189,7 @@ export default function Login() {
       } else if (raw.includes("invalid_identifier") || raw.includes("missing_details")) {
         title = t("login.checkTitle");
         description = t("login.checkBody");
-      } else if (raw.includes("not confirmed") || raw.includes("confirm")) {
+      } else if (raw.includes("not confirmed") || raw.includes("confirm") || raw.includes("not_verified")) {
         title = t("login.notVerifiedTitle");
         description = t("login.notVerifiedBody");
       } else if (raw.includes("rate") || raw.includes("too many")) {

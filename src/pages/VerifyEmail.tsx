@@ -102,7 +102,7 @@ export default function VerifyEmail() {
     if (error) {
       toast({
         title: t("code.cantResend"),
-        description: error.message,
+        description: t("auth.tryAgain"),
         variant: "destructive",
       });
       return;
