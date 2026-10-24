@@ -283,8 +283,11 @@ export default function Home() {
       return;
     }
     setOpenNew(false);
-    await loadChats();
-    navigate(`/chat/${data}`);
+    const p = people.find((x) => x.id === otherId);
+    navigate(`/chat/${data}`, {
+      state: { peer: { name: p?.display_name ?? null, avatarUrl: p?.avatar_url ?? null } },
+    });
+    void loadChats();
   };
 
   const [peopleQuery, setPeopleQuery] = useState("");

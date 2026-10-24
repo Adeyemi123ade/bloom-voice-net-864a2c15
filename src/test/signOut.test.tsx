@@ -48,6 +48,8 @@ vi.mock("@/lib/chatBackup", () => ({ getMyBackup: async () => null }));
 vi.mock("@/lib/admin", () => ({ amIAdmin: async () => false }));
 
 import Settings from "@/pages/Settings";
+import SettingsPreferences from "@/pages/SettingsPreferences";
+import { Route, Routes } from "react-router-dom";
 import { clearChatCaches } from "@/lib/chat/chatCache";
 
 const replace = vi.fn();
@@ -74,8 +76,8 @@ describe("Sign out", () => {
     expect(await screen.findByTestId("sign-out")).toHaveTextContent(/sign out/i);
   });
 
-  it("Delete account is its own card, apart from Account, with a compact button", async () => {
-    render(<MemoryRouter><Settings /></MemoryRouter>);
+  it("Delete account is its own card, apart from Sign out, with a compact button", async () => {
+    render(<MemoryRouter><SettingsPreferences /></MemoryRouter>);
     const card = await screen.findByTestId("delete-card");
     const signOut = screen.getByTestId("sign-out");
     expect(card.contains(signOut)).toBe(false);
@@ -85,11 +87,33 @@ describe("Sign out", () => {
     expect(btn.className).not.toMatch(/w-full/);
   });
 
-  it("every existing setting is still on the screen", async () => {
+  it("screen 1 has the account, Preferences and Sign out, nothing else", async () => {
     render(<MemoryRouter><Settings /></MemoryRouter>);
-    for (const label of ["Profile settings", "Privacy and account", "Phone settings", "App settings", "Language", "Blocked", "Chat backup"]) {
+    for (const label of ["Profile settings", "Privacy and account", "Preferences"]) {
       expect(await screen.findByText(label)).toBeInTheDocument();
     }
+    expect(screen.getByTestId("sign-out")).toBeInTheDocument();
+    for (const label of ["Phone settings", "App settings", "Language", "Blocked", "Chat backup"]) {
+      expect(screen.queryByText(label)).not.toBeInTheDocument();
+    }
+    expect(screen.queryByTestId("delete-account")).not.toBeInTheDocument();
+  });
+
+  it("Preferences opens screen 2 with every other setting, Sign out and Delete", async () => {
+    render(
+      <MemoryRouter initialEntries={["/settings"]}>
+        <Routes>
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/settings/preferences" element={<SettingsPreferences />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    fireEvent.click(await screen.findByTestId("open-preferences"));
+    for (const label of ["Phone settings", "App settings", "Language", "Blocked", "Chat backup", "Send feedback"]) {
+      expect(await screen.findByText(label)).toBeInTheDocument();
+    }
+    expect(screen.getByTestId("sign-out")).toBeInTheDocument();
+    expect(screen.getByTestId("delete-account")).toBeInTheDocument();
   });
 
   it("ends only this device's session and goes straight to the sign-in screen", async () => {
@@ -109,7 +133,7 @@ describe("Sign out", () => {
   });
 
   it("deleting the account is still a separate, confirmed action", async () => {
-    render(<MemoryRouter><Settings /></MemoryRouter>);
+    render(<MemoryRouter><SettingsPreferences /></MemoryRouter>);
     fireEvent.click(await screen.findByTestId("delete-account"));
     expect(server.deleteMyAccount).not.toHaveBeenCalled();
     expect(await screen.findByRole("alertdialog")).toBeInTheDocument();

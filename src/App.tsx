@@ -18,6 +18,7 @@ import Contacts from "./pages/Contacts.tsx";
 import Profile from "./pages/Profile.tsx";
 import Settings from "./pages/Settings.tsx";
 import PhoneSettings from "./pages/PhoneSettings.tsx";
+import SettingsPreferences from "./pages/SettingsPreferences.tsx";
 import ChatBackup from "./pages/ChatBackup.tsx";
 import AppSettings from "./pages/AppSettings.tsx";
 import ForgotPassword from "./pages/ForgotPassword.tsx";
@@ -99,6 +100,7 @@ const App = () => (
                   <Route path="/invite" element={<InviteFriends />} />
                   <Route path="/profile" element={<Profile />} />
                   <Route path="/settings" element={<Settings />} />
+                  <Route path="/settings/preferences" element={<SettingsPreferences />} />
                   <Route path="/settings/phone" element={<PhoneSettings />} />
                   <Route path="/settings/backup" element={<ChatBackup />} />
                   <Route path="/settings/app" element={<AppSettings />} />
