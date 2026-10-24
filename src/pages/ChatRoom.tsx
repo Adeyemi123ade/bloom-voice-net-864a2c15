@@ -1,6 +1,6 @@
 import { isLimitError, isSuspendedError, requestAccountCheck } from "@/lib/accountStatus";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Phone, Video } from "lucide-react";
 import { type ForwardResult } from "@/components/chat/ForwardSheet";
 import type { EmojiClickData } from "emoji-picker-react";
@@ -63,6 +63,11 @@ export default function ChatRoom() {
   const { resolvedTheme } = useTheme();
   const [messages, setMessages] = useState<Message[]>([]);
   const [other, setOther] = useState<Profile | null>(null);
+  // Name and photo of the person tapped in Contacts or New chat, so the
+  // header shows them at once instead of a placeholder while it loads.
+  const location = useLocation();
+  const peer = (location.state as { peer?: { name?: string | null; avatarUrl?: string | null } } | null)?.peer;
+  const peerShown = peer?.name ? { name: peer.name, avatarUrl: peer.avatarUrl ?? null } : null;
   // Lets the realtime channel's callbacks read the latest `other` without
   // needing it in the effect's dependency array — see the channel effect
   // below for why that matters.
@@ -175,7 +180,7 @@ export default function ChatRoom() {
     // What was there last time, shown at once while the latest loads.
     const cached = loadChatCache<Message, Profile>(conversationId);
     setMessages(cached?.messages ?? []);
-    if (cached?.other) setOther(cached.other);
+    setOther(cached?.other ?? null);
     // The other person's profile and the messages load at the same time.
     void (async () => {
       const { data: parts } = await supabase
@@ -1241,6 +1246,7 @@ export default function ChatRoom() {
               showBackArrow,
               goBack,
               other,
+              peer: peerShown,
               otherTyping,
               startCall,
               setContactInfoOpen,

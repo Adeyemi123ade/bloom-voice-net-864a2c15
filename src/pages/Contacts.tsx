@@ -456,7 +456,9 @@ export default function Contacts() {
         _other_user: c.user_id,
       });
       if (error) throw error;
-      navigate(`/chat/${data as string}`);
+      navigate(`/chat/${data as string}`, {
+        state: { peer: { name: c.display_name ?? null, avatarUrl: c.avatar_url ?? null } },
+      });
     } catch (err) {
       const msg = err instanceof Error ? err.message : t("ct.chatOpenFailed");
       toast({ title: t("ct.chatFailed"), description: msg, variant: "destructive" });

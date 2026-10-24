@@ -17,6 +17,8 @@ export interface ChatHeaderProps {
   showBackArrow: boolean;
   goBack: () => void;
   other: Profile | null;
+  /** Name and photo from the screen that opened this chat, shown until the profile loads. */
+  peer?: { name: string | null; avatarUrl: string | null } | null;
   otherTyping: boolean;
   startCall: (type: "voice" | "video") => void;
   setContactInfoOpen: React.Dispatch<React.SetStateAction<boolean>>;
@@ -31,6 +33,7 @@ export default function ChatHeader({
   showBackArrow,
   goBack,
   other,
+  peer = null,
   otherTyping,
   startCall,
   setContactInfoOpen,
@@ -41,6 +44,10 @@ export default function ChatHeader({
   setReport,
 }: ChatHeaderProps) {
   const { t } = useLanguage();
+  // Loading: the name from the list that was tapped, or a grey bar. "ChiChat
+  // user" is only for a loaded chat whose person can't be shown (blocked).
+  const name = other ? (other.display_name ?? peer?.name ?? t("chat.chichatUser")) : (peer?.name ?? null);
+  const photo = other?.avatar_url ?? (other ? null : peer?.avatarUrl ?? null);
   return (
     <div className="px-3 pt-4 pb-3 flex items-center gap-2 border-b border-border">
       {showBackArrow && (
@@ -54,9 +61,9 @@ export default function ChatHeader({
       )}
       <div className="relative">
         <Avatar className="w-9 h-9">
-          <AvatarImage src={other?.avatar_url ?? undefined} />
+          <AvatarImage src={photo ?? undefined} />
           <AvatarFallback className="bg-primary/20 text-foreground text-xs font-semibold">
-            {initials(other?.display_name)}
+            {initials(name)}
           </AvatarFallback>
         </Avatar>
         {other && (() => {
@@ -68,7 +75,7 @@ export default function ChatHeader({
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-foreground truncate leading-tight">
-          {other?.display_name ?? t("chat.chichatUser")}
+          {name ?? <span data-testid="chat-name-loading" className="inline-block h-3.5 w-28 rounded bg-muted animate-pulse align-middle" />}
         </p>
         {/* Fixed-height status row — never changes header height */}
         <div className="h-[14px] flex items-center">
