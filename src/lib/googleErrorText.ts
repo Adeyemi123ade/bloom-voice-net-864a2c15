@@ -21,7 +21,9 @@ export function googleErrorText(error: Error, fallbackBody: TextKey): { descript
         : error.kind === "no_account"
           ? tNow("google.noAccountBody")
           : tNow(fallbackBody);
-    const detail = short(error.detail);
+    // A known cause ("setup": this app version isn't registered with Google)
+    // gets plain words only; Google's own message is kept in the problem log.
+    const detail = error.kind === "setup" ? "" : short(error.detail);
     return { description: detail ? `${body} ${tNow("google.detail", { detail })}` : body };
   }
   return { description: tNow(fallbackBody) };
