@@ -245,8 +245,15 @@ export default function CallSession({
     }
   };
 
-  // Caller hears classic phone ringback while waiting for the callee to pick up.
-  useRingback(role === "caller" && status === "ringing");
+  // The other phone has said it is ringing (calls.callee_ringing_at). Until
+  // then the caller sees "Calling…" and hears nothing: the call has been
+  // sent, but that doesn't mean their phone rings.
+  const [remoteRinging, setRemoteRinging] = useState(false);
+  const noteRinging = (row: { callee_ringing_at?: string | null } | null | undefined) => {
+    if (row?.callee_ringing_at) setRemoteRinging(true);
+  };
+  // Caller hears ringback only once the other phone really rings.
+  useRingback(role === "caller" && status === "ringing" && remoteRinging);
 
   // Signed out mid-call: end the call. Only a real sign out counts; the
   // sign-in briefly not being readable (slow network at start up) is not one.
@@ -318,7 +325,8 @@ export default function CallSession({
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "calls", filter: `id=eq.${callId}` },
         (payload) => {
-          const row = payload.new as { status: string };
+          const row = payload.new as { status: string; callee_ringing_at?: string | null };
+          noteRinging(row);
           handleCallStatus(row.status);
         },
       )
@@ -368,16 +376,20 @@ export default function CallSession({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [callId, status, role, isVideo]);
 
+  // Backup for the realtime listener. Quick while the call is being set up;
+  // once connected the listener does the work, so only an occasional check
+  // (it used to ask the server 2-3 times a second for the whole call).
   useEffect(() => {
     if (!callId || status === "ended") return;
     const pollId = window.setInterval(async () => {
       const { data } = await supabase
         .from("calls")
-        .select("status")
+        .select("status, callee_ringing_at")
         .eq("id", callId)
         .maybeSingle();
+      noteRinging(data);
       if (data?.status) handleCallStatus(data.status);
-    }, 400);
+    }, status === "connected" ? 5000 : 400);
 
     return () => window.clearInterval(pollId);
   }, [callId, status, role]);
@@ -1537,6 +1549,7 @@ export default function CallSession({
         isVideo,
         other,
         status,
+        remoteRinging,
         reconnecting,
         selfReconnecting,
         seconds,

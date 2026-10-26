@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useLanguage } from "@/lib/i18n/context";
 import { reportProblem } from "@/lib/errorReport";
+import { unregisterCallPush } from "@/lib/fcmRegistration";
 
 type GoogleSignupCheck = {
   allowed?: boolean;
@@ -97,6 +98,8 @@ export default function GoogleReturn() {
   }, [run]);
 
   const otherWay = async () => {
+    // Like Settings > Sign out: this phone stops ringing for the account.
+    await unregisterCallPush();
     await supabase.auth.signOut({ scope: "local" });
     navigate("/login", { replace: true });
   };

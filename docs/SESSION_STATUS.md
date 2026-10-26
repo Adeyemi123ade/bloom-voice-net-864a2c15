@@ -1,7 +1,7 @@
 # ChiChat: project status
 
 Current state of the project for anyone picking it up (developers, testers,
-reviewers). Updated 2026-10-23. Update this file in the same pull request
+reviewers). Updated 2026-10-26. Update this file in the same pull request
 as any change that makes it wrong.
 
 ## What ChiChat is
@@ -64,6 +64,8 @@ Local run: `npm install`, `npm run dev` (http://localhost:8080). Tests:
 
 | Item | Where | State |
 | --- | --- | --- |
+| Contacts shown as Invite; signed-out phones ringing; caller ringing too early | `20261026120000_phone_at_signup_push_sessions_ringing.sql`, `send-call-push`, branch `fix/calls-contacts-server` | Order: run the SQL, deploy `send-call-push`, then merge. Form sign-ups now save the phone at sign-up; push only reaches phones still signed in; caller shows "Calling…" until the other phone reports ringing |
+| Native call follow-ups (need a new APK) | `android/app/src/main/java/` | Open: native ringing report when the app is closed, ignore pushes for an account not signed in on the phone, full-screen permission check (Android 14+), native timing marks for slow answers |
 | Google sign-in on Android (browser flow fails at Supabase: "Unable to exchange external code") | `ChiChatGooglePlugin.java`, `src/lib/googleAuth.ts`, `docs/GOOGLE_SIGN_IN.md` | Native picker in PR `feat/native-google-signin`. Needs the Android OAuth client (package + SHA-1) in Google Cloud and a new APK |
 | Chat restore hole (backups could be edited to join chats or forge messages) | PR #86 | Merged. Confirm `chat-backup` and `chat-restore` are deployed and `20261021120000_backups_server_only.sql` was run |
 | PR checks and branch protection | PR #87 | Check merged. Branch protection on main still to turn on in GitHub settings |

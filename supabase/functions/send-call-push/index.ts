@@ -93,10 +93,10 @@ async function pushToUser(
   data: Record<string, string>,
   ttl: string,
 ): Promise<{ sent: number; failed: number; reason?: string; error?: string }> {
-  const { data: tokens } = await supabase
-    .from("device_push_tokens")
-    .select("fcm_token")
-    .eq("user_id", userId);
+  // Only phones still signed in to this account; the database deletes the
+  // tokens of phones that signed out, so a signed-out phone never rings.
+  const { data: tokens, error: tokensError } = await supabase.rpc("push_tokens_for_user", { _user: userId });
+  if (tokensError) throw new Error(`push tokens: ${tokensError.message}`);
   if (!tokens || tokens.length === 0) return { sent: 0, failed: 0, reason: "no tokens" };
 
   const saRaw = Deno.env.get("FCM_SERVICE_ACCOUNT_JSON");

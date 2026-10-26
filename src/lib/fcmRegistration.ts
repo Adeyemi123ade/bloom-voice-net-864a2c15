@@ -83,15 +83,14 @@ export async function registerForCallPush(userId: string) {
 
     PushNotifications.addListener("registration", async (token) => {
       try {
-        const { error } = await supabase.from("device_push_tokens").upsert(
-          {
-            user_id: userId,
-            fcm_token: token.value,
-            platform: Capacitor.getPlatform(),
-            last_seen_at: new Date().toISOString(),
-          },
-          { onConflict: "fcm_token" },
-        );
+        // Saved with this sign-in, so calls stop ringing this phone once it
+        // signs out. The token belongs to the phone: the server moves it
+        // from any account that used this phone before (a plain upsert
+        // couldn't, and that account's calls kept ringing here instead).
+        const { error } = await supabase.rpc("register_push_token", {
+          _token: token.value,
+          _platform: Capacitor.getPlatform(),
+        });
         // Supabase reports failures in `error` rather than throwing.
         if (error) {
           console.warn("[fcm] failed to store token", error);

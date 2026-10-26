@@ -21,6 +21,8 @@ const w = vi.hoisted(() => ({
   statusListeners: [] as ((p: { new: { status: string } }) => void)[],
   pollGate: null as null | (() => void),
   holdPoll: false,
+  // When the other phone said it rings (calls.callee_ringing_at).
+  ringingAt: "2026-10-26T10:00:00Z" as string | null,
 }));
 
 function makeTrack(kind: "audio" | "video") {
@@ -83,7 +85,7 @@ vi.mock("@/integrations/supabase/client", () => {
     q.maybeSingle = async () => {
       // The poll's answer can be held back to land after other events.
       if (w.holdPoll) await new Promise<void>((res) => { w.pollGate = res; });
-      return { data: { id: "call-1", status: w.dbStatus }, error: null };
+      return { data: { id: "call-1", status: w.dbStatus, callee_ringing_at: w.ringingAt }, error: null };
     };
     q.single = q.maybeSingle;
     q.then = (res: (v: unknown) => void) => res({ data: null, error: null });
@@ -147,6 +149,7 @@ beforeEach(() => {
   w.statusListeners = [];
   w.pollGate = null;
   w.holdPoll = false;
+  w.ringingAt = "2026-10-26T10:00:00Z";
 });
 
 describe("call status after the other person answers", () => {
@@ -189,4 +192,27 @@ describe("call status after the other person answers", () => {
       await waitFor(() => expect(screen.getAllByText(timer).length).toBeGreaterThan(0));
     });
   }
+});
+
+describe("caller: Calling until the other phone rings", () => {
+  it("shows Calling… while unconfirmed, then Ringing… once the other phone reports it", async () => {
+    w.ringingAt = null;
+    render(
+      <MemoryRouter initialEntries={["/call/conv-1"]}>
+        <CallSession params={callerParams(false) as never} />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(w.rooms.length).toBe(1));
+    await waitFor(() => expect(screen.getAllByText("Calling…").length).toBeGreaterThan(0));
+    await new Promise((r) => setTimeout(r, 500));
+    expect(shows("Ringing…")).toBe(false);
+    expect(screen.getByTestId("call-avatar").getAttribute("data-ringing")).toBe("false");
+    // Their phone reports ringing (realtime update).
+    w.ringingAt = "2026-10-26T10:00:02Z";
+    await act(async () => {
+      w.statusListeners[w.statusListeners.length - 1]({ new: { status: "ringing", callee_ringing_at: w.ringingAt } as never });
+    });
+    await waitFor(() => expect(shows("Ringing…")).toBe(true));
+    expect(screen.getByTestId("call-avatar").getAttribute("data-ringing")).toBe("true");
+  });
 });
