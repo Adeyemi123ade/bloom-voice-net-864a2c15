@@ -346,8 +346,12 @@ export default function Register() {
       }
       return;
     }
-    // Save phone to profile (handle_new_user trigger created the row without phone)
-    if (signUpData.user?.id && e164) {
+    // The sign-up saves the phone itself (handle_new_user, since
+    // 20261026120000). Sign-up waits for the email code, so there is no
+    // session here: an update now would be refused and stop the sign-up.
+    // Only when a session already exists (email codes switched off) is the
+    // phone written from here as well.
+    if (signUpData.session && signUpData.user?.id && e164) {
       const { error: profileError } = await supabase
         .from("profiles")
         .update({ phone: e164 })

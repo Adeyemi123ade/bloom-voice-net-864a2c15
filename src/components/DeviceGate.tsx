@@ -61,6 +61,10 @@ export default function DeviceGate({ children }: { children: ReactNode }) {
     if (isExempt) return;
     if (!user) {
       setVerified(false);
+      // A call answered on a phone that is no longer signed in (a ring that
+      // arrived late, after signing out): say the call isn't available here
+      // instead of sending the person to the sign-in screen.
+      if (isCallPath(location.pathname)) return;
       // No session and we're on a protected route (deep link, expired/lost
       // session, etc.) — bounce to /login instead of stranding the user on
       // the loading shell forever. isExempt guards against a redirect loop
@@ -133,6 +137,9 @@ export default function DeviceGate({ children }: { children: ReactNode }) {
 
   // No user — the effect above is already navigating to /login; render nothing
   // in the meantime rather than the protected page.
+  if (!user && isCallPath(location.pathname)) {
+    return <CallUnavailable onOk={() => navigate("/", { replace: true })} />;
+  }
   if (!user) return <LoadingShell label={tNow("dg.signingIn")} />;
 
   // Session exists but the email OTP hasn't been confirmed yet — never render
@@ -160,6 +167,27 @@ function LoadingShell({ label }: { label: string }) {
         <p className="text-base text-muted-foreground/70 animate-pulse">
           {label}
         </p>
+      </div>
+    </MobileFrame>
+  );
+}
+
+function isCallPath(path: string): boolean {
+  return path.startsWith("/call/");
+}
+
+function CallUnavailable({ onOk }: { onOk: () => void }) {
+  return (
+    <MobileFrame>
+      <div className="h-full w-full flex flex-col items-center justify-center gap-6 bg-background px-6">
+        <p className="text-base text-foreground text-center">{tNow("cs.notAvailable")}</p>
+        <button
+          type="button"
+          onClick={onOk}
+          className="rounded-full bg-primary px-8 py-2 text-sm font-medium text-primary-foreground"
+        >
+          {tNow("common.ok")}
+        </button>
       </div>
     </MobileFrame>
   );

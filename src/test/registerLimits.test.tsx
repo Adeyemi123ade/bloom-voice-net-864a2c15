@@ -7,6 +7,9 @@ const server = vi.hoisted(() => ({
   availability: { data: null as unknown, error: null as unknown },
   emailExists: { data: null as unknown, error: null as unknown },
   signUpError: null as unknown,
+  // Sign-up normally waits for the email code, so no session comes back.
+  signUpSession: null as unknown,
+  phoneUpdates: 0,
   phoneUpdateError: null as unknown,
   invoked: [] as string[],
   signUp: vi.fn(),
@@ -22,7 +25,7 @@ vi.mock("@/integrations/supabase/client", () => ({
         server.signUp(args);
         return server.signUpError
           ? { data: { user: null }, error: server.signUpError }
-          : { data: { user: { id: "new-user" } }, error: null };
+          : { data: { user: { id: "new-user" }, session: server.signUpSession }, error: null };
       },
     },
     functions: {
@@ -36,7 +39,7 @@ vi.mock("@/integrations/supabase/client", () => ({
     rpc: async () => ({ data: true, error: null }),
     from: () => ({
       select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null }) }) }),
-      update: () => ({ eq: async () => ({ error: server.phoneUpdateError }) }),
+      update: () => ({ eq: async () => { server.phoneUpdates += 1; return { error: server.phoneUpdateError }; } }),
     }),
   },
 }));
@@ -67,6 +70,8 @@ beforeEach(() => {
   server.emailExists = { data: { exists: false, deleted: false }, error: null };
   server.signUpError = null;
   server.phoneUpdateError = null;
+  server.signUpSession = null;
+  server.phoneUpdates = 0;
   server.invoked = [];
   server.signUp.mockReset();
 });
@@ -95,9 +100,20 @@ describe("Sign-up and the registration check limits", () => {
     expect((await screen.findAllByText(/already registered|already in use|already has an account/i)).length).toBeGreaterThan(0);
   });
 
-  it("check limited, but the phone is taken: the database refusal is shown on the phone field", async () => {
+  it("sign-up waiting for the email code: the phone goes with the sign-up, no signed-out profile update", async () => {
     server.availability = rateLimited;
     server.emailExists = rateLimited;
+    await fillAndSubmit();
+    await waitFor(() => expect(server.signUp).toHaveBeenCalledTimes(1));
+    const args = server.signUp.mock.calls[0][0] as { options: { data: { phone: string } } };
+    expect(args.options.data.phone).toBe("+12025550123");
+    expect(server.phoneUpdates).toBe(0);
+  });
+
+  it("check limited, phone taken, sign-up already signed in: the database refusal is shown on the phone field", async () => {
+    server.availability = rateLimited;
+    server.emailExists = rateLimited;
+    server.signUpSession = { access_token: "t" };
     server.phoneUpdateError = { code: "23505", message: "duplicate key" };
     await fillAndSubmit();
     await waitFor(() => expect(server.signUp).toHaveBeenCalledTimes(1));

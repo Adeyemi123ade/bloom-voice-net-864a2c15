@@ -105,6 +105,7 @@ export type Database = {
         Row: {
           call_type: string
           callee_id: string
+          callee_ringing_at: string | null
           caller_id: string
           conversation_id: string
           created_at: string
@@ -117,6 +118,7 @@ export type Database = {
         Insert: {
           call_type: string
           callee_id: string
+          callee_ringing_at?: string | null
           caller_id: string
           conversation_id: string
           created_at?: string
@@ -129,6 +131,7 @@ export type Database = {
         Update: {
           call_type?: string
           callee_id?: string
+          callee_ringing_at?: string | null
           caller_id?: string
           conversation_id?: string
           created_at?: string
@@ -284,6 +287,7 @@ export type Database = {
           id: string
           last_seen_at: string
           platform: string
+          session_id: string | null
           user_id: string
         }
         Insert: {
@@ -292,6 +296,7 @@ export type Database = {
           id?: string
           last_seen_at?: string
           platform?: string
+          session_id?: string | null
           user_id: string
         }
         Update: {
@@ -300,6 +305,7 @@ export type Database = {
           id?: string
           last_seen_at?: string
           platform?: string
+          session_id?: string | null
           user_id?: string
         }
         Relationships: []
@@ -673,6 +679,10 @@ export type Database = {
         Args: { _conversation_id: string; _user_id: string }
         Returns: boolean
       }
+      mark_call_ringing: {
+        Args: { _call_id: string }
+        Returns: boolean
+      }
       match_contacts_by_phone: {
         Args: { _phones: string[] }
         Returns: {
@@ -698,6 +708,10 @@ export type Database = {
           msg_id: number
           read_ct: number
         }[]
+      }
+      register_push_token: {
+        Args: { _token: string; _platform?: string }
+        Returns: undefined
       }
       resolve_email_for_phone: { Args: { _phone: string }; Returns: Json }
       search_users: {

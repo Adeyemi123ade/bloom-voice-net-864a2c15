@@ -273,6 +273,12 @@ export default function IncomingCallScreen() {
         .maybeSingle();
       setCallerName(prof?.display_name ?? tNow("common.unknown"));
       setCallerAvatar(prof?.avatar_url ?? null);
+      // Tell the caller this phone is ringing now, so their screen moves
+      // from "Calling…" to "Ringing…" (once per call; the server ignores
+      // repeats and calls that stopped ringing).
+      void supabase.rpc("mark_call_ringing", { _call_id: call.id }).then(({ error }) => {
+        if (error) console.warn("[incoming] ringing report failed", error);
+      });
       setIncoming({
         id: call.id,
         conversation_id: call.conversation_id,

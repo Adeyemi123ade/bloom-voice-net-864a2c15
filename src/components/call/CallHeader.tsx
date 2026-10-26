@@ -10,6 +10,8 @@ type Props = {
   other: Profile | null;
   status: "connecting" | "ringing" | "connected" | "ended";
   /** The connection dropped and is coming back; the call is still on. */
+  /** Caller only: the other phone has confirmed it is ringing. */
+  remoteRinging?: boolean;
   reconnecting?: boolean;
   /** This phone's own connection is poor (not the other person's). */
   poorNetwork?: boolean;
@@ -37,6 +39,7 @@ export default function CallHeader({
   isVideo,
   other,
   status,
+  remoteRinging = true,
   reconnecting = false,
   poorNetwork = false,
   seconds,
@@ -49,6 +52,9 @@ export default function CallHeader({
   const offline = !useIsOnline() && status !== "ended";
   const size = overlay ? "small" : belowCard ? "medium" : "large";
   const Icon = isVideo ? Video : Phone;
+  // Caller: "Calling…" until the other phone confirms it rings, then
+  // "Ringing…". The person being called always sees their phone ringing.
+  const ringingShown = status === "ringing" && (role === "callee" || remoteRinging);
   const headerLabel =
     status === "connected"
       ? isVideo ? tNow("call.video") : tNow("call.voice")
@@ -73,9 +79,9 @@ export default function CallHeader({
           to the real call status, so they stop the moment the call connects,
           is declined, fails or ends. */}
       <div
-        className={`${size === "large" ? "my-6" : "my-2"} rounded-full ${status === "ringing" ? "call-ring" : ""}`}
+        className={`${size === "large" ? "my-6" : "my-2"} rounded-full ${ringingShown ? "call-ring" : ""}`}
         data-testid="call-avatar"
-        data-ringing={status === "ringing" ? "true" : "false"}
+        data-ringing={ringingShown ? "true" : "false"}
       >
         <Avatar
           className={`${size === "large" ? "w-32 h-32" : size === "medium" ? "w-20 h-20" : "w-14 h-14"} ring-4 ring-primary/30`}
@@ -95,7 +101,7 @@ export default function CallHeader({
       </h1>
       <p className="text-sm text-muted-foreground">
         {offline && tNow("login.offlineTitle")}
-        {!offline && status === "ringing" && tNow("oc.ringing")}
+        {!offline && status === "ringing" && (ringingShown ? tNow("oc.ringing") : tNow("fb.calling"))}
         {!offline && status === "connecting" && tNow("fb.connecting")}
         {!offline && status === "connected" && (reconnecting ? (poorNetwork ? tNow("ch.poorNetwork") : tNow("ch.reconnecting")) : onHold ? tNow("cs.onHold") : fmt(seconds))}
         {status === "ended" && tNow("cs.ended")}
