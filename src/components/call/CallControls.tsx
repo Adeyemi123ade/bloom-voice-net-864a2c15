@@ -1,5 +1,12 @@
 import { tNow } from "@/lib/i18n/language";
 import { Mic, MicOff, Volume2, VolumeX, Video, VideoOff, PhoneOff, SwitchCamera, VideoIcon, Pause, Play, MessageCircle } from "lucide-react";
+import { tapFeedback } from "@/lib/haptics";
+
+/** A short buzz on every call button, so a press is felt before anything changes. */
+const withTap = (f?: () => void) => () => {
+  tapFeedback();
+  f?.();
+};
 
 type Props = {
   muted: boolean;
@@ -46,7 +53,7 @@ export default function CallControls({
       <div className="flex items-center justify-around">
         {speakerAvailable && (
         <button
-          onClick={onToggleSpeaker}
+          onClick={withTap(onToggleSpeaker)}
           className={`w-12 h-12 rounded-full flex items-center justify-center active:scale-90 transition-transform ${
             speakerOn
               ? "bg-primary text-primary-foreground"
@@ -61,7 +68,7 @@ export default function CallControls({
 
         {isVideo ? (
           <button
-            onClick={onToggleVideo}
+            onClick={withTap(onToggleVideo)}
             className={`w-12 h-12 rounded-full flex items-center justify-center active:scale-90 transition-transform ${
               videoEnabled
                 ? "bg-primary text-primary-foreground"
@@ -73,7 +80,7 @@ export default function CallControls({
           </button>
         ) : (
           <button
-            onClick={onUpgradeToVideo}
+            onClick={withTap(onUpgradeToVideo)}
             className="w-12 h-12 rounded-full flex items-center justify-center active:scale-90 transition-transform bg-secondary text-foreground hover:bg-secondary/80"
             aria-label={tNow("cc.switchToVideoCall")}
             title={tNow("cc.switchToVideo")}
@@ -83,7 +90,7 @@ export default function CallControls({
         )}
 
         <button
-          onClick={onToggleMute}
+          onClick={withTap(onToggleMute)}
           className={`w-12 h-12 rounded-full flex items-center justify-center active:scale-90 transition-transform ${
             muted
               ? "bg-destructive text-destructive-foreground"
@@ -96,7 +103,7 @@ export default function CallControls({
         </button>
 
         <button
-          onClick={onSwitchCamera}
+          onClick={withTap(onSwitchCamera)}
           disabled={!isVideo || !videoEnabled || !canSwitchCamera}
           className={`w-12 h-12 rounded-full flex items-center justify-center active:scale-90 transition-transform bg-secondary text-foreground hover:bg-secondary/80 ${
             !isVideo || !videoEnabled || !canSwitchCamera ? "opacity-40" : ""
@@ -109,7 +116,7 @@ export default function CallControls({
 
         {onOpenChat && (
           <button
-            onClick={onOpenChat}
+            onClick={withTap(onOpenChat)}
             className="w-12 h-12 rounded-full flex items-center justify-center active:scale-90 transition-transform bg-secondary text-foreground hover:bg-secondary/80"
             aria-label={tNow("cc.openChat")}
             title={tNow("cc.chat")}
@@ -124,7 +131,7 @@ export default function CallControls({
       <div className={`mt-5 flex gap-3 ${showHold ? "" : "w-1/2 mx-auto"}`}>
         {showHold && (
           <button
-            onClick={onToggleHold}
+            onClick={withTap(onToggleHold)}
             aria-label={held ? tNow("cc.resumeCall") : tNow("cc.holdCall")}
             className={`flex-1 h-12 rounded-full flex items-center justify-center gap-2 active:scale-95 transition-transform font-medium text-base ${
               held
@@ -137,7 +144,7 @@ export default function CallControls({
           </button>
         )}
         <button
-          onClick={onEndCall}
+          onClick={withTap(onEndCall)}
           className="flex-1 h-12 rounded-full active:scale-95 transition-transform bg-destructive hover:bg-destructive/90 text-destructive-foreground flex items-center justify-center gap-2 font-medium text-base"
         >
           <PhoneOff className="w-5 h-5" />
