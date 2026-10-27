@@ -191,6 +191,9 @@ export default function CallSession({
   // Set once a more specific end notice (declined, no answer, failed) has
   // been shown, so the generic "Call ended" doesn't replace it.
   const endNoticeShownRef = useRef(false);
+  // How the call ended, shown in the call's own status line ("Call
+  // declined", "No answer", "Call ended · 00:29") instead of a pop-up.
+  const [endLabel, setEndLabel] = useState<{ title: string; description?: string } | null>(null);
   const callNotice = (title: string, opts: { destructive?: boolean; description?: string } = {}) => {
     toast({
       title,
@@ -200,8 +203,9 @@ export default function CallSession({
     });
   };
   const endNotice = (title: string, opts: { destructive?: boolean; description?: string } = {}) => {
+    if (endNoticeShownRef.current) return;
     endNoticeShownRef.current = true;
-    callNotice(title, opts);
+    setEndLabel({ title, description: opts.description });
   };
 
   const handleCallStatus = (nextStatus: string) => {
@@ -651,6 +655,14 @@ export default function CallSession({
     // Keep Android's call service running while another call is still on.
     const others = getCallsSnapshot().calls.filter((c) => c.callId !== callId);
     if (others.length === 0) void stopCallForegroundService();
+    // The status line says how it ended; leave it on screen long enough to
+    // read, then close the call screen.
+    if (!endNoticeShownRef.current) {
+      endNoticeShownRef.current = true;
+      setEndLabel({
+        title: connectedRef.current ? tNow("cs.endedTime", { time: formatCallClock(secondsRef.current) }) : tNow("cs.ended"),
+      });
+    }
     setTimeout(() => {
       const wasOnScreen = onCallScreenRef.current;
       // Drop this call first, so a call on hold becomes the call on screen
@@ -663,13 +675,7 @@ export default function CallSession({
         if (next) navigate(activeCallPath(next), { replace: true });
         else navigate(`/chat/${conversationId}`, { replace: true });
       }
-      // Shown wherever the user is now (the chat, or the screen they'd
-      // minimised the call to), with the length when the call connected.
-      if (!endNoticeShownRef.current) {
-        endNoticeShownRef.current = true;
-        callNotice(connectedRef.current ? tNow("cs.endedTime", { time: formatCallClock(secondsRef.current) }) : tNow("cs.ended"));
-      }
-    }, 500);
+    }, 1500);
   };
 
   /**
@@ -1515,6 +1521,7 @@ export default function CallSession({
           isVideo={isVideo}
           other={other}
           status={status}
+          endLabel={endLabel?.title}
           reconnecting={reconnecting && status === "connected"}
           poorNetwork={selfReconnecting}
           seconds={seconds}
@@ -1549,6 +1556,7 @@ export default function CallSession({
         isVideo,
         other,
         status,
+        endLabel,
         remoteRinging,
         reconnecting,
         selfReconnecting,

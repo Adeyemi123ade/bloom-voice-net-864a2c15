@@ -102,6 +102,9 @@ public class CallNotificationHelper {
         // The ringtone chosen in ChiChat (or ChiChat's default), until the
         // call is answered, declined, cancelled or times out.
         RingService.ring(context, id, notification);
+        // A real call (not the Call setup test): the caller can now hear
+        // ringing, because this phone really rings.
+        if (!"1".equals(data.get("test"))) CallActionReceiver.reportRinging(data);
     }
 
     /**

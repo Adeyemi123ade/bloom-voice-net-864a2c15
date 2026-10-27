@@ -15,7 +15,7 @@ import {
 } from "@/lib/activeCall";
 import { getSelectedRingtone, playRingtone } from "@/lib/ringtones";
 import { startNativeCallNotifications } from "@/lib/nativeCallNotifications";
-import { isCallPushReady, registerForCallPush } from "@/lib/fcmRegistration";
+import { isCallPushReady, onIncomingCallPush, registerForCallPush } from "@/lib/fcmRegistration";
 import { Capacitor } from "@capacitor/core";
 import { ensureFullScreenIntentPermission } from "@/lib/nativeCalls";
 import { startPreparingCallMedia } from "@/lib/callMedia";
@@ -241,11 +241,17 @@ export default function IncomingCallScreen() {
       if (handled.current.has(callId)) return;
       handled.current.add(callId);
 
-      const { data: call } = await supabase
+      const { data: call, error: callErr } = await supabase
         .from("calls")
         .select("id, conversation_id, caller_id, room_name, call_type, status, callee_id, created_at")
         .eq("id", callId)
         .maybeSingle();
+      if (callErr) {
+        // Network hiccup: allow the next check (push, reconnect, return to
+        // the screen) to try this call again instead of ignoring it.
+        handled.current.delete(callId);
+        return;
+      }
       if (!call) return;
       if (call.callee_id !== user.id) return;
       // Already answered from the phone's own call screen (the app opened
@@ -288,7 +294,10 @@ export default function IncomingCallScreen() {
       });
     };
 
-    (async () => {
+    // Is a call ringing for me right now? Asked on start, whenever the live
+    // connection (re)connects, and when the app comes back on screen: a call
+    // made while the connection was down never arrives as a live event.
+    const checkRinging = async () => {
       const { data } = await supabase
         .from("calls")
         .select("id")
@@ -297,8 +306,15 @@ export default function IncomingCallScreen() {
         .order("created_at", { ascending: false })
         .limit(1);
       const id = data?.[0]?.id;
-      if (id) handle(id);
-    })();
+      if (id) void handle(id);
+    };
+    void checkRinging();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void checkRinging();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    // The call's push reached this app (it is running): use it as well.
+    const offPush = onIncomingCallPush((callId) => void handle(callId));
 
     const ch = supabase
       .channel(`incoming-calls-${user.id}`)
@@ -323,9 +339,14 @@ export default function IncomingCallScreen() {
           }
         },
       )
-      .subscribe();
+      .subscribe((state) => {
+        // Also fires after a reconnect: catch any call made while it was down.
+        if (state === "SUBSCRIBED") void checkRinging();
+      });
 
     return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      offPush();
       supabase.removeChannel(ch);
     };
   }, [user]);

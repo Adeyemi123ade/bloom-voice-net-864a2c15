@@ -79,6 +79,47 @@ public class CallActionReceiver extends BroadcastReceiver {
         }).start();
     }
 
+    /**
+     * This phone is now ringing for the call (its call screen is up): tell
+     * the server, so the caller's screen moves from "Calling…" to
+     * "Ringing…" and plays the ringing tone. Uses the signed ringingToken
+     * from the call push, so no signed-in session is needed. One quick try
+     * plus one retry; if both fail the caller just keeps "Calling…".
+     */
+    static void reportRinging(java.util.Map<String, String> data) {
+        final String actionUrl = data.get("actionUrl");
+        final String ringingToken = data.get("ringingToken");
+        if (actionUrl == null || ringingToken == null || ringingToken.isEmpty()) return;
+        final String key = data.get("actionKey");
+        final String body = "{\"action\":\"ringing\",\"callId\":\"" + esc(data.get("callId")) +
+            "\",\"calleeId\":\"" + esc(data.get("calleeId")) +
+            "\",\"ringingToken\":\"" + esc(ringingToken) + "\"}";
+        new Thread(() -> {
+            for (int attempt = 0; attempt < 2; attempt++) {
+                try {
+                    HttpURLConnection c = (HttpURLConnection) new URL(actionUrl).openConnection();
+                    c.setConnectTimeout(4000);
+                    c.setReadTimeout(4000);
+                    c.setRequestMethod("POST");
+                    c.setRequestProperty("Content-Type", "application/json");
+                    if (key != null && !key.isEmpty()) {
+                        c.setRequestProperty("apikey", key);
+                        c.setRequestProperty("Authorization", "Bearer " + key);
+                    }
+                    c.setDoOutput(true);
+                    try (OutputStream os = c.getOutputStream()) { os.write(body.getBytes("UTF-8")); }
+                    int code = c.getResponseCode();
+                    c.disconnect();
+                    if (code >= 200 && code < 300) return;
+                    if (code >= 400 && code < 500) return; // refused: don't retry
+                } catch (Exception e) {
+                    Log.w("ChiChatCalls", "ringing report failed", e);
+                }
+                try { Thread.sleep(1000); } catch (InterruptedException ignored) { return; }
+            }
+        }).start();
+    }
+
     private static String esc(String s) {
         return s == null ? "" : s.replace("\\", "\\\\").replace("\"", "\\\"");
     }
