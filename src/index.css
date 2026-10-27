@@ -91,6 +91,27 @@
     @apply bg-background text-foreground;
     font-family: 'DM Sans', sans-serif;
   }
+
+  /* Touch screens: every button shows it was pressed, at once, before the
+     action happens (hover colours never show on a phone). One rule for the
+     whole app, so all screens behave the same. */
+  @media (hover: none) {
+    button,
+    [role="button"],
+    a[href],
+    label:has(> button[role="switch"]) {
+      -webkit-tap-highlight-color: transparent;
+      transition: opacity 120ms ease, filter 120ms ease;
+    }
+    button:not(:disabled):active,
+    [role="button"]:active,
+    a[href]:active,
+    label:has(> button[role="switch"]):active {
+      opacity: 0.7;
+      filter: brightness(0.92);
+      transition-duration: 0ms;
+    }
+  }
 }
 
 @layer utilities {
