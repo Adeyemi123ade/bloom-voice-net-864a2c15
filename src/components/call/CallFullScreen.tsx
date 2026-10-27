@@ -36,6 +36,8 @@ export interface CallFullScreenProps {
   status: "connecting" | "ringing" | "connected" | "ended";
   /** Caller: the other phone has confirmed it is ringing. */
   remoteRinging?: boolean;
+  /** How the call ended, for the status line. */
+  endLabel?: { title: string; description?: string } | null;
   reconnecting: boolean;
   selfReconnecting: boolean;
   seconds: number;
@@ -77,6 +79,7 @@ export default function CallFullScreen({
   isVideo,
   other,
   status,
+  endLabel,
   remoteRinging,
   reconnecting,
   selfReconnecting,
@@ -136,6 +139,7 @@ export default function CallFullScreen({
             other={other}
             status={status}
             remoteRinging={remoteRinging}
+            endLabel={endLabel}
             reconnecting={reconnecting && status === "connected"}
             poorNetwork={selfReconnecting}
             seconds={seconds}

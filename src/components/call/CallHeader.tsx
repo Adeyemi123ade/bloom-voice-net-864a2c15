@@ -12,6 +12,8 @@ type Props = {
   /** The connection dropped and is coming back; the call is still on. */
   /** Caller only: the other phone has confirmed it is ringing. */
   remoteRinging?: boolean;
+  /** How the call ended ("No answer", "Call ended · 00:29"). */
+  endLabel?: { title: string; description?: string } | null;
   reconnecting?: boolean;
   /** This phone's own connection is poor (not the other person's). */
   poorNetwork?: boolean;
@@ -40,6 +42,7 @@ export default function CallHeader({
   other,
   status,
   remoteRinging = true,
+  endLabel = null,
   reconnecting = false,
   poorNetwork = false,
   seconds,
@@ -104,8 +107,11 @@ export default function CallHeader({
         {!offline && status === "ringing" && (ringingShown ? tNow("oc.ringing") : tNow("fb.calling"))}
         {!offline && status === "connecting" && tNow("fb.connecting")}
         {!offline && status === "connected" && (reconnecting ? (poorNetwork ? tNow("ch.poorNetwork") : tNow("ch.reconnecting")) : onHold ? tNow("cs.onHold") : fmt(seconds))}
-        {status === "ended" && tNow("cs.ended")}
+        {status === "ended" && (endLabel?.title ?? tNow("cs.ended"))}
       </p>
+      {status === "ended" && endLabel?.description && (
+        <p className="text-xs text-muted-foreground text-center px-6 -mt-1">{endLabel.description}</p>
+      )}
       {status === "connected" && !onHold && !reconnecting && (
         <span className="mt-1 inline-flex items-center gap-1.5 text-2xs text-accent">
           <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />

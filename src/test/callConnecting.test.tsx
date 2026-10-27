@@ -216,3 +216,26 @@ describe("caller: Calling until the other phone rings", () => {
     expect(screen.getByTestId("call-avatar").getAttribute("data-ringing")).toBe("true");
   });
 });
+
+describe("how the call ended is shown in the call's status line, not a pop-up", () => {
+  it("declined: the status line says Call declined", async () => {
+    await startRinging(false);
+    w.dbStatus = "declined";
+    await act(async () => {
+      w.statusListeners[w.statusListeners.length - 1]({ new: { status: "declined" } });
+    });
+    await waitFor(() => expect(shows("Call declined")).toBe(true));
+    expect(shows("Ringing…")).toBe(false);
+  });
+
+  it("connected then hung up by the other person: Call ended with the length", async () => {
+    const room = await startRinging(false);
+    w.dbStatus = "accepted";
+    await act(async () => { w.statusListeners[w.statusListeners.length - 1]({ new: { status: "accepted" } }); });
+    await act(async () => { room.arrive(); });
+    await waitFor(() => expect(screen.getAllByText(timer).length).toBeGreaterThan(0));
+    w.dbStatus = "ended";
+    await act(async () => { w.statusListeners[w.statusListeners.length - 1]({ new: { status: "ended" } }); });
+    await waitFor(() => expect(shows(/^Call ended · \d{2}:\d{2}$/)).toBe(true));
+  });
+});

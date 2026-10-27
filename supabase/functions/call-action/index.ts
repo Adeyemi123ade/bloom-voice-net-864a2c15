@@ -25,7 +25,39 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    const { action, callId, calleeId, token } = await req.json();
+    // decline: the lock-screen Decline button. ringing: the phone's own call
+    // screen is showing and ringing (sent by the app's native push handler,
+    // which has no signed-in session), so the caller can move from
+    // "Calling…" to "Ringing…". Each has its own signed token from the push.
+    const { action, callId, calleeId, token, ringingToken } = await req.json();
+    if (action === "ringing") {
+      if (!callId || !calleeId || !ringingToken) {
+        return new Response(JSON.stringify({ error: "missing fields" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (ringingToken !== (await sign(`${callId}:${calleeId}:ringing`))) {
+        return new Response(JSON.stringify({ error: "invalid token" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+      // Only while it still rings and only the first time: a late or
+      // repeated report changes nothing.
+      const { error } = await admin
+        .from("calls")
+        .update({ callee_ringing_at: new Date().toISOString() })
+        .eq("id", callId)
+        .eq("callee_id", calleeId)
+        .eq("status", "ringing")
+        .is("callee_ringing_at", null);
+      if (error) throw error;
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     if (action !== "decline" || !callId || !calleeId || !token) {
       return new Response(JSON.stringify({ error: "missing fields" }), {
         status: 400,

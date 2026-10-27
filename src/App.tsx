@@ -37,6 +37,7 @@ import TermsOfService from "./pages/TermsOfService.tsx";
 import MessageNotifier from "./components/MessageNotifier.tsx";
 import PresenceHeartbeat from "./components/PresenceHeartbeat.tsx";
 import IncomingCallScreen from "./components/IncomingCallScreen.tsx";
+import CallSetupPrompt from "./components/CallSetupPrompt.tsx";
 import DeviceGate from "./components/DeviceGate.tsx";
 import ErrorBoundary from "./components/ErrorBoundary.tsx";
 import BackButtonGuard from "./components/BackButtonGuard.tsx";
@@ -85,6 +86,7 @@ const App = () => (
               <MessageNotifier />
               <PresenceHeartbeat />
               <IncomingCallScreen />
+              <CallSetupPrompt />
               <ErrorBoundary>
                 <Routes>
                   <Route path="/" element={<Index />} />

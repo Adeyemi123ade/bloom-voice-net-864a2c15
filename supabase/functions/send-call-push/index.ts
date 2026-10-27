@@ -92,10 +92,19 @@ async function pushToUser(
   userId: string,
   data: Record<string, string>,
   ttl: string,
+  priority: "HIGH" | "NORMAL" = "HIGH",
 ): Promise<{ sent: number; failed: number; reason?: string; error?: string }> {
   // Only phones still signed in to this account; the database deletes the
   // tokens of phones that signed out, so a signed-out phone never rings.
-  const { data: tokens, error: tokensError } = await supabase.rpc("push_tokens_for_user", { _user: userId });
+  let { data: tokens, error: tokensError } = await supabase.rpc("push_tokens_for_user", { _user: userId });
+  if (tokensError && (tokensError.code === "PGRST202" || tokensError.code === "42883")) {
+    // push_tokens_for_user not in the database yet: every saved token, as
+    // before, rather than no call reaching anyone.
+    ({ data: tokens, error: tokensError } = await supabase
+      .from("device_push_tokens")
+      .select("fcm_token")
+      .eq("user_id", userId));
+  }
   if (tokensError) throw new Error(`push tokens: ${tokensError.message}`);
   if (!tokens || tokens.length === 0) return { sent: 0, failed: 0, reason: "no tokens" };
 
@@ -111,9 +120,12 @@ async function pushToUser(
         method: "POST",
         headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
         // Data-only + high priority wakes Android even when the app is closed;
-        // the app's native push handler decides what to show.
+        // the app's native push handler decides what to show. Google lowers
+        // an app's high-priority pushes when many of them show nothing on
+        // screen, which makes later CALLS arrive late or not ring at all; so
+        // pushes that show nothing use normal priority (see the callers).
         body: JSON.stringify({
-          message: { token: t.fcm_token, data, android: { priority: "HIGH", ttl } },
+          message: { token: t.fcm_token, data, android: { priority, ttl } },
         }),
       });
       if (!r.ok) {
@@ -243,6 +255,10 @@ Deno.serve(async (req) => {
           conversationId: String(call.conversation_id ?? ""),
         },
         "60s",
+        // A phone that is ringing has its screen on, so a normal push
+        // arrives at once; and a stop-ringing push shows nothing, so it must
+        // not count against the app's high-priority pushes.
+        "NORMAL",
       );
       return json({ ok: true, ...result });
     }
@@ -265,6 +281,18 @@ Deno.serve(async (req) => {
         .eq("conversation_id", msg.conversation_id)
         .neq("user_id", me);
       const senderName = await displayName(supabase, me);
+      // People with ChiChat open right now see the message in the app; the
+      // push shows nothing there, so it goes as normal priority.
+      const ids = (others ?? []).map((o: { user_id: string }) => o.user_id);
+      const { data: presence } = ids.length
+        ? await supabase.from("profiles").select("id, is_online, last_seen_at").in("id", ids)
+        : { data: [] };
+      const inApp = new Set<string>(
+        (presence ?? [])
+          .filter((p: { is_online: boolean | null; last_seen_at: string | null }) =>
+            p.is_online === true && !!p.last_seen_at && Date.now() - new Date(p.last_seen_at).getTime() < 90_000)
+          .map((p: { id: string }) => p.id),
+      );
       let sent = 0;
       for (const o of others ?? []) {
         const r = await pushToUser(
@@ -278,6 +306,7 @@ Deno.serve(async (req) => {
             preview: messagePreview(content),
           },
           "86400s",
+          inApp.has(o.user_id as string) ? "NORMAL" : "HIGH",
         );
         sent += r.sent;
       }
@@ -315,6 +344,16 @@ Deno.serve(async (req) => {
       .replace(/=+$/, "")
       .replace(/\+/g, "-")
       .replace(/\//g, "_");
+    // Lets the phone report "ringing" the same way, without a session.
+    const ringBuf = await crypto.subtle.sign(
+      "HMAC",
+      hmacKey,
+      new TextEncoder().encode(`${callId}:${calleeId}:ringing`),
+    );
+    const ringingToken = btoa(String.fromCharCode(...new Uint8Array(ringBuf)))
+      .replace(/=+$/, "")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_");
     const actionUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/call-action`;
 
     const caller = await profileOf(supabase, me);
@@ -334,6 +373,7 @@ Deno.serve(async (req) => {
         roomName: String(roomName ?? ""),
         actionUrl,
         actionToken,
+        ringingToken,
         // Public key Supabase asks for on every function request; without
         // it the lock-screen Decline was refused before reaching call-action.
         actionKey: Deno.env.get("SUPABASE_ANON_KEY") ?? "",

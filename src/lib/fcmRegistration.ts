@@ -40,6 +40,17 @@ export async function retryCallPush(userId: string): Promise<boolean> {
 
 const TOKEN_KEY = "chichat:fcm-token";
 
+type IncomingCallListener = (callId: string) => void;
+const incomingCallListeners = new Set<IncomingCallListener>();
+
+/** Called with the call id whenever a call push reaches the running app. */
+export function onIncomingCallPush(f: IncomingCallListener): () => void {
+  incomingCallListeners.add(f);
+  return () => {
+    incomingCallListeners.delete(f);
+  };
+}
+
 /**
  * Before signing out: remove this phone's push token, so it stops receiving
  * this account's calls and messages, and so the next account to sign in on
@@ -87,10 +98,23 @@ export async function registerForCallPush(userId: string) {
         // signs out. The token belongs to the phone: the server moves it
         // from any account that used this phone before (a plain upsert
         // couldn't, and that account's calls kept ringing here instead).
-        const { error } = await supabase.rpc("register_push_token", {
+        let { error } = await supabase.rpc("register_push_token", {
           _token: token.value,
           _platform: Capacitor.getPlatform(),
         });
+        // The database doesn't have register_push_token yet (its SQL file
+        // not run): save the token the old way, so calls still ring here.
+        if (error && (error.code === "PGRST202" || error.code === "42883")) {
+          ({ error } = await supabase.from("device_push_tokens").upsert(
+            {
+              user_id: userId,
+              fcm_token: token.value,
+              platform: Capacitor.getPlatform(),
+              last_seen_at: new Date().toISOString(),
+            },
+            { onConflict: "fcm_token" },
+          ));
+        }
         // Supabase reports failures in `error` rather than throwing.
         if (error) {
           console.warn("[fcm] failed to store token", error);
@@ -114,8 +138,16 @@ export async function registerForCallPush(userId: string) {
 
     // Incoming data-only call push → app foregrounds, IncomingCallScreen
     // takes over from the realtime subscription on the `calls` table.
+    // A call push reaching the app while it runs (on screen or in the
+    // background): hand it to the incoming call screen too. The realtime
+    // listener can miss a call after the connection dropped and came back.
     PushNotifications.addListener("pushNotificationReceived", (n) => {
-      console.log("[fcm] push received", n.data);
+      const data = (n.data ?? {}) as Record<string, string>;
+      if (data.type === "incoming_call" && data.callId) {
+        incomingCallListeners.forEach((f) => {
+          try { f(data.callId); } catch { /* ignore */ }
+        });
+      }
     });
 
     PushNotifications.addListener("pushNotificationActionPerformed", (a) => {

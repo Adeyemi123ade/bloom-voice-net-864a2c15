@@ -12,6 +12,8 @@ type Props = {
   isVideo: boolean;
   other: Profile | null;
   status: "connecting" | "ringing" | "connected" | "ended";
+  /** How the call ended, shown in place of "Ended". */
+  endLabel?: string;
   /** The connection dropped and is coming back; the call is still on. */
   reconnecting?: boolean;
   poorNetwork?: boolean;
@@ -109,6 +111,7 @@ export default function FloatingCallBubble({
   isVideo,
   other,
   status,
+  endLabel,
   reconnecting = false,
   poorNetwork = false,
   seconds,
@@ -189,7 +192,7 @@ export default function FloatingCallBubble({
 
   const label =
     !online && status !== "ended" ? tNow("login.offlineTitle") :
-    status === "connected" ? (reconnecting ? (poorNetwork ? tNow("ch.poorNetwork") : tNow("ch.reconnecting")) : fmt(seconds)) : status === "ended" ? tNow("fb.ended") : status === "ringing" ? tNow("fb.calling") : tNow("fb.connecting");
+    status === "connected" ? (reconnecting ? (poorNetwork ? tNow("ch.poorNetwork") : tNow("ch.reconnecting")) : fmt(seconds)) : status === "ended" ? (endLabel ?? tNow("fb.ended")) : status === "ringing" ? tNow("fb.calling") : tNow("fb.connecting");
   const name = other?.display_name ?? tNow("chat.contact");
 
   // Buttons in the strip must not start a drag or reopen the call.
