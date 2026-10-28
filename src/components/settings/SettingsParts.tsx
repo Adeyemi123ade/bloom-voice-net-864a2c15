@@ -11,7 +11,6 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
@@ -127,10 +126,9 @@ export function SignOutCard() {
         testId="sign-out"
       />
       <AlertDialog open={confirming} onOpenChange={(open) => !working && setConfirming(open)}>
-        <AlertDialogContent className="max-w-[320px]">
+        <AlertDialogContent className="max-w-[320px]" aria-describedby={undefined}>
           <AlertDialogHeader>
             <AlertDialogTitle className="text-base">{t("settings.signOutConfirmTitle")}</AlertDialogTitle>
-            <AlertDialogDescription className="text-sm">{t("settings.signOutConfirmBody")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={working} className="text-sm h-10">

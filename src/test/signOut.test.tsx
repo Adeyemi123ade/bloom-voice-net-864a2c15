@@ -120,7 +120,7 @@ describe("Sign out", () => {
   it("asks first: a mistaken tap can be cancelled and nothing happens", async () => {
     render(<MemoryRouter><Settings /></MemoryRouter>);
     fireEvent.click(await screen.findByTestId("sign-out"));
-    expect(await screen.findByRole("alertdialog")).toHaveTextContent("Sign out of ChiChat?");
+    expect(await screen.findByRole("alertdialog")).toHaveTextContent("Are you sure you want to sign out?");
     expect(server.signOut).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
