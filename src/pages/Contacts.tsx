@@ -30,6 +30,7 @@ import {
   loadNativeContacts,
   pickWebContacts,
   removeManualContact,
+  renormalizeContacts,
   saveCachedContacts,
   saveManualContacts,
 } from "@/lib/deviceContacts";
@@ -49,7 +50,8 @@ import { shareChichatInvite } from "@/components/contacts/ShareInviteCard";
 import { beginOutgoingCall, canStartAnotherCall } from "@/lib/callStart";
 import { useLanguage } from "@/lib/i18n/context";
 import { GoogleContactsError, googleContactsAvailable, importGoogleContacts, preloadGoogleContacts } from "@/lib/googleContacts";
-import { inBatches, loadMatchCache, phonesKey, saveMatchCache, type CallStat } from "@/lib/contactMatchCache";
+import { inBatches, isFreshFor, loadMatchCache, phonesKey, saveMatchCache, type CallStat } from "@/lib/contactMatchCache";
+import { getMyDefaultCountry } from "@/lib/phone";
 
 // Long phone books: rows are added as the list is scrolled, not all at once
 // (drawing every row made the screen take seconds to appear on a phone).
@@ -149,7 +151,10 @@ export default function Contacts() {
   useEffect(() => {
     if (!user) return;
     (async () => {
-      const cached = loadCachedContacts() ?? [];
+      // Numbers saved here by an older version may not be in +country form
+      // yet (e.g. 00971…, 971… or a local number): read them again.
+      const myCountry = await getMyDefaultCountry();
+      const cached = renormalizeContacts(loadCachedContacts() ?? [], myCountry);
       const manual = loadManualContacts();
       const merged = mergeContacts(cached, manual);
       setContacts(merged);
@@ -159,7 +164,7 @@ export default function Contacts() {
         setMatched(new Map(saved.matches.map((m) => [m.phone, m])));
         setStats(new Map(saved.stats));
       }
-      await Promise.all([merged.length ? runMatch(merged) : Promise.resolve(), loadInvited()]);
+      await Promise.all([merged.length ? runMatch(merged, { unlessFresh: true }) : Promise.resolve(), loadInvited()]);
 
       // On native Android: load the phone's contacts directly.
       if (isNativePlatform()) await loadPhoneContacts();
@@ -178,13 +183,21 @@ export default function Contacts() {
     setInvitedPhones(new Set((data ?? []).map((r) => r.phone)));
   };
 
-  const runMatch = async (list: DeviceContact[], opts: { onlyIfChanged?: boolean } = {}) => {
+  const runMatch = async (
+    list: DeviceContact[],
+    opts: { onlyIfChanged?: boolean; unlessFresh?: boolean } = {},
+  ) => {
     if (!user) return;
     const allPhones = Array.from(
       new Set(list.flatMap((c) => c.phones).filter(Boolean)),
     );
     const key = phonesKey(allPhones);
     if (opts.onlyIfChanged && key === lastCheckedRef.current) return;
+    // Same phone book, checked a few minutes ago: the saved result stands.
+    if (opts.unlessFresh && isFreshFor(loadMatchCache(user.id), key)) {
+      lastCheckedRef.current = key;
+      return;
+    }
     const seq = ++matchSeq.current;
     setMatching(true);
     const matches = new Map<string, MatchedUser>();
@@ -216,10 +229,10 @@ export default function Contacts() {
           });
         }
         setStats(m);
-        saveMatchCache(user.id, { phonesKey: key, matches: [...matches.values()], stats: [...m.entries()] });
+        saveMatchCache(user.id, { phonesKey: key, matches: [...matches.values()], stats: [...m.entries()], checkedAt: Date.now() });
       } else {
         setStats(new Map());
-        saveMatchCache(user.id, { phonesKey: key, matches: [], stats: [] });
+        saveMatchCache(user.id, { phonesKey: key, matches: [], stats: [], checkedAt: Date.now() });
       }
       lastCheckedRef.current = key;
     } catch (err) {

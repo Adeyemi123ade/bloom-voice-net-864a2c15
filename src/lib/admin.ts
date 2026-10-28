@@ -84,6 +84,34 @@ export async function amIAdmin(): Promise<boolean> {
   return !error && data === true;
 }
 
+/**
+ * The newest database migration this version of the app needs. Change it in
+ * the same pull request as every new file in supabase/migrations (a test
+ * checks this), and every migration records itself in app_migrations.
+ */
+export const EXPECTED_DB_VERSION = "20261028090000";
+
+export type DbVersion =
+  | { state: "ok"; live: string }
+  | { state: "behind"; live: string | null }
+  | { state: "unknown" };
+
+/** Compares the live database's newest recorded migration with what this app needs. */
+export function compareDbVersion(live: string | null, error: { message?: string; code?: string } | null): DbVersion {
+  if (error) {
+    // The version function itself is missing: the database is older than this app.
+    const missing = error.code === "PGRST202" || /could not find the function|does not exist/i.test(error.message ?? "");
+    return missing ? { state: "behind", live: null } : { state: "unknown" };
+  }
+  if (!live || live < EXPECTED_DB_VERSION) return { state: "behind", live };
+  return { state: "ok", live };
+}
+
+export async function loadDbVersion(): Promise<DbVersion> {
+  const { data, error } = await callRpc<string>("app_db_version");
+  return compareDbVersion(data, error);
+}
+
 export async function loadOverview() {
   return callRpc<Overview>("admin_overview");
 }

@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
-import type { MatchedUser } from "@/components/contacts/contactsHelpers";
-import { loadMatchCache } from "@/lib/contactMatchCache";
+import { BATCH_SIZE, type MatchedUser } from "@/components/contacts/contactsHelpers";
+import { inBatches, isFreshFor, loadMatchCache, phonesKey, saveMatchCache } from "@/lib/contactMatchCache";
 import { loadCachedContacts, loadManualContacts } from "@/lib/deviceContacts";
 
 /**
@@ -20,19 +20,31 @@ export type NewChatPerson = {
 
 const digitsOf = (s: string) => s.replace(/\D/g, "").replace(/^0+/, "");
 
-/** My contacts who are on ChiChat: last saved match, or a fresh match of the contacts kept on this device. */
+/** My contacts who are on ChiChat: the recent saved check, or a new check of the contacts kept on this device. */
 export async function myContactMatches(userId: string): Promise<MatchedUser[]> {
   const saved = loadMatchCache(userId);
-  if (saved && saved.matches.length > 0) return saved.matches;
   const local = [...(loadCachedContacts() ?? []), ...loadManualContacts()];
   const phones = Array.from(new Set(local.flatMap((c) => c.phones).filter(Boolean)));
   if (phones.length === 0) return saved?.matches ?? [];
-  const { data, error } = await supabase.rpc("match_contacts_by_phone", { _phones: phones });
-  if (error) return saved?.matches ?? [];
-  return (data ?? []) as MatchedUser[];
+  // Checked recently (here or on Contacts) for the same numbers: reuse it, so
+  // people who joined since appear within 30 minutes without sending the
+  // whole phone book every time this screen opens.
+  const key = phonesKey(phones);
+  if (isFreshFor(saved, key)) return saved!.matches;
+  try {
+    const found = await inBatches(phones, BATCH_SIZE, 4, async (batch) => {
+      const { data, error } = await supabase.rpc("match_contacts_by_phone", { _phones: batch });
+      if (error) throw error;
+      return (data ?? []) as MatchedUser[];
+    });
+    const unique = Array.from(new Map(found.map((m) => [m.phone, m])).values());
+    saveMatchCache(userId, { phonesKey: key, matches: unique, stats: saved?.stats ?? [], checkedAt: Date.now() });
+    return unique;
+  } catch {
+    return saved?.matches ?? [];
+  }
 }
 
-/** Keep only contacts that fit what was typed (name, or the number). */
 export function filterContactMatches(matches: MatchedUser[], query: string): MatchedUser[] {
   const q = query.trim().toLowerCase();
   if (!q) return matches;

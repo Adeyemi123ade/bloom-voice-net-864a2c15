@@ -2,7 +2,6 @@ import { tNow } from "@/lib/i18n/language";
 import { ReactNode, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
 import { getDeviceId, getDeviceLabel } from "@/lib/deviceId";
 import { getAppPlatform } from "@/lib/platform";
 import {
@@ -12,14 +11,25 @@ import {
 import { isRecoveryPending } from "@/lib/recoveryPending";
 import { toast } from "@/hooks/use-toast";
 import MobileFrame from "@/components/MobileFrame";
+import {
+  ADD_PHONE_PATH,
+  checkMyPhone,
+  isGoogleOnly,
+  phoneKnownOnDevice,
+} from "@/lib/phoneRequired";
+
+// Accounts whose number the server confirmed since the app started.
+const checkedThisStart = new Set<string>();
 
 /**
  * Sits between AuthProvider and the routes. Whenever a user is signed in on
- * a protected page, BLOCKS rendering until the device-binding state is
- * resolved:
- *   - trusted device           → render children
- *   - new device / takeover    → email a code and route to /verify-device
- *   - failure (network, etc.)  → sign the user out and route to /login
+ * a protected page, BLOCKS rendering until the account is ready:
+ *   - email confirmed, no unfinished password reset
+ *   - a saved phone number (checked with the server; see phoneRequired.ts)
+ *       none, Google-only account → /register to finish the form
+ *       none, any other account   → /add-phone
+ *       server unreachable        → "couldn't check" with Try again, unless
+ *                                   this device already saw the number
  *
  * No protected screen ever renders before verification clears.
  */
@@ -37,6 +47,8 @@ const EXEMPT_ROUTES = new Set<string>([
   "/reset-password",
   "/verify-device",
   "/auth/google-return",
+  // Where an account without a phone number adds it.
+  ADD_PHONE_PATH,
   // Public documentation — must render for a signed-out visitor (the
   // Register/Login page links here) and must never trigger the
   // auth-loading/redirect logic below.
@@ -55,6 +67,8 @@ export default function DeviceGate({ children }: { children: ReactNode }) {
   const isExempt = EXEMPT_ROUTES.has(location.pathname);
   const [verified, setVerified] = useState(false);
   const [checking, setChecking] = useState(false);
+  const [checkFailed, setCheckFailed] = useState(false);
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
     if (loading) return;
@@ -90,36 +104,56 @@ export default function DeviceGate({ children }: { children: ReactNode }) {
       navigate("/reset-password", { replace: true });
       return;
     }
-    // Dual-device verification temporarily disabled. Trust every signed-in
-    // session. We still run the Google-signup probe so brand-new Google users
-    // get routed to /register to finish their profile.
+    // Every account has a phone number before it uses the app: friends find
+    // each other by it. Checked with the server, never assumed. A number
+    // already seen on this device lets the app open at once (offline too);
+    // the server is still asked once per app start.
     if (checking) return;
+    const known = phoneKnownOnDevice(user.id);
+    if (known) {
+      markDeviceVerified(user.id);
+      setVerified(true);
+      if (checkedThisStart.has(user.id)) return;
+    }
 
     let cancelled = false;
     (async () => {
       setChecking(true);
+      setCheckFailed(false);
       try {
-        const { data: googleCheck, error: gErr } = await supabase.functions.invoke("check-google-signup");
+        const result = await checkMyPhone(user.id);
         if (cancelled) return;
-        if (!gErr && googleCheck?.allowed === false && googleCheck?.pending_registration) {
-          navigate("/register", {
-            replace: true,
-            state: {
-              prefill: {
-                email: googleCheck.email,
-                name: googleCheck.full_name,
-                googleVerified: true,
-              },
-            },
-          });
+        if (result === "has-phone") {
+          checkedThisStart.add(user.id);
+          markDeviceVerified(user.id);
+          setVerified(true);
           return;
         }
-        markDeviceVerified(user.id);
-        setVerified(true);
-      } catch {
-        // Network hiccup on the Google probe — don't block the user.
-        markDeviceVerified(user.id);
-        setVerified(true);
+        if (result === "no-phone") {
+          setVerified(false);
+          if (isGoogleOnly(user)) {
+            // A Google sign-in that stopped before the form: finish it there
+            // (phone, password and the policy, as for everyone else).
+            const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
+            navigate("/register", {
+              replace: true,
+              state: {
+                prefill: {
+                  email: user.email ?? "",
+                  name: String(meta.full_name ?? meta.name ?? ""),
+                  googleVerified: true,
+                },
+              },
+            });
+          } else {
+            navigate(ADD_PHONE_PATH, { replace: true });
+          }
+          return;
+        }
+        // Couldn't reach the server. With a number already seen here, carry
+        // on; otherwise say so and offer to try again. Never let an account
+        // in on a guess.
+        if (!known) setCheckFailed(true);
       } finally {
         if (!cancelled) setChecking(false);
       }
@@ -127,7 +161,7 @@ export default function DeviceGate({ children }: { children: ReactNode }) {
 
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, loading, location.pathname, isExempt]);
+  }, [user, loading, location.pathname, isExempt, retry]);
 
   // Public/auth routes always render.
   if (isExempt) return <>{children}</>;
@@ -149,11 +183,19 @@ export default function DeviceGate({ children }: { children: ReactNode }) {
   // Session came from an unfinished password reset — same story.
   if (isRecoveryPending(user.id)) return <LoadingShell label={tNow("dg.signingIn")} />;
 
-  // Render the protected screen immediately. Device verification runs silently
-  // in the background; if it determines a real verification step is required,
-  // the effect above will navigate to /verify-device. We deliberately do NOT
-  // block the UI on a "Verifying this device…" loader — the user should never
-  // see the verification machinery during normal use.
+  // Account check couldn't reach the server and this device hasn't seen a
+  // number for this account yet: plain words and a way to try again.
+  if (checkFailed && !verified) {
+    return (
+      <CheckFailed
+        onRetry={() => { setCheckFailed(false); setRetry((n) => n + 1); }}
+      />
+    );
+  }
+
+  // The phone number check (above) must pass before any protected screen.
+  if (!verified) return <LoadingShell label={tNow("dg.signingIn")} />;
+
   return <>{children}</>;
 }
 
@@ -167,6 +209,24 @@ function LoadingShell({ label }: { label: string }) {
         <p className="text-base text-muted-foreground/70 animate-pulse">
           {label}
         </p>
+      </div>
+    </MobileFrame>
+  );
+}
+
+function CheckFailed({ onRetry }: { onRetry: () => void }) {
+  return (
+    <MobileFrame>
+      <div className="h-full w-full flex flex-col items-center justify-center gap-4 bg-background px-6 text-center">
+        <p className="text-base font-medium text-foreground">{tNow("ph.checkFailTitle")}</p>
+        <p className="text-sm text-muted-foreground">{tNow("ph.checkFailBody")}</p>
+        <button
+          type="button"
+          onClick={onRetry}
+          className="rounded-full bg-primary px-8 py-2 text-sm font-medium text-primary-foreground"
+        >
+          {tNow("common.tryAgain")}
+        </button>
       </div>
     </MobileFrame>
   );

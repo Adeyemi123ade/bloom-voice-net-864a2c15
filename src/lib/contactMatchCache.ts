@@ -14,7 +14,22 @@ export type MatchCache = {
   phonesKey: string;
   matches: MatchedUser[];
   stats: [string, CallStat][];
+  /** When the whole list was last checked with ChiChat (ms). */
+  checkedAt?: number;
 };
+
+/**
+ * How long a check of the whole phone book stays good. Opening Contacts or
+ * New chat again within this time uses it instead of sending every number
+ * again (a 7,000-number phone book was being sent several times an hour).
+ * A changed phone book, an import, or Refresh checks at once.
+ */
+export const MATCH_FRESH_MS = 30 * 60 * 1000;
+
+/** The saved check covers exactly these numbers and is recent enough to reuse. */
+export function isFreshFor(cache: MatchCache | null, key: string, now = Date.now()): boolean {
+  return !!cache && cache.phonesKey === key && !!cache.checkedAt && now - cache.checkedAt < MATCH_FRESH_MS;
+}
 
 export function phonesKey(phones: string[]): string {
   // Short fingerprint of the sorted list (order of the phone book doesn't matter).

@@ -1,4 +1,5 @@
 import { requestAccountCheck } from "@/lib/accountStatus";
+import { goAddPhone } from "@/lib/phoneRequired";
 import { tNow } from "@/lib/i18n/language";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -512,6 +513,11 @@ export default function CallSession({
       }
       if (savedCall.result === "limited") {
         fail(tNow("cs.notAvailable"), tNow("lim.calls"));
+        return;
+      }
+      if (savedCall.result === "no-phone") {
+        fail(tNow("cs.notAvailable"), tNow("ph.needed"));
+        goAddPhone();
         return;
       }
       if (savedCall.result === "suspended") {

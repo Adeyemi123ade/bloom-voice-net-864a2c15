@@ -1,4 +1,5 @@
 import { isLimitError, isSuspendedError } from "@/lib/accountStatus";
+import { isNoPhoneError } from "@/lib/phoneRequired";
 import { tNow } from "@/lib/i18n/language";
 import type { NavigateFunction } from "react-router-dom";
 import { FROM_CALL_BUBBLE, activeCallPath, getActiveCall, getCallsSnapshot } from "@/lib/activeCall";
@@ -92,6 +93,8 @@ export type SavedCall =
   | { result: "limited" }
   /** This account is suspended. */
   | { result: "suspended" }
+  /** This account has no phone number yet. */
+  | { result: "no-phone" }
   | { result: "error" };
 
 type RpcResult = { data: unknown; error: { code?: string; message?: string } | null };
@@ -99,6 +102,7 @@ type RpcResult = { data: unknown; error: { code?: string; message?: string } | n
 function refusalResult(err: unknown): SavedCall | null {
   if (isSuspendedError(err)) return { result: "suspended" };
   if (isLimitError(err)) return { result: "limited" };
+  if (isNoPhoneError(err)) return { result: "no-phone" };
   return null;
 }
 

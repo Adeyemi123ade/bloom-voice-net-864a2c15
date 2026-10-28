@@ -1,4 +1,5 @@
 import { isLimitError, isSuspendedError, requestAccountCheck } from "@/lib/accountStatus";
+import { goAddPhone, isNoPhoneError } from "@/lib/phoneRequired";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Phone, Video } from "lucide-react";
@@ -714,6 +715,9 @@ export default function ChatRoom() {
         toast({ title: t("chat.notSent"), description: t("chat.cantMessage") });
       } else if (isLimitError(error)) {
         toast({ title: t("chat.notSent"), description: t("lim.chats") });
+      } else if (isNoPhoneError(error)) {
+        toast({ title: t("chat.notSent"), description: t("ph.needed") });
+        goAddPhone();
       } else if (isSuspendedError(error)) {
         requestAccountCheck();
       } else {

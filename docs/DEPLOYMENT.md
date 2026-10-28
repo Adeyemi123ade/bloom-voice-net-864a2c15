@@ -9,9 +9,28 @@ How each part of ChiChat is deployed, and what Render is (and is not) for.
 | Web app (`src/`, built to `dist/`) | Vercel | Automatic on merge to `main`; preview per pull request |
 | Invite page (`api/invite.js`) | Vercel Edge Function | Same deployment as the web app |
 | Android app | Google Play (planned), APK built in Android Studio | `npm run build`, `npx cap sync android`, build in Android Studio |
-| Database schema and rules (`supabase/migrations/`) | Supabase project `pnpabtxvsrkrldpfmtaz` | Run new migration files in the SQL Editor, in order |
+| Database schema and rules (`supabase/migrations/`) | Supabase project `pnpabtxvsrkrldpfmtaz` | Run new migration files in the SQL Editor, in order (see "Database changes" below) |
 | Edge Functions (`supabase/functions/`) | Same Supabase project | Supabase CLI or dashboard editor, one function at a time |
 | API reference (`docs/api/viewer/`) | Optional: Render static site | `render.yaml` (below) |
+
+## Database changes: one record of what ran
+
+Each file in `supabase/migrations/` runs by hand in the SQL Editor, so the
+live database can fall behind the code without anyone noticing. Since
+2026-10-28 the database keeps its own record:
+
+- Every migration runs as one transaction (`BEGIN; … COMMIT;`) and its last
+  statement records itself:
+  `INSERT INTO public.app_migrations (id) VALUES ('<first 14 digits of the file name>') ON CONFLICT (id) DO NOTHING;`
+- `EXPECTED_DB_VERSION` in `src/lib/admin.ts` names the newest migration
+  the app needs. Change it in the same pull request as the new file.
+- `src/test/phoneRequired.test.tsx` fails the PR check if either is missing.
+- The Admin page shows "Database up to date" or "Database update missing"
+  by comparing `app_db_version()` with `EXPECTED_DB_VERSION`.
+- Order for a change with a migration: run the SQL, deploy any functions it
+  names, then merge.
+
+To see what has run: `select * from public.app_migrations order by id;`
 
 ## Should the backend move to Render?
 

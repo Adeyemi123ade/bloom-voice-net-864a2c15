@@ -6,13 +6,20 @@ import { supabase } from "@/integrations/supabase/client";
  * Normalize a raw phone string to E.164 (e.g. +2348012345678).
  * Returns null when the number cannot be confidently parsed.
  *
- * Tries NG first (primary market), then the provided default country,
- * then locale guess, then US as last resort.
+ * Phone books store the same number many ways; all of these give +2348031234567:
+ *   0803 123 4567 (with a Nigerian default), +234 803 123 4567,
+ *   00234 803 123 4567 (international dialling prefix), 234 803 123 4567
+ *   (country code without the +).
+ * Local numbers are read with, in order: the given default country (the
+ * person's own, from their saved number), the country this phone is in
+ * (time zone), Nigeria, the language setting's region, then the US.
  */
 export function toE164(raw: string, defaultCountry?: CountryCode): string | null {
     if (!raw) return null;
-    const cleaned = raw.replace(/[^\d+]/g, "");
+    let cleaned = raw.replace(/[^\d+]/g, "");
     if (!cleaned) return null;
+    // 00 is the international dialling prefix in most of the world.
+    if (cleaned.startsWith("00")) cleaned = "+" + cleaned.slice(2);
 
     if (cleaned.startsWith("+")) {
         try {
@@ -21,12 +28,10 @@ export function toE164(raw: string, defaultCountry?: CountryCode): string | null
         } catch { /* ignore */ }
     }
 
-    const countriesToTry: CountryCode[] = [
-        ...(defaultCountry ? [defaultCountry] : []),
-        "NG",
-        (guessCountryFromLocale() as CountryCode | undefined) ?? "US",
-        "US",
-    ];
+    const countriesToTry: CountryCode[] = [];
+    for (const c of [defaultCountry, guessCountryFromTimeZone(), "NG", guessCountryFromLocale(), "US"]) {
+        if (c && !countriesToTry.includes(c as CountryCode)) countriesToTry.push(c as CountryCode);
+    }
 
     for (const country of countriesToTry) {
         try {
@@ -34,16 +39,61 @@ export function toE164(raw: string, defaultCountry?: CountryCode): string | null
             if (parsed?.isValid()) return parsed.number;
         } catch { /* ignore */ }
     }
+
+    // A country code written without the + (e.g. 971 50 123 4567). Only for
+    // numbers long enough to carry one, so a short local number is never
+    // read as some other country's.
+    if (!cleaned.startsWith("+") && !cleaned.startsWith("0") && cleaned.length >= 11) {
+        try {
+            const parsed = parsePhoneNumberFromString("+" + cleaned);
+            if (parsed?.isValid()) return parsed.number;
+        } catch { /* ignore */ }
+    }
     return null;
 }
 
-function guessCountryFromLocale(): string | undefined {
+function guessCountryFromLocale(): CountryCode | undefined {
     try {
         const loc = (navigator.languages?.[0] ?? navigator.language ?? "").split("-");
-        return loc[1]?.toUpperCase();
+        return loc[1]?.toUpperCase() as CountryCode | undefined;
     } catch {
         return undefined;
     }
+}
+
+/**
+ * Where this phone is, from its time zone, for the countries ChiChat is used
+ * in most. A phone in Dubai set to English (US) still reads 050… as a UAE
+ * number. Unknown zones give undefined (the other guesses apply).
+ */
+const ZONE_COUNTRY: Record<string, CountryCode> = {
+    "Asia/Dubai": "AE",
+    "Africa/Lagos": "NG",
+    "Africa/Accra": "GH",
+    "Africa/Nairobi": "KE",
+    "Africa/Johannesburg": "ZA",
+    "Asia/Riyadh": "SA",
+    "Asia/Qatar": "QA",
+    "Asia/Kuwait": "KW",
+    "Asia/Bahrain": "BH",
+    "Asia/Muscat": "OM",
+    "Europe/London": "GB",
+    "Asia/Kolkata": "IN",
+    "Asia/Calcutta": "IN",
+    "America/Toronto": "CA",
+};
+
+export function guessCountryFromTimeZone(): CountryCode | undefined {
+    try {
+        return ZONE_COUNTRY[Intl.DateTimeFormat().resolvedOptions().timeZone];
+    } catch {
+        return undefined;
+    }
+}
+
+/** Best first guess for a country picker when the person's own number isn't known. */
+export function guessMyCountry(): CountryCode {
+    return guessCountryFromTimeZone() ?? guessCountryFromLocale() ?? "NG";
 }
 
 export function countryFromE164(raw: string | null | undefined): CountryCode | undefined {
