@@ -695,6 +695,8 @@ const d: Dictionary = {
   "ph.checkFailBody": "Ağ bağlantını kontrol et ve tekrar dene.",
   "ph.needed": "Mesaj göndermek ve arama yapmak için telefon numaranı ekle.",
   "pr.phoneKept": "Telefon numaran değiştirilebilir ama kaldırılamaz. Arkadaşların seni onunla bulur.",
+  "settings.signOutConfirmTitle": "ChiChat'ten çıkış yapılsın mı?",
+  "settings.signOutConfirmBody": "Tekrar giriş yapana kadar aramalar ve mesajlar bu telefona ulaşmaz.",
   "dg.signingIn": "Giriş yapılıyor…",
   "eb.title": "Bir şeyler ters gitti",
   "eb.reload": "Yeniden yükle",

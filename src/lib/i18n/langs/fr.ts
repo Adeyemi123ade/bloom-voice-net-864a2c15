@@ -695,6 +695,8 @@ const d: Dictionary = {
   "ph.checkFailBody": "Vérifiez votre connexion réseau et réessayez.",
   "ph.needed": "Ajoutez votre numéro de téléphone pour envoyer des messages et passer des appels.",
   "pr.phoneKept": "Votre numéro de téléphone peut être modifié mais pas supprimé. Vos amis vous trouvent grâce à lui.",
+  "settings.signOutConfirmTitle": "Se déconnecter de ChiChat ?",
+  "settings.signOutConfirmBody": "Les appels et les messages n'arriveront plus sur ce téléphone tant que vous ne vous serez pas reconnecté.",
   "dg.signingIn": "Connexion en cours…",
   "eb.title": "Un problème est survenu",
   "eb.reload": "Recharger",

@@ -695,6 +695,8 @@ const d: Dictionary = {
   "ph.checkFailBody": "Kagua muunganisho wako wa mtandao kisha ujaribu tena.",
   "ph.needed": "Ongeza nambari yako ya simu ili kutuma ujumbe na kupiga simu.",
   "pr.phoneKept": "Nambari yako ya simu inaweza kubadilishwa lakini haiwezi kuondolewa. Marafiki wanakupata kupitia hiyo.",
+  "settings.signOutConfirmTitle": "Uondoke kwenye ChiChat?",
+  "settings.signOutConfirmBody": "Simu na ujumbe havitafika kwenye simu hii hadi uingie tena.",
   "dg.signingIn": "Inakuingiza…",
   "eb.title": "Kuna hitilafu imetokea",
   "eb.reload": "Pakia upya",

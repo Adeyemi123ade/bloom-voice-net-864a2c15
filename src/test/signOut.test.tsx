@@ -67,6 +67,7 @@ beforeEach(() => {
 async function tapSignOut() {
   render(<MemoryRouter><Settings /></MemoryRouter>);
   fireEvent.click(await screen.findByTestId("sign-out"));
+  fireEvent.click(await screen.findByTestId("sign-out-confirm"));
   await waitFor(() => expect(replace).toHaveBeenCalled());
 }
 
@@ -114,6 +115,18 @@ describe("Sign out", () => {
     }
     expect(screen.getByTestId("sign-out")).toBeInTheDocument();
     expect(screen.getByTestId("delete-account")).toBeInTheDocument();
+  });
+
+  it("asks first: a mistaken tap can be cancelled and nothing happens", async () => {
+    render(<MemoryRouter><Settings /></MemoryRouter>);
+    fireEvent.click(await screen.findByTestId("sign-out"));
+    expect(await screen.findByRole("alertdialog")).toHaveTextContent("Sign out of ChiChat?");
+    expect(server.signOut).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    expect(server.signOut).not.toHaveBeenCalled();
+    expect(server.unregisterCallPush).not.toHaveBeenCalled();
+    expect(replace).not.toHaveBeenCalled();
   });
 
   it("ends only this device's session and goes straight to the sign-in screen", async () => {

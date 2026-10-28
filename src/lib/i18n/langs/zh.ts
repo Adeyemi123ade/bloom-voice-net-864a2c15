@@ -695,6 +695,8 @@ const d: Dictionary = {
   "ph.checkFailBody": "请检查网络连接后重试。",
   "ph.needed": "添加手机号码后才能发送消息和拨打电话。",
   "pr.phoneKept": "手机号码可以更改，但不能删除。朋友通过它找到你。",
+  "settings.signOutConfirmTitle": "要退出 ChiChat 吗？",
+  "settings.signOutConfirmBody": "在你重新登录之前，通话和消息不会送达这部手机。",
   "dg.signingIn": "正在为你登录…",
   "eb.title": "出了点问题",
   "eb.reload": "重新加载",
