@@ -255,10 +255,12 @@ Deno.serve(async (req) => {
           conversationId: String(call.conversation_id ?? ""),
         },
         "60s",
-        // A phone that is ringing has its screen on, so a normal push
-        // arrives at once; and a stop-ringing push shows nothing, so it must
-        // not count against the app's high-priority pushes.
-        "NORMAL",
+        // The caller hung up or nobody answered: the phone must stop ringing
+        // at once and shows "Missed call", even asleep, so this is urgent
+        // (and it shows something, so it doesn't count against the app with
+        // Google). Answered or declined on another device shows nothing:
+        // normal priority.
+        reason === "missed" || reason === "cancelled" ? "HIGH" : "NORMAL",
       );
       return json({ ok: true, ...result });
     }

@@ -12,9 +12,18 @@ public class ChiChatMessagingService extends FirebaseMessagingService {
         String type = data.get("type");
         try {
             if ("incoming_call".equals(type)) {
-                // On screen, the app rings itself; ringing here too would
-                // play two ringtones at once.
-                if (!AppState.isForeground()) CallNotificationHelper.showIncomingCall(this, data);
+                // Held back by the phone while it slept, and arriving after
+                // the call could still be answered: show it as missed rather
+                // than ringing for a call that is over.
+                long sent = remoteMessage.getSentTime();
+                long age = sent > 0 ? System.currentTimeMillis() - sent : 0;
+                if (age > CallNotificationHelper.STALE_ALERT_MS) {
+                    if (!AppState.isForeground()) CallNotificationHelper.showLateCall(this, data);
+                } else if (!AppState.isForeground()) {
+                    // On screen, the app rings itself; ringing here too would
+                    // play two ringtones at once.
+                    CallNotificationHelper.showIncomingCall(this, data);
+                }
             } else if ("call_cancelled".equals(type)) {
                 // Always stop any ringing; only leave a missed-call notice
                 // when the app isn't open (in the app, the chat shows it).

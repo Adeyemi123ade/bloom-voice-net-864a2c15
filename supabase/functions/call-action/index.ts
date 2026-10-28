@@ -54,7 +54,18 @@ Deno.serve(async (req) => {
         .eq("status", "ringing")
         .is("callee_ringing_at", null);
       if (error) throw error;
-      return new Response(JSON.stringify({ ok: true }), {
+      // Tells the phone whether the call can still be answered. A phone that
+      // got the call alert late (it was asleep) stops ringing and shows a
+      // missed call when the call is already over.
+      const { data: now } = await admin
+        .from("calls")
+        .select("status")
+        .eq("id", callId)
+        .eq("callee_id", calleeId)
+        .maybeSingle();
+      // Unknown (row not found): keep ringing rather than silence a real call.
+      const live = now ? now.status === "ringing" : true;
+      return new Response(JSON.stringify({ ok: true, live }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

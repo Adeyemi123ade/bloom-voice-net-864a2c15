@@ -6,18 +6,33 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.media.AudioAttributes;
+import android.net.Uri;
 import android.os.Build;
 import android.os.PowerManager;
+import android.service.notification.StatusBarNotification;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.Person;
+import androidx.core.content.FileProvider;
+import java.io.File;
 import java.util.Map;
 
 public class CallNotificationHelper {
-    // Silent channel: CallRinger plays the tone chosen in ChiChat (the old
-    // channel played the phone's own ringtone, and a channel's sound can't
-    // be changed once created, so it's replaced).
-    static final String CHANNEL_ID = "incoming_calls_v3";
-    private static final String OLD_CHANNEL_ID = "incoming_calls_fullscreen_v2";
+    // The call notification rings by itself: Android plays the channel's
+    // sound, looping (FLAG_INSISTENT) until the call is answered, declined,
+    // cancelled or times out. Nothing else has to be running, so it rings
+    // with the app closed, the phone locked, and battery saving on.
+    // (Until 1.12 the channel was silent and a background service played the
+    // tone; since 1.9 dropped the battery exemption, Android often refused
+    // that service, so the call screen showed without a sound.)
+    // A channel's sound can't change once created, so each tone has its own
+    // channel: ChiChat's tone, or the one chosen in ChiChat.
+    private static final String CHANNEL_PREFIX = "incoming_calls";
+    private static final String DEFAULT_CHANNEL_ID = "incoming_calls_ring_v4";
+    // A call alert that reaches the phone this late is for a call that is
+    // over (the phone held it while asleep): it shows as missed instead of
+    // ringing. Generous, so a phone clock that is a little off doesn't matter.
+    static final long STALE_ALERT_MS = 60_000L;
     static final String ACTION_ACCEPT = "com.bloomvoicenet.chat.ACCEPT_CALL";
     static final String ACTION_DECLINE = "com.bloomvoicenet.chat.DECLINE_CALL";
     static final String MISSED_CHANNEL_ID = "missed_calls";
@@ -30,7 +45,7 @@ public class CallNotificationHelper {
     }
 
     static void showIncomingCall(Context context, Map<String, String> data) {
-        createChannel(context);
+        String channelId = ringChannel(context);
         String callId = data.get("callId");
         String callerName = data.get("callerName") == null ? "Someone" : data.get("callerName");
         boolean isVideo = "video".equals(data.get("callType"));
@@ -77,7 +92,7 @@ public class CallNotificationHelper {
             .setImportant(true)
             .build();
 
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_stat_call)
             .setContentTitle("Incoming " + (isVideo ? "video " : "") + "call")
             .setContentText(callerName + " is calling…")
@@ -93,18 +108,28 @@ public class CallNotificationHelper {
             // ringing call (correct ranking, screen-wake, lock-screen UI).
             .setStyle(NotificationCompat.CallStyle.forIncomingCall(caller, declinePi, acceptPi));
 
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            // Phones before Android 8 take the sound from the notification.
+            builder.setSound(defaultToneUri(context), android.media.AudioManager.STREAM_RING);
+            builder.setVibrate(new long[] {0, 700, 350, 700, 1000, 700});
+        }
+
         Notification notification = builder.build();
         // Keep ringing (like a phone) until answered, declined, cancelled by
         // the caller, or the 45 s timeout above, instead of playing once.
         notification.flags |= Notification.FLAG_INSISTENT;
         NotificationManager nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         nm.notify(id, notification);
-        // The ringtone chosen in ChiChat (or ChiChat's default), until the
-        // call is answered, declined, cancelled or times out.
-        RingService.ring(context, id, notification);
         // A real call (not the Call setup test): the caller can now hear
-        // ringing, because this phone really rings.
-        if (!"1".equals(data.get("test"))) CallActionReceiver.reportRinging(data);
+        // ringing, because this phone really rings. The server also answers
+        // whether the call is still on; if it's already over, the ringing
+        // stops and it shows as missed.
+        if (!"1".equals(data.get("test"))) CallActionReceiver.reportRinging(context, data);
+    }
+
+    /** A call alert held back by the phone until the call was over: missed, not ringing. */
+    static void showLateCall(Context context, Map<String, String> data) {
+        showMissedCall(context, data);
     }
 
     /**
@@ -156,26 +181,83 @@ public class CallNotificationHelper {
     }
 
     static void cancel(Context context, String callId) {
+        // Stops a ringtone from an older version's background ringer, if any.
         RingService.silence(context);
         NotificationManager nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         nm.cancel(notificationId(callId));
     }
 
-    static void createChannel(Context context) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
+    /**
+     * ChiChat came on screen: it shows the incoming call and rings by itself,
+     * so the ringing notification goes (no two ringtones at once).
+     */
+    static void stopRingingNotifications(Context context) {
+        RingService.silence(context);
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return;
+        try {
+            NotificationManager nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+            for (StatusBarNotification n : nm.getActiveNotifications()) {
+                String ch = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+                    ? n.getNotification().getChannelId() : null;
+                boolean ringing = ch != null
+                    ? ch.startsWith(CHANNEL_PREFIX)
+                    : (n.getNotification().flags & Notification.FLAG_INSISTENT) != 0;
+                if (ringing) nm.cancel(n.getTag(), n.getId());
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    private static Uri defaultToneUri(Context context) {
+        return Uri.parse("android.resource://" + context.getPackageName() + "/" + R.raw.chichat_ring);
+    }
+
+    /** The channel ringing with the tone chosen in ChiChat, or ChiChat's own tone. Created when needed. */
+    static String ringChannel(Context context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return DEFAULT_CHANNEL_ID;
+        File tone = CallRinger.savedTone(context);
+        if (tone != null) {
+            try {
+                Uri uri = FileProvider.getUriForFile(context, context.getPackageName() + ".fileprovider", tone);
+                // The sound is played by Android itself, which must be able to read the file.
+                for (String pkg : new String[] {"com.android.systemui", "android"}) {
+                    context.grantUriPermission(pkg, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                }
+                String id = CHANNEL_PREFIX + "_tone_" + Integer.toHexString(tone.getName().hashCode());
+                ensureRingChannel(context, id, uri);
+                return id;
+            } catch (Throwable ignored) {
+                // A tone Android can't use: ring with ChiChat's own.
+            }
+        }
+        ensureRingChannel(context, DEFAULT_CHANNEL_ID, defaultToneUri(context));
+        return DEFAULT_CHANNEL_ID;
+    }
+
+    private static void ensureRingChannel(Context context, String id, Uri sound) {
         NotificationManager nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-        if (nm.getNotificationChannel(OLD_CHANNEL_ID) != null) nm.deleteNotificationChannel(OLD_CHANNEL_ID);
-        if (nm.getNotificationChannel(CHANNEL_ID) != null) return;
-        NotificationChannel ch = new NotificationChannel(
-            CHANNEL_ID, "Incoming calls", NotificationManager.IMPORTANCE_HIGH);
-        ch.setDescription("Full-screen incoming ChiChat calls");
+        // Earlier call channels (silent ones, or for a tone no longer chosen) go.
+        for (NotificationChannel old : nm.getNotificationChannels()) {
+            String oid = old.getId();
+            if (oid.startsWith(CHANNEL_PREFIX) && !oid.equals(id)) nm.deleteNotificationChannel(oid);
+        }
+        if (nm.getNotificationChannel(id) != null) return;
+        NotificationChannel ch = new NotificationChannel(id, "Incoming calls", NotificationManager.IMPORTANCE_HIGH);
+        ch.setDescription("Rings for incoming ChiChat calls");
         ch.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
         ch.enableVibration(true);
         ch.setVibrationPattern(new long[] {0, 700, 350, 700, 1000, 700});
         ch.setBypassDnd(true);
         ch.setShowBadge(true);
-        ch.setSound(null, null);
+        ch.setSound(sound, new AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+            .build());
         nm.createNotificationChannel(ch);
+    }
+
+    /** The current call channel, for the Call setup check. */
+    static String currentChannelId(Context context) {
+        return ringChannel(context);
     }
 
     private static void wakeBriefly(Context context, String callId) {

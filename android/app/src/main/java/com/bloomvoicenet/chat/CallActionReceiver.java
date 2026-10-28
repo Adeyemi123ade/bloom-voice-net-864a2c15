@@ -85,11 +85,18 @@ public class CallActionReceiver extends BroadcastReceiver {
      * "Ringing…" and plays the ringing tone. Uses the signed ringingToken
      * from the call push, so no signed-in session is needed. One quick try
      * plus one retry; if both fail the caller just keeps "Calling…".
+     *
+     * The server answers whether the call is still ringing ("live"). If the
+     * caller already hung up or it timed out (the alert reached this phone
+     * late), the ringing stops here and it shows as a missed call. With no
+     * answer (no network), the phone keeps ringing as before.
      */
-    static void reportRinging(java.util.Map<String, String> data) {
+    static void reportRinging(Context context, java.util.Map<String, String> data) {
         final String actionUrl = data.get("actionUrl");
         final String ringingToken = data.get("ringingToken");
         if (actionUrl == null || ringingToken == null || ringingToken.isEmpty()) return;
+        final Context app = context.getApplicationContext();
+        final java.util.Map<String, String> copy = new java.util.HashMap<>(data);
         final String key = data.get("actionKey");
         final String body = "{\"action\":\"ringing\",\"callId\":\"" + esc(data.get("callId")) +
             "\",\"calleeId\":\"" + esc(data.get("calleeId")) +
@@ -109,8 +116,27 @@ public class CallActionReceiver extends BroadcastReceiver {
                     c.setDoOutput(true);
                     try (OutputStream os = c.getOutputStream()) { os.write(body.getBytes("UTF-8")); }
                     int code = c.getResponseCode();
+                    String reply = "";
+                    if (code >= 200 && code < 300) {
+                        try (java.io.InputStream in = c.getInputStream()) {
+                            java.io.ByteArrayOutputStream buf = new java.io.ByteArrayOutputStream();
+                            byte[] b = new byte[1024];
+                            int n;
+                            while ((n = in.read(b)) > 0 && buf.size() < 4096) buf.write(b, 0, n);
+                            reply = buf.toString("UTF-8");
+                        } catch (Exception ignored) {}
+                    }
                     c.disconnect();
-                    if (code >= 200 && code < 300) return;
+                    if (code >= 200 && code < 300) {
+                        if (reply.contains("\"live\":false")) {
+                            // Already over: stop ringing, leave a missed call.
+                            String callId = copy.get("callId");
+                            CallNotificationHelper.cancel(app, callId);
+                            IncomingCallActivity.dismiss(callId);
+                            CallNotificationHelper.showMissedCall(app, copy);
+                        }
+                        return;
+                    }
                     if (code >= 400 && code < 500) return; // refused: don't retry
                 } catch (Exception e) {
                     Log.w("ChiChatCalls", "ringing report failed", e);
