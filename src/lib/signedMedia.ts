@@ -33,10 +33,22 @@ export function parseChatMediaPath(url: string): string | null {
   }
 }
 
+/**
+ * An attachment address the app may open or show: https, or a file made on
+ * this phone (blob:). Anything else, like a "javascript:" link written into
+ * a message by hand, would run code inside ChiChat when tapped, so it
+ * becomes "" (nothing opens). The database refuses such messages too
+ * (20261028200000_security_hardening.sql).
+ */
+export function safeMediaUrl(url: string | null | undefined): string {
+  const u = (url ?? "").trim();
+  return /^(https:\/\/|blob:)/i.test(u) ? u : "";
+}
+
 /** Resolve a (possibly public) chat-media URL to a fresh signed URL. Cached. */
 export async function getSignedChatMediaUrl(originalUrl: string): Promise<string> {
   const path = parseChatMediaPath(originalUrl);
-  if (!path) return originalUrl; // not a chat-media URL — pass through
+  if (!path) return safeMediaUrl(originalUrl); // not a chat-media URL: only a safe one passes
 
   const now = Date.now();
   const cached = cache.get(path);
@@ -47,7 +59,7 @@ export async function getSignedChatMediaUrl(originalUrl: string): Promise<string
     const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, EXPIRY_SEC);
     if (error || !data?.signedUrl) {
       // Can't sign right now (offline, or no access): leave the stored URL.
-      return originalUrl;
+      return safeMediaUrl(originalUrl);
     }
     cache.set(path, { url: data.signedUrl, expiresAt: Date.now() + EXPIRY_SEC * 1000 });
     return data.signedUrl;
@@ -64,7 +76,7 @@ export async function getSignedChatMediaUrl(originalUrl: string): Promise<string
 
 /** React hook: returns a usable URL, auto-refreshing before the signed URL expires. */
 export function useSignedMediaUrl(originalUrl: string | undefined | null): string {
-  const [url, setUrl] = useState<string>(originalUrl ?? "");
+  const [url, setUrl] = useState<string>(safeMediaUrl(originalUrl));
 
   useEffect(() => {
     if (!originalUrl) {
