@@ -6,6 +6,15 @@ import { unregisterCallPush } from "@/lib/fcmRegistration";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useLanguage } from "@/lib/i18n/context";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 /** A card with a header that opens and closes (open to start). */
 export function SettingsGroup({
@@ -84,6 +93,8 @@ export function SettingsRow({
 export function SignOutCard() {
   const { t } = useLanguage();
   const [working, setWorking] = useState(false);
+  // A tap on Sign out asks first, so a mistaken touch can be cancelled.
+  const [confirming, setConfirming] = useState(false);
   const signOut = async () => {
     setWorking(true);
     try {
@@ -110,10 +121,34 @@ export function SignOutCard() {
         iconSpin={working}
         title={working ? t("settings.signingOut") : t("settings.signOut")}
         subtitle={t("settings.signOutSub")}
-        onClick={() => void signOut()}
+        onClick={() => setConfirming(true)}
         disabled={working}
         testId="sign-out"
       />
+      <AlertDialog open={confirming} onOpenChange={(open) => !working && setConfirming(open)}>
+        <AlertDialogContent className="max-w-[320px]" aria-describedby={undefined}>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-base">{t("settings.signOutConfirmTitle")}</AlertDialogTitle>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={working} className="text-sm h-10">
+              {t("common.cancel")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="sign-out-confirm"
+              disabled={working}
+              className="text-sm h-10"
+              onClick={(e) => {
+                e.preventDefault();
+                setConfirming(false);
+                void signOut();
+              }}
+            >
+              {t("settings.signOut")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

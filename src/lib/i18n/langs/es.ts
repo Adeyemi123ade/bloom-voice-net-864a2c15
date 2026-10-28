@@ -695,6 +695,7 @@ const d: Dictionary = {
   "ph.checkFailBody": "Comprueba tu conexión a la red e inténtalo de nuevo.",
   "ph.needed": "Añade tu número de teléfono para enviar mensajes y hacer llamadas.",
   "pr.phoneKept": "Puedes cambiar tu número de teléfono, pero no quitarlo. Tus amigos te encuentran por él.",
+  "settings.signOutConfirmTitle": "¿Seguro que quieres cerrar sesión?",
   "dg.signingIn": "Iniciando sesión…",
   "eb.title": "Algo salió mal",
   "eb.reload": "Recargar",
