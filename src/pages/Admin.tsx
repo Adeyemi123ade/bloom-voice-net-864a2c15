@@ -24,6 +24,8 @@ import {
   listFeedback,
   listProblems,
   listReports,
+  EXPECTED_DB_VERSION,
+  loadDbVersion,
   loadOverview,
   restoreUser,
   screenshotLink,
@@ -35,6 +37,7 @@ import {
   type AdminUser,
   type AppProblem,
   type CallMinutes,
+  type DbVersion,
   type Overview,
 } from "@/lib/admin";
 import NotFound from "./NotFound";
@@ -71,6 +74,7 @@ export default function Admin() {
   const { user, loading } = useAuth();
   const [allowed, setAllowed] = useState<boolean | null>(null);
   const [overview, setOverview] = useState<Overview | null>(null);
+  const [dbVersion, setDbVersion] = useState<DbVersion | null>(null);
   const [suspendTarget, setSuspendTarget] = useState<SuspendTarget | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -90,6 +94,7 @@ export default function Admin() {
   useEffect(() => {
     if (!allowed) return;
     void loadOverview().then((r) => setOverview(r.data));
+    void loadDbVersion().then(setDbVersion);
   }, [allowed, refreshKey]);
 
   const refresh = () => setRefreshKey((k) => k + 1);
@@ -125,6 +130,8 @@ export default function Admin() {
             <RefreshCw className="w-5 h-5 text-foreground" />
           </button>
         </div>
+
+        {dbVersion && <DbVersionLine v={dbVersion} />}
 
         {overview && (
           <div className="grid grid-cols-3 gap-2 px-4 pt-4">
@@ -173,6 +180,25 @@ export default function Admin() {
         />
       </div>
     </MobileFrame>
+  );
+}
+
+/** Whether the database has every change this version of the app needs. */
+function DbVersionLine({ v }: { v: DbVersion }) {
+  if (v.state === "unknown") {
+    return <p className="px-4 pt-4 text-xs text-muted-foreground">Database version couldn't be checked.</p>;
+  }
+  if (v.state === "ok") {
+    return <p className="px-4 pt-4 text-xs text-muted-foreground">Database up to date ({v.live}).</p>;
+  }
+  return (
+    <div className="mx-4 mt-4 rounded-xl border border-destructive/40 bg-destructive/5 px-3 py-2">
+      <p className="text-sm font-semibold text-foreground">Database update missing</p>
+      <p className="text-xs text-muted-foreground">
+        This app needs {EXPECTED_DB_VERSION}; the database has {v.live ?? "an older version"}. Run the
+        newer files from supabase/migrations in the SQL Editor, in order.
+      </p>
+    </div>
   );
 }
 

@@ -66,6 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             for (const k of keys) {
               if (
                 k.startsWith("chichat.device_verified.") ||
+                k.startsWith("chichat.phone_ok.") ||
                 k.startsWith("chichat.recovery_pending.")
               ) {
                 storage.removeItem(k);

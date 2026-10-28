@@ -4,6 +4,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { tNow } from "@/lib/i18n/language";
 import { isLimitError, isSuspendedError, requestAccountCheck } from "@/lib/accountStatus";
+import { goAddPhone, isNoPhoneError } from "@/lib/phoneRequired";
 import { isBlockedError } from "@/lib/safety";
 
 // A row coming from Supabase (initial fetch or realtime payload) is only
@@ -124,6 +125,10 @@ export type Profile = {
 export function sendRefusalText(err: unknown): string {
   if (isBlockedError(err)) return tNow("chat.cantMessage");
   if (isLimitError(err)) return tNow("lim.chats");
+  if (isNoPhoneError(err)) {
+    goAddPhone();
+    return tNow("ph.needed");
+  }
   if (isSuspendedError(err)) {
     requestAccountCheck();
     return tNow("chat.cantMessage");

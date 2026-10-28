@@ -21,7 +21,9 @@ vi.mock("@/integrations/supabase/client", () => {
   return {
     supabase: {
       from: table,
-      rpc: (_fn: string, args: { _phones: string[] }) => {
+      rpc: (fn: string, args: { _phones: string[] }) => {
+        // The person's own number (for reading local numbers): answered at once.
+        if (fn === "get_my_profile_private") return Promise.resolve({ data: [{ phone: "+2348031234567" }], error: null });
         server.rpcCalls.push(args._phones);
         server.inFlight++;
         server.maxInFlight = Math.max(server.maxInFlight, server.inFlight);
@@ -92,6 +94,23 @@ describe("Contacts screen opening", () => {
     expect(saved.matches.length).toBe(N / 10);
   });
 
+  it("opening again within 30 minutes reuses the check instead of sending the whole phone book", async () => {
+    const first = renderScreen();
+    await waitFor(() => expect(server.rpcCalls.length).toBeGreaterThan(0));
+    await releaseAll();
+    expect(await screen.findByText("Fresh +2340000010")).toBeInTheDocument();
+    const sent = server.rpcCalls.flat().length;
+    expect(sent).toBe(N);
+    first.unmount();
+
+    renderScreen();
+    // The people found last time show at once...
+    expect(await screen.findByText("Fresh +2340000010")).toBeInTheDocument();
+    await new Promise((r) => setTimeout(r, 50));
+    // ...and no number was sent again.
+    expect(server.rpcCalls.flat().length).toBe(sent);
+  });
+
   it("checks numbers in parallel batches (not one after another)", async () => {
     renderScreen();
     await waitFor(() => expect(server.rpcCalls.length).toBe(4));
@@ -102,6 +121,7 @@ describe("Contacts screen opening", () => {
 
   it("draws the first rows of a long phone book, not all of them", async () => {
     renderScreen();
+    await waitFor(() => expect(server.rpcCalls.length).toBeGreaterThan(0));
     await releaseAll();
     expect(await screen.findByText("Person 0001")).toBeInTheDocument();
     expect(screen.queryByText("Person 0999")).not.toBeInTheDocument();

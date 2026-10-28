@@ -9,6 +9,7 @@ import { LanguageProvider } from "@/lib/i18n/LanguageProvider";
 import Index from "./pages/Index.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import Register from "./pages/Register.tsx";
+import AddPhone from "./pages/AddPhone.tsx";
 import Login from "./pages/Login.tsx";
 import Welcome from "./pages/Welcome.tsx";
 import Home from "./pages/Home.tsx";
@@ -91,6 +92,7 @@ const App = () => (
                 <Routes>
                   <Route path="/" element={<Index />} />
                   <Route path="/register" element={<Register />} />
+                  <Route path="/add-phone" element={<AddPhone />} />
                   <Route path="/login" element={<Login />} />
                   <Route path="/auth/google-return" element={<GoogleReturn />} />
                   <Route path="/welcome" element={<Welcome />} />

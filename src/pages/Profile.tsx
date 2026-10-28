@@ -11,7 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { toE164, formatDisplay } from "@/lib/phone";
+import { toE164, formatDisplay, getMyDefaultCountry } from "@/lib/phone";
 import { useBackNavigation } from "@/hooks/useBackNavigation";
 import { useLanguage } from "@/lib/i18n/context";
 
@@ -97,17 +97,20 @@ export default function Profile() {
 
   const save = async () => {
     if (!user) return;
-    let normalizedPhone: string | null = null;
-    if (phone.trim()) {
-      normalizedPhone = toE164(phone.trim());
-      if (!normalizedPhone) {
-        toast({
-          title: t("nc.invalidPhone"),
-          description: t("pr.useIntl"),
-          variant: "destructive",
-        });
-        return;
-      }
+    if (!phone.trim()) {
+      // The number can be changed but not removed: friends find you by it.
+      toast({ title: t("pr.saveFailed"), description: t("pr.phoneKept"), variant: "destructive" });
+      return;
+    }
+    // A local number (no +) is read with this person's own country first.
+    const normalizedPhone = toE164(phone.trim(), await getMyDefaultCountry());
+    if (!normalizedPhone) {
+      toast({
+        title: t("nc.invalidPhone"),
+        description: t("pr.useIntl"),
+        variant: "destructive",
+      });
+      return;
     }
     setSaving(true);
     const { error } = await supabase.rpc("update_my_profile", {
@@ -117,16 +120,16 @@ export default function Profile() {
     await supabase.auth.updateUser({ data: { about: about.trim() } });
     setSaving(false);
     if (error) {
-      const msg =
-        error.message.includes("phone_taken") ||
-        error.message.includes("profiles_phone_unique")
+      const msg = error.message.includes("phone_required")
+        ? t("pr.phoneKept")
+        : error.message.includes("phone_taken") || error.message.includes("profiles_phone_unique")
           ? t("pr.phoneLinked")
           : isBannedError(error)
             ? t("pr.phoneNotAllowed")
             : t("pr.cantSave");
       toast({ title: t("pr.saveFailed"), description: msg, variant: "destructive" });
     } else {
-      if (normalizedPhone) setPhone(normalizedPhone);
+      setPhone(normalizedPhone);
       toast({ title: t("pr.saved") });
     }
   };

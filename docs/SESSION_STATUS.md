@@ -1,7 +1,7 @@
 # ChiChat: project status
 
 Current state of the project for anyone picking it up (developers, testers,
-reviewers). Updated 2026-10-27. Update this file in the same pull request
+reviewers). Updated 2026-10-28. Update this file in the same pull request
 as any change that makes it wrong.
 
 ## What ChiChat is
@@ -64,7 +64,8 @@ Local run: `npm install`, `npm run dev` (http://localhost:8080). Tests:
 
 | Item | Where | State |
 | --- | --- | --- |
-| Contacts shown as Invite; signed-out phones ringing; caller ringing too early | `20261026120000_phone_at_signup_push_sessions_ringing.sql`, `send-call-push`, branch `fix/calls-contacts-server` | Order: run the SQL, deploy `send-call-push`, then merge. Form sign-ups now save the phone at sign-up; push only reaches phones still signed in; caller shows "Calling…" until the other phone reports ringing |
+| Registered people shown as Invite: accounts with no phone number | `20261028090000_phone_required.sql`, branch `fix/phone-required` | Live check 2026-10-28: every migration applied, all 9 saved numbers correct, 3 Google sign-ins (Oct 22, 25, 26) with no number at all. Now every account must add a number before using the app (the check no longer lets people in when it fails); the server refuses messages and calls without one; Profile can't erase it; numbers saved as 00…, without + or as local numbers are read correctly; the phone book is checked at most every 30 minutes unless it changed; the database records which migrations ran (Admin shows it). Order: run the SQL, then merge. No function deploy, no new APK |
+| Contacts shown as Invite; signed-out phones ringing; caller ringing too early | `20261026120000_phone_at_signup_push_sessions_ringing.sql`, `send-call-push` | Done: confirmed live 2026-10-28 |
 | Calls not reaching the phone next to you; Calling stuck; pop-ups at call end | branch `fix/call-delivery-status` | Open app now also finds a ringing call from its push, after a reconnect and when it comes back on screen; silent pushes go normal priority (Google downgraded the app's urgent pushes); app and push function keep working if the SQL wasn't run; end of call shown in the status line; one-time call setup switches after sign-in (Android, only when something is off). Deploy `send-call-push` and `call-action`, then merge |
 | Native call follow-ups (need a new APK) | `android/app/src/main/java/` | In branch `fix/call-delivery-status`: closed app reports ringing (`CallActionReceiver.reportRinging`). Still open: ignore pushes for an account not signed in on the phone, native timing marks for slow answers |
 | Google sign-in on Android (browser flow fails at Supabase: "Unable to exchange external code") | `ChiChatGooglePlugin.java`, `src/lib/googleAuth.ts`, `docs/GOOGLE_SIGN_IN.md` | Native picker in PR `feat/native-google-signin`. Needs the Android OAuth client (package + SHA-1) in Google Cloud and a new APK |

@@ -35,6 +35,22 @@ function normalizePhone(raw: string, defaultCountry?: CountryCode): string | nul
 }
 
 /**
+ * Reads again any number not yet in +country form (saved by an older version
+ * of the app), so it can match. Numbers already in +country form are kept.
+ */
+export function renormalizeContacts(list: DeviceContact[], defaultCountry?: CountryCode): DeviceContact[] {
+  return list.map((c) => {
+    if (c.phones.every((p) => p.startsWith("+"))) return c;
+    const phones: string[] = [];
+    for (const p of c.phones) {
+      const n = p.startsWith("+") ? p : normalizePhone(p, defaultCountry);
+      if (n && !phones.includes(n)) phones.push(n);
+    }
+    return { ...c, phones };
+  });
+}
+
+/**
  * Load device contacts on a native build via @capacitor-community/contacts.
  * Throws on web or when permission is denied so the caller can show a clear message.
  */
