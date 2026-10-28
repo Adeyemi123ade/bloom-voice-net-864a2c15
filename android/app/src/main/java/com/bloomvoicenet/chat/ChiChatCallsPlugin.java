@@ -180,7 +180,7 @@ public class ChiChatCallsPlugin extends Plugin {
             NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
             boolean channelOn = true;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && nm != null) {
-                NotificationChannel ch = nm.getNotificationChannel(CallNotificationHelper.CHANNEL_ID);
+                NotificationChannel ch = nm.getNotificationChannel(CallNotificationHelper.currentChannelId(ctx));
                 if (ch != null) channelOn = ch.getImportance() != NotificationManager.IMPORTANCE_NONE;
             }
             r.put("callChannel", channelOn);

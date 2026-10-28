@@ -44,3 +44,35 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  # The phone app's own code (calls, ringing, notifications) is compiled on
+  # every pull request too, so a change that doesn't build is caught here,
+  # not on the build laptop. No signing key or google-services.json is
+  # needed for this check.
+  android:
+    name: android compiles
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      - name: Build web and copy into the Android project
+        run: npm run build && npx cap sync android
+
+      - name: Compile the Android app (debug)
+        working-directory: android
+        run: chmod +x gradlew && ./gradlew --no-daemon assembleDebug

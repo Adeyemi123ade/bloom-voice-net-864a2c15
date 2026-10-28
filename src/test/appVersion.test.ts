@@ -10,7 +10,7 @@ describe("app version shown in Settings", () => {
     expect(displayVersion("2.0.0")).toBe("2.0");
   });
   it("is a short version number, not a build code", () => {
-    expect(APP_VERSION).toBe("1.11");
+    expect(APP_VERSION).toBe("1.12");
     expect(pkg.version).toMatch(/^\d+\.\d+\.\d+$/);
   });
   it("matches the Android app's version, so Settings shows the version that is installed", () => {

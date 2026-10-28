@@ -2,4 +2,6 @@
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
     <external-path name="my_images" path="." />
     <cache-path name="my_cache_images" path="." />
+    <!-- The ringtone chosen in ChiChat, played by Android for incoming calls. -->
+    <files-path name="ringtone" path="ringtone/" />
 </paths>

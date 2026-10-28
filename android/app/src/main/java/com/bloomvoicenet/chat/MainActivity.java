@@ -123,9 +123,9 @@ public class MainActivity extends BridgeActivity {
     public void onResume() {
         super.onResume();
         AppState.setForeground(true);
-        // ChiChat is on screen: it rings by itself, so the phone app's
-        // ringer stops (no two ringtones at once).
-        RingService.silence(this);
+        // ChiChat is on screen: it shows the call and rings by itself, so the
+        // ringing call notification goes (no two ringtones at once).
+        CallNotificationHelper.stopRingingNotifications(this);
         MessageNotificationHelper.clearAll(this);
     }
 
