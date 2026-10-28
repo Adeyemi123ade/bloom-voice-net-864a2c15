@@ -251,14 +251,19 @@ export default function CallSession({
   };
 
   // The other phone has said it is ringing (calls.callee_ringing_at). Until
-  // then the caller sees "Calling…" and hears nothing: the call has been
-  // sent, but that doesn't mean their phone rings.
+  // then the caller sees "Calling…" (the call has been sent, but that
+  // doesn't mean their phone rings).
   const [remoteRinging, setRemoteRinging] = useState(false);
+  const remoteRingingRef = useRef(false);
   const noteRinging = (row: { callee_ringing_at?: string | null } | null | undefined) => {
-    if (row?.callee_ringing_at) setRemoteRinging(true);
+    if (row?.callee_ringing_at) {
+      remoteRingingRef.current = true;
+      setRemoteRinging(true);
+    }
   };
-  // Caller hears ringback only once the other phone really rings.
-  useRingback(role === "caller" && status === "ringing" && remoteRinging);
+  // Caller hears a calling tone while "Calling…", the ringback once the other
+  // phone really rings, and nothing once it connects or ends.
+  useRingback(role === "caller" && status === "ringing" ? (remoteRinging ? "ringing" : "calling") : null);
 
   // Signed out mid-call: end the call. Only a real sign out counts; the
   // sign-in briefly not being readable (slow network at start up) is not one.
@@ -540,11 +545,21 @@ export default function CallSession({
         return;
       }
       // Wake the other phone (rings even if ChiChat is closed there).
-      void supabase.functions
-        .invoke("send-call-push", {
+      const sendCallPush = () =>
+        supabase.functions.invoke("send-call-push", {
           body: { calleeId, callId, callType: initialIsVideo ? "video" : "voice", conversationId, roomName },
-        })
-        .then(() => markCall(callId, "push"), (e) => console.warn("[call-push] failed", e));
+        });
+      void sendCallPush().then(() => markCall(callId, "push"), (e) => console.warn("[call-push] failed", e));
+      // A phone asleep for hours can miss the first alert while it
+      // reconnects. If it hasn't rung after 8 s and again after 20 s, the
+      // alert goes again; a phone already ringing ignores the repeat.
+      for (const delay of [8_000, 20_000]) {
+        window.setTimeout(() => {
+          if (endedRef.current || connectedRef.current) return;
+          if (statusRef.current !== "ringing" || remoteRingingRef.current) return;
+          void sendCallPush().catch((e) => console.warn("[call-push] repeat failed", e));
+        }, delay);
+      }
       prefetchCallToken(roomName);
       const room = roomNeedsTwilioSetup(roomName)
         ? supabase.functions
