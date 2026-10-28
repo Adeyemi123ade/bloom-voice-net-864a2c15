@@ -7,8 +7,10 @@ name: PR checks
 
 on:
   pull_request:
+  # Every pushed branch too, so a branch is already checked before its
+  # pull request is opened.
   push:
-    branches: [main]
+    branches: ["**"]
 
 permissions:
   contents: read
