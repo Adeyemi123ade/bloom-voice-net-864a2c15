@@ -53,12 +53,18 @@ const flush = async () => {
 };
 
 describe("what the caller hears", () => {
-  it("Calling…: a soft double pip, repeating", async () => {
+  it("Calling…: one \"tom tom\", then a pause of about 3 s, repeating", async () => {
     renderHook(() => useRingback("calling"));
     await flush();
     expect(audio.tones).toEqual([[440], [440]]);
+    // Still quiet just before the next pair...
     await act(async () => {
-      vi.advanceTimersByTime(2000);
+      vi.advanceTimersByTime(3400);
+    });
+    expect(audio.tones.length).toBe(2);
+    // ...then the next "tom tom".
+    await act(async () => {
+      vi.advanceTimersByTime(100);
     });
     expect(audio.tones.length).toBe(4);
   });
