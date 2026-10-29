@@ -7,7 +7,7 @@ export type CallerTone = "calling" | "ringing" | null;
  * Tones for the CALLER (the one dialing), made with WebAudio (no files, and
  * the caller has just tapped Call, so the browser lets it play):
  *   "calling": the call is on its way, the other phone hasn't rung yet;
- *              a soft double pip, repeating every 2 s
+ *              "tom tom", then about 3 s quiet, repeating
  *   "ringing": the other phone is ringing; classic ringback,
  *              2 s tone, 4 s quiet
  *   null:      silence (connected, ended, or not the caller)
@@ -65,9 +65,9 @@ export function useRingback(tone: CallerTone) {
         beep(now, [400, 450], 2.0, 0.18);
         timer = window.setTimeout(cycle, 6000);
       } else {
-        beep(now, [440], 0.14, 0.12);
-        beep(now + 0.28, [440], 0.14, 0.12);
-        timer = window.setTimeout(cycle, 2000);
+        beep(now, [440], 0.16, 0.12);
+        beep(now + 0.34, [440], 0.16, 0.12);
+        timer = window.setTimeout(cycle, 3500);
       }
     };
 
