@@ -1,72 +1,109 @@
 import { useEffect, useRef } from "react";
 
+/** What the CALLER hears before the call connects. */
+export type CallerTone = "calling" | "ringing" | null;
+
 /**
- * Classic phone ringback tone for the CALLER (the one dialing).
- * Plays a "brrring brrring … pause" pattern using WebAudio while `active` is true.
- * No external assets, no autoplay issues (caller already tapped the call button).
+ * Tones for the CALLER (the one dialing), made with WebAudio (no files, and
+ * the caller has just tapped Call, so the browser lets it play):
+ *   "calling": the call is on its way, the other phone hasn't rung yet;
+ *              a soft double pip, repeating every 2 s
+ *   "ringing": the other phone is ringing; classic ringback,
+ *              2 s tone, 4 s quiet
+ *   null:      silence (connected, ended, or not the caller)
+ * One sound source for the whole call: moving from calling to ringing
+ * switches the pattern at once, with no gap.
  */
-export function useRingback(active: boolean) {
-  const ctxRef = useRef<AudioContext | null>(null);
-  const stopRef = useRef<(() => void) | null>(null);
+export function useRingback(tone: CallerTone) {
+  const toneRef = useRef<CallerTone>(tone);
+  toneRef.current = tone;
+  // Starts the current pattern now (set while a call's tones are on).
+  const restartRef = useRef<(() => void) | null>(null);
+
+  const active = tone !== null;
 
   useEffect(() => {
     if (!active) return;
-
     const AC =
       window.AudioContext ||
-      (window as unknown as { webkitAudioContext?: typeof AudioContext })
-        .webkitAudioContext;
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!AC) return;
-    const ctx = new AC();
-    ctxRef.current = ctx;
+    let ctx: AudioContext;
+    try {
+      ctx = new AC();
+    } catch {
+      return;
+    }
     let cancelled = false;
+    let timer: number | null = null;
+    let playing: GainNode[] = [];
 
-    // One "brrring": 400Hz + 450Hz dual tone for ~1s, then 200ms gap, repeat,
-    // then ~3s silence (classic UK/intl ringback cadence ~ 2on / 4off).
-    const playRing = (startAt: number) => {
-      const o1 = ctx.createOscillator();
-      const o2 = ctx.createOscillator();
+    const beep = (startAt: number, freqs: number[], length: number, level: number) => {
       const g = ctx.createGain();
-      o1.frequency.value = 400;
-      o2.frequency.value = 450;
-      o1.type = "sine";
-      o2.type = "sine";
       g.gain.setValueAtTime(0, startAt);
-      g.gain.linearRampToValueAtTime(0.18, startAt + 0.05);
-      g.gain.setValueAtTime(0.18, startAt + 1.9);
-      g.gain.linearRampToValueAtTime(0, startAt + 2.0);
-      o1.connect(g);
-      o2.connect(g);
+      g.gain.linearRampToValueAtTime(level, startAt + 0.03);
+      g.gain.setValueAtTime(level, startAt + length - 0.05);
+      g.gain.linearRampToValueAtTime(0, startAt + length);
       g.connect(ctx.destination);
-      o1.start(startAt);
-      o2.start(startAt);
-      o1.stop(startAt + 2.05);
-      o2.stop(startAt + 2.05);
+      playing.push(g);
+      for (const f of freqs) {
+        const o = ctx.createOscillator();
+        o.type = "sine";
+        o.frequency.value = f;
+        o.connect(g);
+        o.start(startAt);
+        o.stop(startAt + length + 0.02);
+      }
     };
 
-    const loop = () => {
+    // One cycle of the current pattern, then the next one is scheduled.
+    const cycle = () => {
       if (cancelled) return;
+      playing = [];
       const now = ctx.currentTime;
-      playRing(now);
-      // 2s tone + 4s silence = 6s cadence
-      window.setTimeout(loop, 6000);
+      if (toneRef.current === "ringing") {
+        beep(now, [400, 450], 2.0, 0.18);
+        timer = window.setTimeout(cycle, 6000);
+      } else {
+        beep(now, [440], 0.14, 0.12);
+        beep(now + 0.28, [440], 0.14, 0.12);
+        timer = window.setTimeout(cycle, 2000);
+      }
     };
 
-    ctx.resume().finally(loop);
+    restartRef.current = () => {
+      if (cancelled) return;
+      if (timer) window.clearTimeout(timer);
+      // Cut whatever is sounding, then start the new pattern.
+      for (const g of playing) {
+        try {
+          g.disconnect();
+        } catch {
+          /* already finished */
+        }
+      }
+      cycle();
+    };
 
-    stopRef.current = () => {
+    ctx.resume().catch(() => undefined).finally(cycle);
+
+    return () => {
       cancelled = true;
+      restartRef.current = null;
+      if (timer) window.clearTimeout(timer);
       try {
-        ctx.close();
+        void ctx.close();
       } catch {
         /* ignore */
       }
     };
-
-    return () => {
-      stopRef.current?.();
-      stopRef.current = null;
-      ctxRef.current = null;
-    };
   }, [active]);
+
+  // Calling → ringing: the ringback starts now, not after the current pause.
+  const prev = useRef<CallerTone>(tone);
+  useEffect(() => {
+    const was = prev.current;
+    prev.current = tone;
+    if (was === "calling" && tone === "ringing") restartRef.current?.();
+  }, [tone]);
 }

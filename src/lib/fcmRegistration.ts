@@ -150,9 +150,9 @@ export async function registerForCallPush(userId: string) {
       }
     });
 
-    PushNotifications.addListener("pushNotificationActionPerformed", (a) => {
-      console.log("[fcm] push tapped", a.notification.data);
-    });
+    // Tapping a notification is handled natively (MainActivity). Its data
+    // carries call tokens, so it is not written to the log.
+    PushNotifications.addListener("pushNotificationActionPerformed", () => {});
 
     await PushNotifications.register();
   } catch (e) {

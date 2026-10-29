@@ -23,6 +23,10 @@ const w = vi.hoisted(() => ({
   holdPoll: false,
   // When the other phone said it rings (calls.callee_ringing_at).
   ringingAt: "2026-10-26T10:00:00Z" as string | null,
+  // Calls to server functions, by name.
+  invokes: [] as string[],
+  // What the caller hears (useRingback's argument, each render).
+  tones: [] as (string | null)[],
 }));
 
 function makeTrack(kind: "audio" | "video") {
@@ -74,7 +78,7 @@ vi.mock("@/lib/callTimeline", () => ({ markCall: () => {}, startCallTimeline: ()
 vi.mock("@/lib/pushNotify", () => ({ pushCallCancelled: () => {} }));
 vi.mock("@/lib/accountStatus", () => ({ requestAccountCheck: () => {} }));
 vi.mock("@/lib/callStart", () => ({ saveNewCall: async () => ({ result: "saved" }) }));
-vi.mock("@/hooks/useRingback", () => ({ useRingback: () => {} }));
+vi.mock("@/hooks/useRingback", () => ({ useRingback: (t: string | null) => { w.tones.push(t); } }));
 vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "me" }, loading: false, signedOut: false }) }));
 vi.mock("@/components/MobileFrame", () => ({ default: ({ children }: { children: React.ReactNode }) => <div>{children}</div> }));
 vi.mock("@/integrations/supabase/client", () => {
@@ -107,7 +111,12 @@ vi.mock("@/integrations/supabase/client", () => {
       from: () => chain(),
       channel,
       removeChannel: () => {},
-      functions: { invoke: async () => ({ data: null, error: null }) },
+      functions: {
+        invoke: async (name: string) => {
+          w.invokes.push(name);
+          return { data: null, error: null };
+        },
+      },
       rpc: async () => ({ data: null, error: null }),
     },
   };
@@ -195,6 +204,85 @@ describe("call status after the other person answers", () => {
 });
 
 describe("caller: Calling until the other phone rings", () => {
+  it("caller hears the calling tone, then the ringback once the other phone rings", async () => {
+    w.ringingAt = null;
+    w.tones = [];
+    render(
+      <MemoryRouter initialEntries={["/call/conv-1"]}>
+        <CallSession params={callerParams(false) as never} />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getAllByText("Calling…").length).toBeGreaterThan(0));
+    expect(w.tones[w.tones.length - 1]).toBe("calling");
+    w.ringingAt = "2026-10-26T10:00:02Z";
+    await act(async () => {
+      w.statusListeners[w.statusListeners.length - 1]({ new: { status: "ringing", callee_ringing_at: w.ringingAt } as never });
+    });
+    await waitFor(() => expect(w.tones[w.tones.length - 1]).toBe("ringing"));
+  });
+
+  it("sends the call alert again after 8 s and 20 s while the other phone hasn't rung", async () => {
+    w.ringingAt = null;
+    w.invokes = [];
+    const later: { delay: number; fn: () => void }[] = [];
+    const real = window.setTimeout;
+    const spy = vi.spyOn(window, "setTimeout").mockImplementation(((fn: () => void, delay?: number) => {
+      if (delay === 8_000 || delay === 20_000) {
+        later.push({ delay, fn });
+        return 0;
+      }
+      return real(fn, delay);
+    }) as typeof window.setTimeout);
+    try {
+      render(
+        <MemoryRouter initialEntries={["/call/conv-1"]}>
+          <CallSession params={callerParams(false) as never} />
+        </MemoryRouter>,
+      );
+      await waitFor(() => expect(w.invokes.filter((n) => n === "send-call-push").length).toBe(1));
+      expect(later.map((l) => l.delay)).toEqual([8_000, 20_000]);
+      await act(async () => {
+        later.forEach((l) => l.fn());
+      });
+      await waitFor(() => expect(w.invokes.filter((n) => n === "send-call-push").length).toBe(3));
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("doesn't send it again once the other phone rings", async () => {
+    w.ringingAt = null;
+    w.invokes = [];
+    const later: (() => void)[] = [];
+    const real = window.setTimeout;
+    const spy = vi.spyOn(window, "setTimeout").mockImplementation(((fn: () => void, delay?: number) => {
+      if (delay === 8_000 || delay === 20_000) {
+        later.push(fn);
+        return 0;
+      }
+      return real(fn, delay);
+    }) as typeof window.setTimeout);
+    try {
+      render(
+        <MemoryRouter initialEntries={["/call/conv-1"]}>
+          <CallSession params={callerParams(false) as never} />
+        </MemoryRouter>,
+      );
+      await waitFor(() => expect(w.invokes.filter((n) => n === "send-call-push").length).toBe(1));
+      w.ringingAt = "2026-10-26T10:00:02Z";
+      await act(async () => {
+        w.statusListeners[w.statusListeners.length - 1]({ new: { status: "ringing", callee_ringing_at: w.ringingAt } as never });
+      });
+      await waitFor(() => expect(shows("Ringing…")).toBe(true));
+      await act(async () => {
+        later.forEach((fn) => fn());
+      });
+      expect(w.invokes.filter((n) => n === "send-call-push").length).toBe(1);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it("shows Calling… while unconfirmed, then Ringing… once the other phone reports it", async () => {
     w.ringingAt = null;
     render(

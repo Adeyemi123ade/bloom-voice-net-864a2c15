@@ -45,8 +45,12 @@ public class CallNotificationHelper {
     }
 
     static void showIncomingCall(Context context, Map<String, String> data) {
-        String channelId = ringChannel(context);
         String callId = data.get("callId");
+        // The caller's phone sends the call alert again if this phone hasn't
+        // rung within a few seconds; when it is already ringing, the repeat
+        // changes nothing (the ringtone doesn't restart).
+        if (isRinging(context, notificationId(callId))) return;
+        String channelId = ringChannel(context);
         String callerName = data.get("callerName") == null ? "Someone" : data.get("callerName");
         boolean isVideo = "video".equals(data.get("callType"));
         int id = notificationId(callId);
@@ -205,6 +209,17 @@ public class CallNotificationHelper {
                 if (ringing) nm.cancel(n.getTag(), n.getId());
             }
         } catch (Throwable ignored) {}
+    }
+
+    private static boolean isRinging(Context context, int id) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return false;
+        try {
+            NotificationManager nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+            for (StatusBarNotification n : nm.getActiveNotifications()) {
+                if (n.getId() == id) return true;
+            }
+        } catch (Throwable ignored) {}
+        return false;
     }
 
     private static Uri defaultToneUri(Context context) {

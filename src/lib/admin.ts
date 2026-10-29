@@ -89,7 +89,7 @@ export async function amIAdmin(): Promise<boolean> {
  * the same pull request as every new file in supabase/migrations (a test
  * checks this), and every migration records itself in app_migrations.
  */
-export const EXPECTED_DB_VERSION = "20261028090000";
+export const EXPECTED_DB_VERSION = "20261028200000";
 
 export type DbVersion =
   | { state: "ok"; live: string }
