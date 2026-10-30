@@ -736,7 +736,14 @@ paths:
                     properties:
                       blocked:
                         type: string
-                        enum: [suspended, too_new, daily_limit]
+                        description: >-
+                          Decided by the database (paid_call_check): the person's
+                          plan, dial pad switch, new account wait, one call at a
+                          time, daily minutes and minute balance.
+                        enum: [suspended, "off", too_new, busy, daily_limit, no_balance, error]
+                      daily_minutes:
+                        type: [integer, "null"]
+                        description: The person's daily minutes, sent with daily_limit.
               examples:
                 refused:
                   value: { blocked: too_new }

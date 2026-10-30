@@ -7,6 +7,7 @@ import type { TextKey } from "@/lib/i18n/strings";
 // of "who I blocked" so screens can show the right controls at once.
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { callRpc } from "@/lib/rpc";
 import { loadCachedContacts, loadManualContacts } from "@/lib/deviceContacts";
 import { loadMatchCache } from "@/lib/contactMatchCache";
 
@@ -266,4 +267,29 @@ export async function acceptChat(conversationId: string): Promise<void> {
     .from("accepted_chats")
     .upsert({ user_id: me, conversation_id: conversationId }, { onConflict: "user_id,conversation_id", ignoreDuplicates: true });
   if (error) console.error("[safety] accept failed", error);
+}
+
+// ── Accounts closed by ChiChat ──────────────────────────────────────────
+
+/**
+ * React hook: true when this chat partner's account was removed by ChiChat.
+ * Their earlier messages stay; the message box is replaced by a short line.
+ * The database refuses new messages and calls either way; this only shows
+ * it. Unknown (offline, older server) counts as not removed.
+ */
+export function useIsAccountRemoved(userId: string | null | undefined): boolean {
+  const [removed, setRemoved] = useState(false);
+  useEffect(() => {
+    setRemoved(false);
+    if (!userId) return;
+    let cancelled = false;
+    void callRpc<string[]>("removed_chat_partners", { _ids: [userId] }).then(({ data, error }) => {
+      if (cancelled || error || !Array.isArray(data)) return;
+      setRemoved(data.includes(userId));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+  return removed;
 }

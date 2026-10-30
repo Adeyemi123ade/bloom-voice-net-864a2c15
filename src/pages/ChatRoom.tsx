@@ -7,7 +7,7 @@ import { type ForwardResult } from "@/components/chat/ForwardSheet";
 import type { EmojiClickData } from "emoji-picker-react";
 import { useTheme } from "next-themes";
 import MobileFrame from "@/components/MobileFrame";
-import { isBlockedError, isMessageRequest, useIsBlocked } from "@/lib/safety";
+import { isBlockedError, isMessageRequest, useIsAccountRemoved, useIsBlocked } from "@/lib/safety";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -99,6 +99,7 @@ export default function ChatRoom() {
     setRequestState(v);
   };
   const blockedByMe = useIsBlocked(other?.id);
+  const otherRemoved = useIsAccountRemoved(other?.id);
   const otherName = other?.display_name ?? t("chat.thisPerson");
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -1326,6 +1327,7 @@ export default function ChatRoom() {
         <ChatComposer
           {...{
             blockedByMe,
+            otherRemoved,
             other,
             otherName,
             setBlockOpen,

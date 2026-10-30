@@ -516,6 +516,10 @@ export default function CallSession({
         fail(tNow("cs.notAvailable"), tNow("cs.cantCall"));
         return;
       }
+      if (savedCall.result === "calls-off") {
+        fail(tNow("cs.notAvailable"), tNow("cs.callsOff"));
+        return;
+      }
       if (savedCall.result === "limited") {
         fail(tNow("cs.notAvailable"), tNow("lim.calls"));
         return;

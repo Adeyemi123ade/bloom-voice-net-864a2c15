@@ -20,16 +20,27 @@ export function isCallableNumber(raw: string): boolean {
   return ALLOWED.some((re) => re.test(e164));
 }
 
-export type PaidCallBlock = "country" | "too_new" | "daily_limit";
+export type PaidCallBlock = "country" | "off" | "too_new" | "busy" | "daily_limit" | "no_balance";
+
+/** Refusals the server can send back (twilio-voice-token `blocked`). */
+export function isPaidCallBlock(v: unknown): v is Exclude<PaidCallBlock, "country"> {
+  return v === "off" || v === "too_new" || v === "busy" || v === "daily_limit" || v === "no_balance";
+}
 
 /** Plain wording shown to the person when a phone call can't be made. */
-export function paidCallMessage(reason: PaidCallBlock): string {
+export function paidCallMessage(reason: PaidCallBlock, dailyMinutes?: number | null): string {
   switch (reason) {
     case "country":
       return tNow("pc.country");
+    case "off":
+      return tNow("pc.off");
     case "too_new":
       return tNow("pc.tooNew");
+    case "busy":
+      return tNow("pc.busy");
+    case "no_balance":
+      return tNow("pc.noBalance");
     case "daily_limit":
-      return tNow("pc.dailyLimit");
+      return tNow("pc.dailyLimit", { n: String(dailyMinutes && dailyMinutes > 0 ? dailyMinutes : 20) });
   }
 }

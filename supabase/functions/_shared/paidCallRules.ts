@@ -16,16 +16,77 @@ export const ALLOWED_COUNTRIES: { code: string; name: string; pattern: RegExp }[
   { code: "971", name: "UAE", pattern: /^\+971(5\d{8}|[234679]\d{7})$/ },
 ];
 
-/** Minutes of paid calls one person may use per day (UTC day). */
-export const DAILY_LIMIT_SECONDS = 30 * 60;
-
 /** Longest single paid call. */
 export const MAX_CALL_SECONDS = 30 * 60;
 
-/** New accounts wait this long before they can make paid calls. */
+/** New accounts wait this long before they can make paid calls (unless an
+ *  admin switched the dial pad on for them or they are on Premium). */
 export const NEW_ACCOUNT_WAIT_MS = 24 * 60 * 60 * 1000;
 
-export type PaidCallRefusal = "country" | "too_new" | "daily_limit";
+/** Why a dial pad call can't be made. Everything except "country" comes
+ *  from the database (paid_call_check), where each person's plan, switch,
+ *  daily minutes and balance are kept. */
+export type PaidCallRefusal =
+  | "country"
+  | "suspended"
+  | "off"
+  | "too_new"
+  | "busy"
+  | "daily_limit"
+  | "no_balance"
+  | "error";
+
+export type PaidCallDecision =
+  | { allowed: true; seconds: number; id?: string }
+  | { allowed: false; reason: PaidCallRefusal; dailyMinutes?: number };
+
+const KNOWN: PaidCallRefusal[] = ["suspended", "off", "too_new", "busy", "daily_limit", "no_balance"];
+
+/** Reads the database answer. Anything unexpected refuses the call. */
+export function readDecision(data: unknown): PaidCallDecision {
+  const d = (data ?? {}) as Record<string, unknown>;
+  if (d.allowed === true) {
+    const seconds = Number(d.seconds ?? d.seconds_left);
+    if (!Number.isFinite(seconds) || seconds < 30) return { allowed: false, reason: "error" };
+    return {
+      allowed: true,
+      seconds: Math.min(Math.floor(seconds), MAX_CALL_SECONDS),
+      id: typeof d.id === "string" ? d.id : undefined,
+    };
+  }
+  const reason = KNOWN.includes(d.reason as PaidCallRefusal) ? (d.reason as PaidCallRefusal) : "error";
+  const dailyMinutes = Number(d.daily_minutes);
+  return Number.isFinite(dailyMinutes)
+    ? { allowed: false, reason, dailyMinutes }
+    : { allowed: false, reason };
+}
+
+/** May this person start a dial pad call now? (Nothing is recorded.) */
+// deno-lint-ignore no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function checkPaidCall(admin: any, userId: string): Promise<PaidCallDecision> {
+  const { data, error } = await admin.rpc("paid_call_check", { _uid: userId });
+  if (error) {
+    console.error("paid_call_check failed", error.message);
+    return { allowed: false, reason: "error" };
+  }
+  return readDecision(data);
+}
+
+/** Check and record the call in one database step, so two calls at once
+ *  can't both pass the limits. */
+// deno-lint-ignore no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function beginPaidCall(admin: any, userId: string, to: string, callSid: string | null): Promise<PaidCallDecision> {
+  const { data, error } = await admin.rpc("paid_call_begin", { _uid: userId, _to: to, _call_sid: callSid });
+  if (error) {
+    console.error("paid_call_begin failed", error.message);
+    return { allowed: false, reason: "error" };
+  }
+  const decision = readDecision(data);
+  if (decision.allowed && !decision.id) return { allowed: false, reason: "error" };
+  return decision;
+}
 
 export function normaliseNumber(raw: string): string {
   const trimmed = (raw ?? "").trim();
@@ -37,69 +98,4 @@ export function normaliseNumber(raw: string): string {
 
 export function isAllowedNumber(e164: string): boolean {
   return ALLOWED_COUNTRIES.some((c) => c.pattern.test(e164));
-}
-
-export function isAccountTooNew(createdAt: string | null | undefined, now = Date.now()): boolean {
-  if (!createdAt) return true;
-  const t = Date.parse(createdAt);
-  if (Number.isNaN(t)) return true;
-  return now - t < NEW_ACCOUNT_WAIT_MS;
-}
-
-export function startOfUtcDay(now = new Date()): string {
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString();
-}
-
-type UsageRow = { started_at: string; duration_seconds: number | null; max_seconds: number };
-
-/** Seconds used today. A call still running (or whose end report never
- *  arrived) counts for the time since it started, up to its own limit. */
-export function secondsUsed(rows: UsageRow[], now = Date.now()): number {
-  let total = 0;
-  for (const r of rows) {
-    if (r.duration_seconds != null) {
-      total += Math.max(0, r.duration_seconds);
-    } else {
-      const elapsed = Math.floor((now - Date.parse(r.started_at)) / 1000);
-      total += Math.max(0, Math.min(elapsed, r.max_seconds));
-    }
-  }
-  return total;
-}
-
-// deno-lint-ignore no-explicit-any
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function loadUsage(admin: any, userId: string): Promise<number> {
-  const { data, error } = await admin
-    .from("outbound_calls")
-    .select("started_at, duration_seconds, max_seconds")
-    .eq("user_id", userId)
-    .gte("started_at", startOfUtcDay());
-  if (error) throw new Error(`usage lookup failed: ${error.message}`);
-  return secondsUsed((data ?? []) as UsageRow[]);
-}
-
-// deno-lint-ignore no-explicit-any
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function loadAccountCreatedAt(admin: any, userId: string): Promise<string | null> {
-  const { data, error } = await admin.auth.admin.getUserById(userId);
-  if (error) throw new Error(`user lookup failed: ${error.message}`);
-  return data?.user?.created_at ?? null;
-}
-
-/** True when an admin suspended this account. Treated as not suspended if it can't be checked. */
-// deno-lint-ignore no-explicit-any
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function isAccountSuspended(admin: any, userId: string): Promise<boolean> {
-  try {
-    const { data, error } = await admin
-      .from("account_status")
-      .select("status")
-      .eq("user_id", userId)
-      .maybeSingle();
-    if (error) return false;
-    return data?.status === "suspended";
-  } catch {
-    return false;
-  }
 }

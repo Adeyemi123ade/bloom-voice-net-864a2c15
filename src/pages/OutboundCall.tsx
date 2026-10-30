@@ -12,7 +12,7 @@ import SaveContactDialog from "@/components/SaveContactDialog";
 import { loadManualContacts, loadCachedContacts } from "@/lib/deviceContacts";
 import { startCallForegroundService, stopCallForegroundService } from "@/lib/nativeCalls";
 import { isOffline, useIsOnline } from "@/lib/network";
-import { isCallableNumber, paidCallMessage, type PaidCallBlock } from "@/lib/paidCallRules";
+import { isCallableNumber, isPaidCallBlock, paidCallMessage, type PaidCallBlock } from "@/lib/paidCallRules";
 
 const callFailedText = () => tNow("oc.failed");
 
@@ -69,8 +69,8 @@ export default function OutboundCall() {
     dialedRef.current = true;
     let cancelled = false;
 
-    const refuse = (reason: PaidCallBlock) => {
-      setErrorMsg(paidCallMessage(reason));
+    const refuse = (reason: PaidCallBlock, dailyMinutes?: number | null) => {
+      setErrorMsg(paidCallMessage(reason, dailyMinutes));
       endLocally("failed");
     };
 
@@ -90,8 +90,8 @@ export default function OutboundCall() {
           body: {},
         });
         if (cancelled) return;
-        if (data?.blocked === "too_new" || data?.blocked === "daily_limit") {
-          refuse(data.blocked);
+        if (isPaidCallBlock(data?.blocked)) {
+          refuse(data.blocked, typeof data?.daily_minutes === "number" ? data.daily_minutes : null);
           return;
         }
         if (data?.blocked === "suspended") {

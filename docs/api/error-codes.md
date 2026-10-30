@@ -30,7 +30,7 @@ can show a plain message. Always check for `error` or `blocked`:
 | Endpoint | 200 body that means refused |
 |---|---|
 | `check-registration-availability` | `{ "error": "invalid_details" }` |
-| `twilio-voice-token` | `{ "blocked": "suspended" \| "too_new" \| "daily_limit" }` |
+| `twilio-voice-token` | `{ "blocked": "suspended" \| "off" \| "too_new" \| "busy" \| "daily_limit" \| "no_balance" \| "error", "daily_minutes": 20 }` |
 | `twilio-voice-twiml` | Spoken refusal (`<Say>…</Say><Hangup/>`) |
 
 ## Codes by status

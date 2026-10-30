@@ -1,13 +1,7 @@
 // Mints a Twilio Voice SDK access token bound to a TwiML App for outbound PSTN calls.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
 import { create, getNumericDate } from "https://deno.land/x/djwt@v3.0.2/mod.ts";
-import {
-  isAccountSuspended,
-  DAILY_LIMIT_SECONDS,
-  isAccountTooNew,
-  loadAccountCreatedAt,
-  loadUsage,
-} from "../_shared/paidCallRules.ts";
+import { checkPaidCall } from "../_shared/paidCallRules.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -57,22 +51,14 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
-    if (await isAccountSuspended(admin, userId)) {
-      return new Response(JSON.stringify({ blocked: "suspended" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    const createdAt = await loadAccountCreatedAt(admin, userId);
-    if (isAccountTooNew(createdAt)) {
-      return new Response(JSON.stringify({ blocked: "too_new" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    const used = await loadUsage(admin, userId);
-    if (used >= DAILY_LIMIT_SECONDS) {
-      return new Response(JSON.stringify({ blocked: "daily_limit" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    // Plan, dial pad switch, new account wait, one call at a time, daily
+    // minutes and balance: all decided by the database (paid_call_check).
+    const decision = await checkPaidCall(admin, userId);
+    if (!decision.allowed) {
+      return new Response(
+        JSON.stringify({ blocked: decision.reason, daily_minutes: decision.dailyMinutes ?? null }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
 
     const now = Math.floor(Date.now() / 1000);

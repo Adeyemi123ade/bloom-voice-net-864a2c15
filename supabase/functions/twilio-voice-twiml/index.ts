@@ -24,22 +24,13 @@
 // runs behind a proxy that rewrites the path seen by `req.url`.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
-import {
-  DAILY_LIMIT_SECONDS,
-  MAX_CALL_SECONDS,
-  isAccountTooNew,
-  isAllowedNumber,
-  isAccountSuspended,
-  loadAccountCreatedAt,
-  loadUsage,
-  normaliseNumber,
-} from "../_shared/paidCallRules.ts";
+import { beginPaidCall, isAllowedNumber, normaliseNumber } from "../_shared/paidCallRules.ts";
 
-// Paid-call limits (see _shared/paidCallRules.ts): only allowed countries,
-// a daily minutes cap per person, a maximum call length, and no paid calls
-// in an account's first 24 hours. Each call is recorded in outbound_calls;
-// Twilio reports the real length back to this function (the <Dial action>
-// below) when the call ends.
+// Paid-call limits: only allowed countries (checked here), then the
+// person's plan, dial pad switch, new account wait, one call at a time,
+// daily minutes and balance, checked and recorded in one database step
+// (paid_call_begin). Twilio reports the real length back to this function
+// (the <Dial action> below) when the call ends.
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -180,36 +171,26 @@ Deno.serve(async (req) => {
       return sayAndHangUp("Calls to this number are not available.");
     }
 
-    if (await isAccountSuspended(admin, userId)) {
-      return sayAndHangUp("This call can't be made.");
+    const decision = await beginPaidCall(admin, userId, to, params["CallSid"] ?? null);
+    if (!decision.allowed) {
+      switch (decision.reason) {
+        case "too_new":
+          return sayAndHangUp("Phone calls are available 24 hours after you join ChiChat.");
+        case "daily_limit":
+          return sayAndHangUp("You have used today's phone call minutes. Please try again tomorrow.");
+        case "no_balance":
+          return sayAndHangUp("You have no phone call minutes left.");
+        case "busy":
+          return sayAndHangUp("You are already on a phone call.");
+        case "error":
+          // Fail closed: if the call can't be counted, it isn't placed.
+          return sayAndHangUp("This call cannot be made right now. Please try again.");
+        default:
+          return sayAndHangUp("This call can't be made.");
+      }
     }
-
-    const createdAt = await loadAccountCreatedAt(admin, userId);
-    if (isAccountTooNew(createdAt)) {
-      return sayAndHangUp("Phone calls are available 24 hours after you join ChiChat.");
-    }
-
-    const remaining = DAILY_LIMIT_SECONDS - (await loadUsage(admin, userId));
-    if (remaining < 30) {
-      return sayAndHangUp("You have used today's phone call minutes. Please try again tomorrow.");
-    }
-    const limit = Math.min(MAX_CALL_SECONDS, remaining);
-
-    const { data: row, error: insErr } = await admin
-      .from("outbound_calls")
-      .insert({
-        user_id: userId,
-        to_number: to,
-        call_sid: params["CallSid"] ?? null,
-        max_seconds: limit,
-      })
-      .select("id")
-      .single();
-    if (insErr || !row) {
-      // Fail closed: if the call can't be counted, it isn't placed.
-      console.error("twilio-voice-twiml: could not record call", insErr?.message);
-      return sayAndHangUp("This call cannot be made right now. Please try again.");
-    }
+    const limit = decision.seconds;
+    const row = { id: decision.id as string };
 
     const action = `${baseUrl(req)}?event=done&id=${encodeURIComponent(row.id)}`;
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>

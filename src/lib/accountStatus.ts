@@ -19,6 +19,12 @@ export function isLimitError(err: unknown): boolean {
   return !!e && (e.hint === "chichat_limit" || e.message === "limit");
 }
 
+/** The database refused a call because an admin switched calls off for this account. */
+export function isCallsOffError(err: unknown): boolean {
+  const e = err as DbRefusal;
+  return !!e && (e.hint === "chichat_calls_off" || e.message === "calls_off");
+}
+
 /** Sign-up or a phone number refused because the details belong to a suspended account. */
 export function isBannedError(err: unknown): boolean {
   const e = err as DbRefusal;

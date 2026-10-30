@@ -5,6 +5,7 @@
 // (default techpath411@gmail.com) and REPORTS_FROM (default
 // "ChiChat <noreply@chichatapp.com>").
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
+import { originOfRequest } from "../_shared/requestOrigin.ts";
 import { checkRateLimit } from "../_shared/rateLimit.ts";
 
 const corsHeaders = {
@@ -119,6 +120,7 @@ Deno.serve(async (req) => {
         reason,
         details: details || null,
         also_blocked: alsoBlocked,
+        origin: originOfRequest(req),
       })
       .select("id, created_at")
       .single();
