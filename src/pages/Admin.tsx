@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
@@ -27,7 +28,6 @@ import {
   EXPECTED_DB_VERSION,
   loadDbVersion,
   loadOverview,
-  restoreUser,
   screenshotLink,
   setFeedbackStatus,
   setReportStatus,
@@ -40,6 +40,7 @@ import {
   type DbVersion,
   type Overview,
 } from "@/lib/admin";
+import PersonDialog from "@/components/admin/PersonDialog";
 import NotFound from "./NotFound";
 
 /**
@@ -77,6 +78,9 @@ export default function Admin() {
   const [dbVersion, setDbVersion] = useState<DbVersion | null>(null);
   const [suspendTarget, setSuspendTarget] = useState<SuspendTarget | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  // Test accounts and anything sent from a preview link or a local copy are
+  // hidden unless this is on.
+  const [showTest, setShowTest] = useState(false);
 
   useEffect(() => {
     document.title = "Admin — Chichat";
@@ -138,12 +142,23 @@ export default function Admin() {
             <Stat label="People" value={overview.users} />
             <Stat label="New this week" value={overview.new_users_7d} />
             <Stat label="Suspended" value={overview.suspended} />
+            {overview.removed != null && <Stat label="Removed" value={overview.removed} />}
             <Stat label="Open reports" value={overview.open_reports} warn={overview.open_reports > 0} />
             <Stat label="New feedback" value={overview.new_feedback} warn={overview.new_feedback > 0} />
             <Stat label="Problems (24 h)" value={overview.errors_24h} warn={overview.errors_24h > 0} />
             <Stat label="Paid minutes today" value={overview.paid_minutes_today} />
           </div>
         )}
+
+        <label className="mx-4 mt-4 flex items-center justify-between gap-3 rounded-xl border border-border px-3 py-2 text-sm text-foreground">
+          <span>
+            Show test data
+            <span className="block text-xs text-muted-foreground">
+              Test accounts, and anything sent from a preview link or a laptop copy.
+            </span>
+          </span>
+          <Switch checked={showTest} onCheckedChange={setShowTest} />
+        </label>
 
         <Tabs defaultValue="reports" className="px-4 py-4">
           <TabsList className="w-full grid grid-cols-5 h-auto">
@@ -154,19 +169,19 @@ export default function Admin() {
             <TabsTrigger value="calls" className="text-xs px-1">Calls</TabsTrigger>
           </TabsList>
           <TabsContent value="reports">
-            <ReportsTab refreshKey={refreshKey} onSuspend={setSuspendTarget} onChanged={refresh} />
+            <ReportsTab refreshKey={refreshKey} showTest={showTest} onSuspend={setSuspendTarget} onChanged={refresh} />
           </TabsContent>
           <TabsContent value="people">
-            <PeopleTab refreshKey={refreshKey} myId={user?.id} onSuspend={setSuspendTarget} onChanged={refresh} />
+            <PeopleTab refreshKey={refreshKey} myId={user?.id} onChanged={refresh} />
           </TabsContent>
           <TabsContent value="feedback">
-            <FeedbackTab refreshKey={refreshKey} onChanged={refresh} />
+            <FeedbackTab refreshKey={refreshKey} showTest={showTest} onChanged={refresh} />
           </TabsContent>
           <TabsContent value="problems">
-            <ProblemsTab refreshKey={refreshKey} />
+            <ProblemsTab refreshKey={refreshKey} showTest={showTest} />
           </TabsContent>
           <TabsContent value="calls">
-            <CallsTab refreshKey={refreshKey} />
+            <CallsTab refreshKey={refreshKey} showTest={showTest} />
           </TabsContent>
         </Tabs>
 
@@ -228,7 +243,7 @@ function Card({ children }: { children: React.ReactNode }) {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const bad = status === "suspended" || status === "open" || status === "new";
+  const bad = status === "suspended" || status === "removed" || status === "open" || status === "new";
   return (
     <span
       className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
@@ -238,6 +253,13 @@ function StatusBadge({ status }: { status: string }) {
       {status}
     </span>
   );
+}
+
+/** Marks rows that count as test data (shown only with "Show test data"). */
+function TestTag({ origin, isTest }: { origin?: string; isTest?: boolean }) {
+  if (!isTest && origin !== "preview" && origin !== "local") return null;
+  const label = origin === "preview" ? "preview link" : origin === "local" ? "laptop copy" : "test account";
+  return <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">{label}</span>;
 }
 
 function useList<T>(load: () => Promise<{ data: T[] | null; error: { message: string } | null }>, deps: unknown[]) {
@@ -260,15 +282,17 @@ function useList<T>(load: () => Promise<{ data: T[] | null; error: { message: st
 
 function ReportsTab({
   refreshKey,
+  showTest,
   onSuspend,
   onChanged,
 }: {
   refreshKey: number;
+  showTest: boolean;
   onSuspend: (t: SuspendTarget) => void;
   onChanged: () => void;
 }) {
   const [onlyOpen, setOnlyOpen] = useState(true);
-  const rows = useList<AdminReport>(() => listReports(onlyOpen ? "open" : ""), [onlyOpen, refreshKey]);
+  const rows = useList<AdminReport>(() => listReports(onlyOpen ? "open" : "", showTest), [onlyOpen, showTest, refreshKey]);
 
   const mark = async (id: string, status: AdminReport["status"]) => {
     const { error } = await setReportStatus(id, status);
@@ -295,6 +319,7 @@ function ReportsTab({
           <Card key={r.id}>
             <div className="flex items-center gap-2">
               <p className="text-sm font-semibold text-foreground flex-1">{REASONS[r.reason] ?? r.reason}</p>
+              <TestTag origin={r.origin} isTest={r.is_test} />
               <StatusBadge status={r.status} />
             </div>
             <p className="text-xs text-muted-foreground">{when(r.created_at)}</p>
@@ -326,7 +351,7 @@ function ReportsTab({
                   Reopen
                 </Button>
               )}
-              {r.reported_user_id && r.reported_status !== "suspended" && (
+              {r.reported_user_id && r.reported_status === "active" && (
                 <Button
                   size="sm"
                   variant="destructive"
@@ -346,26 +371,23 @@ function ReportsTab({
 function PeopleTab({
   refreshKey,
   myId,
-  onSuspend,
   onChanged,
 }: {
   refreshKey: number;
   myId?: string;
-  onSuspend: (t: SuspendTarget) => void;
   onChanged: () => void;
 }) {
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState("");
+  const [open, setOpen] = useState<AdminUser | null>(null);
   const rows = useList<AdminUser>(() => findUsers(search), [search, refreshKey]);
 
-  const restore = async (u: AdminUser) => {
-    const { error } = await restoreUser(u.id);
-    if (error) toast({ title: "Couldn't restore the account" });
-    else {
-      toast({ title: `${u.display_name ?? u.email} restored` });
-      onChanged();
-    }
-  };
+  // Keep the open person's row fresh after a change (status, tags).
+  useEffect(() => {
+    if (!open || !rows) return;
+    const fresh = rows.find((r) => r.id === open.id);
+    if (fresh && fresh !== open) setOpen(fresh);
+  }, [rows, open]);
 
   return (
     <div className="flex flex-col gap-3 pt-2">
@@ -390,6 +412,8 @@ function PeopleTab({
           <Card key={u.id}>
             <div className="flex items-center gap-2">
               <p className="text-sm font-semibold text-foreground flex-1 truncate">{u.display_name ?? "No name"}</p>
+              {u.is_admin && <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary">admin</span>}
+              <TestTag isTest={u.is_test} />
               <StatusBadge status={u.status} />
             </div>
             <p className="text-xs text-muted-foreground break-all">
@@ -399,35 +423,28 @@ function PeopleTab({
               Joined {when(u.created_at)} · last sign-in {when(u.last_sign_in_at)}
               {u.reports_against > 0 ? ` · reported ${u.reports_against}×` : ""}
             </p>
-            {u.status === "suspended" && u.status_reason && (
-              <p className="text-xs text-destructive">Reason: {u.status_reason}</p>
+            {u.plan != null && (
+              <p className="text-xs text-muted-foreground">
+                {u.plan === "premium" ? "Premium" : "Free"} · dial pad {u.dial_pad ? "on" : "off"}
+                {u.app_calls === false ? " · app calls off" : ""}
+              </p>
             )}
-            {u.id !== myId && (
-              <div className="flex gap-2 pt-1">
-                {u.status === "suspended" ? (
-                  <Button size="sm" variant="outline" onClick={() => void restore(u)}>
-                    Restore
-                  </Button>
-                ) : (
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => onSuspend({ id: u.id, name: u.display_name ?? u.email ?? "this person" })}
-                  >
-                    Suspend
-                  </Button>
-                )}
-              </div>
-            )}
+            {u.status !== "active" && u.status_reason && <p className="text-xs text-destructive">Reason: {u.status_reason}</p>}
+            <div className="flex gap-2 pt-1">
+              <Button size="sm" variant="outline" onClick={() => setOpen(u)}>
+                Manage
+              </Button>
+            </div>
           </Card>
         ))
       )}
+      <PersonDialog person={open} myId={myId} onClose={() => setOpen(null)} onChanged={onChanged} />
     </div>
   );
 }
 
-function FeedbackTab({ refreshKey, onChanged }: { refreshKey: number; onChanged: () => void }) {
-  const rows = useList<AdminFeedback>(() => listFeedback(), [refreshKey]);
+function FeedbackTab({ refreshKey, showTest, onChanged }: { refreshKey: number; showTest: boolean; onChanged: () => void }) {
+  const rows = useList<AdminFeedback>(() => listFeedback(showTest), [showTest, refreshKey]);
   const [shots, setShots] = useState<Record<string, string>>({});
 
   const openShot = async (f: AdminFeedback) => {
@@ -455,6 +472,7 @@ function FeedbackTab({ refreshKey, onChanged }: { refreshKey: number; onChanged:
         <Card key={f.id}>
           <div className="flex items-center gap-2">
             <p className="text-sm font-semibold text-foreground flex-1">{FEEDBACK_KINDS[f.category] ?? f.category}</p>
+            <TestTag origin={f.origin} isTest={f.is_test} />
             <StatusBadge status={f.status} />
           </div>
           <p className="text-xs text-muted-foreground">
@@ -491,8 +509,8 @@ function FeedbackTab({ refreshKey, onChanged }: { refreshKey: number; onChanged:
   );
 }
 
-function ProblemsTab({ refreshKey }: { refreshKey: number }) {
-  const rows = useList<AppProblem>(() => listProblems(), [refreshKey]);
+function ProblemsTab({ refreshKey, showTest }: { refreshKey: number; showTest: boolean }) {
+  const rows = useList<AppProblem>(() => listProblems(showTest), [showTest, refreshKey]);
   const [open, setOpen] = useState<string | null>(null);
   if (rows === null) return <Busy />;
   if (rows.length === 0) return <Empty text="No problems recorded." />;
@@ -502,6 +520,7 @@ function ProblemsTab({ refreshKey }: { refreshKey: number }) {
         <Card key={p.id}>
           <button className="text-left" onClick={() => setOpen(open === p.id ? null : p.id)}>
             <p className="text-sm font-semibold text-foreground break-words">{p.message}</p>
+            <TestTag origin={p.origin} isTest={p.is_test} />
             <p className="text-xs text-muted-foreground">
               {p.times}× · last {when(p.last_seen_at)} · {p.platform ?? "?"} · version {p.app_build ?? "?"}
             </p>
@@ -520,12 +539,15 @@ function ProblemsTab({ refreshKey }: { refreshKey: number }) {
   );
 }
 
-function CallsTab({ refreshKey }: { refreshKey: number }) {
+function CallsTab({ refreshKey, showTest }: { refreshKey: number; showTest: boolean }) {
   const [days, setDays] = useState(1);
-  const rows = useList<CallMinutes>(() => callMinutes(days), [days, refreshKey]);
+  const rows = useList<CallMinutes>(() => callMinutes(days, showTest), [days, showTest, refreshKey]);
   return (
     <div className="flex flex-col gap-3 pt-2">
-      <p className="text-xs text-muted-foreground">Paid calls to phone numbers (dial pad). In-app calls aren't counted here.</p>
+      <p className="text-xs text-muted-foreground">
+            Paid calls to phone numbers (dial pad). In-app calls aren't counted here. To switch calls on or off or change minutes for
+            someone, open them in People.
+          </p>
       <div className="flex gap-2">
         {[1, 7, 30].map((d) => (
           <Button key={d} size="sm" variant={days === d ? "default" : "outline"} onClick={() => setDays(d)}>
@@ -542,7 +564,7 @@ function CallsTab({ refreshKey }: { refreshKey: number }) {
           <Card key={c.user_id}>
             <div className="flex items-center gap-2">
               <p className="text-sm font-semibold text-foreground flex-1 truncate">{c.display_name ?? c.email ?? "Unknown"}</p>
-              <p className={`text-sm font-bold ${days === 1 && c.minutes >= 30 ? "text-destructive" : "text-foreground"}`}>
+              <p className={`text-sm font-bold ${days === 1 && c.minutes >= 20 ? "text-destructive" : "text-foreground"}`}>
                 {c.minutes} min
               </p>
             </div>

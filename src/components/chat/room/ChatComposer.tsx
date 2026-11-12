@@ -12,11 +12,14 @@ import type { Message, Profile } from "@/lib/chat/chatRoomData";
 
 /**
  * Bottom of the chat: the message box with attach, emoji, send and voice
- * note controls, or the blocked bar, or the message request bar; and the
+ * note controls, or the removed account line, the blocked bar, or the
+ * message request bar; and the
  * emoji panel under it.
  */
 export interface ChatComposerProps {
   blockedByMe: boolean;
+  /** The other person's account was removed by ChiChat. */
+  otherRemoved?: boolean;
   other: Profile | null;
   otherName: string;
   setBlockOpen: React.Dispatch<React.SetStateAction<boolean>>;
@@ -53,6 +56,7 @@ export interface ChatComposerProps {
 
 export default function ChatComposer({
   blockedByMe,
+  otherRemoved = false,
   other,
   otherName,
   setBlockOpen,
@@ -89,7 +93,11 @@ export default function ChatComposer({
   const { t } = useLanguage();
   return (
     <>
-      {blockedByMe && other ? (
+      {otherRemoved && other ? (
+        <div className="px-4 pt-3 pb-5 border-t border-border bg-background text-center">
+          <p className="text-sm text-muted-foreground">{t("chat.accountGone")}</p>
+        </div>
+      ) : blockedByMe && other ? (
         <div
           className="px-4 pt-3 pb-5 border-t border-border bg-background text-center"
           onClick={(e) => e.stopPropagation()}

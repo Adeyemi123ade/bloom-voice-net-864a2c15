@@ -48,6 +48,8 @@ async function signInDirect(email: string, password: string) {
   // "wrong password" too, which hid the real cause: pass it on as it is.
   const code = (error as { code?: string }).code ?? "";
   if (code === "invalid_credentials" || msg.includes("invalid login credentials")) return { data: null, errorCode: "wrong_password" };
+  // An account closed by ChiChat: the sign-in service itself refuses it.
+  if (code === "user_banned" || msg.includes("banned")) return { data: null, errorCode: "account_closed" };
   reportProblem("login", `signInWithPassword: ${error.status ?? ""} ${code} ${error.message}`.trim());
   return { data: null, errorCode: error.message || "unknown_error" };
 }
@@ -170,7 +172,10 @@ export default function Login() {
       let title = t("login.notRecognizedTitle");
       let description = t("login.notRecognizedBody");
 
-      if (raw.includes("sign_in_timed_out")) {
+      if (raw.includes("account_closed")) {
+        title = t("sus.title");
+        description = t("sus.body");
+      } else if (raw.includes("sign_in_timed_out")) {
         // Used to fall through to "Account not recognized".
         title = t("login.offlineTitle");
         description = t("login.timeout");

@@ -1,7 +1,7 @@
 # ChiChat: project status
 
 Current state of the project for anyone picking it up (developers, testers,
-reviewers). Updated 2026-10-28. Update this file in the same pull request
+reviewers). Updated 2026-10-30. Update this file in the same pull request
 as any change that makes it wrong.
 
 ## What ChiChat is
@@ -16,7 +16,7 @@ Android app id `com.bloomvoicenet.chat` (permanent once on Google Play).
 | Database, sign-in, live updates, files | Supabase (Postgres, Auth, Realtime, Storage) |
 | Server code | 22 Supabase Edge Functions in `supabase/functions/` (list and shapes in `docs/openapi.yaml`) |
 | In-app voice and video calls | Agora (default since PR #75). Switch back with Vercel env `VITE_CALL_ENGINE=twilio` |
-| Calls to phone numbers (dial pad) | Twilio Voice. Nigeria and UAE only, 30 minutes a day, accounts older than 24 hours |
+| Calls to phone numbers (dial pad) | Twilio Voice. Nigeria and UAE only. Per person: plan (Free: dial pad off; Premium: on), switch, 20 minutes a day, 24 hour wait for new accounts unless switched on or Premium; one call at a time. Decided in the database (`paid_call_check`, `paid_call_begin`) |
 | Incoming call ringing when the app is closed | Firebase Cloud Messaging plus native Android code in `android/app/src/main/java/` |
 | Email | Resend (sign-up codes, password reset, reports to the support inbox) |
 | Voice note transcription | Speech-to-text API through `transcribe-voice` |
@@ -29,7 +29,7 @@ More detail: `docs/ARCHITECTURE.md`, `docs/DEPLOYMENT.md`, `docs/SECRETS.md`,
 - Accounts: register with email code, sign in, Google sign-in (account chooser; returning accounts go straight in, new ones finish the pre-filled form), forgot password with code, delete account (in the app and at `/delete-account`).
 - Chats: text, photos, videos, files, voice notes with transcription, reply, edit, copy and paste of media, forward, delete for me, delete for everyone, search, read ticks, typing, unread badges, chat backup, date pills between days with a floating date while scrolling, jump-to-latest button.
 - Calls: voice and video (switch to video either way; camera and microphone come back by themselves if they stop), loudspeaker/earpiece with headset and Bluetooth following (Android app; needs the APK with `CallAudioRoute.java`), call waiting with hold and swap, floating call window, call records in the chat, ringing on a locked phone, dial pad to phone numbers.
-- Safety: block, report (person, chat, message), message requests from people not in your contacts, account suspension and ban list, contact privacy ("Start a new chat" shows only people you chat with and your own contacts; phone numbers are visible only to their owner), limits for new accounts, admin page at `/admin` (admins only).
+- Safety: block, report (person, chat, message), message requests from people not in your contacts, account suspension and ban list, contact privacy ("Start a new chat" shows only people you chat with and your own contacts; phone numbers are visible only to their owner), limits for new accounts, admin page at `/admin` (admins only): per person suspend (optional end date), ban, remove for good, restore, call plan and dial pad switch, daily minutes, app to app calls switch (abuse only), minute balance (kept, not used yet), test account tag, history of admin actions. Test accounts and anything sent from preview links or laptop copies are hidden unless "Show test data" is on.
 - App: 15 languages (Arabic right to left), dark mode, automatic update when a new web version is live, problem reports, Send feedback, version shown in Settings.
 
 ## Version
@@ -64,6 +64,7 @@ Local run: `npm install`, `npm run dev` (http://localhost:8080). Tests:
 
 | Item | Where | State |
 | --- | --- | --- |
+| Admin controls per person, call plans, test data out of admin | `20261030090000_admin_controls_call_plans.sql`, `src/components/admin/PersonDialog.tsx`, branch `feat/admin-controls-call-plans` | Built, not merged. Order: run the SQL, deploy `twilio-voice-token`, `twilio-voice-twiml`, `submit-report`, merge, tag test accounts, run the test data cleanup. After the SQL the dial pad is off for everyone except the admin account until switched on per person. No new APK |
 | Security audit 2026-10-28 (secrets, history, RLS, functions, uploads, XSS, headers, dependencies) | `20261028200000_security_hardening.sql`, `vercel.json`, `src/lib/signedMedia.ts`, branch `fix/security-audit` | No secrets in code or history. Fixed: attachment `javascript:` links (account takeover), signed-out access to database functions, open chat-insert rule, phone blanking by direct write, upload limits, photo listing, security headers + CSP, Android backups, dependency updates, unused packages. Order: run the SQL, merge, then run the live security check. Open: React Router 7 and Vite/Vitest major upgrades; Google return link should require a sign-in started by the app (needs a phone test); turn on Supabase leaked-password protection |
 | Locked or long-idle phones: call screen silent, or no ring until opened (since 1.9 dropped the battery exemption, Oct 21) | `CallNotificationHelper.java`, `ChiChatMessagingService.java`, `CallActionReceiver.java`, `call-action`, `send-call-push` (merged 2026-10-28; needs the 1.12 APK) | The call notification now rings by itself (Android plays the channel sound; no background service, no battery setting); late call alerts show as missed; hang-up goes urgent. PR check now compiles the Android app. Order: deploy `call-action` and `send-call-push`, merge, build and install 1.12. After everyone has 1.12, the battery switch can leave the one-time call setup prompt |
 | Registered people shown as Invite: accounts with no phone number | `20261028090000_phone_required.sql` (merged 2026-10-28, SQL run) | Live check 2026-10-28: every migration applied, all 9 saved numbers correct, 3 Google sign-ins (Oct 22, 25, 26) with no number at all. Now every account must add a number before using the app (the check no longer lets people in when it fails); the server refuses messages and calls without one; Profile can't erase it; numbers saved as 00…, without + or as local numbers are read correctly; the phone book is checked at most every 30 minutes unless it changed; the database records which migrations ran (Admin shows it). Order: run the SQL, then merge. No function deploy, no new APK |
@@ -100,7 +101,9 @@ These live in dashboards. Check them before each tester round:
 
 ## Decisions on record
 
-- Paid calls: Nigeria and UAE only, 30 minutes a day, 24 hour wait for new accounts. In-app calls unlimited.
+- Paid calls (2026-10-30): Nigeria and UAE only. Free plan: dial pad off; Premium: on. 20 minutes a day, minute balance built but not charged yet. 24 hour wait for new accounts unless an admin switched the dial pad on or they are Premium. App to app calls on for everyone; the per person switch is for abuse only.
+- Removed accounts (2026-10-30): closed for good by an admin; their earlier messages stay in other people's chats under their real name. Accounts people delete themselves are still wiped completely.
+- Admin page shows real users only: test accounts are tagged, and preview and laptop data is hidden by default.
 - Reports and support inbox: techpath411@gmail.com.
 - Android browsers see a closable "use the app" suggestion; web keeps working.
 - Ringing keeps the media playback service type; change to a phone call service only if Google Play asks.
