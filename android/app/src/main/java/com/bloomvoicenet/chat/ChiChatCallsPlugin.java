@@ -68,6 +68,22 @@ public class ChiChatCallsPlugin extends Plugin {
         }
     }
 
+    /**
+     * Back on the main screen while a call is running: hide the app (like the
+     * Home button) instead of closing it, so the call keeps going.
+     */
+    @PluginMethod
+    public void moveToBackground(PluginCall call) {
+        try {
+            if (getActivity() != null) {
+                getActivity().runOnUiThread(() -> getActivity().moveTaskToBack(true));
+            }
+            call.resolve();
+        } catch (Throwable t) {
+            call.reject("Could not move to background: " + t.getMessage());
+        }
+    }
+
     @PluginMethod
     public void stopForegroundCall(PluginCall call) {
         try {

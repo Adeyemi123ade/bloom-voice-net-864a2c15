@@ -5,6 +5,7 @@ import { Capacitor, registerPlugin } from "@capacitor/core";
 interface ChiChatCallsPlugin {
   startForegroundCall(): Promise<void>;
   stopForegroundCall(): Promise<void>;
+  moveToBackground(): Promise<void>;
   requestIgnoreBatteryOptimizations(): Promise<{ ok: boolean }>;
   canUseFullScreenIntent(): Promise<{ granted: boolean }>;
   requestFullScreenIntentPermission(): Promise<{ ok: boolean }>;
@@ -44,6 +45,20 @@ export async function startCallForegroundService(): Promise<void> {
     await ChiChatCalls.startForegroundCall();
   } catch (e) {
     console.warn("[chichat-calls] startForegroundCall failed", e);
+  }
+}
+
+/**
+ * Hides the app like the Home button does. False when this app build can't
+ * (older build without the method, or not the Android app).
+ */
+export async function moveAppToBackground(): Promise<boolean> {
+  if (!isAndroidNative()) return false;
+  try {
+    await ChiChatCalls.moveToBackground();
+    return true;
+  } catch {
+    return false;
   }
 }
 
