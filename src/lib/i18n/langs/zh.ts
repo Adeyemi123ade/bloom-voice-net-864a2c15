@@ -336,6 +336,7 @@ const d: Dictionary = {
   "voice.noSpeech": "此语音消息中未检测到说话内容。",
   "voice.cantDownload": "无法下载此语音消息。请检查网络连接后重试。",
   "voice.toggle": "显示/隐藏文字",
+  "voice.cantTranslate": "无法翻译这条消息。点按图标重试。",
   "voice.transcribe": "转文字",
   "callback.call": "拨打",
   "clip.document": "文档",

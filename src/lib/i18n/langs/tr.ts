@@ -336,6 +336,7 @@ const d: Dictionary = {
   "voice.noSpeech": "Bu sesli mesajda konuşma algılanmadı.",
   "voice.cantDownload": "Bu sesli mesaj indirilemedi. Bağlantınızı kontrol edip tekrar deneyin.",
   "voice.toggle": "Metni göster/gizle",
+  "voice.cantTranslate": "Bu çevrilemedi. Tekrar denemek için simgeye dokun.",
   "voice.transcribe": "Yazıya dök",
   "callback.call": "Ara",
   "clip.document": "Belge",

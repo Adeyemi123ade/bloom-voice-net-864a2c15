@@ -109,11 +109,21 @@ export function VoiceBubble({ id, url, mine }: { id: string; url: string; mine: 
   const [transcript, setTranscript] = useState<string | null>(null);
   const [showTranscript, setShowTranscript] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
-  const { t } = useLanguage();
+  const [translationFailed, setTranslationFailed] = useState(false);
+  const { t, language } = useLanguage();
+
+  // A transcript written for the old language is dropped when the reader
+  // switches language, so the next tap writes it in the new one.
+  useEffect(() => {
+    setTranscript(null);
+    setShowTranscript(false);
+    setTranslationFailed(false);
+  }, [language]);
 
   const onTranscribe = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (transcript) {
+    // Shown again as is, except after a failed translation: that tap retries.
+    if (transcript && !translationFailed) {
       setShowTranscript((v) => !v);
       return;
     }
@@ -135,7 +145,7 @@ export function VoiceBubble({ id, url, mine }: { id: string; url: string; mine: 
           return fetchAudio(await getSignedChatMediaUrl(url));
         }
       };
-      const text = await transcribeVoiceNote(url, download);
+      const { text, translationFailed: failed } = await transcribeVoiceNote(url, download, language);
       if (!text) {
         toast({
           title: t("voice.cantTranscribe"),
@@ -145,6 +155,7 @@ export function VoiceBubble({ id, url, mine }: { id: string; url: string; mine: 
         return;
       }
       setTranscript(text);
+      setTranslationFailed(failed);
       setShowTranscript(true);
     } catch (e) {
       const message = e instanceof Error ? e.message : "";
@@ -203,6 +214,11 @@ export function VoiceBubble({ id, url, mine }: { id: string; url: string; mine: 
           }`}
         >
           {transcript}
+        </p>
+      )}
+      {showTranscript && transcript && translationFailed && (
+        <p className={`mt-1 text-2xs ${mine ? "text-primary-foreground/80" : "text-muted-foreground"}`}>
+          {t("voice.cantTranslate")}
         </p>
       )}
     </div>

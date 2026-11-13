@@ -336,6 +336,7 @@ const d: Dictionary = {
   "voice.noSpeech": "Hakuna maneno yaliyogunduliwa katika ujumbe huu wa sauti.",
   "voice.cantDownload": "Haikuweza kupakua ujumbe huu wa sauti. Angalia muunganisho wako na ujaribu tena.",
   "voice.toggle": "Onyesha/ficha maandishi",
+  "voice.cantTranslate": "Imeshindikana kutafsiri hii. Gusa ikoni ili ujaribu tena.",
   "voice.transcribe": "Nakili kuwa maandishi",
   "callback.call": "Piga",
   "clip.document": "Hati",

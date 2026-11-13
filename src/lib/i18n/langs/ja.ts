@@ -336,6 +336,7 @@ const d: Dictionary = {
   "voice.noSpeech": "このボイスメモでは音声が検出されませんでした。",
   "voice.cantDownload": "このボイスメモをダウンロードできませんでした。接続を確認してもう一度お試しください。",
   "voice.toggle": "文字起こしの表示を切り替え",
+  "voice.cantTranslate": "翻訳できませんでした。アイコンをタップしてもう一度お試しください。",
   "voice.transcribe": "文字起こし",
   "callback.call": "発信",
   "clip.document": "書類",
