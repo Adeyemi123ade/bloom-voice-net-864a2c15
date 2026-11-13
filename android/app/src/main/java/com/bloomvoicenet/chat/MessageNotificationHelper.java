@@ -6,12 +6,15 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
+import android.service.notification.StatusBarNotification;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.Person;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * "New message" notifications when ChiChat isn't on screen. One notification
@@ -22,6 +25,8 @@ public class MessageNotificationHelper {
     static final String CHANNEL_ID = "messages";
     private static final int MAX_LINES = 6;
     private static final Map<String, List<String[]>> pending = new HashMap<>();
+    /** Message ids already shown, so a push delivered twice isn't counted twice. */
+    private static final Set<String> shownIds = new HashSet<>();
 
     static int notificationId(String conversationId) {
         return Math.abs(("msg:" + conversationId).hashCode());
@@ -32,11 +37,16 @@ public class MessageNotificationHelper {
         if (conversationId == null || conversationId.isEmpty()) return;
         String sender = data.get("senderName") == null ? "ChiChat" : data.get("senderName");
         String preview = data.get("preview") == null ? "New message" : data.get("preview");
+        String messageId = data.get("messageId");
+        if (messageId != null && !messageId.isEmpty() && !shownIds.add(messageId)) return;
+        if (shownIds.size() > 500) shownIds.clear();
         createChannel(context);
 
         List<String[]> lines = pending.get(conversationId);
         if (lines == null) {
-            lines = new ArrayList<>();
+            // The app process may have been stopped since the last message:
+            // pick up what that chat's notification on the screen already holds.
+            lines = restoreLines(context, conversationId);
             pending.put(conversationId, lines);
         }
         lines.add(new String[] {sender, preview});
@@ -71,11 +81,46 @@ public class MessageNotificationHelper {
         nm.notify(id, b.build());
     }
 
-    /** The user opened the app: their messages are in front of them now. */
+    private static List<String[]> restoreLines(Context context, String conversationId) {
+        List<String[]> lines = new ArrayList<>();
+        try {
+            NotificationManager nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+            int id = notificationId(conversationId);
+            for (StatusBarNotification sbn : nm.getActiveNotifications()) {
+                if (sbn.getId() != id) continue;
+                NotificationCompat.MessagingStyle old =
+                    NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(sbn.getNotification());
+                if (old == null) break;
+                for (NotificationCompat.MessagingStyle.Message m : old.getMessages()) {
+                    String who = m.getPerson() == null || m.getPerson().getName() == null
+                        ? "ChiChat" : m.getPerson().getName().toString();
+                    lines.add(new String[] {who, String.valueOf(m.getText())});
+                }
+                break;
+            }
+        } catch (Throwable ignored) {
+            // Starting again from this message is fine.
+        }
+        return lines;
+    }
+
+    /**
+     * The user opened the app: their messages are in front of them now. Clears
+     * every message notification on the screen, including ones posted before
+     * the app process last restarted (which the in-memory list no longer knows).
+     */
     static synchronized void clearAll(Context context) {
         NotificationManager nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+        try {
+            for (StatusBarNotification sbn : nm.getActiveNotifications()) {
+                if (CHANNEL_ID.equals(sbn.getNotification().getChannelId())) nm.cancel(sbn.getId());
+            }
+        } catch (Throwable ignored) {
+            // Fall back to the chats this process knows about.
+        }
         for (String conversationId : pending.keySet()) nm.cancel(notificationId(conversationId));
         pending.clear();
+        shownIds.clear();
     }
 
     static void createChannel(Context context) {
