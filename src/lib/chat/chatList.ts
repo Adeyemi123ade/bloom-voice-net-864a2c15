@@ -201,6 +201,9 @@ export function applyNewMessage(rows: ChatRow[], m: MessageLike, myId: string): 
   if (i === -1) return null;
   if (m.deleted_for_everyone) return rows;
   const row = rows[i];
+  // Already in the list (the chat loaded with it, or the same event came twice):
+  // counting it again would leave the badge higher than the real unread count.
+  if (row.last_message_id === m.id) return rows;
   const newer = ms(m.created_at) >= ms(row.last_message_at);
   const next = rows.slice();
   next[i] = {
