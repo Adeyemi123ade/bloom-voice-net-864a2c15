@@ -336,6 +336,7 @@ const d: Dictionary = {
   "voice.noSpeech": "لم يُكتشف أي كلام في هذه الرسالة الصوتية.",
   "voice.cantDownload": "تعذّر تنزيل هذه الرسالة الصوتية. تحقق من اتصالك وحاول مرة أخرى.",
   "voice.toggle": "إظهار/إخفاء النص",
+  "voice.cantTranslate": "تعذرت ترجمة هذا. اضغط على الأيقونة للمحاولة مجددًا.",
   "voice.transcribe": "تحويل إلى نص",
   "callback.call": "اتصال",
   "clip.document": "مستند",

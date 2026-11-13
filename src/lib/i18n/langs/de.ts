@@ -336,6 +336,7 @@ const d: Dictionary = {
   "voice.noSpeech": "In dieser Sprachnachricht wurde keine Sprache erkannt.",
   "voice.cantDownload": "Diese Sprachnachricht konnte nicht geladen werden. Prüfe deine Verbindung und versuche es erneut.",
   "voice.toggle": "Transkript ein-/ausblenden",
+  "voice.cantTranslate": "Das konnte nicht übersetzt werden. Tippe auf das Symbol, um es erneut zu versuchen.",
   "voice.transcribe": "Transkribieren",
   "callback.call": "Anrufen",
   "clip.document": "Dokument",
