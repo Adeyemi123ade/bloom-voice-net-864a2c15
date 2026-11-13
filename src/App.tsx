@@ -12,6 +12,7 @@ import Register from "./pages/Register.tsx";
 import AddPhone from "./pages/AddPhone.tsx";
 import Login from "./pages/Login.tsx";
 import Welcome from "./pages/Welcome.tsx";
+import AppSetup from "./pages/AppSetup.tsx";
 import Home from "./pages/Home.tsx";
 import ChatRoom from "./pages/ChatRoom.tsx";
 import CallRoute from "./pages/CallRoute.tsx";
@@ -96,6 +97,7 @@ const App = () => (
                   <Route path="/login" element={<Login />} />
                   <Route path="/auth/google-return" element={<GoogleReturn />} />
                   <Route path="/welcome" element={<Welcome />} />
+                  <Route path="/setup" element={<AppSetup />} />
                   <Route path="/home" element={<Home />} />
                   <Route path="/chat/:id" element={<ChatRoom />} />
                   <Route path="/call/:id" element={<CallRoute />} />

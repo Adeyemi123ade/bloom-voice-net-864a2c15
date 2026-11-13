@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { CheckCircle2 } from "lucide-react";
 import MobileFrame from "@/components/MobileFrame";
 import { Button } from "@/components/ui/button";
+import { afterRegistrationPath } from "@/lib/callSetup";
 import { useLanguage } from "@/lib/i18n/context";
 
 export default function Welcome() {
@@ -29,7 +30,7 @@ export default function Welcome() {
 
         <div className="absolute bottom-8 left-6 right-6">
           <Button
-            onClick={() => navigate("/home")}
+            onClick={() => navigate(afterRegistrationPath(), { replace: true })}
             className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg"
           >
             {t("wl.continue")}
