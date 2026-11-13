@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { type AppSwitches, changeAppSwitch, readAppSwitches } from "@/lib/appSettings";
 import { useLanguage } from "@/lib/i18n/context";
 import { isAndroidNative } from "@/lib/nativeCalls";
+import { callSetupAskedKey as askedKey } from "@/lib/callSetup";
 
 /**
  * Android app, once per account on this phone, after signing in or
@@ -18,9 +19,8 @@ import { isAndroidNative } from "@/lib/nativeCalls";
  * settings. (Asked for on 2026-10-27, replacing the "no prompt" rule for
  * this one case: calls didn't wake locked phones without these.)
  */
-const askedKey = (userId: string) => `chichat:call-setup-asked:${userId}`;
 
-const QUIET_PATHS = ["/call/", "/login", "/register", "/verify", "/welcome", "/reset-password", "/forgot-password", "/auth/"];
+const QUIET_PATHS = ["/call/", "/login", "/register", "/verify", "/welcome", "/setup", "/reset-password", "/forgot-password", "/auth/"];
 
 function anyCallSwitchOff(s: AppSwitches | null): boolean {
   if (!s) return false;

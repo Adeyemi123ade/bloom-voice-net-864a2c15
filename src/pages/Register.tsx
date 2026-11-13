@@ -27,6 +27,7 @@ import { markVerifyEmailPending, getVerifyEmailPending } from "@/lib/verifyEmail
 import { startGoogleAuth } from "@/lib/googleAuth";
 import { googleErrorText } from "@/lib/googleErrorText";
 import { useLanguage } from "@/lib/i18n/context";
+import { afterRegistrationPath } from "@/lib/callSetup";
 
 const baseSchema = z.object({
   name: z
@@ -246,7 +247,7 @@ export default function Register() {
         return;
       }
       toast({ title: t("reg.welcome") });
-      navigate("/home", { replace: true });
+      navigate(afterRegistrationPath(), { replace: true });
       return;
     }
 
